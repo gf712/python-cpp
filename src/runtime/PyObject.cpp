@@ -1,0 +1,211 @@
+#include "PyObject.hpp"
+
+#include "bytecode/VM.hpp"
+#include "interpreter/Interpreter.hpp"
+
+template<> std::shared_ptr<PyObject> PyObject::from(const std::shared_ptr<PyObject> &value)
+{
+	return value;
+}
+
+template<> std::shared_ptr<PyObject> PyObject::from(const Number &value)
+{
+	return PyObjectNumber::create(value);
+}
+
+template<> std::shared_ptr<PyObject> PyObject::from(const String &value)
+{
+	return PyString::create(value.s);
+}
+
+template<> std::shared_ptr<PyObject> PyObject::from(const Bytes &value)
+{
+	return PyBytes::create(value);
+}
+
+template<> std::shared_ptr<PyObject> PyObject::from(const Ellipsis &)
+{
+	return PyEllipsis::create();
+}
+
+template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
+{
+	return PyNameConstant::create(value);
+}
+
+
+PyObject::PyObject(PyObjectType type) : m_type(type){};
+
+std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
+}
+
+std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
+{
+	return std::visit(
+		[](const auto &value) { return PyString::from(String{ fmt::format("{}", value) }); },
+		m_value.value);
+}
+
+
+std::shared_ptr<PyObject> PyNameConstant::repr_impl(Interpreter &) const
+{
+	if (std::get_if<NoneType>(&m_value.value)) {
+		return PyString::from(String{ "None" });
+	} else {
+		bool bool_value = std::get_if<bool>(&m_value.value);
+		return PyString::from(String{ bool_value ? "True" : "False" });
+	}
+}
+
+
+std::shared_ptr<PyObject> PyObject::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyObject::subtract_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyObject::multiply_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyObject::exp_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for **: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyObject::lshift_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for <<: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+PyCode::PyCode(const size_t pos, std::vector<std::string> args)
+	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_args(std::move(args))
+{
+	// 	m_attributes["co_var"] = PyList::from(m_args);
+}
+
+PyFunction::PyFunction(std::shared_ptr<PyCode> code) : PyObject(PyObjectType::PY_FUNCTION)
+{
+	m_code = std::move(code);
+	// m_attributes["__code__"] = m_code;
+}
+
+
+std::shared_ptr<PyObject> PyObjectNumber::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto rhs = as<PyObjectNumber>(obj)) {
+		return PyObjectNumber::create(m_value + rhs->value());
+	} else {
+		interpreter.raise_exception(
+			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
+	}
+}
+
+
+std::shared_ptr<PyObject> PyString::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto rhs = as<PyString>(obj)) {
+		return PyString::create(m_value + rhs->value());
+	} else {
+		interpreter.raise_exception(
+			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
+	}
+}
+
+std::shared_ptr<PyObject> PyBytes::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+std::shared_ptr<PyObject> PyEllipsis::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyNameConstant::add_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyString> PyString::create(const std::string &value)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyString>(value);
+}
+
+std::shared_ptr<PyObjectNumber> PyObjectNumber::create(const Number &number)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyObjectNumber>(number);
+}
+
+std::shared_ptr<PyBytes> PyBytes::create(const Bytes &value)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyBytes>(value);
+}
+
+std::shared_ptr<PyEllipsis> PyEllipsis::create()
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyEllipsis>();
+}
+
+std::shared_ptr<PyNameConstant> PyNameConstant::create(const NameConstant &value)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyNameConstant>(value);
+}

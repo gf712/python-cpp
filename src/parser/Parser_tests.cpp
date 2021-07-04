@@ -1,0 +1,304 @@
+#include "ast/AST.hpp"
+
+#include "parser/Parser.hpp"
+
+#include "utilities.hpp"
+
+#include "gtest/gtest.h"
+
+using namespace ast;
+
+namespace {
+
+void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected);
+
+void compare_constant(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Constant);
+	const auto result_value = as<Constant>(result)->value();
+	const auto expected_value = as<Constant>(expected)->value();
+
+	ASSERT_EQ(result_value.index(), expected_value.index());
+	std::visit(
+		overloaded{ [&](const Number &number_value) {
+					   if (auto *int_result = std::get_if<int64_t>(&number_value.value)) {
+						   ASSERT_EQ(*int_result,
+							   std::get<int64_t>(std::get<Number>(expected_value).value));
+					   } else if (auto *double_result = std::get_if<double>(&number_value.value)) {
+						   ASSERT_EQ(*double_result,
+							   std::get<double>(std::get<Number>(expected_value).value));
+					   } else {
+						   TODO()
+					   }
+				   },
+			[&](const String &string_value) {
+				ASSERT_EQ(string_value.s, std::get<String>(expected_value).s);
+			},
+			[&](const auto &) {
+				TODO()
+				// ASSERT_EQ(result_, std::get<result_.index()>(expected_));
+			} },
+		result_value);
+}
+
+void compare_assign(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Assign);
+
+	const auto result_targets = as<Assign>(result)->targets();
+	const auto expected_targets = as<Assign>(expected)->targets();
+
+	ASSERT_EQ(result_targets.size(), expected_targets.size());
+	for (size_t i = 0; i < expected_targets.size(); ++i) {
+		dispatch(result_targets[i], expected_targets[i]);
+	}
+
+	const auto result_value = as<Assign>(result)->value();
+	const auto expected_value = as<Assign>(expected)->value();
+
+	dispatch(result_value, expected_value);
+}
+
+void compare_name(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Name);
+
+	const auto result_ids = as<Name>(result)->ids();
+	const auto expected_ids = as<Name>(expected)->ids();
+	ASSERT_EQ(result_ids.size(), expected_ids.size());
+	for (size_t i = 0; i < expected_ids.size(); ++i) { ASSERT_EQ(result_ids[i], expected_ids[i]); }
+
+	ASSERT_EQ(as<Name>(result)->context_type(), as<Name>(expected)->context_type());
+}
+
+void compare_binary_expr(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::BinaryExpr);
+
+	const auto result_lhs = as<BinaryExpr>(result)->lhs();
+	const auto expected_lhs = as<BinaryExpr>(expected)->lhs();
+	dispatch(result_lhs, expected_lhs);
+
+	const auto result_rhs = as<BinaryExpr>(result)->rhs();
+	const auto expected_rhs = as<BinaryExpr>(expected)->rhs();
+	dispatch(result_rhs, expected_rhs);
+
+	const auto result_optype = as<BinaryExpr>(result)->op_type();
+	const auto expected_optype = as<BinaryExpr>(expected)->op_type();
+
+	ASSERT_EQ(result_optype, expected_optype);
+}
+
+
+void compare_function_definition(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::FunctionDefinition);
+
+	const auto result_name = as<FunctionDefinition>(result)->name();
+	const auto expected_name = as<FunctionDefinition>(expected)->name();
+	EXPECT_EQ(result_name, expected_name);
+
+	// const auto result_args = as<FunctionDefinition>(result)->args();
+	// const auto expected_args = as<FunctionDefinition>(expected)->args();
+	// dispatch(result_args, expected_args);
+
+	const auto result_body = as<FunctionDefinition>(result)->body();
+	const auto expected_body = as<FunctionDefinition>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+
+	const auto result_decorator_list = as<FunctionDefinition>(result)->decorator_list();
+	const auto expected_decorator_list = as<FunctionDefinition>(expected)->decorator_list();
+	ASSERT_EQ(result_decorator_list.size(), expected_decorator_list.size());
+	for (size_t i = 0; i < result_decorator_list.size(); ++i) {
+		dispatch(result_decorator_list[i], expected_decorator_list[i]);
+	}
+
+	const auto result_returns = as<FunctionDefinition>(result)->returns();
+	const auto expected_returns = as<FunctionDefinition>(expected)->returns();
+	dispatch(result_returns, expected_returns);
+
+	const auto result_type_comment = as<FunctionDefinition>(result)->type_comment();
+	const auto expected_type_comment = as<FunctionDefinition>(expected)->type_comment();
+	EXPECT_EQ(result_type_comment, expected_type_comment);
+}
+
+
+void compare_return(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Return);
+
+	const auto result_value = as<Return>(result)->value();
+	const auto expected_value = as<Return>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
+void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	if (!expected) {
+		ASSERT_FALSE(result);
+		return;
+	}
+	switch (expected->node_type()) {
+	case ASTNodeType::Constant: {
+		compare_constant(result, expected);
+		break;
+	}
+	case ASTNodeType::Assign: {
+		compare_assign(result, expected);
+		break;
+	}
+	case ASTNodeType::Name: {
+		compare_name(result, expected);
+		break;
+	}
+	case ASTNodeType::BinaryExpr: {
+		compare_binary_expr(result, expected);
+		break;
+	}
+	case ASTNodeType::FunctionDefinition: {
+		compare_function_definition(result, expected);
+		break;
+	}
+	case ASTNodeType::Return: {
+		compare_return(result, expected);
+		break;
+	}
+	default: {
+		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
+		TODO()
+	}
+	}
+}
+
+void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expected_module)
+{
+	Lexer lexer{ std::string(program) };
+	parser::Parser p{ lexer };
+	p.parse();
+
+	size_t i = 0;
+	for (const auto &node : p.module()->body()) {
+		dispatch(node, expected_module->body()[i]);
+		i++;
+	}
+
+	spdlog::set_level(spdlog::level::debug);
+	p.module()->print_node("");
+	expected_module->print_node("");
+	spdlog::set_level(spdlog::level::err);
+}
+}// namespace
+
+TEST(Parser, SimplePositiveIntegerAssignment)
+{
+	constexpr std::string_view program = "a = 2\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<Constant>(static_cast<int64_t>(2)),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SimplePositiveDoubleAssignment)
+{
+	constexpr std::string_view program = "a = 2.0\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<Constant>(static_cast<double>(2.0)),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SimpleStringAssignment)
+{
+	constexpr std::string_view program = "a = \"2\"\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<Constant>("2"),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, BinaryOperationWithAssignment)
+{
+	constexpr std::string_view program = "a = 1 + 2\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+				std::make_shared<Constant>(static_cast<int64_t>(1)),
+				std::make_shared<Constant>(static_cast<int64_t>(2))),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinition)
+{
+	spdlog::set_level(spdlog::level::debug);
+	constexpr std::string_view program =
+		"def add(a, b):\n"
+		"   return a + b\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
+			std::make_shared<Argument>("a", "", ""),
+			std::make_shared<Argument>("b", "", ""),
+		}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+				std::make_shared<Name>("a", Variable::ContextType::LOAD),
+				std::make_shared<Name>("b", Variable::ContextType::LOAD))),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, MultilineFunctionDefinition)
+{
+	spdlog::set_level(spdlog::level::debug);
+	constexpr std::string_view program =
+		"def plus_one(a):\n"
+		"   constant = 1\n"
+		"   return a + constant\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("plus_one",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
+			std::make_shared<Argument>("a", "", ""),
+		}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+										 "constant", Variable::ContextType::STORE) },
+				std::make_shared<Constant>(static_cast<int64_t>(1)),
+				""),
+			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+				std::make_shared<Name>("a", Variable::ContextType::LOAD),
+				std::make_shared<Name>("constant", Variable::ContextType::LOAD))),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+
+	assert_generates_ast(program, expected_ast);
+}

@@ -1,0 +1,323 @@
+#pragma once
+
+#include "forward.hpp"
+#include "ast/AST.hpp"
+#include "parser/Parser.hpp"
+#include "bytecode/VM.hpp"
+#include "utilities.hpp"
+#include "interpreter/Interpreter.hpp"
+
+#include <sstream>
+
+std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+
+
+class Instruction
+{
+  public:
+	virtual ~Instruction() = default;
+	virtual std::string to_string() const = 0;
+	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
+};
+
+
+class LoadConst final : public Instruction
+{
+	Register m_destination;
+	Value m_source;
+
+  public:
+	LoadConst(Register destination, Value source)
+		: m_destination(destination), m_source(std::move(source))
+	{}
+	~LoadConst() override {}
+	std::string to_string() const final
+	{
+		return std::visit(
+			[this](const auto &val) {
+				std::ostringstream os;
+				os << val;
+				return fmt::format("LOAD_CONST      r{:<3} {:<3}", m_destination, os.str());
+			},
+			m_source);
+	}
+	void execute(VirtualMachine &vm, Interpreter &) const final
+	{
+		ASSERT(vm.registers().size() > m_destination)
+		vm.reg(m_destination) = m_source;
+	}
+};
+
+class Store final : public Instruction
+{
+	Register m_destination;
+	Register m_source;
+
+  public:
+	Store(Register destination, Register source) : m_destination(destination), m_source(source) {}
+	~Store() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("STORE           r{:<3}  {:<3}", m_destination, m_source);
+	}
+	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
+};
+
+
+class Add : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Add(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs) {}
+	~Add() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("ADD             r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = add(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+};
+
+
+class Subtract : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Subtract(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs)
+	{}
+	~Subtract() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("SUB             r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = subtract(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+};
+
+class Multiply : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Multiply(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs)
+	{}
+	~Multiply() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("MUL             r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = multiply(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+};
+
+
+class Exp : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Exp(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs) {}
+	~Exp() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("EXP             r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = exp(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+};
+
+
+class LeftShift : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	LeftShift(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs)
+	{}
+	~LeftShift() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("LSHIFT          r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = lshift(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+};
+
+
+class LoadName final : public Instruction
+{
+	Register m_destination;
+	std::string m_object_name;
+
+  public:
+	LoadName(Register destination, std::string object_name)
+		: m_destination(destination), m_object_name(std::move(object_name))
+	{}
+	~LoadName() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("LOAD_NAME       r{:<3} \"{}\"", m_destination, m_object_name);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		auto obj = interpreter.fetch_object(m_object_name);
+		if (!obj) {
+			std::cout << interpreter.execution_frame()->symbol_table()->to_string() << '\n';
+			interpreter.raise_exception("Could not find \"{:s}\"", m_object_name);
+			return;
+		}
+		vm.reg(m_destination) = obj;
+	}
+};
+
+
+class LoadFast final : public Instruction
+{
+	Register m_destination;
+	const size_t m_parameter_index;
+	const std::string m_object_name;
+
+  public:
+	LoadFast(Register destination, size_t parameter_index, std::string object_name)
+		: m_destination(destination), m_parameter_index(parameter_index),
+		  m_object_name(std::move(object_name))
+	{}
+	~LoadFast() override {}
+	std::string to_string() const final
+	{
+		return fmt::format(
+			"LOAD_FAST       r{:<3} {} (\"{}\")", m_destination, m_parameter_index, m_object_name);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		vm.reg(m_destination) = interpreter.execution_frame()->parameter(m_parameter_index);
+	}
+};
+
+class StoreFast final : public Instruction
+{
+	const size_t m_parameter_index;
+	const std::string m_object_name;
+	Register m_src;
+
+  public:
+	StoreFast(size_t parameter_index, std::string object_name, Register src)
+		: m_parameter_index(parameter_index), m_object_name(std::move(object_name)), m_src(src)
+	{}
+	~StoreFast() override {}
+	std::string to_string() const final
+	{
+		return fmt::format(
+			"STORE_FAST       {} (\"{}\") r{:<3}", m_parameter_index, m_object_name, m_src);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		interpreter.execution_frame()->parameter(m_parameter_index) = vm.reg(m_src);
+	}
+};
+
+
+class ReturnValue final : public Instruction
+{
+	Register m_source;
+
+  public:
+	ReturnValue(Register source) : m_source(source) {}
+	~ReturnValue() override {}
+	std::string to_string() const final { return fmt::format("RETURN_VALUE    r{:<3}", m_source); }
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+};
+
+class MakeFunction : public Instruction
+{
+	std::string m_function_name;
+	size_t m_function_id;
+	std::vector<std::string> m_args;
+
+  public:
+	MakeFunction(std::string function_name, size_t function_id, std::vector<std::string> args)
+		: m_function_name(std::move(function_name)), m_function_id(function_id),
+		  m_args(std::move(args))
+	{}
+
+	~MakeFunction() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("MAKE_FUNCTION   {:<3} ({})", m_function_id, m_function_name);
+	}
+	void execute(VirtualMachine &, Interpreter &) const final;
+};
+
+
+class StoreName final : public Instruction
+{
+	std::string m_object_name;
+	Register m_source;
+
+  public:
+	StoreName(std::string object_name, Register source)
+		: m_object_name(std::move(object_name)), m_source(source)
+	{}
+	~StoreName() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+};
