@@ -18,15 +18,32 @@
 // static constexpr std::string_view program =
 // 	"a = 2 * 3 + 4 * 5 * 6\n";
 // static constexpr std::string_view program = "a = 1 + 2 + 5 * 2 << 10 * 2 + 1\n";
-static constexpr std::string_view program =
-	"def add(lhs, rhs):\n"
-	"	lhs = 1\n"
-	"	print(lhs + rhs)\n"
-	"	return lhs + rhs\n"
-	"a = 3\n"
-	"b = 10\n"
-	"c = add(a, b)\n";
+// static constexpr std::string_view program =
+// 	"def add(lhs, rhs):\n"
+// 	"	if lhs > 1:\n"
+// 	"		lhs = 0\n"
+// 	"	elif lhs == 1:\n"
+// 	"		lhs = 10\n"
+// 	"	elif lhs == 2:\n"
+// 	"		lhs = 20\n"
+// 	"	else:\n"
+// 	"		rhs = 3\n"
+// 	"	return lhs + rhs\n"
+// 	"a = 3\n"
+// 	"b = 10\n"
+// 	"c = add(a, b)\n";
 
+static constexpr std::string_view program =
+	"def foo(a):\n"
+	"	if a == 1:\n"
+	"		return 10\n"
+	"	elif a == 2:\n"
+	"		return 0\n"
+	"	else:\n"
+	"		return 5\n"
+	// "a = foo(1)\n"
+	// "b = foo(2)\n"
+	"c = foo(3)\n";
 
 int main()
 {

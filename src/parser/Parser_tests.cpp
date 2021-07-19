@@ -35,7 +35,16 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 			[&](const String &string_value) {
 				ASSERT_EQ(string_value.s, std::get<String>(expected_value).s);
 			},
-			[&](const auto &) {
+			[&](const NameConstant &name_constant_value) {
+				if (auto *bool_result = std::get_if<bool>(&name_constant_value.value)) {
+					ASSERT_EQ(
+						*bool_result, std::get<bool>(std::get<NameConstant>(expected_value).value));
+				} else {
+					TODO()
+				}
+			},
+			[&](const auto &val) {
+				(void)val;
 				TODO()
 				// ASSERT_EQ(result_, std::get<result_.index()>(expected_));
 			} },
@@ -138,6 +147,70 @@ void compare_return(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
+void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::If);
+
+	const auto result_test = as<If>(result)->test();
+	const auto expected_test = as<If>(expected)->test();
+	dispatch(result_test, expected_test);
+
+	const auto result_body = as<If>(result)->body();
+	const auto expected_body = as<If>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < expected_body.size(); ++i) {
+		dispatch(result_body[i], expected_body[i]);
+	}
+
+	const auto result_orelse = as<If>(result)->orelse();
+	const auto expected_orelse = as<If>(expected)->orelse();
+	ASSERT_EQ(result_orelse.size(), expected_orelse.size());
+	for (size_t i = 0; i < result_orelse.size(); ++i) {
+		dispatch(result_orelse[i], expected_orelse[i]);
+	}
+}
+
+void compare_call(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Call);
+
+	const auto result_function = as<Call>(result)->function();
+	const auto expected_function = as<Call>(expected)->function();
+	dispatch(result_function, expected_function);
+
+	const auto result_args = as<Call>(result)->args();
+	const auto expected_args = as<Call>(expected)->args();
+	ASSERT_EQ(result_args.size(), expected_args.size());
+	for (size_t i = 0; i < expected_args.size(); ++i) {
+		dispatch(result_args[i], expected_args[i]);
+	}
+
+	const auto result_keywords = as<Call>(result)->keywords();
+	const auto expected_keywords = as<Call>(expected)->keywords();
+	ASSERT_EQ(result_keywords.size(), expected_keywords.size());
+	for (size_t i = 0; i < result_keywords.size(); ++i) {
+		dispatch(result_keywords[i], expected_keywords[i]);
+	}
+}
+
+void compare_compare(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Compare);
+
+	const auto result_lhs = as<Compare>(result)->lhs();
+	const auto expected_lhs = as<Compare>(expected)->lhs();
+	dispatch(result_lhs, expected_lhs);
+
+	const auto result_op = as<Compare>(result)->op();
+	const auto expected_op = as<Compare>(expected)->op();
+	ASSERT_EQ(result_op, expected_op);
+
+	const auto result_rhs = as<Compare>(result)->rhs();
+	const auto expected_rhs = as<Compare>(expected)->rhs();
+	dispatch(result_rhs, expected_rhs);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -167,6 +240,18 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Return: {
 		compare_return(result, expected);
+		break;
+	}
+	case ASTNodeType::If: {
+		compare_if(result, expected);
+		break;
+	}
+	case ASTNodeType::Call: {
+		compare_call(result, expected);
+		break;
+	}
+	case ASTNodeType::Compare: {
+		compare_compare(result, expected);
 		break;
 	}
 	default: {
@@ -251,7 +336,6 @@ TEST(Parser, BinaryOperationWithAssignment)
 
 TEST(Parser, FunctionDefinition)
 {
-	spdlog::set_level(spdlog::level::debug);
 	constexpr std::string_view program =
 		"def add(a, b):\n"
 		"   return a + b\n";
@@ -276,7 +360,6 @@ TEST(Parser, FunctionDefinition)
 
 TEST(Parser, MultilineFunctionDefinition)
 {
-	spdlog::set_level(spdlog::level::debug);
 	constexpr std::string_view program =
 		"def plus_one(a):\n"
 		"   constant = 1\n"
@@ -298,6 +381,75 @@ TEST(Parser, MultilineFunctionDefinition)
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
 		""// type_comment
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, SimpleIfStatement)
+{
+	constexpr std::string_view program =
+		"if True:\n"
+		"   print(\"Hello, World!\")\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", Variable::ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
+			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+		std::vector<std::shared_ptr<ASTNode>>{}// orelse
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SimpleIfElseStatement)
+{
+	constexpr std::string_view program =
+		"if True:\n"
+		"   print(\"Hello, World!\")\n"
+		"else:\n"
+		"   print(\"Goodbye!\")\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", Variable::ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
+			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Goodbye!") },
+				std::vector<std::shared_ptr<ASTNode>>{}) }// orelse
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, IfStatementWithComparisson)
+{
+	constexpr std::string_view program =
+		"a = 1\n"
+		"if a == 1:\n"
+		"   a = 2\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<Constant>(static_cast<int64_t>(1)),
+			""));
+	expected_ast->emplace(std::make_shared<If>(
+		std::make_shared<Compare>(std::make_shared<Name>("a", Variable::ContextType::LOAD),
+			Compare::OpType::Eq,
+			std::make_shared<Constant>(static_cast<int64_t>(1))),// test
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+										 "a", Variable::ContextType::STORE) },
+				std::make_shared<Constant>(static_cast<int64_t>(2)),
+				"") },// body
+		std::vector<std::shared_ptr<ASTNode>>{}// orelse
 		));
 
 	assert_generates_ast(program, expected_ast);

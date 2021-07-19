@@ -20,4 +20,6 @@ class FunctionCall final : public Instruction
 	}
 
 	void execute(VirtualMachine &, Interpreter &) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };

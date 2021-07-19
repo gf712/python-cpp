@@ -22,8 +22,10 @@ namespace ast {
 	__AST_NODE_TYPE(Assign)             \
 	__AST_NODE_TYPE(BinaryExpr)         \
 	__AST_NODE_TYPE(Call)               \
+	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(FunctionDefinition) \
+	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Return)
@@ -419,6 +421,10 @@ class Call : public ASTNode
 
 	Call(std::shared_ptr<ASTNode> function) : Call(function, {}, {}) {}
 
+	const std::shared_ptr<ASTNode> &function() const { return m_function; }
+	const std::vector<std::shared_ptr<ASTNode>> &args() const { return m_args; }
+	const std::vector<std::shared_ptr<ASTNode>> &keywords() const { return m_keywords; }
+
 	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
@@ -438,10 +444,108 @@ class Module : public ASTNode
   private:
 	void print_this_node(const std::string &indent) const override
 	{
-		spdlog::debug("{}ModuleAST", indent);
+		spdlog::debug("{}Module", indent);
 		spdlog::debug("{}  - body:", indent);
 		std::string new_indent = indent + std::string(6, ' ');
 		for (const auto &el : m_body) { el->print_node(new_indent); }
+	}
+};
+
+
+class If : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_test;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_orelse;
+
+  public:
+	If(std::shared_ptr<ASTNode> test,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ASTNode>> orelse)
+		: ASTNode(ASTNodeType::If), m_test(std::move(test)), m_body(std::move(body)),
+		  m_orelse(std::move(orelse))
+	{}
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+
+	const std::shared_ptr<ASTNode> &test() const { return m_test; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}If", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - test:", indent);
+		m_test->print_node(new_indent);
+		spdlog::debug("{}  - body:", indent);
+		for (const auto &el : m_body) { el->print_node(new_indent); }
+		spdlog::debug("{}  - orelse:", indent);
+		for (const auto &el : m_orelse) { el->print_node(new_indent); }
+	}
+};
+
+#define COMPARE_OPERATIONS \
+	__COMPARE_OP(Eq)       \
+	__COMPARE_OP(NotEq)    \
+	__COMPARE_OP(Lt)       \
+	__COMPARE_OP(LtE)      \
+	__COMPARE_OP(Gt)       \
+	__COMPARE_OP(GtE)      \
+	__COMPARE_OP(Is)       \
+	__COMPARE_OP(IsNot)    \
+	__COMPARE_OP(In)       \
+	__COMPARE_OP(NotIn)
+
+class Compare : public ASTNode
+{
+  public:
+	enum class OpType {
+#define __COMPARE_OP(x) x,
+		COMPARE_OPERATIONS
+#undef __COMPARE_OP
+	};
+
+  private:
+	std::shared_ptr<ASTNode> m_lhs;
+	OpType m_op;
+	std::shared_ptr<ASTNode> m_rhs;
+
+  public:
+	Compare(std::shared_ptr<ASTNode> lhs, OpType op, std::shared_ptr<ASTNode> rhs)
+		: ASTNode(ASTNodeType::Compare), m_lhs(std::move(lhs)), m_op(op), m_rhs(std::move(rhs))
+	{}
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+
+	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
+	OpType op() const { return m_op; }
+	const std::shared_ptr<ASTNode> &rhs() const { return m_rhs; }
+
+  private:
+	std::string_view op_type_to_string(OpType type) const
+	{
+		switch (type) {
+#define __COMPARE_OP(x) \
+	case OpType::x:     \
+		return #x;
+			COMPARE_OPERATIONS
+#undef __COMPARE_OP
+		}
+		ASSERT_NOT_REACHED()
+	}
+
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}Compare", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - lhs:", indent);
+		m_lhs->print_node(new_indent);
+		spdlog::debug("{}  - op: {}", indent, op_type_to_string(m_op));
+		spdlog::debug("{}  - rhs:", indent);
+		m_rhs->print_node(new_indent);
 	}
 };
 

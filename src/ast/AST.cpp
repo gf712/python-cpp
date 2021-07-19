@@ -168,4 +168,48 @@ Register Call::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 	return {};
 }
 
+Register If::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	static size_t if_count = 0;
+
+	ASSERT(!m_body.empty())
+
+	auto orelse_start_label =
+		generator.make_label(fmt::format("ORELSE_{}", if_count++), function_id);
+	auto end_label = generator.make_label(fmt::format("END_{}", if_count), function_id);
+
+	// if
+	const auto test_result_register = m_test->generate(function_id, generator, ctx);
+	generator.emit<JumpIfFalse>(function_id, test_result_register, orelse_start_label);
+	for (const auto &body_statement : m_body) {
+		body_statement->generate(function_id, generator, ctx);
+	}
+	generator.emit<Jump>(function_id, end_label);
+
+	// else
+	generator.bind(orelse_start_label);
+	for (const auto &orelse_statement : m_orelse) {
+		orelse_statement->generate(function_id, generator, ctx);
+	}
+	generator.bind(end_label);
+
+	return {};
+}
+
+Register Compare::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	const auto lhs_reg = m_lhs->generate(function_id, generator, ctx);
+	const auto rhs_reg = m_rhs->generate(function_id, generator, ctx);
+	const auto result_reg = generator.allocate_register();
+
+	switch (m_op) {
+	case OpType::Eq: {
+		generator.emit<Equal>(function_id, result_reg, lhs_reg, rhs_reg);
+	} break;
+	default: {
+		TODO()
+	}
+	}
+	return result_reg;
+}
 }// namespace ast

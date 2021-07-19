@@ -14,7 +14,7 @@ std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &i
 std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-
+std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 class Instruction
 {
@@ -22,6 +22,7 @@ class Instruction
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
 	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
+	virtual void rellocate(BytecodeGenerator &, const std::vector<size_t> &) = 0;
 };
 
 
@@ -50,6 +51,8 @@ class LoadConst final : public Instruction
 		ASSERT(vm.registers().size() > m_destination)
 		vm.reg(m_destination) = m_source;
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class Store final : public Instruction
@@ -65,6 +68,8 @@ class Store final : public Instruction
 		return fmt::format("STORE           r{:<3}  {:<3}", m_destination, m_source);
 	}
 	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -90,6 +95,8 @@ class Add : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -116,6 +123,8 @@ class Subtract : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class Multiply : public Instruction
@@ -141,6 +150,7 @@ class Multiply : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -166,6 +176,8 @@ class Exp : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -192,6 +204,8 @@ class LeftShift : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -220,6 +234,8 @@ class LoadName final : public Instruction
 		}
 		vm.reg(m_destination) = obj;
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -245,6 +261,8 @@ class LoadFast final : public Instruction
 	{
 		vm.reg(m_destination) = interpreter.execution_frame()->parameter(m_parameter_index);
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class StoreFast final : public Instruction
@@ -268,6 +286,8 @@ class StoreFast final : public Instruction
 	{
 		interpreter.execution_frame()->parameter(m_parameter_index) = vm.reg(m_src);
 	}
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -281,6 +301,8 @@ class ReturnValue final : public Instruction
 	std::string to_string() const final { return fmt::format("RETURN_VALUE    r{:<3}", m_source); }
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class MakeFunction : public Instruction
@@ -301,6 +323,8 @@ class MakeFunction : public Instruction
 		return fmt::format("MAKE_FUNCTION   {:<3} ({})", m_function_id, m_function_name);
 	}
 	void execute(VirtualMachine &, Interpreter &) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -313,11 +337,67 @@ class StoreName final : public Instruction
 	StoreName(std::string object_name, Register source)
 		: m_object_name(std::move(object_name)), m_source(source)
 	{}
-	~StoreName() override {}
 	std::string to_string() const final
 	{
 		return fmt::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
 	}
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+
+class JumpIfFalse final : public Instruction
+{
+	Register m_test_register;
+	Label m_label;
+
+  public:
+	JumpIfFalse(Register test_register, Label label)
+		: m_test_register(test_register), m_label(std::move(label))
+	{}
+	std::string to_string() const final
+	{
+		return fmt::format("JUMP_IF_FALSE   position: {}", m_label.position());
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final;
+};
+
+class Jump final : public Instruction
+{
+	Label m_label;
+
+  public:
+	Jump(Label label) : m_label(std::move(label)) {}
+	std::string to_string() const final
+	{
+		return fmt::format("JUMP            position: {}", m_label.position());
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final;
+};
+
+class Equal final : public Instruction
+{
+	Register m_dst;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Equal(Register dst, Register lhs, Register rhs) : m_dst(dst), m_lhs(lhs), m_rhs(rhs) {}
+
+	std::string to_string() const final
+	{
+		return fmt::format("EQUAL            r{:<3} r{:<3} r{:<3}", m_dst, m_lhs, m_rhs);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };

@@ -1,8 +1,11 @@
 #pragma once
 
 #include "forward.hpp"
+#include "utilities.hpp"
+
 #include <vector>
 #include <memory>
+#include <set>
 
 class Bytecode
 {
@@ -21,12 +24,39 @@ class Bytecode
 	const std::vector<std::unique_ptr<Instruction>> &instructions() const { return m_instructions; }
 	const std::vector<std::pair<size_t, std::string>> &functions() const { return m_functions; }
 
-	size_t function_offset(size_t function_id) const
-	{
-		return m_functions[function_id - 1].first;
-	}
+	size_t function_offset(size_t function_id) const { return m_functions[function_id - 1].first; }
 
 	std::string to_string() const;
+};
+
+
+class Label
+{
+	std::string m_label_name;
+	size_t m_function_id;
+	mutable std::optional<size_t> m_position;
+
+  public:
+	Label(std::string name, size_t function_id)
+		: m_label_name(std::move(name)), m_function_id(function_id)
+	{}
+
+	void set_position(size_t position) const { m_position = position; }
+
+	size_t position() const
+	{
+		ASSERT(m_position.has_value());
+		return *m_position;
+	}
+
+	size_t function_id() const { return m_function_id; }
+
+	const std::string &name() const { return m_label_name; }
+
+	bool operator<(const Label &other) const
+	{
+		return (m_label_name < other.name()) || (m_function_id < other.function_id());
+	}
 };
 
 
@@ -37,6 +67,7 @@ class BytecodeGenerator
 
   private:
 	std::vector<std::vector<std::unique_ptr<Instruction>>> m_functions;
+	std::set<Label> m_labels;
 	Register m_register_index{ start_register };
 
   public:
@@ -60,6 +91,30 @@ class BytecodeGenerator
 		return m_functions.at(idx);
 	}
 
+	Label make_label(const std::string &name, size_t function_id)
+	{
+		spdlog::debug("New label to be added: name={} function_id={}", name, function_id);
+		if (auto result = m_labels.emplace(name, function_id); result.second) {
+			return *result.first;
+		}
+		ASSERT_NOT_REACHED()
+	}
+
+	Label label(const Label &l) const
+	{
+		if (auto result = m_labels.find(l); result != m_labels.end()) { return *result; }
+		ASSERT_NOT_REACHED()
+	}
+
+	void bind(Label &label)
+	{
+		if (auto result = m_labels.find(label); result != m_labels.end()) {
+			const size_t current_instruction_position = function(result->function_id()).size();
+			result->set_position(current_instruction_position);
+			return;
+		}
+		ASSERT_NOT_REACHED()
+	}
 
 	size_t register_count() const { return m_register_index; }
 
@@ -68,4 +123,6 @@ class BytecodeGenerator
 
   private:
 	std::shared_ptr<Bytecode> generate_executable();
+	void rellocate_labels(const std::vector<std::unique_ptr<Instruction>> &executable,
+		const std::vector<size_t> &offsets);
 };

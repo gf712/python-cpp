@@ -79,6 +79,8 @@ class PyObject
 	virtual std::shared_ptr<PyObject> lshift_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const;
 
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
 };
@@ -148,13 +150,14 @@ class PyString : public PyObject
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+
 
   private:
 	PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s)) {}
 };
 
-class PyObjectNumber final
-	: public PyObject
+class PyObjectNumber final : public PyObject
 {
 	friend class Heap;
 
@@ -173,12 +176,13 @@ class PyObjectNumber final
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const override;
 
 	const Number &value() const { return m_value; }
 
   private:
-	PyObjectNumber(Number number)
-		: PyObject(PyObjectType::PY_NUMBER), m_value(number)
+	PyObjectNumber(Number number) : PyObject(PyObjectType::PY_NUMBER), m_value(number)
 	{
 		// m_attributes.emplace("__repr__",
 		// 	std::make_shared<PyNativeFunction>([this](const std::shared_ptr<PyObject> &) {
@@ -247,7 +251,7 @@ class PyNameConstant : public PyObject
   public:
 	static std::shared_ptr<PyNameConstant> create(const NameConstant &);
 	~PyNameConstant() = default;
-	std::string to_string() const override { return fmt::format("PyEllipsis"); }
+	std::string to_string() const override;
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
@@ -287,6 +291,14 @@ template<> inline std::shared_ptr<PyObjectNumber> as(std::shared_ptr<PyObject> n
 {
 	if (node->type() == PyObjectType::PY_NUMBER) {
 		return std::static_pointer_cast<PyObjectNumber>(node);
+	}
+	return nullptr;
+}
+
+template<> inline std::shared_ptr<PyNameConstant> as(std::shared_ptr<PyObject> node)
+{
+	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
+		return std::static_pointer_cast<PyNameConstant>(node);
 	}
 	return nullptr;
 }

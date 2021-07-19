@@ -76,6 +76,13 @@ struct Number
 			value,
 			rhs.value);
 	}
+	bool operator==(const Number &rhs) const
+	{
+		return std::visit(
+			[](const auto &lhs_value, const auto &rhs_value) { return lhs_value == rhs_value; },
+			value,
+			rhs.value);
+	}
 };
 
 struct String
@@ -86,6 +93,8 @@ struct String
 		os << s.to_string();
 		return os;
 	}
+
+	bool operator==(const String &rhs) const { return s == rhs.s; }
 
 	std::string to_string() const { return s; }
 };
@@ -104,6 +113,11 @@ struct Bytes
 		for (const auto &byte_ : b) { os << std::to_integer<uint8_t>(byte_); }
 		return os.str();
 	}
+
+	bool operator==(const Bytes &rhs) const
+	{
+		return std::equal(b.begin(), b.end(), rhs.b.begin(), rhs.b.end());
+	}
 };
 
 struct Ellipsis
@@ -114,12 +128,18 @@ struct Ellipsis
 		return os << Ellipsis::ellipsis_repr;
 	}
 
+	bool operator==(const Ellipsis &) const { return true; }
+
 	std::string to_string() const { return std::string(ellipsis_repr); }
 };
 
 struct NoneType
 {
 	friend std::ostream &operator<<(std::ostream &os, const NoneType &) { return os << "None"; }
+
+	bool operator==(const NoneType &) const { return true; }
+
+	template<typename T> bool operator==(T &&) const { return false; }
 
 	std::string to_string() const { return "None"; }
 };
@@ -130,6 +150,14 @@ struct NameConstant
 	friend std::ostream &operator<<(std::ostream &os, const NameConstant &val)
 	{
 		return os << val.to_string();
+	}
+
+	bool operator==(const NoneType &) const { return false; }
+
+	bool operator==(const NameConstant &other) const
+	{
+		return std::visit(
+			[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
 	}
 
 	std::string to_string() const

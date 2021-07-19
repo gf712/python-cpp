@@ -12,7 +12,7 @@
 #include "spdlog/fmt/fmt.h"
 #include "spdlog/spdlog.h"
 
-static constexpr size_t tab_size = 4;
+static constexpr size_t tab_size = 8;
 
 struct Position
 {
@@ -39,32 +39,63 @@ template<> struct fmt::formatter<Position>
 };
 
 
-#define ENUMERATE_TOKENS \
-	__TOKEN(EOF_)        \
-	__TOKEN(ENDMARKER)   \
-	__TOKEN(NAME)        \
-	__TOKEN(OP)          \
-	__TOKEN(INDENT)      \
-	__TOKEN(DEDENT)      \
-	__TOKEN(NEWLINE)     \
-	__TOKEN(NUMBER)      \
-	__TOKEN(RPAREN)      \
-	__TOKEN(LPAREN)      \
-	__TOKEN(COLON)       \
-	__TOKEN(EQUAL)       \
-	__TOKEN(PLUS)        \
-	__TOKEN(MINUS)       \
-	__TOKEN(STAR)        \
-	__TOKEN(DOUBLESTAR)  \
-	__TOKEN(SLASH)       \
-	__TOKEN(LEFTSHIFT)   \
-	__TOKEN(RIGHTSHIFT)  \
-	__TOKEN(LSQB)        \
-	__TOKEN(RSQB)        \
-	__TOKEN(SEMI)        \
-	__TOKEN(COMMA)       \
-	__TOKEN(COLONEQUAL)  \
-	__TOKEN(STRING)
+#define ENUMERATE_TOKENS      \
+	__TOKEN(EOF_)             \
+	__TOKEN(ENDMARKER)        \
+	__TOKEN(NAME)             \
+	__TOKEN(NUMBER)           \
+	__TOKEN(STRING)           \
+	__TOKEN(NEWLINE)          \
+	__TOKEN(INDENT)           \
+	__TOKEN(DEDENT)           \
+	__TOKEN(OP)               \
+	__TOKEN(LPAREN)           \
+	__TOKEN(RPAREN)           \
+	__TOKEN(LSQB)             \
+	__TOKEN(RSQB)             \
+	__TOKEN(COLON)            \
+	__TOKEN(COMMA)            \
+	__TOKEN(SEMI)             \
+	__TOKEN(PLUS)             \
+	__TOKEN(MINUS)            \
+	__TOKEN(STAR)             \
+	__TOKEN(SLASH)            \
+	__TOKEN(VBAR)             \
+	__TOKEN(AMPER)            \
+	__TOKEN(LESS)             \
+	__TOKEN(GREATER)          \
+	__TOKEN(EQUAL)            \
+	__TOKEN(DOT)              \
+	__TOKEN(PERCENT)          \
+	__TOKEN(LBRACE)           \
+	__TOKEN(RBRACE)           \
+	__TOKEN(EQEQUAL)          \
+	__TOKEN(NOTEQUAL)         \
+	__TOKEN(LESSEQUAL)        \
+	__TOKEN(GREATEREQUAL)     \
+	__TOKEN(TILDE)            \
+	__TOKEN(CIRCUMFLEX)       \
+	__TOKEN(LEFTSHIFT)        \
+	__TOKEN(RIGHTSHIFT)       \
+	__TOKEN(DOUBLESTAR)       \
+	__TOKEN(PLUSEQUAL)        \
+	__TOKEN(MINEQUAL)         \
+	__TOKEN(STAREQUAL)        \
+	__TOKEN(SLASHEQUAL)       \
+	__TOKEN(PERCENTEQUAL)     \
+	__TOKEN(AMPEREQUAL)       \
+	__TOKEN(VBAREQUAL)        \
+	__TOKEN(CIRCUMFLEXEQUAL)  \
+	__TOKEN(LEFTSHIFTEQUAL)   \
+	__TOKEN(RIGHTSHIFTEQUAL)  \
+	__TOKEN(DOUBLESTAREQUAL)  \
+	__TOKEN(DOUBLESLASH)      \
+	__TOKEN(DOUBLESLASHEQUAL) \
+	__TOKEN(AT)               \
+	__TOKEN(ATEQUAL)          \
+	__TOKEN(RARROW)           \
+	__TOKEN(ELLIPSIS)         \
+	__TOKEN(COLONEQUAL)
 
 class Token
 {
@@ -85,8 +116,7 @@ class Token
 	};
 
 	Token(TokenType token_type, const Position start, const Position end)
-		: m_token_type(token_type), m_token_exact_type(exact_type_from_token(token_type)),
-		  m_start(start), m_end(end)
+		: m_token_type(token_type), m_token_exact_type(token_type), m_start(start), m_end(end)
 	{}
 
 	TokenType token_type() const { return m_token_type; }
@@ -113,8 +143,7 @@ class Token
 		return os << t.to_string();
 	}
 
-  private:
-	std::string_view stringify_token_type(const TokenType token_type) const
+	static std::string_view stringify_token_type(const TokenType token_type)
 	{
 		switch (token_type) {
 
@@ -126,8 +155,6 @@ class Token
 		}
 		ASSERT_NOT_REACHED()
 	}
-
-	TokenType exact_type_from_token(TokenType token) { return token; }
 };
 
 #undef ENUMERATE_TOKENS
@@ -139,8 +166,7 @@ class Lexer
 	const std::string m_program;
 	size_t m_cursor{ 0 };
 	Position m_position;
-	size_t m_current_indent_level{ 0 };
-	size_t m_current_indent_value{ 0 };
+	std::vector<size_t> m_indent_values;
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -149,7 +175,8 @@ class Lexer
 	Lexer &operator=(Lexer &&) = delete;
 
   public:
-	Lexer(std::string program) : m_program(std::move(program)), m_position({ 0, 0, &m_program[0] })
+	Lexer(std::string program)
+		: m_program(std::move(program)), m_position({ 0, 0, &m_program[0] }), m_indent_values({ 0 })
 	{}
 
 	std::optional<Token> next_token()
@@ -186,9 +213,9 @@ class Lexer
 		if (m_cursor == m_program.size()) {
 			auto original_position = m_position;
 			increment_row_position();
-			while (m_current_indent_level > 0) {
+			while (m_indent_values.size() > 1) {
 				m_tokens_to_emit.emplace_back(Token::TokenType::DEDENT, m_position, m_position);
-				m_current_indent_level--;
+				m_indent_values.pop_back();
 			}
 			m_tokens_to_emit.emplace_back(
 				Token::TokenType::ENDMARKER, original_position, m_position);
@@ -213,17 +240,17 @@ class Lexer
 			const Position original_position = m_position;
 			const auto [indent_value, position_increment] = compute_indent_level();
 			increment_column_position(position_increment);
-			if (indent_value > m_current_indent_value) {
+			if (indent_value > m_indent_values.back()) {
 				m_tokens_to_emit.emplace_back(
 					Token::TokenType::INDENT, original_position, m_position);
-				m_current_indent_level++;
-			} else if (indent_value < m_current_indent_value) {
-				m_tokens_to_emit.emplace_back(
-					Token::TokenType::DEDENT, original_position, m_position);
-				m_current_indent_level--;
-			}
-			if (m_current_indent_value != indent_value) {
-				m_current_indent_value = indent_value;
+				m_indent_values.push_back(indent_value);
+				return true;
+			} else if (indent_value < m_indent_values.back()) {
+				while (indent_value != m_indent_values.back()) {
+					m_tokens_to_emit.emplace_back(
+						Token::TokenType::DEDENT, original_position, m_position);
+					m_indent_values.pop_back();
+				}
 				return true;
 			}
 		}
@@ -287,34 +314,67 @@ class Lexer
 
 	std::optional<Token::TokenType> try_read_operation_with_one_character() const
 	{
-		if (peek(0) == '(')
-			return Token::TokenType::LPAREN;
-		else if (peek(0) == ')')
-			return Token::TokenType::RPAREN;
-		else if (peek(0) == ':')
-			return Token::TokenType::COLON;
-		else if (peek(0) == '=')
-			return Token::TokenType::EQUAL;
-		else if (peek(0) == '+')
-			return Token::TokenType::PLUS;
-		else if (peek(0) == '-')
-			return Token::TokenType::MINUS;
-		else if (peek(0) == '*')
-			return Token::TokenType::STAR;
-		else if (peek(0) == '/')
-			return Token::TokenType::SLASH;
-		else if (peek(0) == ',')
-			return Token::TokenType::COMMA;
+		if (std::isalnum(peek(0))) return {};
+
+		if (peek(0) == '(') return Token::TokenType::LPAREN;
+		if (peek(0) == ')') return Token::TokenType::RPAREN;
+		if (peek(0) == ':') return Token::TokenType::COLON;
+		if (peek(0) == ',') return Token::TokenType::COMMA;
+		if (peek(0) == ';') return Token::TokenType::SEMI;
+		if (peek(0) == '+') return Token::TokenType::PLUS;
+		if (peek(0) == '-') return Token::TokenType::MINUS;
+		if (peek(0) == '*') return Token::TokenType::STAR;
+		if (peek(0) == '/') return Token::TokenType::SLASH;
+		if (peek(0) == '|') return Token::TokenType::VBAR;
+		if (peek(0) == '&') return Token::TokenType::AMPER;
+		if (peek(0) == '<') return Token::TokenType::LESS;
+		if (peek(0) == '>') return Token::TokenType::GREATER;
+		if (peek(0) == '=') return Token::TokenType::EQUAL;
+		if (peek(0) == '.') return Token::TokenType::DOT;
+		if (peek(0) == '%') return Token::TokenType::PERCENT;
+		if (peek(0) == '{') return Token::TokenType::LBRACE;
+		if (peek(0) == '}') return Token::TokenType::RBRACE;
+		if (peek(0) == '~') return Token::TokenType::TILDE;
+		if (peek(0) == '^') return Token::TokenType::CIRCUMFLEX;
+		if (peek(0) == '@') return Token::TokenType::AT;
 		return {};
 	}
 
 	std::optional<Token::TokenType> try_read_operation_with_two_characters() const
 	{
-		if (peek(0) == '*' && peek(1) == '*') return Token::TokenType::DOUBLESTAR;
+		if (std::isalnum(peek(0)) || std::isalnum(peek(1))) return {};
+		if (peek(0) == '=' && peek(1) == '=') return Token::TokenType::EQEQUAL;
+		if (peek(0) == '!' && peek(1) == '=') return Token::TokenType::NOTEQUAL;
+		if (peek(0) == '<' && peek(1) == '=') return Token::TokenType::LESSEQUAL;
+		if (peek(0) == '>' && peek(1) == '=') return Token::TokenType::GREATEREQUAL;
 		if (peek(0) == '<' && peek(1) == '<') return Token::TokenType::LEFTSHIFT;
 		if (peek(0) == '>' && peek(1) == '>') return Token::TokenType::RIGHTSHIFT;
+		if (peek(0) == '*' && peek(1) == '*') return Token::TokenType::DOUBLESTAR;
+		if (peek(0) == '+' && peek(1) == '=') return Token::TokenType::PLUSEQUAL;
+		if (peek(0) == '-' && peek(1) == '=') return Token::TokenType::MINEQUAL;
+		if (peek(0) == '*' && peek(1) == '=') return Token::TokenType::STAREQUAL;
+		if (peek(0) == '%' && peek(1) == '=') return Token::TokenType::PERCENTEQUAL;
+		if (peek(0) == '&' && peek(1) == '=') return Token::TokenType::AMPEREQUAL;
+		if (peek(0) == '|' && peek(1) == '=') return Token::TokenType::VBAREQUAL;
+		if (peek(0) == '^' && peek(1) == '=') return Token::TokenType::CIRCUMFLEXEQUAL;
+		if (peek(0) == '/' && peek(1) == '/') return Token::TokenType::DOUBLESLASH;
 		if (peek(0) == ':' && peek(1) == '=') return Token::TokenType::COLONEQUAL;
+		if (peek(0) == '@' && peek(1) == '=') return Token::TokenType::ATEQUAL;
+		if (peek(0) == '-' && peek(1) == '>') return Token::TokenType::RARROW;
+		return {};
+	}
 
+	std::optional<Token::TokenType> try_read_operation_with_three_characters() const
+	{
+		if (std::isalnum(peek(0)) || std::isalnum(peek(1)) || std::isalnum(peek(2))) return {};
+		if (peek(0) == '<' && peek(1) == '<' && peek(2) == '=')
+			return Token::TokenType::LEFTSHIFTEQUAL;
+		if (peek(0) == '>' && peek(1) == '>' && peek(2) == '=')
+			return Token::TokenType::RIGHTSHIFTEQUAL;
+		if (peek(0) == '*' && peek(1) == '*' && peek(2) == '=')
+			return Token::TokenType::DOUBLESTAREQUAL;
+		if (peek(0) == '/' && peek(1) == '/' && peek(2) == '=')
+			return Token::TokenType::DOUBLESLASHEQUAL;
 		return {};
 	}
 
@@ -409,9 +469,7 @@ class Lexer
 
 	template<typename ConditionType> bool advance_if(ConditionType &&condition)
 	{
-		if (!condition(m_program[m_cursor])) {
-			return false;
-		}
+		if (!condition(m_program[m_cursor])) { return false; }
 		increment_column_position(1);
 		return true;
 	}

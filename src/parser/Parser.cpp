@@ -17,7 +17,7 @@ template<typename Derived> struct Pattern
 		const auto start_position = p.token_position();
 		const bool is_match = Derived::matches_impl(p);
 		if (!is_match) {
-			while (p.stack().size() > start_stack_size) { p.pop_stack(); }
+			while (p.stack().size() > start_stack_size) { p.pop_back(); }
 			p.token_position() = start_position;
 		}
 		return is_match;
@@ -69,7 +69,7 @@ template<typename... PatternType> class PatternMatch
 		const auto start_stack_size = p.stack().size();
 		const bool is_match = PatternMatch_<0, std::tuple<PatternType...>>::match(p);
 		if (!is_match) {
-			while (p.stack().size() > start_stack_size) { p.pop_stack(); }
+			while (p.stack().size() > start_stack_size) { p.pop_back(); }
 			p.token_position() = start_token_position;
 		}
 		return is_match;
@@ -483,8 +483,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			for (size_t i = original_stack_size; i < stack_size; ++i) {
 				args.push_back(p.stack()[i]);
 			}
-			for (size_t i = original_stack_size; i < stack_size; ++i) { p.pop_stack(); }
-			auto function = p.pop_stack();
+			for (size_t i = original_stack_size; i < stack_size; ++i) { p.pop_back(); }
+			auto function = p.pop_back();
 			p.push_to_stack(std::make_shared<Call>(function, args, kwargs));
 			p.print_stack();
 			return true;
@@ -499,7 +499,9 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::LEFTSHIFT,
 			Token::TokenType::RIGHTSHIFT,
 			Token::TokenType::COMMA,
-			Token::TokenType::RPAREN>>>;
+			Token::TokenType::RPAREN,
+			Token::TokenType::COLON,
+			Token::TokenType::EQEQUAL>>>;
 		if (pattern5::match(p)) { return true; }
 		return false;
 	}
@@ -557,8 +559,8 @@ struct PowerPattern : Pattern<PowerPattern>
 			SingleTokenPattern<Token::TokenType::DOUBLESTAR>,
 			FactorPattern>;
 		if (pattern1::match(p)) {
-			auto rhs = p.pop_stack();
-			auto lhs = p.pop_stack();
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::EXP, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
@@ -611,8 +613,8 @@ struct TermPattern_ : Pattern<TermPattern_>
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
 		if (pattern1::match(p)) {
-			auto rhs = p.pop_stack();
-			auto lhs = p.pop_stack();
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::MULTIPLY, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
@@ -671,8 +673,8 @@ struct SumPattern_ : Pattern<SumPattern_>
 		if (pattern1::match(p)) {
 			spdlog::debug("'+' term sum'");
 			p.print_stack();
-			auto rhs = p.pop_stack();
-			auto lhs = p.pop_stack();
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS, lhs, rhs);
 			p.push_to_stack(binary_op);
 			p.print_stack();
@@ -684,8 +686,8 @@ struct SumPattern_ : Pattern<SumPattern_>
 			PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, TermPattern, SumPattern_>;
 		if (pattern2::match(p)) {
 			spdlog::debug("'-' term sum'");
-			auto rhs = p.pop_stack();
-			auto lhs = p.pop_stack();
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
 			if (auto rhs_binop = as<BinaryExpr>(rhs)) {
 				auto node = std::static_pointer_cast<ASTNode>(rhs_binop);
 				auto binary_op =
@@ -704,7 +706,10 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::LEFTSHIFT,
 			Token::TokenType::RIGHTSHIFT,
 			Token::TokenType::COMMA,
-			Token::TokenType::RPAREN>>>;
+			Token::TokenType::RPAREN,
+			Token::TokenType::NAME,
+			Token::TokenType::COLON,
+			Token::TokenType::EQEQUAL>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}
@@ -747,8 +752,8 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			SumPattern,
 			ShiftExprPattern_>;
 		if (pattern1::match(p)) {
-			auto rhs = p.pop_stack();
-			auto lhs = p.pop_stack();
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::LEFTSHIFT, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
@@ -764,7 +769,10 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 		using pattern3 = PatternMatch<LookAhead<SingleTokenPattern<Token::TokenType::NEWLINE,
 			Token::TokenType::NUMBER,
 			Token::TokenType::COMMA,
-			Token::TokenType::RPAREN>>>;
+			Token::TokenType::RPAREN,
+			Token::TokenType::NAME,
+			Token::TokenType::COLON,
+			Token::TokenType::EQEQUAL>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}
@@ -841,6 +849,52 @@ struct BitwiseOrPattern : Pattern<BitwiseOrPattern>
 	}
 };
 
+struct EqBitwiseOrPattern : Pattern<EqBitwiseOrPattern>
+{
+	// eq_bitwise_or: '==' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::EQEQUAL>, BitwiseOrPattern>;
+		spdlog::debug("EqBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'==' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto eq_comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Eq, rhs);
+			p.push_to_stack(eq_comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct CompareOpBitwiseOrPairPattern : Pattern<CompareOpBitwiseOrPairPattern>
+{
+	// compare_op_bitwise_or_pair:
+	//     | eq_bitwise_or
+	//     | noteq_bitwise_or
+	//     | lte_bitwise_or
+	//     | lt_bitwise_or
+	//     | gte_bitwise_or
+	//     | gt_bitwise_or
+	//     | notin_bitwise_or
+	//     | in_bitwise_or
+	//     | isnot_bitwise_or
+	//     | is_bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("CompareOpBitwiseOrPairPattern");
+		// eq_bitwise_or
+		using pattern1 = PatternMatch<EqBitwiseOrPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("eq_bitwise_or");
+			return true;
+		}
+		return false;
+	}
+};
+
 
 struct ComparissonPattern : Pattern<ComparissonPattern>
 {
@@ -851,9 +905,20 @@ struct ComparissonPattern : Pattern<ComparissonPattern>
 	{
 		spdlog::debug("ComparissonPattern");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		// bitwise_or compare_op_bitwise_or_pair+
+		using pattern1 =
+			PatternMatch<BitwiseOrPattern, OneOrMorePattern<CompareOpBitwiseOrPairPattern>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("bitwise_or compare_op_bitwise_or_pair+");
+			return true;
+		}
+
 		// bitwise_or
 		using pattern2 = PatternMatch<BitwiseOrPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			spdlog::debug("bitwise_or");
+			return true;
+		}
 
 		return false;
 	}
@@ -980,12 +1045,12 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 			spdlog::debug(
 				"(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
 			std::vector<std::shared_ptr<Variable>> targets;
-			auto expressions = p.pop_stack();
+			auto expressions = p.pop_back();
 			const auto &stack = p.stack();
 			for (size_t i = start_position; i < stack.size(); ++i) {
 				targets.push_back(std::static_pointer_cast<Variable>(stack[i]));
 			}
-			while (p.stack().size() > start_position) { p.pop_stack(); }
+			while (p.stack().size() > start_position) { p.pop_back(); }
 			p.print_stack();
 			auto assignment = std::make_shared<Assign>(targets, expressions, "");
 			p.push_to_stack(assignment);
@@ -1011,7 +1076,7 @@ struct ReturnStatementPattern : Pattern<ReturnStatementPattern>
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ReturnPattern>,
 				ZeroOrMorePattern<StarExpressionsPattern>>;
 		if (pattern1::match(p)) {
-			const auto &return_value = p.pop_stack();
+			const auto &return_value = p.pop_back();
 			auto return_node = std::make_shared<Return>(return_value);
 			p.push_to_stack(return_node);
 			return true;
@@ -1112,7 +1177,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 		using pattern1 = PatternMatch<ParamPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("param ',' TYPE_COMMENT?");
-			auto arg = p.pop_stack();
+			auto arg = p.pop_back();
 			auto args = p.stack().back();
 			ASSERT(as<Arguments>(args));
 			ASSERT(as<Argument>(arg));
@@ -1126,7 +1191,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 			PatternMatch<ParamPattern, LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
 		if (pattern2::match(p)) {
 			spdlog::debug("param TYPE_COMMENT? &')'");
-			auto arg = p.pop_stack();
+			auto arg = p.pop_back();
 			auto args = p.stack().back();
 			ASSERT(as<Arguments>(args));
 			ASSERT(as<Argument>(arg));
@@ -1191,8 +1256,10 @@ struct BlockPattern : Pattern<BlockPattern>
 			StatementsPattern,
 			SingleTokenPattern<Token::TokenType::DEDENT>>;
 		if (pattern1::match(p)) {
+			spdlog::set_level(spdlog::level::debug);
 			spdlog::debug("NEWLINE INDENT statements DEDENT");
-			for (const auto &node : p.statements()) { node->print_node(""); }
+			for (const auto &node : p.stack()) { node->print_node(""); }
+			spdlog::set_level(spdlog::level::info);
 			return true;
 		}
 
@@ -1255,25 +1322,33 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 	//     block
 	static bool matches_impl(Parser &p)
 	{
-		// function_def_raw
+		BlockScope scope{ p };
+
+		// | function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern, BlockPattern>;
 		if (pattern1::match(p)) {
 			spdlog::debug("function_def_raw: function_def block");
-			auto args = p.pop_stack();
-			auto name = p.pop_stack();
+			auto name = p.pop_front();
+			auto args = p.pop_front();
 			args->print_node("");
 			name->print_node("");
+
+			std::vector<std::shared_ptr<ASTNode>> body;
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
 
 			ASSERT(as<Constant>(name));
 			ASSERT(as<Arguments>(args));
 			auto function = std::make_shared<FunctionDefinition>(
 				std::get<String>(as<Constant>(name)->value()).s,
 				as<Arguments>(args),
-				std::move(p.statements()),
+				body,
 				std::vector<std::shared_ptr<ASTNode>>{},
 				nullptr,
 				"");
-			p.push_to_stack(function);
+			scope.parent().push_back(function);
+			spdlog::set_level(spdlog::level::debug);
+			function->print_node("");
+			spdlog::set_level(spdlog::level::info);
 			return true;
 		}
 		return false;
@@ -1281,7 +1356,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 };
 
 
-struct FunctionDefinitionStatement : Pattern<FunctionDefinitionStatement>
+struct FunctionDefinitionStatementPattern : Pattern<FunctionDefinitionStatementPattern>
 {
 	// function_def:
 	//     | decorators function_def_raw
@@ -1292,6 +1367,115 @@ struct FunctionDefinitionStatement : Pattern<FunctionDefinitionStatement>
 		using pattern2 = PatternMatch<FunctionDefinitionRawStatement>;
 		if (pattern2::match(p)) {
 			spdlog::debug("function_def_raw");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct IfPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "if"; }
+};
+
+
+struct ElifPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "elif"; }
+};
+
+struct ElsePattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "else"; }
+};
+
+
+struct ElseBlockStatementPattern : Pattern<ElseBlockStatementPattern>
+{
+	// else_block: 'else' ':' block
+	static bool matches_impl(Parser &p)
+	{
+		// else_block: 'else' ':' block
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElsePattern>,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("else_block: 'else' ':' block");
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct ElifStatementPattern : Pattern<ElifStatementPattern>
+{
+	// elif_stmt:
+	//     | 'elif' named_expression ':' block elif_stmt
+	//     | 'elif' named_expression ':' block [else_block]
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		// 'elif' named_expression ':' block
+		using pattern0 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElifPattern>,
+				NamedExpressionPattern,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern0::match(p)) {
+			spdlog::debug("'if' named_expression ':' block");
+			std::vector<std::shared_ptr<ASTNode>> orelse;
+			std::vector<std::shared_ptr<ASTNode>> body;
+			{
+				BlockScope inner_scope{ p };
+				using pattern1 = PatternMatch<ElifStatementPattern>;
+				if (pattern1::match(p)) { spdlog::debug("elif_stmt"); }
+				using pattern2 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
+				if (pattern2::match(p)) { spdlog::debug("[else_block]"); }
+				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
+			}
+			auto test = p.pop_front();
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<If>(test, body, orelse));
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct IfStatementPattern : Pattern<IfStatementPattern>
+{
+	// if_stmt:
+	//     | 'if' named_expression ':' block elif_stmt
+	//     | 'if' named_expression ':' block [else_block]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("IfStatementPattern");
+		BlockScope scope{ p };
+
+		// 'if' named_expression ':' block
+		using pattern0 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfPattern>,
+				NamedExpressionPattern,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern0::match(p)) {
+			spdlog::debug("'if' named_expression ':' block");
+			std::vector<std::shared_ptr<ASTNode>> orelse;
+			std::vector<std::shared_ptr<ASTNode>> body;
+			{
+				BlockScope inner_scope{ p };
+				using pattern1 = PatternMatch<ElifStatementPattern>;
+				if (pattern1::match(p)) { spdlog::debug("elif_stmt"); }
+				using pattern2 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
+				if (pattern2::match(p)) { spdlog::debug("[else_block]"); }
+				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
+			}
+			auto test = p.pop_front();
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<If>(test, body, orelse));
 			return true;
 		}
 		return false;
@@ -1312,9 +1496,16 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 	static bool matches_impl(Parser &p)
 	{
 		// function_def
-		using pattern1 = PatternMatch<FunctionDefinitionStatement>;
+		using pattern1 = PatternMatch<FunctionDefinitionStatementPattern>;
 		if (pattern1::match(p)) {
 			spdlog::debug("function_def");
+			p.print_stack();
+			return true;
+		}
+		// if_stmt
+		using pattern2 = PatternMatch<IfStatementPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("if_stmt");
 			p.print_stack();
 			return true;
 		}
@@ -1350,11 +1541,7 @@ struct StatementsPattern : Pattern<StatementsPattern>
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 = PatternMatch<StatementPattern>;
-		while (pattern1::match(p)) {
-			p.statements().push_back(p.pop_stack());
-			p.statements().back()->print_node("");
-			p.commit();
-		}
+		while (pattern1::match(p)) { p.commit(); }
 		return true;
 	}
 };
@@ -1364,10 +1551,11 @@ struct FilePattern : Pattern<FilePattern>
 	// file: [statements] ENDMARKER
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
 		using pattern1 =
 			PatternMatch<StatementsPattern, SingleTokenPattern<Token::TokenType::ENDMARKER>>;
 		if (pattern1::match(p)) {
-			for (const auto &node : p.statements()) { p.module()->emplace(node); }
+			for (auto &&node : p.stack()) { p.module()->emplace(std::move(node)); }
 			return true;
 		}
 		PARSER_ERROR();

@@ -17,11 +17,12 @@ void assert_generates_tokens(std::string_view program,
 	const auto tokens = generate_tokens(program);
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
-		ASSERT_EQ(expected_tokens[i], tokens[i].token_type());
+		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
+			<< fmt::format("Expected {}, but got {}",
+				   Token::stringify_token_type(expected_tokens[i]),
+				   Token::stringify_token_type(tokens[i].token_type()));
 	}
 }
-
-
 }// namespace
 
 TEST(Lexer, SimpleNumericAssignment)
@@ -189,6 +190,46 @@ TEST(Lexer, DoubleNestedIndentationAtProgramEnd)
 	assert_generates_tokens(program, expected_tokens);
 }
 
+TEST(Lexer, IfStatementEqualityCheck)
+{
+	constexpr std::string_view program =
+		"a = 1\n"
+		"if a == 1:\n"
+		"  a = 2\n"
+		"else:\n"
+		"  a = 3\n";
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::EQEQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::ENDMARKER,
+	};
+	assert_generates_tokens(program, expected_tokens);
+}
+
+
 TEST(Lexer, FunctionWithUnderscoreDefinition)
 {
 	constexpr std::string_view program =
@@ -213,6 +254,54 @@ TEST(Lexer, FunctionWithUnderscoreDefinition)
 		Token::TokenType::NAME,
 		Token::TokenType::NEWLINE,
 		Token::TokenType::DEDENT,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, FunctionWithIfElseReturn)
+{
+	constexpr std::string_view program =
+		"def foo(a):\n"
+		"	if a == 1:\n"
+		"		return 10\n"
+		"	else:\n"
+		"		return 2\n"
+		"a = foo(1)\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NAME,
+		Token::TokenType::RPAREN,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::EQEQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::DEDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NUMBER,
+		Token::TokenType::RPAREN,
+		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
 }

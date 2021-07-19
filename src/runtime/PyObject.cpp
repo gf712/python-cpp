@@ -41,6 +41,12 @@ std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
 	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
 }
 
+std::shared_ptr<PyObject> PyString::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ m_value });
+}
+
+
 std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
 {
 	return std::visit(
@@ -49,14 +55,19 @@ std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
 }
 
 
-std::shared_ptr<PyObject> PyNameConstant::repr_impl(Interpreter &) const
+std::string PyNameConstant::to_string() const
 {
 	if (std::get_if<NoneType>(&m_value.value)) {
-		return PyString::from(String{ "None" });
+		return "None";
 	} else {
 		bool bool_value = std::get_if<bool>(&m_value.value);
-		return PyString::from(String{ bool_value ? "True" : "False" });
+		return bool_value ? "True" : "False";
 	}
+}
+
+std::shared_ptr<PyObject> PyNameConstant::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ to_string() });
 }
 
 
@@ -108,6 +119,27 @@ std::shared_ptr<PyObject> PyObject::lshift_impl(const std::shared_ptr<PyObject> 
 		object_name(obj->type()));
 	return nullptr;
 }
+
+std::shared_ptr<PyObject> PyObject::equal_impl(const std::shared_ptr<PyObject> &,
+	Interpreter &) const
+{
+	return PyObject::from(NameConstant{ false });
+}
+
+std::shared_ptr<PyObject> PyObjectNumber::equal_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto pynum = as<PyObjectNumber>(obj)) {
+		const bool comparisson = m_value == pynum->value();
+		return PyObject::from(NameConstant{ comparisson });
+	}
+
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for ==: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
 
 PyCode::PyCode(const size_t pos, std::vector<std::string> args)
 	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_args(std::move(args))

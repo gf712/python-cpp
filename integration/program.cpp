@@ -11,9 +11,9 @@ void run(std::string_view program)
 	Lexer lexer{ std::string(program) };
 	parser::Parser p{ lexer };
 	p.parse();
-	// spdlog::set_level(spdlog::level::debug);
-	// p.module()->print_node("");
-	// spdlog::set_level(spdlog::level::critical);
+	spdlog::set_level(spdlog::level::debug);
+	p.module()->print_node("");
+	spdlog::set_level(spdlog::level::info);
 	auto bytecode = BytecodeGenerator::compile(p.module());
 	ASSERT_FALSE(bytecode->instructions().empty());
 	auto &vm = VirtualMachine::the();
@@ -23,7 +23,7 @@ void run(std::string_view program)
 	vm.execute();
 	spdlog::set_level(spdlog::level::debug);
 	vm.dump();
-	spdlog::set_level(spdlog::level::critical);
+	spdlog::set_level(spdlog::level::info);
 }
 
 
@@ -195,4 +195,99 @@ TEST(RunPythonProgram, FunctionArgAssignment)
 		"c = plus_one(10)\n";
 	run(program);
 	assert_interpreter_object_value("c", 11);
+}
+
+TEST(RunPythonProgram, IfBlockAssignmentInBody)
+{
+	constexpr std::string_view program =
+		"if True:\n"
+		"	a = 1\n"
+		"else:\n"
+		"	a = 2\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 1);
+}
+
+TEST(RunPythonProgram, IfBlockAssignmentInOrElse)
+{
+	constexpr std::string_view program =
+		"if None:\n"
+		"	a = 1\n"
+		"else:\n"
+		"	a = 2\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 2);
+}
+
+
+TEST(RunPythonProgram, FunctionWithIfElseAssignment)
+{
+	static constexpr std::string_view program =
+		"def foo(a):\n"
+		"	if a == 1:\n"
+		"		result = 10\n"
+		"	else:\n"
+		"		result = 2\n"
+		"	return result\n"
+		"a = foo(1)\n"
+		"b = foo(5)\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 10);
+	assert_interpreter_object_value("b", 2);
+}
+
+
+TEST(RunPythonProgram, FunctionWithIfElseReturn)
+{
+	static constexpr std::string_view program =
+		"def foo(a):\n"
+		"	if a == 1:\n"
+		"		return 10\n"
+		"	else:\n"
+		"		return 2\n"
+		"a = foo(1)\n"
+		"b = foo(5)\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 10);
+	assert_interpreter_object_value("b", 2);
+}
+
+TEST(RunPythonProgram, IfElifElseInModuleSpace)
+{
+	static constexpr std::string_view program1 =
+		"a = 0\n"
+		"if a == 1:\n"
+		"	a = 0\n"
+		"elif a == 2:\n"
+		"	a = 2\n"
+		"else:\n"
+		"	a = 3\n";
+	run(program1);
+	assert_interpreter_object_value("a", 3);
+
+	static constexpr std::string_view program2 =
+		"a = 1\n"
+		"if a == 1:\n"
+		"	a = 0\n"
+		"elif a == 2:\n"
+		"	a = 2\n"
+		"else:\n"
+		"	a = 3\n";
+	run(program2);
+	assert_interpreter_object_value("a", 0);
+
+	static constexpr std::string_view program3 =
+		"a = 2\n"
+		"if a == 1:\n"
+		"	a = 0\n"
+		"elif a == 2:\n"
+		"	a = 5\n"
+		"else:\n"
+		"	a = 3\n";
+	run(program3);
+	assert_interpreter_object_value("a", 5);
 }
