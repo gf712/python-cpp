@@ -160,6 +160,31 @@ struct ZeroOrOnePattern : Pattern<ZeroOrOnePattern<PatternTypes...>>
 	}
 };
 
+template<size_t TypeIdx, typename PatternTuple> struct GroupPattern_
+{
+	static bool match(Parser &p)
+	{
+		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
+			return std::tuple_element_t<TypeIdx, PatternTuple>::matches(p);
+		} else {
+			if (std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
+				return true;
+			} else {
+				return GroupPattern_<TypeIdx + 1, PatternTuple>::match(p);
+			}
+		}
+	}
+};
+
+
+template<typename... PatternTypes> struct GroupPattern : Pattern<GroupPattern<PatternTypes...>>
+{
+	static bool matches_impl(Parser &p)
+	{
+		return GroupPattern_<0, std::tuple<PatternTypes...>>::match(p);
+	}
+};
+
 
 template<typename PatternsType> struct SingleTokenPattern_
 {
@@ -329,6 +354,67 @@ struct StringPattern : Pattern<StringPattern>
 	}
 };
 
+struct BitwiseOrPattern;
+struct NamedExpressionPattern;
+
+struct StarNamedExpression : Pattern<StarNamedExpression>
+{
+	// star_named_expression:
+	// | '*' bitwise_or
+	// | named_expression
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, BitwiseOrPattern>;
+		if (pattern1::match(p)) { return true; }
+
+		using pattern2 = PatternMatch<NamedExpressionPattern>;
+		if (pattern2::match(p)) { return true; }
+
+		return false;
+	}
+};
+
+struct StarNamedExpressions : Pattern<StarNamedExpressions>
+{
+	// star_named_expressions: ','.star_named_expression+ [',']
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("star_named_expressions");
+		using pattern1 = PatternMatch<
+			ApplyInBetweenPattern<StarNamedExpression, SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+
+		if (pattern1::match(p)) { return true; }
+
+		return false;
+	}
+};
+
+struct ListPattern : Pattern<ListPattern>
+{
+	// list: '[' [star_named_expressions] ']'
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope list_scope{ p };
+		spdlog::debug("list");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
+			ZeroOrMorePattern<StarNamedExpressions>,
+			SingleTokenPattern<Token::TokenType::RSQB>>;
+		if (pattern1::match(p)) {
+			auto list = std::make_shared<List>(List::ContextType::LOAD);
+			while (!p.stack().empty()) { list->append(p.pop_front()); }
+			list_scope.parent().push_back(std::move(list));
+			return true;
+		}
+		return false;
+	}
+};
+
+struct ListCompPattern : Pattern<ListCompPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
 struct AtomPattern : Pattern<AtomPattern>
 {
 	// atom:
@@ -390,6 +476,14 @@ struct AtomPattern : Pattern<AtomPattern>
 
 			return true;
 		}
+
+		// 	| (list | listcomp)
+		using pattern9 = PatternMatch<GroupPattern<ListPattern, ListCompPattern>>;
+		if (pattern9::match(p)) {
+			spdlog::debug("(list | listcomp)");
+			return true;
+		}
+
 		return false;
 	}
 };
@@ -501,7 +595,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::COMMA,
 			Token::TokenType::RPAREN,
 			Token::TokenType::COLON,
-			Token::TokenType::EQEQUAL>>>;
+			Token::TokenType::EQEQUAL,
+			Token::TokenType::RSQB>>>;
 		if (pattern5::match(p)) { return true; }
 		return false;
 	}
@@ -709,7 +804,8 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::RPAREN,
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
-			Token::TokenType::EQEQUAL>>>;
+			Token::TokenType::EQEQUAL,
+			Token::TokenType::RSQB>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}
@@ -772,7 +868,8 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::RPAREN,
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
-			Token::TokenType::EQEQUAL>>>;
+			Token::TokenType::EQEQUAL,
+			Token::TokenType::RSQB>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}

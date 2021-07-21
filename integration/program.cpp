@@ -27,11 +27,16 @@ void run(std::string_view program)
 }
 
 
-template<typename T> void assert_interpreter_object_value(std::string name, T expected_value)
+template<typename T> struct is_vector : std::false_type
 {
-	auto &vm = VirtualMachine::the();
-	auto obj = vm.interpreter()->fetch_object(name);
-	ASSERT_TRUE(obj);
+};
+
+template<typename T> struct is_vector<std::vector<T>> : std::true_type
+{
+};
+
+template<typename T> void check_value(std::shared_ptr<PyObject> obj, T expected_value)
+{
 	if constexpr (std::is_integral_v<T>) {
 		ASSERT_EQ(obj->type(), PyObjectType::PY_NUMBER);
 		auto pynum = as<PyObjectNumber>(obj);
@@ -43,10 +48,34 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 		ASSERT_TRUE(pystring);
 		ASSERT_EQ(pystring->value(), expected_value);
 	} else {
-		ASSERT_TRUE(false);
+		TODO()
 	}
 }
 
+template<typename T> void assert_interpreter_object_value(std::string name, T expected_value)
+{
+	auto &vm = VirtualMachine::the();
+	auto obj = vm.interpreter()->fetch_object(name);
+	ASSERT_TRUE(obj);
+	if constexpr (is_vector<T>{}) {
+		ASSERT_EQ(obj->type(), PyObjectType::PY_LIST);
+		auto pylist = as<PyList>(obj);
+		ASSERT_TRUE(pylist);
+		size_t i = 0;
+		for (const auto &el : pylist->elements()) {
+			std::visit(overloaded{ [&](const std::shared_ptr<PyObject> &obj) {
+									  check_value(obj, expected_value[i]);
+								  },
+						   [&](const auto &value) {
+							   check_value(PyObject::from(value), expected_value[i]);
+						   } },
+				el);
+			i++;
+		}
+	} else {
+		check_value(obj, expected_value);
+	}
+}
 
 TEST(RunPythonProgram, SimpleAssignment)
 {
@@ -290,4 +319,13 @@ TEST(RunPythonProgram, IfElifElseInModuleSpace)
 		"	a = 3\n";
 	run(program3);
 	assert_interpreter_object_value("a", 5);
+}
+
+
+TEST(RunPythonProgram, BuildListLiteralWithValues)
+{
+	static constexpr std::string_view program = "a = [1,2,3,5]\n";
+
+	run(program);
+	assert_interpreter_object_value("a", std::vector<int64_t>{ 1, 2, 3, 5 });
 }

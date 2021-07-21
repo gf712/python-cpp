@@ -318,6 +318,8 @@ class Lexer
 
 		if (peek(0) == '(') return Token::TokenType::LPAREN;
 		if (peek(0) == ')') return Token::TokenType::RPAREN;
+		if (peek(0) == '[') return Token::TokenType::LSQB;
+		if (peek(0) == ']') return Token::TokenType::RSQB;
 		if (peek(0) == ':') return Token::TokenType::COLON;
 		if (peek(0) == ',') return Token::TokenType::COMMA;
 		if (peek(0) == ';') return Token::TokenType::SEMI;

@@ -212,4 +212,21 @@ Register Compare::generate(size_t function_id, BytecodeGenerator &generator, AST
 	}
 	return result_reg;
 }
+
+
+Register List::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	std::vector<Register> element_registers;
+	element_registers.reserve(m_elements.size());
+	const auto result_reg = generator.allocate_register();
+
+	for (const auto &el : m_elements) {
+		element_registers.push_back(el->generate(function_id, generator, ctx));
+	}
+
+	generator.emit<BuildList>(function_id, result_reg, element_registers);
+
+	return result_reg;
+}
+
 }// namespace ast

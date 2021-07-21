@@ -21,6 +21,7 @@ enum class PyObjectType {
 	PY_ELLIPSIS,
 	PY_CONSTANT_NAME,
 	PY_CODE,
+	PY_LIST,
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -49,6 +50,9 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_CODE: {
 		return "code";
+	}
+	case PyObjectType::PY_LIST: {
+		return "list";
 	}
 	}
 	ASSERT_NOT_REACHED()
@@ -269,6 +273,24 @@ class PyNameConstant : public PyObject
 	{}
 };
 
+class PyList : public PyObject
+{
+	friend class Heap;
+
+	std::vector<Value> m_elements;
+
+  public:
+	PyList(std::vector<Value> elements)
+		: PyObject(PyObjectType::PY_LIST), m_elements(std::move(elements))
+	{}
+
+	std::string to_string() const override;
+
+	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+
+	const std::vector<Value> &elements() const { return m_elements; }
+};
+
 
 template<typename T> std::shared_ptr<T> as(std::shared_ptr<PyObject> node);
 
@@ -312,6 +334,13 @@ template<> inline std::shared_ptr<PyNativeFunction> as(std::shared_ptr<PyObject>
 	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
 		return std::static_pointer_cast<PyNativeFunction>(node);
 	}
+	return nullptr;
+}
+
+
+template<> inline std::shared_ptr<PyList> as(std::shared_ptr<PyObject> node)
+{
+	if (node->type() == PyObjectType::PY_LIST) { return std::static_pointer_cast<PyList>(node); }
 	return nullptr;
 }
 

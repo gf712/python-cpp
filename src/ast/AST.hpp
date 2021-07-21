@@ -26,6 +26,7 @@ namespace ast {
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
+	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Return)
@@ -123,6 +124,42 @@ class Constant : public ASTNode
 
 	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 };
+
+
+class List : public ASTNode
+{
+  public:
+	enum class ContextType { LOAD = 0, STORE = 1, UNSET = 2 };
+
+  private:
+	std::vector<std::shared_ptr<ASTNode>> m_elements;
+	ContextType m_ctx;
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}List", indent);
+		spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
+		spdlog::debug("{}  elements:", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		for (const auto &el : m_elements) { el->print_node(new_indent); }
+	}
+
+  public:
+	List(std::vector<std::shared_ptr<ASTNode>> elements, ContextType ctx)
+		: ASTNode(ASTNodeType::List), m_elements(std::move(elements)), m_ctx(ctx)
+	{}
+
+	List(ContextType ctx) : ASTNode(ASTNodeType::List), m_elements(), m_ctx(ctx) {}
+
+	void append(std::shared_ptr<ASTNode> element) { m_elements.push_back(std::move(element)); }
+
+	ContextType context() const { return m_ctx; }
+	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+};
+
 
 class Variable : public ASTNode
 {

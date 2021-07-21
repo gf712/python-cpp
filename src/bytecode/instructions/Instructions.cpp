@@ -11,9 +11,7 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			[](const String &s) {
 				return std::static_pointer_cast<PyObject>(PyString::create(s.s));
 			},
-			[](const NameConstant &s) {
-				return PyObject::from(s);
-			},
+			[](const NameConstant &s) { return PyObject::from(s); },
 			[](const std::shared_ptr<PyObject> &obj) { return obj; },
 			[&interpreter, this](const auto &) {
 				interpreter.raise_exception("Failed to store object \"{}\"", m_object_name);
@@ -103,6 +101,15 @@ void Equal::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		ASSERT(vm.registers().size() > m_dst)
 		vm.reg(m_dst) = *result;
 	}
+};
+
+void BuildList::execute(VirtualMachine &vm, Interpreter &) const
+{
+	std::vector<Value> elements;
+	for (const auto &src : m_srcs) { elements.push_back(vm.reg(src)); }
+
+	auto &heap = vm.heap();
+	vm.reg(m_dst) = heap.allocate<PyList>(elements);
 };
 
 std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter)

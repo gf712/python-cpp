@@ -211,6 +211,23 @@ void compare_compare(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_rhs, expected_rhs);
 }
 
+
+void compare_list(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::List);
+
+	const auto result_context = as<List>(result)->context();
+	const auto expected_context = as<List>(expected)->context();
+	ASSERT_EQ(result_context, expected_context);
+
+	const auto result_elements = as<List>(result)->elements();
+	const auto expected_elements = as<List>(expected)->elements();
+	ASSERT_EQ(result_elements.size(), expected_elements.size());
+	for (size_t i = 0; i < result_elements.size(); ++i) {
+		dispatch(expected_elements[i], expected_elements[i]);
+	}
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -254,6 +271,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_compare(result, expected);
 		break;
 	}
+	case ASTNodeType::List: {
+		compare_list(result, expected);
+		break;
+	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
 		TODO()
@@ -265,7 +286,9 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 {
 	Lexer lexer{ std::string(program) };
 	parser::Parser p{ lexer };
+	spdlog::set_level(spdlog::level::debug);
 	p.parse();
+	spdlog::set_level(spdlog::level::info);
 
 	size_t i = 0;
 	for (const auto &node : p.module()->body()) {
@@ -276,7 +299,7 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 	spdlog::set_level(spdlog::level::debug);
 	p.module()->print_node("");
 	expected_module->print_node("");
-	spdlog::set_level(spdlog::level::err);
+	spdlog::set_level(spdlog::level::info);
 }
 }// namespace
 
@@ -451,6 +474,27 @@ TEST(Parser, IfStatementWithComparisson)
 				"") },// body
 		std::vector<std::shared_ptr<ASTNode>>{}// orelse
 		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LiteralList)
+{
+	constexpr std::string_view program = "a = [1, 2, 3, 5]\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<List>(
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Constant>(static_cast<int64_t>(1)),
+					std::make_shared<Constant>(static_cast<int64_t>(2)),
+					std::make_shared<Constant>(static_cast<int64_t>(3)),
+					std::make_shared<Constant>(static_cast<int64_t>(5)),
+				},
+				List::ContextType::LOAD),
+			""));
 
 	assert_generates_ast(program, expected_ast);
 }

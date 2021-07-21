@@ -401,3 +401,18 @@ class Equal final : public Instruction
 
 	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
+
+class BuildList final : public Instruction
+{
+	Register m_dst;
+	std::vector<Register> m_srcs;
+
+  public:
+	BuildList(Register dst, std::vector<Register> srcs) : m_dst(dst), m_srcs(std::move(srcs)) {}
+
+	std::string to_string() const final { return fmt::format("BUILD_LIST      r{:<3}", m_dst); }
+
+	void execute(VirtualMachine &, Interpreter &) const final;
+
+	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};

@@ -214,6 +214,28 @@ std::shared_ptr<PyObject> PyNameConstant::add_impl(const std::shared_ptr<PyObjec
 }
 
 
+std::string PyList::to_string() const
+{
+	std::ostringstream os;
+
+	os << "[";
+	auto it = m_elements.begin();
+	while (std::next(it) != m_elements.end()) {
+		std::visit([&os](const auto &value) { os << value << ", "; }, *it);
+		std::advance(it, 1);
+	}
+	std::visit([&os](const auto &value) { os << value; }, *it);
+	os << "]";
+
+	return os.str();
+}
+
+std::shared_ptr<PyObject> PyList::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ to_string() });
+}
+
+
 std::shared_ptr<PyString> PyString::create(const std::string &value)
 {
 	auto &heap = VirtualMachine::the().heap();

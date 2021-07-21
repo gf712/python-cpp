@@ -305,3 +305,24 @@ TEST(Lexer, FunctionWithIfElseReturn)
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
 }
+
+
+TEST(Lexer, LiteralList)
+{
+	constexpr std::string_view program = "a = [1, 2, 3, 5]\n";
+
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::LSQB,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::RSQB,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
