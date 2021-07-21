@@ -9,8 +9,11 @@ static constexpr size_t KB = 1024;
 class Heap
 {
 	uint8_t *m_memory;
-	size_t m_memory_size;
+	uint8_t *m_static_memory;
+	size_t m_memory_size{ 64 * KB };
+	size_t m_static_memory_size{ 4 * KB };
 	size_t m_offset{ 0 };
+	size_t m_static_offset{ 0 };
 
   public:
 	static Heap &the()
@@ -22,7 +25,9 @@ class Heap
 	~Heap()
 	{
 		free(m_memory);
+		free(m_static_memory);
 		m_memory = nullptr;
+		m_static_memory = nullptr;
 	}
 
 	void reset()
@@ -39,11 +44,19 @@ class Heap
 		return std::shared_ptr<T>(ptr, [](T *) { return; });
 	}
 
+	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
+	{
+		if (m_offset + sizeof(T) >= m_static_memory_size) { return nullptr; }
+		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
+		m_static_offset += sizeof(T);
+		return std::shared_ptr<T>(ptr, [](T *) { return; });
+	}
+
   private:
 	Heap()
 	{
-		m_memory = static_cast<uint8_t *>(malloc(64 * KB));
-		m_memory_size = 64 * KB;
+		m_memory = static_cast<uint8_t *>(malloc(m_memory_size));
+		m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size));
 	}
 };
 

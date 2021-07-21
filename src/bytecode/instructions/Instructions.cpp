@@ -12,7 +12,7 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				return std::static_pointer_cast<PyObject>(PyString::create(s.s));
 			},
 			[](const NameConstant &s) {
-				return std::static_pointer_cast<PyObject>(PyNameConstant::create(s));
+				return PyObject::from(s);
 			},
 			[](const std::shared_ptr<PyObject> &obj) { return obj; },
 			[&interpreter, this](const auto &) {

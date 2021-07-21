@@ -23,14 +23,16 @@ template<> std::shared_ptr<PyObject> PyObject::from(const Bytes &value)
 	return PyBytes::create(value);
 }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const Ellipsis &)
-{
-	return PyEllipsis::create();
-}
+template<> std::shared_ptr<PyObject> PyObject::from(const Ellipsis &) { return py_ellipsis(); }
 
 template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 {
-	return PyNameConstant::create(value);
+	if (auto none_value = std::get_if<NoneType>(&value.value)) {
+		return py_none();
+	} else {
+		const bool bool_value = std::get<bool>(value.value);
+		return bool_value ? py_true() : py_false();
+	}
 }
 
 
@@ -233,11 +235,40 @@ std::shared_ptr<PyBytes> PyBytes::create(const Bytes &value)
 std::shared_ptr<PyEllipsis> PyEllipsis::create()
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyEllipsis>();
+	return heap.allocate_static<PyEllipsis>();
 }
 
 std::shared_ptr<PyNameConstant> PyNameConstant::create(const NameConstant &value)
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyNameConstant>(value);
+	return heap.allocate_static<PyNameConstant>(value);
+}
+
+
+std::shared_ptr<PyObject> py_none()
+{
+	static std::shared_ptr<PyObject> none = nullptr;
+	if (!none) { none = PyNameConstant::create(NameConstant{ NoneType{} }); }
+	return none;
+}
+
+std::shared_ptr<PyObject> py_true()
+{
+	static std::shared_ptr<PyObject> true_value = nullptr;
+	if (!true_value) { true_value = PyNameConstant::create(NameConstant{ true }); }
+	return true_value;
+}
+
+std::shared_ptr<PyObject> py_false()
+{
+	static std::shared_ptr<PyObject> false_value = nullptr;
+	if (!false_value) { false_value = PyNameConstant::create(NameConstant{ false }); }
+	return false_value;
+}
+
+std::shared_ptr<PyObject> py_ellipsis()
+{
+	static std::shared_ptr<PyObject> ellipsis = nullptr;
+	if (!ellipsis) { ellipsis = PyEllipsis::create(); }
+	return ellipsis;
 }

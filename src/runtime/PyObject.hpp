@@ -224,12 +224,11 @@ class PyBytes : public PyObject
 class PyEllipsis : public PyObject
 {
 	friend class Heap;
+	friend std::shared_ptr<PyObject> py_ellipsis();
 
 	static constexpr Ellipsis m_value{};
 
   public:
-	static std::shared_ptr<PyEllipsis> create();
-	~PyEllipsis() = default;
 	std::string to_string() const override { return fmt::format("PyEllipsis"); }
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
@@ -238,6 +237,7 @@ class PyEllipsis : public PyObject
 	const Ellipsis &value() const { return m_value; }
 
   private:
+	static std::shared_ptr<PyEllipsis> create();
 	PyEllipsis() : PyObject(PyObjectType::PY_ELLIPSIS) {}
 };
 
@@ -245,12 +245,13 @@ class PyEllipsis : public PyObject
 class PyNameConstant : public PyObject
 {
 	friend class Heap;
+	friend std::shared_ptr<PyObject> py_none();
+	friend std::shared_ptr<PyObject> py_false();
+	friend std::shared_ptr<PyObject> py_true();
 
 	NameConstant m_value;
 
   public:
-	static std::shared_ptr<PyNameConstant> create(const NameConstant &);
-	~PyNameConstant() = default;
 	std::string to_string() const override;
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
@@ -261,6 +262,8 @@ class PyNameConstant : public PyObject
 	const NameConstant &value() const { return m_value; }
 
   private:
+	static std::shared_ptr<PyNameConstant> create(const NameConstant &);
+
 	PyNameConstant(const NameConstant &name)
 		: PyObject(PyObjectType::PY_CONSTANT_NAME), m_value(name)
 	{}
@@ -311,3 +314,8 @@ template<> inline std::shared_ptr<PyNativeFunction> as(std::shared_ptr<PyObject>
 	}
 	return nullptr;
 }
+
+std::shared_ptr<PyObject> py_none();
+std::shared_ptr<PyObject> py_true();
+std::shared_ptr<PyObject> py_false();
+std::shared_ptr<PyObject> py_ellipsis();
