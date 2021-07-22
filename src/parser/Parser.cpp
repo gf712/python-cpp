@@ -591,6 +591,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::PLUS,
 			Token::TokenType::MINUS,
 			Token::TokenType::LEFTSHIFT,
+			Token::TokenType::PERCENT,
 			Token::TokenType::RIGHTSHIFT,
 			Token::TokenType::COMMA,
 			Token::TokenType::RPAREN,
@@ -720,9 +721,15 @@ struct TermPattern_ : Pattern<TermPattern_>
 		// using pattern3 =
 		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
 		// if (pattern3::match(tokens, p)) { return true; }
-		// using pattern4 =
-		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
-		// if (pattern4::match(tokens, p)) { return true; }
+		using pattern4 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>, FactorPattern, TermPattern_>;
+		if (pattern4::match(p)) {
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO, lhs, rhs);
+			p.push_to_stack(binary_op);
+			return true;
+		}
 		// using pattern5 =
 		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
 		// if (pattern5::match(tokens, p)) { return true; }

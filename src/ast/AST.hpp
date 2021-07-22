@@ -242,6 +242,7 @@ class Assign : public Statement
 #define BINARY_OPERATIONS  \
 	__BINARY_OP(PLUS)      \
 	__BINARY_OP(MINUS)     \
+	__BINARY_OP(MODULO)    \
 	__BINARY_OP(MULTIPLY)  \
 	__BINARY_OP(EXP)       \
 	__BINARY_OP(SLASH)     \

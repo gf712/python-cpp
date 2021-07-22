@@ -98,6 +98,9 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 		Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> lshift_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const;
+
 	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
@@ -206,6 +209,9 @@ class PyObjectNumber final : public PyObject
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const override;
+
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;

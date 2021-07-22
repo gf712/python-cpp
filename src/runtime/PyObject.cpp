@@ -145,6 +145,15 @@ std::shared_ptr<PyObject> PyObject::lshift_impl(const std::shared_ptr<PyObject> 
 	return nullptr;
 }
 
+std::shared_ptr<PyObject> PyObject::modulo_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
+		object_name(type()),
+		object_name(obj->type()));
+	return nullptr;
+}
+
 std::shared_ptr<PyObject> PyObject::equal_impl(const std::shared_ptr<PyObject> &,
 	Interpreter &) const
 {
@@ -185,6 +194,20 @@ std::shared_ptr<PyObject> PyObjectNumber::add_impl(const std::shared_ptr<PyObjec
 {
 	if (auto rhs = as<PyObjectNumber>(obj)) {
 		return PyObjectNumber::create(m_value + rhs->value());
+	} else {
+		interpreter.raise_exception(
+			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
+	}
+}
+
+std::shared_ptr<PyObject> PyObjectNumber::modulo_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto rhs = as<PyObjectNumber>(obj)) {
+		return PyObjectNumber::create(m_value % rhs->value());
 	} else {
 		interpreter.raise_exception(
 			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",

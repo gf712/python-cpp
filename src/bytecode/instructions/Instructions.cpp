@@ -255,6 +255,22 @@ std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &int
 		rhs);
 }
 
+std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter)
+{
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
+					   return lhs_value % rhs_value;
+				   },
+			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (auto result = py_lhs->modulo_impl(py_rhs, interpreter)) { return result; }
+				return {};
+			} },
+		lhs,
+		rhs);
+}
+
 std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter)
 {
 	return std::visit(

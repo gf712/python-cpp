@@ -66,6 +66,17 @@ struct Number
 			value,
 			rhs.value);
 	}
+
+	Number operator%(const Number &rhs) const
+	{
+		return std::visit(
+			[](const auto &lhs_value, const auto &rhs_value) {
+				return Number{ static_cast<decltype(lhs_value)>(
+					std::fmod(static_cast<double>(lhs_value), static_cast<double>(rhs_value))) };
+			},
+			value,
+			rhs.value);
+	}
 	Number operator<<(const Number &rhs) const
 	{
 		return std::visit(

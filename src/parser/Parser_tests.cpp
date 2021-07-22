@@ -392,6 +392,23 @@ TEST(Parser, BinaryOperationWithAssignment)
 	assert_generates_ast(program, expected_ast);
 }
 
+
+TEST(Parser, BinaryOperationModulo)
+{
+	constexpr std::string_view program = "a = 3 % 4\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
+									 "a", Variable::ContextType::STORE) },
+			std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO,
+				std::make_shared<Constant>(int64_t{3}),
+				std::make_shared<Constant>(int64_t{4})),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
 TEST(Parser, FunctionDefinition)
 {
 	constexpr std::string_view program =

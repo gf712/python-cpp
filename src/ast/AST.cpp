@@ -66,6 +66,10 @@ Register
 		generator.emit<Exp>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
+	case OpType::MODULO: {
+		generator.emit<Modulo>(function_id, dst_register, lhs_register, rhs_register);
+		return dst_register;
+	}
 	case OpType::SLASH:
 		TODO()
 	case OpType::LEFTSHIFT: {

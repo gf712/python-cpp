@@ -15,6 +15,7 @@ std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &i
 std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 class Instruction
 {
@@ -172,6 +173,33 @@ class Exp : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = exp(lhs, rhs, interpreter)) {
+			ASSERT(vm.registers().size() > m_destination)
+			vm.reg(m_destination) = *result;
+		}
+	}
+
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+class Modulo : public Instruction
+{
+	Register m_destination;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	Modulo(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs)
+	{}
+	~Modulo() override {}
+	std::string to_string() const final
+	{
+		return fmt::format("MODULO         r{:<3} r{:<3} r{:<3}", m_destination, m_lhs, m_rhs);
+	}
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	{
+		const auto &lhs = vm.reg(m_lhs);
+		const auto &rhs = vm.reg(m_rhs);
+		if (auto result = modulo(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}

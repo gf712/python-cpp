@@ -384,3 +384,20 @@ TEST(RunPythonProgram, ForLoopWithRange)
 	run(program);
 	assert_interpreter_object_value("acc", 4950);
 }
+
+
+TEST(RunPythonProgram, ForLoopAccumulateEvenAndOddNumbers)
+{
+	static constexpr std::string_view program =
+		"acc_even = 0\n"
+		"acc_odd = 0\n"
+		"for x in range(100):\n"
+		"	if x % 2 == 0:\n"
+		"		acc_even = acc_even + x\n"
+		"	else:\n"
+		"		acc_odd = acc_odd + x\n";
+
+	run(program);
+	assert_interpreter_object_value("acc_even", 2450);
+	assert_interpreter_object_value("acc_odd", 2500);
+}
