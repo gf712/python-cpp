@@ -34,16 +34,8 @@
 // 	"c = add(a, b)\n";
 
 static constexpr std::string_view program =
-	"def foo(a):\n"
-	"	if a == 1:\n"
-	"		return 10\n"
-	"	elif a == 2:\n"
-	"		return 0\n"
-	"	else:\n"
-	"		return 5\n"
-	// "a = foo(1)\n"
-	// "b = foo(2)\n"
-	"c = foo(3)\n";
+	"for x in range(10):\n"
+	"	print(x)\n";
 
 int main()
 {

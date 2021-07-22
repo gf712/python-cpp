@@ -24,6 +24,7 @@ namespace ast {
 	__AST_NODE_TYPE(Call)               \
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
+	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(List)               \
@@ -523,6 +524,50 @@ class If : public ASTNode
 		for (const auto &el : m_orelse) { el->print_node(new_indent); }
 	}
 };
+
+class For : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_target;
+	std::shared_ptr<ASTNode> m_iter;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_orelse;
+	std::string m_type_comment;
+
+  public:
+	For(std::shared_ptr<ASTNode> target,
+		std::shared_ptr<ASTNode> iter,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ASTNode>> orelse,
+		std::string type_comment)
+		: ASTNode(ASTNodeType::For), m_target(std::move(target)), m_iter(std::move(iter)),
+		  m_body(std::move(body)), m_orelse(std::move(orelse)), m_type_comment(type_comment)
+	{}
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+
+	const std::shared_ptr<ASTNode> &target() const { return m_target; }
+	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+	const std::string &type_comment() const { return m_type_comment; }
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}For", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - target:", indent);
+		m_target->print_node(new_indent);
+		spdlog::debug("{}  - iter:", indent);
+		m_iter->print_node(new_indent);
+		spdlog::debug("{}  - body:", indent);
+		for (const auto &el : m_body) { el->print_node(new_indent); }
+		spdlog::debug("{}  - orelse:", indent);
+		for (const auto &el : m_orelse) { el->print_node(new_indent); }
+		spdlog::debug("{}  - type_comment:", m_type_comment);
+	}
+};
+
 
 #define COMPARE_OPERATIONS \
 	__COMPARE_OP(Eq)       \

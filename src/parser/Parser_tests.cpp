@@ -170,6 +170,37 @@ void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<AS
 	}
 }
 
+void compare_for(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::For);
+
+	const auto result_target = as<For>(result)->target();
+	const auto expected_target = as<For>(expected)->target();
+	dispatch(result_target, expected_target);
+
+	const auto result_iter = as<For>(result)->iter();
+	const auto expected_iter = as<For>(expected)->iter();
+	dispatch(result_iter, expected_iter);
+
+	const auto result_body = as<For>(result)->body();
+	const auto expected_body = as<For>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < expected_body.size(); ++i) {
+		dispatch(result_body[i], expected_body[i]);
+	}
+
+	const auto result_orelse = as<For>(result)->orelse();
+	const auto expected_orelse = as<For>(expected)->orelse();
+	ASSERT_EQ(result_orelse.size(), expected_orelse.size());
+	for (size_t i = 0; i < result_orelse.size(); ++i) {
+		dispatch(result_orelse[i], expected_orelse[i]);
+	}
+
+	const auto result_type_comment = as<For>(result)->type_comment();
+	const auto expected_type_comment = as<For>(expected)->type_comment();
+	ASSERT_EQ(result_type_comment, expected_type_comment);
+}
+
 void compare_call(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Call);
@@ -273,6 +304,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::List: {
 		compare_list(result, expected);
+		break;
+	}
+	case ASTNodeType::For: {
+		compare_for(result, expected);
 		break;
 	}
 	default: {
@@ -495,6 +530,61 @@ TEST(Parser, LiteralList)
 				},
 				List::ContextType::LOAD),
 			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SimpleForLoopWithFunctionCall)
+{
+	constexpr std::string_view program =
+		"for x in range(10):\n"
+		"	print(x)\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<For>(std::make_shared<Name>("x", Variable::ContextType::STORE),// target
+			std::make_shared<Call>(std::make_shared<Name>("range", Variable::ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
+				std::vector<std::shared_ptr<ASTNode>>{}),// iter
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
+					std::vector<std::shared_ptr<ASTNode>>{
+						std::make_shared<Name>("x", Variable::ContextType::LOAD) },
+					std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<ASTNode>>{},// orelse
+			""// type_comment
+			));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ForLoopWithElseBlock)
+{
+	// you live and learn
+	constexpr std::string_view program =
+		"for x in range(10):\n"
+		"	print(x)\n"
+		"else:\n"
+		"	print(\"ELSE!\")\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<For>(std::make_shared<Name>("x", Variable::ContextType::STORE),// target
+			std::make_shared<Call>(std::make_shared<Name>("range", Variable::ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
+				std::vector<std::shared_ptr<ASTNode>>{}),// iter
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
+					std::vector<std::shared_ptr<ASTNode>>{
+						std::make_shared<Name>("x", Variable::ContextType::LOAD) },
+					std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
+					std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("ELSE!") },
+					std::vector<std::shared_ptr<ASTNode>>{}),
+			},// orelse
+			""// type_comment
+			));
 
 	assert_generates_ast(program, expected_ast);
 }

@@ -65,9 +65,9 @@ class VirtualMachine;
 
 struct LocalFrame
 {
-	VirtualMachine* vm;
-	LocalFrame(size_t frame_size, VirtualMachine*);
-	LocalFrame(LocalFrame&&);
+	VirtualMachine *vm;
+	LocalFrame(size_t frame_size, VirtualMachine *);
+	LocalFrame(LocalFrame &&);
 	~LocalFrame();
 };
 

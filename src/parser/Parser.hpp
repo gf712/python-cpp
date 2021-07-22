@@ -22,7 +22,8 @@ class Parser
 	size_t m_token_position{ 0 };
 
   public:
-	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>()), m_lexer(l) {
+	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>()), m_lexer(l)
+	{
 		m_stack.emplace_back();
 	}
 
@@ -83,10 +84,7 @@ class BlockScope
   public:
 	BlockScope(Parser &p) : m_p(p) { m_p.m_stack.emplace_back(); }
 
-	~BlockScope()
-	{
-		m_p.m_stack.pop_back();
-	}
+	~BlockScope() { m_p.m_stack.pop_back(); }
 
 	std::deque<std::shared_ptr<ast::ASTNode>> &parent()
 	{

@@ -1575,6 +1575,56 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 	}
 };
 
+struct ForPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "for"; }
+};
+
+struct InPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "in"; }
+};
+
+struct ForStatementPattern : Pattern<ForStatementPattern>
+{
+	// for_stmt:
+	//     | 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
+	//     | ASYNC 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("ForStatementPattern");
+		BlockScope scope{ p };
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForPattern>,
+				StarTargetsPattern,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, InPattern>,
+				StarExpressionsPattern,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("for_stmt");
+			std::vector<std::shared_ptr<ASTNode>> orelse;
+			{
+				BlockScope else_scope{ p };
+				using pattern1 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
+				if (pattern1::match(p)) { spdlog::debug("[else_block]"); }
+				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
+			}
+			// FIXME: type comment is currently not considered
+			std::string type_comment{ "" };
+			auto target = p.pop_front();
+			auto iter = p.pop_front();
+			std::vector<std::shared_ptr<ASTNode>> body;
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			scope.parent().push_back(
+				std::make_shared<For>(target, iter, body, orelse, type_comment));
+			return true;
+		}
+
+		return false;
+	}
+};
+
 
 struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 {
@@ -1599,6 +1649,14 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 		using pattern2 = PatternMatch<IfStatementPattern>;
 		if (pattern2::match(p)) {
 			spdlog::debug("if_stmt");
+			p.print_stack();
+			return true;
+		}
+
+		// for_stmt
+		using pattern5 = PatternMatch<ForStatementPattern>;
+		if (pattern5::match(p)) {
+			spdlog::debug("for_stmt");
 			p.print_stack();
 			return true;
 		}

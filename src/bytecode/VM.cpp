@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-LocalFrame::LocalFrame(size_t frame_size, VirtualMachine *vm_): vm(vm_)
+LocalFrame::LocalFrame(size_t frame_size, VirtualMachine *vm_) : vm(vm_)
 {
 	vm->push_frame(frame_size);
 }
@@ -82,7 +82,7 @@ void VirtualMachine::dump() const
 						   if (obj) {
 							   std::cout << fmt::format("[{}]  {} ({})\n",
 								   i++,
-								   static_cast<const void *>(&obj),
+								   static_cast<const void *>(obj.get()),
 								   obj->to_string());
 						   } else {
 							   std::cout << fmt::format("[{}]  (Empty)\n", i++);
