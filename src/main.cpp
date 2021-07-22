@@ -34,16 +34,19 @@
 // 	"c = add(a, b)\n";
 
 static constexpr std::string_view program =
-	"for x in range(10):\n"
-	"	print(x)\n";
+	"acc = 0\n"
+	"for x in [1,2,3,4]:\n"
+	"	acc = acc + x\n"
+	"print(acc)\n";
 
 int main()
 {
-	spdlog::set_level(spdlog::level::debug);
+	// spdlog::set_level(spdlog::level::debug);
 	Lexer lexer{ std::string(program) };
 	parser::Parser p{ lexer };
 	p.parse();
 	auto bytecode = BytecodeGenerator::compile(p.module());
+	spdlog::set_level(spdlog::level::debug);
 	spdlog::debug("Bytecode:\n {}", bytecode->to_string());
 	auto &vm = VirtualMachine::the().create(std::move(bytecode));
 	vm.execute();

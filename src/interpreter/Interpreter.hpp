@@ -30,6 +30,13 @@ class Interpreter
 		m_exception_message = fmt::format(p, std::forward<Ts>(args)...);
 	}
 
+	template<typename... Ts> void raise_exception(std::shared_ptr<PyObject> exception)
+	{
+		m_status = Status::EXCEPTION;
+		m_exception_message = "DEPRECATED :(";
+		m_current_frame->set_exception(std::move(exception));
+	}
+
 	const std::shared_ptr<ExecutionFrame> &execution_frame() const { return m_current_frame; }
 
 	void set_execution_frame(std::shared_ptr<ExecutionFrame> frame)
@@ -58,6 +65,8 @@ class Interpreter
 			return nullptr;
 		}
 	}
+
+	void unwind();
 
 	void setup();
 };

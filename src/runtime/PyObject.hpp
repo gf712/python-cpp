@@ -22,6 +22,10 @@ enum class PyObjectType {
 	PY_CONSTANT_NAME,
 	PY_CODE,
 	PY_LIST,
+	PY_LIST_ITERATOR,
+	PY_BASE_EXCEPTION,
+	PY_RANGE,
+	PY_RANGE_ITERATOR
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -54,11 +58,23 @@ inline std::string_view object_name(PyObjectType type)
 	case PyObjectType::PY_LIST: {
 		return "list";
 	}
+	case PyObjectType::PY_LIST_ITERATOR: {
+		return "list_iterator";
+	}
+	case PyObjectType::PY_BASE_EXCEPTION: {
+		return "BaseException";
+	}
+	case PyObjectType::PY_RANGE: {
+		return "range";
+	}
+	case PyObjectType::PY_RANGE_ITERATOR: {
+		return "range_iterator";
+	}
 	}
 	ASSERT_NOT_REACHED()
 }
 
-class PyObject
+class PyObject : public std::enable_shared_from_this<PyObject>
 {
 	const PyObjectType m_type;
 
@@ -85,8 +101,17 @@ class PyObject
 	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> next_impl(Interpreter &interpreter);
+	virtual std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const;
 
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
+
+  protected:
+	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
+	{
+		return std::static_pointer_cast<const T>(shared_from_this());
+	}
 };
 
 
@@ -289,8 +314,28 @@ class PyList : public PyObject
 	std::string to_string() const override;
 
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
+};
+
+
+class PyListIterator : public PyObject
+{
+	friend class Heap;
+
+	std::shared_ptr<const PyList> m_pylist;
+	size_t m_current_index;
+
+  public:
+	PyListIterator(std::shared_ptr<const PyList> pylist)
+		: PyObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(std::move(pylist))
+	{}
+
+	std::string to_string() const override;
+
+	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> next_impl(Interpreter &interpreter) override;
 };
 
 

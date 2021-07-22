@@ -199,6 +199,48 @@ Register If::generate(size_t function_id, BytecodeGenerator &generator, ASTConte
 	return {};
 }
 
+Register For::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	static size_t for_loop_count = 0;
+
+	ASSERT(!m_body.empty())
+
+	auto forloop_start_label =
+		generator.make_label(fmt::format("FOR_START_{}", for_loop_count++), function_id);
+	auto forloop_end_label =
+		generator.make_label(fmt::format("END_START_{}", for_loop_count), function_id);
+
+	// generate the iterator
+	const auto iterator_func_register = m_iter->generate(function_id, generator, ctx);
+
+	auto iterator_register = generator.allocate_register();
+	auto iter_variable_register = generator.allocate_register();
+
+	// call the __iter__ implementation
+	generator.emit<GetIter>(function_id, iterator_register, iterator_func_register);
+
+	// call the __next__ implementation
+	auto target_ids = as<Name>(m_target)->ids();
+	if (target_ids.size() != 1) { TODO() }
+	auto target_name = target_ids[0];
+
+	generator.bind(forloop_start_label);
+	generator.emit<ForIter>(
+		function_id, iter_variable_register, iterator_register, target_name, forloop_end_label);
+
+	m_target->generate(function_id, generator, ctx);
+
+	// body
+	for (const auto &el : m_body) { el->generate(function_id, generator, ctx); }
+	generator.emit<Jump>(function_id, forloop_start_label);
+
+	// orelse
+	generator.bind(forloop_end_label);
+	for (const auto &el : m_orelse) { el->generate(function_id, generator, ctx); }
+
+	return {};
+}
+
 Register Compare::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	const auto lhs_reg = m_lhs->generate(function_id, generator, ctx);

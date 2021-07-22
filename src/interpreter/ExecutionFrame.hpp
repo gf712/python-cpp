@@ -30,6 +30,9 @@ class ExecutionFrame
 	std::shared_ptr<ExecutionFrame> m_parent{ nullptr };
 	size_t m_return_address;
 	std::optional<LocalFrame> m_frame_info;
+	std::shared_ptr<PyObject> m_exception{ nullptr };
+	std::shared_ptr<PyObject> m_exception_to_catch{ nullptr };
+
 
   public:
 	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent)
@@ -74,6 +77,14 @@ class ExecutionFrame
 	size_t return_address() const { return m_return_address; }
 
 	void attach_frame(LocalFrame &&frame) { m_frame_info.emplace(std::move(frame)); }
+
+	void set_exception(std::shared_ptr<PyObject> exception);
+
+	std::shared_ptr<PyObject> exception() const { return m_exception; }
+
+	bool catch_exception(std::shared_ptr<PyObject>) const;
+
+	void set_exception_to_catch(std::shared_ptr<PyObject> exception);
 
   private:
 	ExecutionFrame() : m_symbol_table(std::make_unique<SymbolTable>()) {}

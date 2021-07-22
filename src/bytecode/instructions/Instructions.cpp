@@ -1,5 +1,6 @@
 #include "Instructions.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/StopIterationException.hpp"
 
 void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
@@ -124,6 +125,49 @@ void BuildList::execute(VirtualMachine &vm, Interpreter &) const
 	auto &heap = vm.heap();
 	vm.reg(m_dst) = heap.allocate<PyList>(elements);
 };
+
+void GetIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
+{
+	auto iterable_value = vm.reg(m_src);
+	if (auto *iterable_object = std::get_if<std::shared_ptr<PyObject>>(&iterable_value)) {
+		vm.reg(m_dst) = (*iterable_object)->iter_impl(interpreter);
+	} else {
+		vm.reg(m_dst) = std::visit(
+			[&interpreter](
+				const auto &value) { return PyObject::from(value)->iter_impl(interpreter); },
+			iterable_value);
+	}
+}
+
+void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
+{
+	auto iterator = vm.reg(m_src);
+	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
+	if (auto *iterable_object = std::get_if<std::shared_ptr<PyObject>>(&iterator)) {
+		const auto &next_value = (*iterable_object)->next_impl(interpreter);
+		if (auto last_exception = interpreter.execution_frame()->exception()) {
+			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
+				// exit loop in error state and handle unwinding to interpreter
+			} else {
+				interpreter.execution_frame()->set_exception(nullptr);
+				interpreter.set_status(Interpreter::Status::OK);
+				vm.set_instruction_pointer(m_exit_label.position());
+			}
+			return;
+		}
+		interpreter.store_object(m_next_value_name, next_value);
+	} else {
+		// this is probably always going to be something that went wrong
+		TODO();
+	}
+}
+
+void ForIter::relocate(BytecodeGenerator &generator, const std::vector<size_t> &offsets)
+{
+	m_exit_label = generator.label(m_exit_label);
+	const size_t offset = offsets[m_exit_label.function_id()];
+	m_exit_label.set_position(m_exit_label.position() + offset);
+}
 
 std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter)
 {

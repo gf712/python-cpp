@@ -543,7 +543,7 @@ class For : public ASTNode
 		  m_body(std::move(body)), m_orelse(std::move(orelse)), m_type_comment(type_comment)
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &target() const { return m_target; }
 	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }

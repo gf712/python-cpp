@@ -229,7 +229,7 @@ class LoadName final : public Instruction
 		auto obj = interpreter.fetch_object(m_object_name);
 		if (!obj) {
 			// std::cout << interpreter.execution_frame()->symbol_table()->to_string() << '\n';
-			interpreter.raise_exception("Could not find \"{:s}\"", m_object_name);
+			interpreter.raise_exception("NameError: name '{:s}' is not defined", m_object_name);
 			return;
 		}
 		vm.reg(m_destination) = obj;
@@ -420,4 +420,46 @@ class BuildList final : public Instruction
 	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+
+class GetIter final : public Instruction
+{
+	Register m_dst;
+	Register m_src;
+
+  public:
+	GetIter(Register dst, Register src) : m_dst(dst), m_src(src) {}
+
+	std::string to_string() const final
+	{
+		return fmt::format("GET_ITER        r{:<3} r{:<3}", m_dst, m_src);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+class ForIter final : public Instruction
+{
+	Register m_dst;
+	Register m_src;
+	std::string m_next_value_name;
+	Label m_exit_label;
+
+  public:
+	ForIter(Register dst, Register src, std::string next_value_name, Label exit_label)
+		: m_dst(dst), m_src(src), m_next_value_name(std::move(next_value_name)),
+		  m_exit_label(std::move(exit_label))
+	{}
+
+	std::string to_string() const final
+	{
+		return fmt::format("FOR_ITER        r{:<3} r{:<3}", m_dst, m_src);
+	}
+
+	void execute(VirtualMachine &, Interpreter &) const final;
+
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final;
 };

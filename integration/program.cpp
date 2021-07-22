@@ -362,3 +362,25 @@ TEST(RunPythonProgram, FibonacciRecursive)
 	assert_interpreter_object_value("s8", 21);
 	assert_interpreter_object_value("s9", 34);
 }
+
+TEST(RunPythonProgram, ForLoopWithAccumulator)
+{
+	static constexpr std::string_view program =
+		"acc = 0\n"
+		"for x in [1,2,3,4]:\n"
+		"	acc = acc + x\n";
+
+	run(program);
+	assert_interpreter_object_value("acc", 10);
+}
+
+TEST(RunPythonProgram, ForLoopWithRange)
+{
+	static constexpr std::string_view program =
+		"acc = 0\n"
+		"for x in range(100):\n"
+		"	acc = acc + x\n";
+
+	run(program);
+	assert_interpreter_object_value("acc", 4950);
+}

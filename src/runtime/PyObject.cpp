@@ -1,4 +1,5 @@
 #include "PyObject.hpp"
+#include "StopIterationException.hpp"
 
 #include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -42,6 +43,28 @@ std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
 }
+
+std::shared_ptr<PyObject> PyObject::iter_impl(Interpreter &interpreter) const
+{
+	interpreter.raise_exception(
+		fmt::format("TypeError: '{}' object is not iterable", object_name(type())));
+	return nullptr;
+}
+
+std::shared_ptr<PyObject> PyObject::next_impl(Interpreter &interpreter)
+{
+	interpreter.raise_exception(
+		fmt::format("TypeError: '{}' object is not an iterator", object_name(type())));
+	return nullptr;
+}
+
+std::shared_ptr<PyObject> PyObject::len_impl(Interpreter &interpreter) const
+{
+	interpreter.raise_exception(
+		fmt::format("TypeError: object of type '{}' has no len()", object_name(type())));
+	return nullptr;
+}
+
 
 std::shared_ptr<PyObject> PyString::repr_impl(Interpreter &) const
 {
@@ -234,6 +257,31 @@ std::string PyList::to_string() const
 std::shared_ptr<PyObject> PyList::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
+}
+
+std::shared_ptr<PyObject> PyList::iter_impl(Interpreter &) const
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyListIterator>(shared_from_this_as<PyList>());
+}
+
+std::string PyListIterator::to_string() const
+{
+	return fmt::format("<list_iterator at {}>", static_cast<const void *>(this));
+}
+
+std::shared_ptr<PyObject> PyListIterator::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ to_string() });
+}
+
+std::shared_ptr<PyObject> PyListIterator::next_impl(Interpreter &interpreter)
+{
+	if (m_current_index < m_pylist->elements().size())
+		return std::visit([](const auto &element) { return PyObject::from(element); },
+			m_pylist->elements()[m_current_index++]);
+	interpreter.raise_exception(stop_iteration(""));
+	return nullptr;
 }
 
 

@@ -58,7 +58,11 @@ int VirtualMachine::execute()
 		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
 		instruction->execute(*this, *m_interpreter);
 
-		if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
+		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+			m_interpreter->unwind();
+			// restore instruction pointer
+			return 1;
+		} else if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
 			// bail, an error occured
 			std::cout << m_interpreter->exception_message() << '\n';
 			return 1;
