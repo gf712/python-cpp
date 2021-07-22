@@ -7,24 +7,31 @@
 #include <memory>
 #include <set>
 
+struct FunctionMetaData
+{
+	size_t offset;
+	std::string function_name;
+	size_t register_count;
+};
+
 class Bytecode
 {
 	std::vector<std::unique_ptr<Instruction>> m_instructions;
-	std::vector<std::pair<size_t, std::string>> m_functions;
-	size_t m_virtual_register_count;
+	std::vector<FunctionMetaData> m_functions;
+	size_t m_main_local_register_count;
 
   public:
 	Bytecode(std::vector<std::unique_ptr<Instruction>> &&ins,
-		std::vector<std::pair<size_t, std::string>> &&funcs,
-		size_t virtual_register_count);
+		std::vector<FunctionMetaData> &&funcs,
+		size_t main_local_register_count);
 
-	size_t start_offset() const { return m_functions.back().first; }
-	size_t virtual_register_count() const { return m_virtual_register_count; }
+	size_t start_offset() const { return m_functions.back().offset; }
+	size_t main_local_register_count() const { return m_main_local_register_count; }
 
 	const std::vector<std::unique_ptr<Instruction>> &instructions() const { return m_instructions; }
-	const std::vector<std::pair<size_t, std::string>> &functions() const { return m_functions; }
+	const std::vector<FunctionMetaData> &functions() const { return m_functions; }
 
-	size_t function_offset(size_t function_id) const { return m_functions[function_id - 1].first; }
+	size_t function_offset(size_t function_id) const { return m_functions[function_id - 1].offset; }
 
 	std::string to_string() const;
 };
@@ -59,6 +66,17 @@ class Label
 	}
 };
 
+class BytecodeGenerator;
+
+struct FunctionInfo
+{
+	size_t function_id;
+	BytecodeGenerator *generator;
+
+	FunctionInfo(size_t, BytecodeGenerator *);
+	~FunctionInfo();
+};
+
 
 class BytecodeGenerator
 {
@@ -67,8 +85,10 @@ class BytecodeGenerator
 
   private:
 	std::vector<std::vector<std::unique_ptr<Instruction>>> m_functions;
+	std::vector<size_t> m_function_register_count;
+
 	std::set<Label> m_labels;
-	Register m_register_index{ start_register };
+	std::vector<size_t> m_frame_register_count;
 
   public:
 	BytecodeGenerator();
@@ -116,13 +136,21 @@ class BytecodeGenerator
 		ASSERT_NOT_REACHED()
 	}
 
-	size_t register_count() const { return m_register_index; }
+	size_t register_count() const { return m_frame_register_count.back(); }
 
-	Register allocate_register() { return m_register_index++; }
-	size_t allocate_function();
+	Register allocate_register() { return m_frame_register_count.back()++; }
+	FunctionInfo allocate_function();
+
+	void enter_function() { m_frame_register_count.emplace_back(start_register); }
+
+	void exit_function()
+	{
+		m_function_register_count.push_back(register_count());
+		m_frame_register_count.pop_back();
+	}
 
   private:
 	std::shared_ptr<Bytecode> generate_executable();
-	void rellocate_labels(const std::vector<std::unique_ptr<Instruction>> &executable,
+	void relocate_labels(const std::vector<std::unique_ptr<Instruction>> &executable,
 		const std::vector<size_t> &offsets);
 };

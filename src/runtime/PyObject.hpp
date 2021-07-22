@@ -93,12 +93,14 @@ class PyObject
 class PyCode : public PyObject
 {
 	size_t m_pos;
+	size_t m_register_count;
 	std::vector<std::string> m_args;
 
   public:
-	PyCode(const size_t pos, std::vector<std::string> args);
+	PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args);
 
 	size_t offset() const { return m_pos; }
+	size_t register_count() const { return m_register_count; }
 	const std::vector<std::string> &args() const { return m_args; }
 
 	std::string to_string() const override { return fmt::format("PyCode"); }

@@ -23,16 +23,29 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 void ReturnValue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	vm.reg(0) = vm.reg(m_source);
-	vm.set_instruction_pointer(vm.return_address());
+	auto result = vm.reg(m_source);
+
+	std::visit(overloaded{ [](const auto &val) {
+							  std::ostringstream os;
+							  os << val;
+							  spdlog::debug("Return value: {}", os.str());
+						  },
+				   [](const std::shared_ptr<PyObject> &val) {
+					   spdlog::debug("Return value: {}", val->to_string());
+				   } },
+		result);
+	vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
 	interpreter.set_execution_frame(interpreter.execution_frame()->parent());
+	vm.reg(0) = result;
 }
 
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	auto code = interpreter.allocate_object<PyCode>(
-		m_function_name + "__code__", vm.function_offset(m_function_id), m_args);
+	auto code = interpreter.allocate_object<PyCode>(m_function_name + "__code__",
+		vm.function_offset(m_function_id),
+		vm.function_register_count(m_function_id),
+		m_args);
 	interpreter.allocate_object<PyFunction>(
 		m_function_name, std::static_pointer_cast<PyCode>(code));
 }
@@ -72,7 +85,7 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 };
 
 
-void JumpIfFalse::rellocate(BytecodeGenerator &generator, const std::vector<size_t> &offsets)
+void JumpIfFalse::relocate(BytecodeGenerator &generator, const std::vector<size_t> &offsets)
 {
 	m_label = generator.label(m_label);
 	const size_t offset = offsets[m_label.function_id()];
@@ -85,7 +98,7 @@ void Jump::execute(VirtualMachine &vm, Interpreter &) const
 };
 
 
-void Jump::rellocate(BytecodeGenerator &generator, const std::vector<size_t> &offsets)
+void Jump::relocate(BytecodeGenerator &generator, const std::vector<size_t> &offsets)
 {
 	m_label = generator.label(m_label);
 	const size_t offset = offsets[m_label.function_id()];

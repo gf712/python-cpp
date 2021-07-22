@@ -2,6 +2,7 @@
 
 #include "forward.hpp"
 #include "runtime/Value.hpp"
+#include "bytecode/VM.hpp"
 
 #include <unordered_map>
 #include <memory>
@@ -27,6 +28,8 @@ class ExecutionFrame
 	std::unique_ptr<SymbolTable> m_symbol_table;
 	std::array<Value, 16> m_parameters;
 	std::shared_ptr<ExecutionFrame> m_parent{ nullptr };
+	size_t m_return_address;
+	std::optional<LocalFrame> m_frame_info;
 
   public:
 	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent)
@@ -66,6 +69,11 @@ class ExecutionFrame
 	std::shared_ptr<ExecutionFrame> parent() const { return m_parent; }
 
 	const std::unique_ptr<SymbolTable> &symbol_table() const { return m_symbol_table; }
+
+	void set_return_address(size_t address) { m_return_address = address; }
+	size_t return_address() const { return m_return_address; }
+
+	void attach_frame(LocalFrame &&frame) { m_frame_info.emplace(std::move(frame)); }
 
   private:
 	ExecutionFrame() : m_symbol_table(std::make_unique<SymbolTable>()) {}

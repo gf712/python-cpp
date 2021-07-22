@@ -1353,10 +1353,8 @@ struct BlockPattern : Pattern<BlockPattern>
 			StatementsPattern,
 			SingleTokenPattern<Token::TokenType::DEDENT>>;
 		if (pattern1::match(p)) {
-			spdlog::set_level(spdlog::level::debug);
 			spdlog::debug("NEWLINE INDENT statements DEDENT");
 			for (const auto &node : p.stack()) { node->print_node(""); }
-			spdlog::set_level(spdlog::level::info);
 			return true;
 		}
 
@@ -1443,9 +1441,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 				nullptr,
 				"");
 			scope.parent().push_back(function);
-			spdlog::set_level(spdlog::level::debug);
 			function->print_node("");
-			spdlog::set_level(spdlog::level::info);
 			return true;
 		}
 		return false;

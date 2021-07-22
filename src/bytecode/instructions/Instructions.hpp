@@ -22,7 +22,7 @@ class Instruction
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
 	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
-	virtual void rellocate(BytecodeGenerator &, const std::vector<size_t> &) = 0;
+	virtual void relocate(BytecodeGenerator &, const std::vector<size_t> &) = 0;
 };
 
 
@@ -52,7 +52,7 @@ class LoadConst final : public Instruction
 		vm.reg(m_destination) = m_source;
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class Store final : public Instruction
@@ -69,7 +69,7 @@ class Store final : public Instruction
 	}
 	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -96,7 +96,7 @@ class Add : public Instruction
 		}
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -124,7 +124,7 @@ class Subtract : public Instruction
 		}
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class Multiply : public Instruction
@@ -150,7 +150,7 @@ class Multiply : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -177,7 +177,7 @@ class Exp : public Instruction
 		}
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -205,7 +205,7 @@ class LeftShift : public Instruction
 		}
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -228,14 +228,14 @@ class LoadName final : public Instruction
 	{
 		auto obj = interpreter.fetch_object(m_object_name);
 		if (!obj) {
-			std::cout << interpreter.execution_frame()->symbol_table()->to_string() << '\n';
+			// std::cout << interpreter.execution_frame()->symbol_table()->to_string() << '\n';
 			interpreter.raise_exception("Could not find \"{:s}\"", m_object_name);
 			return;
 		}
 		vm.reg(m_destination) = obj;
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -259,10 +259,15 @@ class LoadFast final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
 	{
+		// std::visit(
+		// 	[&](const auto &val) {
+		// 		std::cout << "Arg-" << m_parameter_index << ':' << val << '\n';
+		// 	},
+		// 	interpreter.execution_frame()->parameter(m_parameter_index));
 		vm.reg(m_destination) = interpreter.execution_frame()->parameter(m_parameter_index);
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class StoreFast final : public Instruction
@@ -287,7 +292,7 @@ class StoreFast final : public Instruction
 		interpreter.execution_frame()->parameter(m_parameter_index) = vm.reg(m_src);
 	}
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -302,7 +307,7 @@ class ReturnValue final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class MakeFunction : public Instruction
@@ -324,7 +329,7 @@ class MakeFunction : public Instruction
 	}
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -344,7 +349,7 @@ class StoreName final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 
@@ -364,7 +369,7 @@ class JumpIfFalse final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final;
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final;
 };
 
 class Jump final : public Instruction
@@ -380,7 +385,7 @@ class Jump final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final;
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final;
 };
 
 class Equal final : public Instruction
@@ -399,7 +404,7 @@ class Equal final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
 
 class BuildList final : public Instruction
@@ -414,5 +419,5 @@ class BuildList final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void rellocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };

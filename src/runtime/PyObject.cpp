@@ -143,8 +143,8 @@ std::shared_ptr<PyObject> PyObjectNumber::equal_impl(const std::shared_ptr<PyObj
 }
 
 
-PyCode::PyCode(const size_t pos, std::vector<std::string> args)
-	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_args(std::move(args))
+PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args)
+	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_register_count(register_count), m_args(std::move(args))
 {
 	// 	m_attributes["co_var"] = PyList::from(m_args);
 }

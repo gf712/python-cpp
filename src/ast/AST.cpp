@@ -84,15 +84,18 @@ Register FunctionDefinition::generate(size_t function_id,
 {
 	ctx.push_local_args(m_args);
 
-	auto this_function_id = generator.allocate_function();
-	m_args->generate(this_function_id, generator, ctx);
+	auto this_function_info = generator.allocate_function();
+	m_args->generate(this_function_info.function_id, generator, ctx);
 
-	for (const auto &node : m_body) { node->generate(this_function_id, generator, ctx); }
+	for (const auto &node : m_body) {
+		node->generate(this_function_info.function_id, generator, ctx);
+	}
 
 	std::vector<std::string> arg_names;
 	for (const auto &arg_name : m_args->argument_names()) { arg_names.push_back(arg_name); }
 
-	generator.emit<MakeFunction>(function_id, m_function_name, this_function_id, arg_names);
+	generator.emit<MakeFunction>(
+		function_id, m_function_name, this_function_info.function_id, arg_names);
 
 	ctx.pop_local_args();
 	return {};
