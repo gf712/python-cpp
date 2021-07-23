@@ -308,6 +308,86 @@ std::shared_ptr<PyObject> PyListIterator::next_impl(Interpreter &interpreter)
 }
 
 
+std::string PyTuple::to_string() const
+{
+	std::ostringstream os;
+
+	os << "(";
+	auto it = m_elements.begin();
+	while (std::next(it) != m_elements.end()) {
+		std::visit([&os](const auto &value) { os << value << ", "; }, *it);
+		std::advance(it, 1);
+	}
+	std::visit([&os](const auto &value) { os << value; }, *it);
+	os << ")";
+
+	return os.str();
+}
+
+std::shared_ptr<PyObject> PyTuple::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ to_string() });
+}
+
+std::shared_ptr<PyObject> PyTuple::iter_impl(Interpreter &) const
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyTupleIterator>(shared_from_this_as<PyTuple>());
+}
+
+
+PyTupleIterator PyTuple::begin() const { return PyTupleIterator(shared_from_this_as<PyTuple>()); }
+
+
+PyTupleIterator PyTuple::end() const
+{
+	auto end = PyTupleIterator(shared_from_this_as<PyTuple>());
+	end.m_current_index = m_elements.size();
+	return end;
+}
+
+std::shared_ptr<PyObject> PyTuple::operator[](size_t idx) const
+{
+	return std::visit([](const auto &value) { return PyObject::from(value); }, m_elements[idx]);
+}
+
+
+std::string PyTupleIterator::to_string() const
+{
+	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
+}
+
+std::shared_ptr<PyObject> PyTupleIterator::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ to_string() });
+}
+
+std::shared_ptr<PyObject> PyTupleIterator::next_impl(Interpreter &interpreter)
+{
+	if (m_current_index < m_pytuple->elements().size())
+		return std::visit([](const auto &element) { return PyObject::from(element); },
+			m_pytuple->elements()[m_current_index++]);
+	interpreter.raise_exception(stop_iteration(""));
+	return nullptr;
+}
+
+bool PyTupleIterator::operator==(const PyTupleIterator &other) const
+{
+	return m_pytuple.get() == other.m_pytuple.get() && m_current_index == other.m_current_index;
+}
+
+PyTupleIterator &PyTupleIterator::operator++()
+{
+	m_current_index++;
+	return *this;
+}
+
+std::shared_ptr<PyObject> PyTupleIterator::operator*() const
+{
+	return std::visit([](const auto &element) { return PyObject::from(element); },
+		m_pytuple->elements()[m_current_index]);
+}
+
 std::shared_ptr<PyString> PyString::create(const std::string &value)
 {
 	auto &heap = VirtualMachine::the().heap();

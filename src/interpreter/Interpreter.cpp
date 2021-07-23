@@ -22,22 +22,31 @@ std::optional<int64_t> to_integer(const std::shared_ptr<PyObject> &obj, Interpre
 
 void Interpreter::setup()
 {
-	allocate_object<PyNativeFunction>("print", [this](const std::shared_ptr<PyObject> &arg) {
-		// make sure this is flushed immediately
-		std::cout << arg->repr_impl(*this)->to_string() << std::endl;
-		return py_none();
+	allocate_object<PyNativeFunction>(
+		"print", [this](const std::shared_ptr<PyTuple> &args) {
+			const std::string separator = " ";
+			for (const auto &arg : *args) {
+				std::cout << arg->repr_impl(*this)->to_string() << separator;
+			}
+			// make sure this is flushed immediately
+			std::cout << std::endl;
+			return py_none();
+		});
+
+	allocate_object<PyNativeFunction>("iter", [this](const std::shared_ptr<PyTuple> &args) {
+		const auto &arg = args->operator[](0);
+		return arg->iter_impl(*this);
 	});
 
-	allocate_object<PyNativeFunction>(
-		"iter", [this](const std::shared_ptr<PyObject> &arg) { return arg->iter_impl(*this); });
-
-	allocate_object<PyNativeFunction>("next", [this](const std::shared_ptr<PyObject> &arg) {
+	allocate_object<PyNativeFunction>("next", [this](const std::shared_ptr<PyTuple> &args) {
+		const auto &arg = args->operator[](0);
 		auto result = arg->next_impl(*this);
 		if (!result) { raise_exception(stop_iteration("")); }
 		return result;
 	});
 
-	allocate_object<PyNativeFunction>("range", [this](const std::shared_ptr<PyObject> &arg) {
+	allocate_object<PyNativeFunction>("range", [this](const std::shared_ptr<PyTuple> &args) {
+		const auto &arg = args->operator[](0);
 		auto &heap = VirtualMachine::the().heap();
 		if (auto pynumber = to_integer(arg, *this)) {
 			return std::static_pointer_cast<PyObject>(heap.allocate<PyRange>(*pynumber));

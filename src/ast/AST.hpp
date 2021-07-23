@@ -191,7 +191,7 @@ class Tuple : public ASTNode
 	ContextType context() const { return m_ctx; }
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 

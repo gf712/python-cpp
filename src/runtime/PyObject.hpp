@@ -23,6 +23,8 @@ enum class PyObjectType {
 	PY_CODE,
 	PY_LIST,
 	PY_LIST_ITERATOR,
+	PY_TUPLE,
+	PY_TUPLE_ITERATOR,
 	PY_BASE_EXCEPTION,
 	PY_RANGE,
 	PY_RANGE_ITERATOR
@@ -60,6 +62,12 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_LIST_ITERATOR: {
 		return "list_iterator";
+	}
+	case PyObjectType::PY_TUPLE: {
+		return "tuple";
+	}
+	case PyObjectType::PY_TUPLE_ITERATOR: {
+		return "tuple_iterator";
 	}
 	case PyObjectType::PY_BASE_EXCEPTION: {
 		return "BaseException";
@@ -115,6 +123,11 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	{
 		return std::static_pointer_cast<const T>(shared_from_this());
 	}
+
+	template<typename T> std::shared_ptr<T> shared_from_this_as()
+	{
+		return std::static_pointer_cast<T>(shared_from_this());
+	}
 };
 
 
@@ -147,18 +160,19 @@ class PyFunction : public PyObject
 	std::string to_string() const override { return fmt::format("PyFunction"); }
 };
 
+class PyTuple;
 
 class PyNativeFunction : public PyObject
 {
-	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyObject>)> m_function;
+	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyTuple>)> m_function;
 
   public:
 	PyNativeFunction(
-		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyObject> &)> function)
+		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &)> function)
 		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_function(function)
 	{}
 
-	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyObject> &args)
+	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyTuple> &args)
 	{
 		return m_function(args);
 	}
@@ -325,13 +339,65 @@ class PyList : public PyObject
 	const std::vector<Value> &elements() const { return m_elements; }
 };
 
+class PyTupleIterator;
+
+class PyTuple : public PyObject
+{
+	friend class Heap;
+
+	std::vector<Value> m_elements;
+
+  public:
+	PyTuple(std::vector<Value> elements)
+		: PyObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
+	{}
+
+	std::string to_string() const override;
+
+	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
+
+	PyTupleIterator begin() const;
+	PyTupleIterator end() const;
+
+	// std::shared_ptr<PyTupleIterator> cbegin() const;
+	// std::shared_ptr<PyTupleIterator> cend() const;
+
+	const std::vector<Value> &elements() const { return m_elements; }
+	std::shared_ptr<PyObject> operator[](size_t idx) const;
+};
+
+
+class PyTupleIterator : public PyObject
+{
+	friend class Heap;
+	friend PyTuple;
+
+	std::shared_ptr<const PyTuple> m_pytuple;
+	size_t m_current_index{ 0 };
+
+  public:
+	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple)
+		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(std::move(pytuple))
+	{}
+
+	std::string to_string() const override;
+
+	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> next_impl(Interpreter &interpreter) override;
+
+	bool operator==(const PyTupleIterator &) const;
+	std::shared_ptr<PyObject> operator*() const;
+	PyTupleIterator &operator++();
+};
+
 
 class PyListIterator : public PyObject
 {
 	friend class Heap;
 
 	std::shared_ptr<const PyList> m_pylist;
-	size_t m_current_index;
+	size_t m_current_index{ 0 };
 
   public:
 	PyListIterator(std::shared_ptr<const PyList> pylist)

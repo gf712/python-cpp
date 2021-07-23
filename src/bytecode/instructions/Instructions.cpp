@@ -126,6 +126,17 @@ void BuildList::execute(VirtualMachine &vm, Interpreter &) const
 	vm.reg(m_dst) = heap.allocate<PyList>(elements);
 };
 
+
+void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
+{
+	std::vector<Value> elements;
+	for (const auto &src : m_srcs) { elements.push_back(vm.reg(src)); }
+
+	auto &heap = vm.heap();
+	vm.reg(m_dst) = heap.allocate<PyTuple>(elements);
+};
+
+
 void GetIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto iterable_value = vm.reg(m_src);

@@ -275,15 +275,30 @@ Register List::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 {
 	std::vector<Register> element_registers;
 	element_registers.reserve(m_elements.size());
-	const auto result_reg = generator.allocate_register();
 
 	for (const auto &el : m_elements) {
 		element_registers.push_back(el->generate(function_id, generator, ctx));
 	}
 
+	const auto result_reg = generator.allocate_register();
 	generator.emit<BuildList>(function_id, result_reg, element_registers);
 
 	return result_reg;
 }
 
+
+Register Tuple::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	std::vector<Register> element_registers;
+	element_registers.reserve(m_elements.size());
+
+	for (const auto &el : m_elements) {
+		element_registers.push_back(el->generate(function_id, generator, ctx));
+	}
+
+	const auto result_reg = generator.allocate_register();
+	generator.emit<BuildTuple>(function_id, result_reg, element_registers);
+
+	return result_reg;
+}
 }// namespace ast
