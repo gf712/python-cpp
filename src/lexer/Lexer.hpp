@@ -420,11 +420,18 @@ class Lexer
 
 	bool try_read_name()
 	{
-		if (!std::isalpha(peek(0))) { return false; }
+		auto valid_start_name = [](const char c) { return std::isalpha(c) || c == '_'; };
+
+		if (!valid_start_name(peek(0))) { return false; }
 		const Position original_position = m_position;
 		// name must start with alpha
-		if (!advance_if([](const char c) { return std::isalpha(c); })) { return false; }
-		advance_while([](const char c) { return std::isalnum(c) || c == '_'; });
+		if (!advance_if([valid_start_name](const char c) { return valid_start_name(c); })) {
+			return false;
+		}
+
+		auto valid_name = [](const char c) { return std::isalnum(c) || c == '_'; };
+
+		advance_while([valid_name](const char c) { return valid_name(c); });
 		m_tokens_to_emit.emplace_back(Token::TokenType::NAME, original_position, m_position);
 		return true;
 	}

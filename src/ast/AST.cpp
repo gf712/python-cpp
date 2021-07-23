@@ -137,20 +137,28 @@ Register Assign::generate(size_t function_id, BytecodeGenerator &generator, ASTC
 		const auto &local_args = ctx.local_args();
 		const auto &arg_names = local_args->argument_names();
 		for (const auto &target : m_targets) {
-			for (const auto &var : target->ids()) {
-				if (auto it = std::find(arg_names.begin(), arg_names.end(), var);
-					it != arg_names.end()) {
-					const size_t arg_index = std::distance(arg_names.begin(), it);
-					generator.emit<StoreFast>(function_id, arg_index, var, src_register);
-				} else {
-					generator.emit<StoreName>(function_id, var, src_register);
+			if (auto ast_name = as<Name>(target)) {
+				for (const auto &var : ast_name->ids()) {
+					if (auto it = std::find(arg_names.begin(), arg_names.end(), var);
+						it != arg_names.end()) {
+						const size_t arg_index = std::distance(arg_names.begin(), it);
+						generator.emit<StoreFast>(function_id, arg_index, var, src_register);
+					} else {
+						generator.emit<StoreName>(function_id, var, src_register);
+					}
 				}
+			} else {
+				TODO();
 			}
 		}
 	} else {
 		for (const auto &target : m_targets) {
-			for (const auto &var : target->ids()) {
-				generator.emit<StoreName>(function_id, var, src_register);
+			if (auto ast_name = as<Name>(target)) {
+				for (const auto &var : ast_name->ids()) {
+					generator.emit<StoreName>(function_id, var, src_register);
+				}
+			} else {
+				TODO();
 			}
 		}
 	}

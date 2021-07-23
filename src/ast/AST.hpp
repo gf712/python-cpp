@@ -19,9 +19,11 @@ namespace ast {
 #define AST_NODE_TYPES                  \
 	__AST_NODE_TYPE(Argument)           \
 	__AST_NODE_TYPE(Arguments)          \
+	__AST_NODE_TYPE(Attribute)          \
 	__AST_NODE_TYPE(Assign)             \
 	__AST_NODE_TYPE(BinaryExpr)         \
 	__AST_NODE_TYPE(Call)               \
+	__AST_NODE_TYPE(ClassDefinition)    \
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(For)                \
@@ -53,6 +55,7 @@ inline std::string_view node_type_to_string(ASTNodeType node_type)
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
+enum class ContextType { LOAD = 0, STORE = 1, DELETE = 2, UNSET = 3 };
 
 class ASTContext
 {
@@ -129,9 +132,6 @@ class Constant : public ASTNode
 
 class List : public ASTNode
 {
-  public:
-	enum class ContextType { LOAD = 0, STORE = 1, UNSET = 2 };
-
   private:
 	std::vector<std::shared_ptr<ASTNode>> m_elements;
 	ContextType m_ctx;
@@ -165,7 +165,6 @@ class List : public ASTNode
 class Variable : public ASTNode
 {
   public:
-	enum class ContextType { LOAD = 0, STORE = 1, DEL = 2, UNSET = 3 };
 	ContextType context_type() const { return m_ctx; }
 
 	virtual const std::vector<std::string> &ids() const = 0;
@@ -209,7 +208,7 @@ class Statement : public ASTNode
 
 class Assign : public Statement
 {
-	std::vector<std::shared_ptr<Variable>> m_targets;
+	std::vector<std::shared_ptr<ASTNode>> m_targets;
 	std::shared_ptr<ASTNode> m_value;
 	std::string m_type_comment;
 
@@ -226,14 +225,14 @@ class Assign : public Statement
 	}
 
   public:
-	Assign(std::vector<std::shared_ptr<Variable>> targets,
+	Assign(std::vector<std::shared_ptr<ASTNode>> targets,
 		std::shared_ptr<ASTNode> value,
 		std::string type_comment)
 		: Statement(ASTNodeType::Assign), m_targets(std::move(targets)), m_value(std::move(value)),
 		  m_type_comment(std::move(type_comment))
 	{}
 
-	const std::vector<std::shared_ptr<Variable>> &targets() const { return m_targets; }
+	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 
 	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
@@ -429,6 +428,49 @@ class FunctionDefinition final : public ASTNode
 	const std::string &type_comment() const { return m_type_comment; }
 
 	Register generate(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
+};
+
+
+class ClassDefinition final : public ASTNode
+{
+	const std::string m_class_name;
+	const std::shared_ptr<Arguments> m_args;
+	const std::vector<std::shared_ptr<ASTNode>> m_body;
+	const std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
+
+	void print_this_node(const std::string &indent) const final
+	{
+		spdlog::debug("{}ClassDefinition", indent);
+		spdlog::debug("{}  - function_name: {}", indent, m_class_name);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - args:", indent);
+		if (m_args) {
+			m_args->print_node(new_indent);
+		} else {
+			spdlog::debug("{}    (Empty):", indent);
+		}
+		spdlog::debug("{}  - body:", indent);
+		for (const auto &statement : m_body) { statement->print_node(new_indent); }
+		spdlog::debug("{}  - decorator_list:", indent);
+		for (const auto &decorator : m_decorator_list) { decorator->print_node(new_indent); }
+	}
+
+  public:
+	ClassDefinition(std::string class_name,
+		std::shared_ptr<Arguments> args,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ASTNode>> decorator_list)
+		: ASTNode(ASTNodeType::ClassDefinition), m_class_name(std::move(class_name)),
+		  m_args(std::move(args)), m_body(std::move(body)),
+		  m_decorator_list(std::move(decorator_list))
+	{}
+
+	const std::string &name() const { return m_class_name; }
+	const std::shared_ptr<Arguments> &args() const { return m_args; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
 };
 
 
@@ -629,6 +671,37 @@ class Compare : public ASTNode
 		spdlog::debug("{}  - op: {}", indent, op_type_to_string(m_op));
 		spdlog::debug("{}  - rhs:", indent);
 		m_rhs->print_node(new_indent);
+	}
+};
+
+
+class Attribute : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_value;
+	std::string m_attr;
+	ContextType m_ctx;
+
+  public:
+	Attribute(std::shared_ptr<ASTNode> value, std::string attr, ContextType ctx)
+		: ASTNode(ASTNodeType::Attribute), m_value(std::move(value)), m_attr(std::move(attr)),
+		  m_ctx(ctx)
+	{}
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO(); }
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	const std::string &attr() const { return m_attr; }
+	ContextType context() const { return m_ctx; }
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}Attribute", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - value:", indent);
+		m_value->print_node(new_indent);
+		spdlog::debug("{}  - attr: \"{}\"", indent, m_attr);
+		spdlog::debug("{}  - ctx: {}", indent, static_cast<int>(m_ctx));
 	}
 };
 

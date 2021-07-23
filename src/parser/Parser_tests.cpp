@@ -137,6 +137,33 @@ void compare_function_definition(const std::shared_ptr<ASTNode> &result,
 }
 
 
+void compare_class_definition(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::ClassDefinition);
+
+	const auto result_name = as<ClassDefinition>(result)->name();
+	const auto expected_name = as<ClassDefinition>(expected)->name();
+	EXPECT_EQ(result_name, expected_name);
+
+	// const auto result_args = as<FunctionDefinition>(result)->args();
+	// const auto expected_args = as<FunctionDefinition>(expected)->args();
+	// dispatch(result_args, expected_args);
+
+	const auto result_body = as<ClassDefinition>(result)->body();
+	const auto expected_body = as<ClassDefinition>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+
+	const auto result_decorator_list = as<ClassDefinition>(result)->decorator_list();
+	const auto expected_decorator_list = as<ClassDefinition>(expected)->decorator_list();
+	ASSERT_EQ(result_decorator_list.size(), expected_decorator_list.size());
+	for (size_t i = 0; i < result_decorator_list.size(); ++i) {
+		dispatch(result_decorator_list[i], expected_decorator_list[i]);
+	}
+}
+
+
 void compare_return(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -259,6 +286,24 @@ void compare_list(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	}
 }
 
+void compare_attribute(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Attribute);
+
+	const auto result_context = as<Attribute>(result)->context();
+	const auto expected_context = as<Attribute>(expected)->context();
+	ASSERT_EQ(result_context, expected_context);
+
+	const auto result_attr = as<Attribute>(result)->attr();
+	const auto expected_attr = as<Attribute>(expected)->attr();
+	ASSERT_EQ(result_attr, expected_attr);
+
+	const auto result_value = as<Attribute>(result)->value();
+	const auto expected_value = as<Attribute>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -310,6 +355,14 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_for(result, expected);
 		break;
 	}
+	case ASTNodeType::ClassDefinition: {
+		compare_class_definition(result, expected);
+		break;
+	}
+	case ASTNodeType::Attribute: {
+		compare_attribute(result, expected);
+		break;
+	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
 		TODO()
@@ -342,11 +395,10 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 {
 	constexpr std::string_view program = "a = 2\n";
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<Constant>(static_cast<int64_t>(2)),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Constant>(static_cast<int64_t>(2)),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -355,11 +407,10 @@ TEST(Parser, SimplePositiveDoubleAssignment)
 {
 	constexpr std::string_view program = "a = 2.0\n";
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<Constant>(static_cast<double>(2.0)),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Constant>(static_cast<double>(2.0)),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -368,11 +419,10 @@ TEST(Parser, SimpleStringAssignment)
 {
 	constexpr std::string_view program = "a = \"2\"\n";
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<Constant>("2"),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Constant>("2"),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -381,13 +431,12 @@ TEST(Parser, BinaryOperationWithAssignment)
 {
 	constexpr std::string_view program = "a = 1 + 2\n";
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
-				std::make_shared<Constant>(static_cast<int64_t>(1)),
-				std::make_shared<Constant>(static_cast<int64_t>(2))),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+			std::make_shared<Constant>(static_cast<int64_t>(1)),
+			std::make_shared<Constant>(static_cast<int64_t>(2))),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -397,13 +446,12 @@ TEST(Parser, BinaryOperationModulo)
 {
 	constexpr std::string_view program = "a = 3 % 4\n";
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO,
-				std::make_shared<Constant>(int64_t{3}),
-				std::make_shared<Constant>(int64_t{4})),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO,
+			std::make_shared<Constant>(int64_t{ 3 }),
+			std::make_shared<Constant>(int64_t{ 4 })),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -422,8 +470,8 @@ TEST(Parser, FunctionDefinition)
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
-				std::make_shared<Name>("a", Variable::ContextType::LOAD),
-				std::make_shared<Name>("b", Variable::ContextType::LOAD))),
+				std::make_shared<Name>("a", ContextType::LOAD),
+				std::make_shared<Name>("b", ContextType::LOAD))),
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
@@ -445,13 +493,13 @@ TEST(Parser, MultilineFunctionDefinition)
 			std::make_shared<Argument>("a", "", ""),
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-										 "constant", Variable::ContextType::STORE) },
+			std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+										 "constant", ContextType::STORE) },
 				std::make_shared<Constant>(static_cast<int64_t>(1)),
 				""),
 			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
-				std::make_shared<Name>("a", Variable::ContextType::LOAD),
-				std::make_shared<Name>("constant", Variable::ContextType::LOAD))),
+				std::make_shared<Name>("a", ContextType::LOAD),
+				std::make_shared<Name>("constant", ContextType::LOAD))),
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
@@ -470,7 +518,7 @@ TEST(Parser, SimpleIfStatement)
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", Variable::ContextType::LOAD),
+			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
 			std::vector<std::shared_ptr<ASTNode>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{}// orelse
@@ -490,11 +538,11 @@ TEST(Parser, SimpleIfElseStatement)
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", Variable::ContextType::LOAD),
+			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
 			std::vector<std::shared_ptr<ASTNode>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
+			std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Goodbye!") },
 				std::vector<std::shared_ptr<ASTNode>>{}) }// orelse
 		));
@@ -510,19 +558,18 @@ TEST(Parser, IfStatementWithComparisson)
 		"   a = 2\n";
 
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<Constant>(static_cast<int64_t>(1)),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Constant>(static_cast<int64_t>(1)),
+		""));
 	expected_ast->emplace(std::make_shared<If>(
-		std::make_shared<Compare>(std::make_shared<Name>("a", Variable::ContextType::LOAD),
+		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD),
 			Compare::OpType::Eq,
 			std::make_shared<Constant>(static_cast<int64_t>(1))),// test
 		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-										 "a", Variable::ContextType::STORE) },
-				std::make_shared<Constant>(static_cast<int64_t>(2)),
+			std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+										 "a", ContextType::STORE) },
+				std::make_shared<Constant>(int64_t{ 2 }),
 				"") },// body
 		std::vector<std::shared_ptr<ASTNode>>{}// orelse
 		));
@@ -535,18 +582,17 @@ TEST(Parser, LiteralList)
 	constexpr std::string_view program = "a = [1, 2, 3, 5]\n";
 
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<Variable>>{ std::make_shared<Name>(
-									 "a", Variable::ContextType::STORE) },
-			std::make_shared<List>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(static_cast<int64_t>(1)),
-					std::make_shared<Constant>(static_cast<int64_t>(2)),
-					std::make_shared<Constant>(static_cast<int64_t>(3)),
-					std::make_shared<Constant>(static_cast<int64_t>(5)),
-				},
-				List::ContextType::LOAD),
-			""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<List>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }),
+				std::make_shared<Constant>(int64_t{ 2 }),
+				std::make_shared<Constant>(int64_t{ 3 }),
+				std::make_shared<Constant>(int64_t{ 5 }),
+			},
+			ContextType::LOAD),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -558,19 +604,18 @@ TEST(Parser, SimpleForLoopWithFunctionCall)
 		"	print(x)\n";
 
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<For>(std::make_shared<Name>("x", Variable::ContextType::STORE),// target
-			std::make_shared<Call>(std::make_shared<Name>("range", Variable::ContextType::LOAD),
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
-				std::vector<std::shared_ptr<ASTNode>>{}),// iter
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Name>("x", Variable::ContextType::LOAD) },
-					std::vector<std::shared_ptr<ASTNode>>{}) },// body
-			std::vector<std::shared_ptr<ASTNode>>{},// orelse
-			""// type_comment
-			));
+	expected_ast->emplace(std::make_shared<For>(
+		std::make_shared<Name>("x", ContextType::STORE),// target
+		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
+			std::vector<std::shared_ptr<ASTNode>>{}),// iter
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("x", ContextType::LOAD) },
+			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+		std::vector<std::shared_ptr<ASTNode>>{},// orelse
+		""// type_comment
+		));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -585,23 +630,55 @@ TEST(Parser, ForLoopWithElseBlock)
 		"	print(\"ELSE!\")\n";
 
 	auto expected_ast = std::make_shared<Module>();
-	expected_ast->emplace(
-		std::make_shared<For>(std::make_shared<Name>("x", Variable::ContextType::STORE),// target
-			std::make_shared<Call>(std::make_shared<Name>("range", Variable::ContextType::LOAD),
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
-				std::vector<std::shared_ptr<ASTNode>>{}),// iter
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Name>("x", Variable::ContextType::LOAD) },
-					std::vector<std::shared_ptr<ASTNode>>{}) },// body
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Call>(std::make_shared<Name>("print", Variable::ContextType::LOAD),
-					std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("ELSE!") },
-					std::vector<std::shared_ptr<ASTNode>>{}),
-			},// orelse
-			""// type_comment
-			));
+	expected_ast->emplace(std::make_shared<For>(
+		std::make_shared<Name>("x", ContextType::STORE),// target
+		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
+			std::vector<std::shared_ptr<ASTNode>>{}),// iter
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("x", ContextType::LOAD) },
+			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("ELSE!") },
+				std::vector<std::shared_ptr<ASTNode>>{}),
+		},// orelse
+		""// type_comment
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ClassDefinition)
+{
+	constexpr std::string_view program =
+		"class A:\n"
+		"	def __init__(self, value):\n"
+		"		self.value = value\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<ClassDefinition>("A",// class name
+		nullptr,// arguments
+		std::vector<std::shared_ptr<ast::ASTNode>>{
+			std::make_shared<FunctionDefinition>("__init__",// function_name
+				std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
+					std::make_shared<Argument>("self", "", ""),
+					std::make_shared<Argument>("value", "", ""),
+				}),// args
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Assign>(
+					std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Attribute>(
+						std::make_shared<Name>("self", ContextType::LOAD),
+						"value",
+						ContextType::STORE) },
+					std::make_shared<Name>("value", ContextType::LOAD),
+					"") },// body
+				std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+				nullptr,// returns
+				""// type_comment
+				) },// body
+		std::vector<std::shared_ptr<ast::ASTNode>>{}// decorator_list
+		));
 
 	assert_generates_ast(program, expected_ast);
 }

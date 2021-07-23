@@ -272,17 +272,85 @@ struct StarAtomPattern : Pattern<StarAtomPattern>
 
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string id{ p.lexer().get(token->start(), token->end()) };
-			p.push_to_stack(std::make_shared<Name>(id, Variable::ContextType::STORE));
+			p.push_to_stack(std::make_shared<Name>(id, ContextType::STORE));
 			return true;
 		}
 		return false;
 	}
 };
 
-struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
+struct TLookahead : Pattern<TLookahead>
 {
+	// t_lookahead: '(' | '[' | '.'
 	static bool matches_impl(Parser &p)
 	{
+		spdlog::debug("t_lookahead");
+		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+
+		using pattern1 = PatternMatch<GroupPattern<SingleTokenPattern<Token::TokenType::LPAREN>,
+			SingleTokenPattern<Token::TokenType::LSQB>,
+			SingleTokenPattern<Token::TokenType::DOT>>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("t_lookahead: '(' | '[' | '.'");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct AtomPattern;
+
+struct TPrimaryPattern : Pattern<TPrimaryPattern>
+{
+	// t_primary:
+	// 	| t_primary '.' NAME &t_lookahead
+	// 	| t_primary '[' slices ']' &t_lookahead
+	// 	| t_primary genexp &t_lookahead
+	// 	| t_primary '(' [arguments] ')' &t_lookahead
+	// 	| atom &t_lookahead
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("t_primary");
+		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+
+		using pattern5 = PatternMatch<AtomPattern, LookAhead<TLookahead>>;
+		if (pattern5::match(p)) {
+			spdlog::debug("atom &t_lookahead");
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
+{
+	// target_with_star_atom:
+	// 		| t_primary '.' NAME !t_lookahead
+	// 		| t_primary '[' slices ']' !t_lookahead
+	// 		| star_atom
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("target_with_star_atom");
+		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+
+		// t_primary '.' NAME !t_lookahead
+		using pattern1 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("t_primary '.' NAME !t_lookahead ");
+			const auto token = p.lexer().peek_token(p.token_position() - 1);
+			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
+			const auto primary = p.pop_back();
+			spdlog::debug("{}", name);
+			primary->print_node("");
+			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
+			p.push_to_stack(attribute);
+			return true;
+		}
+
 		// star_atom
 		using pattern3 = PatternMatch<StarAtomPattern>;
 		if (pattern3::match(p)) {
@@ -296,8 +364,14 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 
 struct StarTargetPattern : Pattern<StarTargetPattern>
 {
+	// star_target:
+	//     | '*' (!'*' star_target)
+	//     | target_with_star_atom
 	static bool matches_impl(Parser &p)
 	{
+		spdlog::debug("star_target");
+		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+
 		// target_with_star_atom
 		using pattern2 = PatternMatch<TargetWithStarAtomPattern>;
 		if (pattern2::match(p)) {
@@ -315,6 +389,9 @@ struct StarTargetsPattern : Pattern<StarTargetsPattern>
 	// | star_target (',' star_target )* [',']
 	static bool matches_impl(Parser &p)
 	{
+		spdlog::debug("star_targets");
+		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+
 		// star_target !','
 		using pattern1 = PatternMatch<StarTargetPattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
@@ -401,7 +478,7 @@ struct ListPattern : Pattern<ListPattern>
 			ZeroOrMorePattern<StarNamedExpressions>,
 			SingleTokenPattern<Token::TokenType::RSQB>>;
 		if (pattern1::match(p)) {
-			auto list = std::make_shared<List>(List::ContextType::LOAD);
+			auto list = std::make_shared<List>(ContextType::LOAD);
 			while (!p.stack().empty()) { list->append(p.pop_front()); }
 			list_scope.parent().push_back(std::move(list));
 			return true;
@@ -446,7 +523,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			} else if (name == "None") {
 				p.push_to_stack(std::make_shared<Constant>(NoneType{}));
 			} else {
-				p.push_to_stack(std::make_shared<Name>(name, Variable::ContextType::LOAD));
+				p.push_to_stack(std::make_shared<Name>(name, ContextType::LOAD));
 			}
 			return true;
 		}
@@ -562,13 +639,21 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 		spdlog::debug("PrimaryPattern_");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
 		const auto original_stack_size = p.stack().size();
-		// '(' [arguments] ')' primary'
+		// '.' NAME primary'
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			PrimaryPattern_>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'.' NAME primary'");
+			return true;
+		}
+
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrOnePattern<ArgumentsPattern>,
 			SingleTokenPattern<Token::TokenType::RPAREN>,
 			PrimaryPattern_>;
 		if (pattern3::match(p)) {
-			spdlog::debug(" '(' [arguments] ')' primary'");
+			spdlog::debug("'(' [arguments] ')' primary'");
 			const size_t stack_size = p.stack().size();
 			std::vector<std::shared_ptr<ASTNode>> args;
 			std::vector<std::shared_ptr<ASTNode>> kwargs;
@@ -721,8 +806,9 @@ struct TermPattern_ : Pattern<TermPattern_>
 		// using pattern3 =
 		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
 		// if (pattern3::match(tokens, p)) { return true; }
-		using pattern4 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>, FactorPattern, TermPattern_>;
+		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>,
+			FactorPattern,
+			TermPattern_>;
 		if (pattern4::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
@@ -1148,16 +1234,16 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 		if (pattern3::match(p)) {
 			spdlog::debug(
 				"(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
-			std::vector<std::shared_ptr<Variable>> targets;
+			std::vector<std::shared_ptr<ASTNode>> targets;
 			auto expressions = p.pop_back();
 			const auto &stack = p.stack();
-			for (size_t i = start_position; i < stack.size(); ++i) {
-				targets.push_back(std::static_pointer_cast<Variable>(stack[i]));
-			}
+			for (size_t i = start_position; i < stack.size(); ++i) { targets.push_back(stack[i]); }
 			while (p.stack().size() > start_position) { p.pop_back(); }
 			p.print_stack();
+			expressions->print_node("");
 			auto assignment = std::make_shared<Assign>(targets, expressions, "");
 			p.push_to_stack(assignment);
+			assignment->print_node("");
 			return true;
 		}
 		return false;
@@ -1582,6 +1668,74 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 	}
 };
 
+
+struct ClassPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "class"; }
+};
+
+
+struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
+{
+	// class_def_raw:
+	//     | 'class' NAME ['(' [arguments] ')' ] ':' block
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("ClassDefinitionRawPattern");
+		BlockScope scope{ p };
+
+		// 'class' NAME ['(' [arguments] ')' ] ':'
+		using pattern0 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ClassPattern>,
+				SingleTokenPattern<Token::TokenType::NAME>,
+				SingleTokenPattern<Token::TokenType::COLON>>;
+		if (pattern0::match(p)) {
+			spdlog::debug("'class' NAME ['(' [arguments] ')' ] ':'");
+			// FIXME: assumes no inheritance
+			auto token = p.lexer().peek_token(p.token_position() - 2);
+			spdlog::debug("{}", token->to_string());
+			std::string class_name{ token->start().pointer_to_program,
+				token->end().pointer_to_program };
+
+			std::vector<std::shared_ptr<ASTNode>> body;
+			{
+				BlockScope block_scope{ p };
+				using pattern1 = PatternMatch<BlockPattern>;
+				if (pattern1::match(p)) {
+					spdlog::debug("block");
+				} else {
+					return false;
+				}
+				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
+			}
+			std::shared_ptr<Arguments> arguments;
+			std::vector<std::shared_ptr<ASTNode>> decorator_list;
+			// while (!p.stack().empty()) { arguments.push_back(p.pop_front()); }
+			scope.parent().push_back(
+				std::make_shared<ClassDefinition>(class_name, arguments, body, decorator_list));
+			return true;
+		}
+		return false;
+	}
+};
+
+struct ClassDefinitionPattern : Pattern<ClassDefinitionPattern>
+{
+	// class_def:
+	//     | decorators class_def_raw
+	//     | class_def_raw
+	static bool matches_impl(Parser &p)
+	{
+		// class_def_raw
+		using pattern2 = PatternMatch<ClassDefinitionRawPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("class_def_raw");
+			return true;
+		}
+		return false;
+	}
+};
+
 struct ForPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "for"; }
@@ -1656,6 +1810,13 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 		using pattern2 = PatternMatch<IfStatementPattern>;
 		if (pattern2::match(p)) {
 			spdlog::debug("if_stmt");
+			p.print_stack();
+			return true;
+		}
+
+		using pattern3 = PatternMatch<ClassDefinitionPattern>;
+		if (pattern3::match(p)) {
+			spdlog::debug("class_def");
 			p.print_stack();
 			return true;
 		}

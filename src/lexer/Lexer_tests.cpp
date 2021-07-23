@@ -326,3 +326,37 @@ TEST(Lexer, LiteralList)
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
 }
+
+TEST(Lexer, ClassDefinition)
+{
+	constexpr std::string_view program =
+		"class A:\n"
+		"	def __init__(self, value):\n"
+		"		self.value = value\n";
+
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NAME,
+		Token::TokenType::COMMA,
+		Token::TokenType::NAME,
+		Token::TokenType::RPAREN,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::DOT,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NAME,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::DEDENT,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
