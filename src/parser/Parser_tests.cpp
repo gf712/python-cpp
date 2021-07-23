@@ -286,6 +286,22 @@ void compare_list(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	}
 }
 
+void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Tuple);
+
+	const auto result_context = as<Tuple>(result)->context();
+	const auto expected_context = as<Tuple>(expected)->context();
+	ASSERT_EQ(result_context, expected_context);
+
+	const auto result_elements = as<Tuple>(result)->elements();
+	const auto expected_elements = as<Tuple>(expected)->elements();
+	ASSERT_EQ(result_elements.size(), expected_elements.size());
+	for (size_t i = 0; i < result_elements.size(); ++i) {
+		dispatch(expected_elements[i], expected_elements[i]);
+	}
+}
+
 void compare_attribute(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -349,6 +365,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::List: {
 		compare_list(result, expected);
+		break;
+	}
+	case ASTNodeType::Tuple: {
+		compare_tuple(result, expected);
 		break;
 	}
 	case ASTNodeType::For: {
@@ -585,6 +605,26 @@ TEST(Parser, LiteralList)
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<List>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }),
+				std::make_shared<Constant>(int64_t{ 2 }),
+				std::make_shared<Constant>(int64_t{ 3 }),
+				std::make_shared<Constant>(int64_t{ 5 }),
+			},
+			ContextType::LOAD),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LiteralTuple)
+{
+	constexpr std::string_view program = "a = (1, 2, 3, 5)\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Constant>(int64_t{ 1 }),
 				std::make_shared<Constant>(int64_t{ 2 }),

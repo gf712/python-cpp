@@ -327,6 +327,26 @@ TEST(Lexer, LiteralList)
 	assert_generates_tokens(program, expected_tokens);
 }
 
+TEST(Lexer, LiteralTuple)
+{
+	constexpr std::string_view program = "a = (1, 2, 3, 5)\n";
+
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::COMMA,
+		Token::TokenType::NUMBER,
+		Token::TokenType::RPAREN,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
 TEST(Lexer, ClassDefinition)
 {
 	constexpr std::string_view program =

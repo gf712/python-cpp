@@ -177,7 +177,7 @@ template<size_t TypeIdx, typename PatternTuple> struct GroupPattern_
 };
 
 
-template<typename... PatternTypes> struct GroupPattern : Pattern<GroupPattern<PatternTypes...>>
+template<typename... PatternTypes> struct OrPattern : Pattern<OrPattern<PatternTypes...>>
 {
 	static bool matches_impl(Parser &p)
 	{
@@ -287,7 +287,7 @@ struct TLookahead : Pattern<TLookahead>
 		spdlog::debug("t_lookahead");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
 
-		using pattern1 = PatternMatch<GroupPattern<SingleTokenPattern<Token::TokenType::LPAREN>,
+		using pattern1 = PatternMatch<OrPattern<SingleTokenPattern<Token::TokenType::LPAREN>,
 			SingleTokenPattern<Token::TokenType::LSQB>,
 			SingleTokenPattern<Token::TokenType::DOT>>>;
 		if (pattern1::match(p)) {
@@ -487,10 +487,48 @@ struct ListPattern : Pattern<ListPattern>
 	}
 };
 
+
 struct ListCompPattern : Pattern<ListCompPattern>
 {
 	static bool matches_impl(Parser &) { return false; }
 };
+
+
+struct TuplePattern : Pattern<TuplePattern>
+{
+	// tuple:
+	//     | '(' [star_named_expression ',' [star_named_expressions]  ] ')'
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope list_scope{ p };
+		spdlog::debug("list");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+			ZeroOrMorePattern<StarNamedExpression,
+				SingleTokenPattern<Token::TokenType::COMMA>,
+				ZeroOrMorePattern<StarNamedExpressions>>,
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
+		if (pattern1::match(p)) {
+			auto tuple = std::make_shared<Tuple>(ContextType::LOAD);
+			while (!p.stack().empty()) { tuple->append(p.pop_front()); }
+			list_scope.parent().push_back(std::move(tuple));
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct GroupPattern : Pattern<GroupPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
+
+struct GenexPattern : Pattern<GenexPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
 
 struct AtomPattern : Pattern<AtomPattern>
 {
@@ -554,8 +592,15 @@ struct AtomPattern : Pattern<AtomPattern>
 			return true;
 		}
 
+		// 	| (tuple | group | genexp)
+		using pattern8 = PatternMatch<OrPattern<TuplePattern, GroupPattern, GenexPattern>>;
+		if (pattern8::match(p)) {
+			spdlog::debug("(tuple | group | genexp)");
+			return true;
+		}
+
 		// 	| (list | listcomp)
-		using pattern9 = PatternMatch<GroupPattern<ListPattern, ListCompPattern>>;
+		using pattern9 = PatternMatch<OrPattern<ListPattern, ListCompPattern>>;
 		if (pattern9::match(p)) {
 			spdlog::debug("(list | listcomp)");
 			return true;
