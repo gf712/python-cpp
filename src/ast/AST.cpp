@@ -1,7 +1,8 @@
 #include "AST.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/instructions/Instructions.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
+#include "bytecode/instructions/Instructions.hpp"
+#include "bytecode/instructions/LoadBuildClass.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {
@@ -301,4 +302,55 @@ Register Tuple::generate(size_t function_id, BytecodeGenerator &generator, ASTCo
 
 	return result_reg;
 }
+
+
+Register ClassDefinition::generate(size_t function_id,
+	BytecodeGenerator &generator,
+	ASTContext &ctx) const
+{
+	if (m_args) {
+		spdlog::error("ClassDefinition cannot handle arguments");
+		TODO();
+	}
+
+	size_t class_id;
+	{
+		auto this_class_info = generator.allocate_function();
+		class_id = this_class_info.function_id;
+
+		auto name_register = generator.allocate_register();
+		auto qualname_register = generator.allocate_register();
+		auto return_none_register = generator.allocate_register();
+
+		// class definition preamble, a la CPython
+		generator.emit<LoadName>(class_id, name_register, "__name__");
+		generator.emit<StoreName>(class_id, "__module__", name_register);
+		generator.emit<LoadConst>(class_id, qualname_register, String{ "A" });
+		generator.emit<StoreName>(class_id, "__qualname__", qualname_register);
+
+		// the actual class definition
+		for (const auto &el : m_body) { el->generate(class_id, generator, ctx); }
+
+		generator.emit<LoadConst>(class_id, return_none_register, NameConstant{ NoneType{} });
+		generator.emit<ReturnValue>(class_id, return_none_register);
+	}
+
+	auto builtin_build_class_register = generator.allocate_register();
+	auto class_name_register = generator.allocate_register();
+	auto class_location_register = generator.allocate_register();
+
+	generator.emit<LoadBuildClass>(function_id, builtin_build_class_register);
+	generator.emit<LoadConst>(function_id, class_name_register, String{ m_class_name });
+	generator.emit<LoadConst>(
+		function_id, class_location_register, Number{ static_cast<int64_t>(class_id) });
+
+	generator.emit<FunctionCall>(function_id,
+		builtin_build_class_register,
+		std::vector{ class_name_register, class_location_register });
+
+	generator.emit<StoreName>(function_id, m_class_name, Register{ 0 });
+
+	return {};
+}
+
 }// namespace ast

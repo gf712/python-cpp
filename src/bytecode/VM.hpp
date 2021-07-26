@@ -6,11 +6,27 @@
 
 static constexpr size_t KB = 1024;
 
+struct NonCopyable
+{
+	NonCopyable() = default;
+	NonCopyable(const NonCopyable &) = delete;
+	NonCopyable &operator=(const NonCopyable &) = delete;
+};
+
+struct NonMoveable
+{
+	NonMoveable() = default;
+	NonMoveable(NonMoveable &&) = delete;
+	NonMoveable &operator=(NonMoveable &&) = delete;
+};
+
 class Heap
+	: NonCopyable
+	, NonMoveable
 {
 	uint8_t *m_memory;
 	uint8_t *m_static_memory;
-	size_t m_memory_size{ 64 * KB };
+	size_t m_memory_size{ 1024 * KB };
 	size_t m_static_memory_size{ 4 * KB };
 	size_t m_offset{ 0 };
 	size_t m_static_offset{ 0 };
@@ -67,11 +83,14 @@ struct LocalFrame
 {
 	VirtualMachine *vm;
 	LocalFrame(size_t frame_size, VirtualMachine *);
+	LocalFrame(const LocalFrame &) = delete;
 	LocalFrame(LocalFrame &&);
 	~LocalFrame();
 };
 
 class VirtualMachine
+	: NonCopyable
+	, NonMoveable
 {
 	std::shared_ptr<Bytecode> m_bytecode;
 	std::unique_ptr<Interpreter> m_interpreter;

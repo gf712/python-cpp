@@ -27,7 +27,8 @@ enum class PyObjectType {
 	PY_TUPLE_ITERATOR,
 	PY_BASE_EXCEPTION,
 	PY_RANGE,
-	PY_RANGE_ITERATOR
+	PY_RANGE_ITERATOR,
+	PY_CUSTOM_TYPE
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -77,6 +78,9 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_RANGE_ITERATOR: {
 		return "range_iterator";
+	}
+	case PyObjectType::PY_CUSTOM_TYPE: {
+		return "object";
 	}
 	}
 	ASSERT_NOT_REACHED()
@@ -150,26 +154,29 @@ class PyCode : public PyObject
 
 class PyFunction : public PyObject
 {
+	std::string m_name;
 	std::shared_ptr<PyCode> m_code;
 
   public:
-	PyFunction(std::shared_ptr<PyCode> code);
+	PyFunction(std::string, std::shared_ptr<PyCode> code);
 
 	const std::shared_ptr<PyCode> &code() const { return m_code; }
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
+	const std::string &name() const { return m_name; }
 };
 
 class PyTuple;
 
 class PyNativeFunction : public PyObject
 {
+	std::string m_name;
 	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyTuple>)> m_function;
 
   public:
-	PyNativeFunction(
+	PyNativeFunction(std::string name,
 		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &)> function)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_function(function)
+		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)), m_function(function)
 	{}
 
 	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyTuple> &args)
@@ -181,6 +188,8 @@ class PyNativeFunction : public PyObject
 	{
 		return fmt::format("PyNativeFunction {}", static_cast<const void *>(&m_function));
 	}
+
+	const std::string &name() const { return m_name; }
 };
 
 class PyString : public PyObject
@@ -199,7 +208,8 @@ class PyString : public PyObject
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-
+	std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const override;
 
   private:
 	PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s)) {}
@@ -222,6 +232,8 @@ class PyObjectNumber final : public PyObject
 	}
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
+		Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> subtract_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
 	std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
@@ -351,6 +363,12 @@ class PyTuple : public PyObject
 	PyTuple(std::vector<Value> elements)
 		: PyObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
 	{}
+
+	PyTuple(std::vector<std::shared_ptr<PyObject>> elements) : PyObject(PyObjectType::PY_TUPLE)
+	{
+		m_elements.reserve(elements.size());
+		for (auto &&el : elements) { m_elements.push_back(std::move(el)); }
+	}
 
 	std::string to_string() const override;
 

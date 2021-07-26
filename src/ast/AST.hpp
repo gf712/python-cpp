@@ -503,7 +503,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 

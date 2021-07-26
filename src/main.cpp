@@ -10,8 +10,25 @@
 // 	"		return \"A\"\n";
 
 static constexpr std::string_view program =
-	"a = (1,2,3,4)\n"
-	"print(\"values in a:\", 1,2,3,4)\n";
+	"class A:\n"
+	"	a = 1\n"
+	"a = A()\n";
+
+// static constexpr std::string_view program =
+// 	"def fibonacci(element):\n"
+// 	"	if element == 0:\n"
+// 	"		return 0\n"
+// 	"	if element == 1:\n"
+// 	"		return 1\n"
+// 	"	else:\n"
+// 	"		lhs = fibonacci(element-1)\n"
+// 	"		rhs = fibonacci(element-2)\n"
+// 	"		return lhs + rhs\n"
+// 	"s1 = fibonacci(15)\n";
+
+// static constexpr std::string_view program =
+// 	"a = (1,2,3,4)\n"
+// 	"print(\"values in a:\", 1,2,3,4)\n";
 
 int main()
 {

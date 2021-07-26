@@ -71,6 +71,15 @@ std::shared_ptr<PyObject> PyString::repr_impl(Interpreter &) const
 	return PyString::from(String{ m_value });
 }
 
+std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto obj_string = as<PyString>(obj)) {
+		return m_value == obj_string->value() ? py_true() : py_false();
+	} else {
+		return PyObject::equal_impl(obj, interpreter);
+	}
+}
 
 std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
 {
@@ -182,7 +191,8 @@ PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::s
 	// 	m_attributes["co_var"] = PyList::from(m_args);
 }
 
-PyFunction::PyFunction(std::shared_ptr<PyCode> code) : PyObject(PyObjectType::PY_FUNCTION)
+PyFunction::PyFunction(std::string name, std::shared_ptr<PyCode> code)
+	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name))
 {
 	m_code = std::move(code);
 	// m_attributes["__code__"] = m_code;
@@ -202,6 +212,22 @@ std::shared_ptr<PyObject> PyObjectNumber::add_impl(const std::shared_ptr<PyObjec
 		return nullptr;
 	}
 }
+
+
+std::shared_ptr<PyObject> PyObjectNumber::subtract_impl(const std::shared_ptr<PyObject> &obj,
+	Interpreter &interpreter) const
+{
+	if (auto rhs = as<PyObjectNumber>(obj)) {
+		return PyObjectNumber::create(m_value - rhs->value());
+	} else {
+		interpreter.raise_exception(
+			"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
+	}
+}
+
 
 std::shared_ptr<PyObject> PyObjectNumber::modulo_impl(const std::shared_ptr<PyObject> &obj,
 	Interpreter &interpreter) const

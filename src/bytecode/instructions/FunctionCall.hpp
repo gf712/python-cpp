@@ -23,3 +23,5 @@ class FunctionCall final : public Instruction
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
+
+std::shared_ptr<PyObject> execute(VirtualMachine &, Interpreter &, std::shared_ptr<PyObject> func_object, const std::shared_ptr<PyTuple>&);

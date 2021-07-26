@@ -1,8 +1,9 @@
 #pragma once
 
 #include "forward.hpp"
-#include "runtime/Value.hpp"
 #include "bytecode/VM.hpp"
+
+#include "runtime/Value.hpp"
 
 #include <unordered_map>
 #include <memory>
@@ -35,12 +36,8 @@ class ExecutionFrame
 
 
   public:
-	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent)
-	{
-		auto new_frame = std::shared_ptr<ExecutionFrame>(new ExecutionFrame{});
-		new_frame->m_parent = std::move(parent);
-		return new_frame;
-	}
+	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent,
+		const std::string &scope_name);
 
 	const Value &parameter(size_t parameter_idx) const
 	{

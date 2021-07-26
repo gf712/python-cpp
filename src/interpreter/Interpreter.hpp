@@ -12,7 +12,7 @@ class Interpreter
 	enum class Status { OK, EXCEPTION };
 
   private:
-	std::shared_ptr<ExecutionFrame> m_current_frame;
+	std::shared_ptr<ExecutionFrame> m_current_frame{ nullptr };
 	Status m_status{ Status::OK };
 	std::string m_exception_message;
 
