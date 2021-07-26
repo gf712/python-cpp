@@ -302,6 +302,23 @@ void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	}
 }
 
+void compare_dict(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Dict);
+
+	const auto result_values = as<Dict>(result)->values();
+	const auto expected_values = as<Dict>(expected)->values();
+	ASSERT_EQ(result_values.size(), expected_values.size());
+	for (size_t i = 0; i < result_values.size(); ++i) {
+		dispatch(result_values[i], expected_values[i]);
+	}
+
+	const auto result_keys = as<Dict>(result)->keys();
+	const auto expected_keys = as<Dict>(expected)->keys();
+	ASSERT_EQ(result_keys.size(), expected_keys.size());
+	for (size_t i = 0; i < result_keys.size(); ++i) { dispatch(result_keys[i], expected_keys[i]); }
+}
+
 void compare_attribute(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -369,6 +386,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Tuple: {
 		compare_tuple(result, expected);
+		break;
+	}
+	case ASTNodeType::Dict: {
+		compare_dict(result, expected);
 		break;
 	}
 	case ASTNodeType::For: {
@@ -632,6 +653,27 @@ TEST(Parser, LiteralTuple)
 				std::make_shared<Constant>(int64_t{ 5 }),
 			},
 			ContextType::LOAD),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LiteralDict)
+{
+	constexpr std::string_view program = "a = {a: 1, b:2}\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Dict>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Name>("a", ContextType::LOAD),
+				std::make_shared<Name>("b", ContextType::LOAD),
+			},
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }),
+				std::make_shared<Constant>(int64_t{ 2 }),
+			}),
 		""));
 
 	assert_generates_ast(program, expected_ast);

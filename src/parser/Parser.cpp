@@ -529,6 +529,114 @@ struct GenexPattern : Pattern<GenexPattern>
 	static bool matches_impl(Parser &) { return false; }
 };
 
+struct ExpressionPattern;
+
+struct KVPairPattern : Pattern<KVPairPattern>
+{
+	// kvpair: expression ':' expression
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("kvpair");
+		using pattern1 = PatternMatch<ExpressionPattern,
+			SingleTokenPattern<Token::TokenType::COLON>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("kvpair: expression ':' expression");
+			auto value = p.pop_back();
+			auto key = p.pop_back();
+			auto dict = p.stack().back();
+			ASSERT(as<Dict>(dict))
+			as<Dict>(dict)->insert(key, value);
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct DoubleStarredKVPairPattern : Pattern<DoubleStarredKVPairPattern>
+{
+	// double_starred_kvpair:
+	// 		| '**' bitwise_or
+	// 		| kvpair
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("double_starred_kvpair");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESTAR>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'**' bitwise_or");
+			return true;
+		}
+
+		using pattern2 = PatternMatch<KVPairPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("kvpair");
+			return true;
+		}
+
+		return false;
+	}
+};
+
+struct DoubleStarredKVPairsPattern : Pattern<DoubleStarredKVPairsPattern>
+{
+	// double_starred_kvpairs: ','.double_starred_kvpair+ [',']
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("double_starred_kvpairs");
+		using pattern1 = PatternMatch<ApplyInBetweenPattern<DoubleStarredKVPairPattern,
+										  SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("','.double_starred_kvpair+ [',']");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct DictPattern : Pattern<DictPattern>
+{
+	// dict:
+	// | '{' [double_starred_kvpairs] '}'
+	// | '{' invalid_double_starred_kvpairs '}'
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope dict_scope{ p };
+		p.push_to_stack(std::make_shared<Dict>());
+		// '{' [double_starred_kvpairs] '}'
+		spdlog::debug("'{' [double_starred_kvpairs] '}'");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LBRACE>,
+			ZeroOrOnePattern<DoubleStarredKVPairsPattern>,
+			SingleTokenPattern<Token::TokenType::RBRACE>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'{' [double_starred_kvpairs] '}'");
+			dict_scope.parent().push_back(p.pop_back());
+			return true;
+		}
+
+		return false;
+	}
+};
+
+
+struct SetPattern : Pattern<SetPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
+
+struct DictCompPattern : Pattern<DictCompPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
+
+struct SetCompPattern : Pattern<SetCompPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
 
 struct AtomPattern : Pattern<AtomPattern>
 {
@@ -603,6 +711,14 @@ struct AtomPattern : Pattern<AtomPattern>
 		using pattern9 = PatternMatch<OrPattern<ListPattern, ListCompPattern>>;
 		if (pattern9::match(p)) {
 			spdlog::debug("(list | listcomp)");
+			return true;
+		}
+
+		// (dict | set | dictcomp | setcomp)
+		using pattern10 =
+			PatternMatch<OrPattern<DictPattern, SetPattern, DictCompPattern, SetCompPattern>>;
+		if (pattern10::match(p)) {
+			spdlog::debug("(dict | set | dictcomp | setcomp)");
 			return true;
 		}
 
@@ -727,7 +843,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::RPAREN,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
-			Token::TokenType::RSQB>>>;
+			Token::TokenType::RSQB,
+			Token::TokenType::RBRACE>>>;
 		if (pattern5::match(p)) { return true; }
 		return false;
 	}
@@ -943,7 +1060,8 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
-			Token::TokenType::RSQB>>>;
+			Token::TokenType::RSQB,
+			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}
@@ -1007,7 +1125,8 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
-			Token::TokenType::RSQB>>>;
+			Token::TokenType::RSQB,
+			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) { return true; }
 		return false;
 	}

@@ -26,6 +26,7 @@ namespace ast {
 	__AST_NODE_TYPE(ClassDefinition)    \
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
+	__AST_NODE_TYPE(Dict)               \
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
@@ -192,6 +193,43 @@ class Tuple : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
 	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+};
+
+
+class Dict : public ASTNode
+{
+  private:
+	std::vector<std::shared_ptr<ASTNode>> m_keys;
+	std::vector<std::shared_ptr<ASTNode>> m_values;
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}Tuple", indent);
+		spdlog::debug("{}  keys:", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		for (const auto &el : m_keys) { el->print_node(new_indent); }
+		spdlog::debug("{}  values:", indent);
+		for (const auto &el : m_values) { el->print_node(new_indent); }
+	}
+
+  public:
+	Dict(std::vector<std::shared_ptr<ASTNode>> keys, std::vector<std::shared_ptr<ASTNode>> values)
+		: ASTNode(ASTNodeType::Dict), m_keys(std::move(keys)), m_values(std::move(values))
+	{}
+
+	Dict() : ASTNode(ASTNodeType::Dict), m_keys(), m_values() {}
+
+	void insert(std::shared_ptr<ASTNode> key, std::shared_ptr<ASTNode> value)
+	{
+		m_keys.push_back(std::move(key));
+		m_values.push_back(std::move(value));
+	}
+
+	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
+	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
+
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
 };
 
 
