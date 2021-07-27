@@ -660,14 +660,14 @@ TEST(Parser, LiteralTuple)
 
 TEST(Parser, LiteralDict)
 {
-	constexpr std::string_view program = "a = {a: 1, b:2}\n";
+	constexpr std::string_view program = "a = {\"a\": 1, b:2}\n";
 
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Dict>(
 			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::LOAD),
+				std::make_shared<Constant>("a"),
 				std::make_shared<Name>("b", ContextType::LOAD),
 			},
 			std::vector<std::shared_ptr<ASTNode>>{

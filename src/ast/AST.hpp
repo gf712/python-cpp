@@ -229,7 +229,7 @@ class Dict : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
 	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 

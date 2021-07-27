@@ -4,6 +4,37 @@
 #include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 
+
+size_t ValueHash::operator()(const Value &value) const
+{
+	return std::visit(
+		overloaded{ [](const Number &number) -> size_t {
+					   if (std::holds_alternative<double>(number.value)) {
+						   return std::hash<double>{}(std::get<double>(number.value));
+					   } else {
+						   return std::hash<int64_t>{}(std::get<int64_t>(number.value));
+					   }
+				   },
+			[](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
+			[](const Bytes &b) -> size_t {
+				return reinterpret_cast<size_t>(static_cast<const void *>(b.b.data()));
+			},
+			[](const Ellipsis &) -> size_t {
+				return reinterpret_cast<size_t>(static_cast<const void *>(py_ellipsis().get()));
+			},
+			[](const NameConstant &c) -> size_t {
+				if (std::holds_alternative<bool>(c.value)) {
+					return std::get<bool>(c.value) ? 0 : 1;
+				} else {
+					return reinterpret_cast<size_t>(static_cast<const void *>(py_none().get()));
+				}
+			},
+			[](const std::shared_ptr<PyObject> &obj) -> size_t {
+				return reinterpret_cast<size_t>(static_cast<const void *>(obj.get()));
+			} },
+		value);
+}
+
 template<> std::shared_ptr<PyObject> PyObject::from(const std::shared_ptr<PyObject> &value)
 {
 	return value;
@@ -62,6 +93,14 @@ std::shared_ptr<PyObject> PyObject::len_impl(Interpreter &interpreter) const
 {
 	interpreter.raise_exception(
 		fmt::format("TypeError: object of type '{}' has no len()", object_name(type())));
+	return nullptr;
+}
+
+
+std::shared_ptr<PyObject> PyObject::hash_impl(Interpreter &interpreter) const
+{
+	interpreter.raise_exception(
+		fmt::format("TypeError: object of type '{}' has no hash()", object_name(type())));
 	return nullptr;
 }
 

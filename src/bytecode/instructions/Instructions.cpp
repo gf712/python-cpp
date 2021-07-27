@@ -1,4 +1,5 @@
 #include "Instructions.hpp"
+#include "runtime/PyDict.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/StopIterationException.hpp"
 
@@ -136,6 +137,16 @@ void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 	vm.reg(m_dst) = heap.allocate<PyTuple>(elements);
 };
 
+void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
+{
+	std::unordered_map<Value, Value, ValueHash> map;
+	for (size_t i = 0; i < m_keys.size(); ++i) {
+		map.emplace(vm.reg(m_keys[i]), vm.reg(m_values[i]));
+	}
+
+	auto &heap = vm.heap();
+	vm.reg(m_dst) = heap.allocate<PyDict>(map);
+};
 
 void GetIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {

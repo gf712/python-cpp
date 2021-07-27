@@ -25,6 +25,9 @@ enum class PyObjectType {
 	PY_LIST_ITERATOR,
 	PY_TUPLE,
 	PY_TUPLE_ITERATOR,
+	PY_DICT,
+	PY_DICT_ITEMS,
+	PY_DICT_ITEMS_ITERATOR,
 	PY_BASE_EXCEPTION,
 	PY_RANGE,
 	PY_RANGE_ITERATOR,
@@ -69,6 +72,15 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_TUPLE_ITERATOR: {
 		return "tuple_iterator";
+	}
+	case PyObjectType::PY_DICT: {
+		return "dict";
+	}
+	case PyObjectType::PY_DICT_ITEMS: {
+		return "dict_items";
+	}
+	case PyObjectType::PY_DICT_ITEMS_ITERATOR: {
+		return "dict_itemiterator";
 	}
 	case PyObjectType::PY_BASE_EXCEPTION: {
 		return "BaseException";
@@ -119,6 +131,7 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> next_impl(Interpreter &interpreter);
 	virtual std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> hash_impl(Interpreter &interpreter) const;
 
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
 
@@ -349,6 +362,11 @@ class PyList : public PyObject
 	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
+};
+
+struct ValueHash
+{
+	size_t operator()(const Value &value) const;
 };
 
 class PyTupleIterator;

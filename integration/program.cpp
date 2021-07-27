@@ -2,6 +2,7 @@
 #include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
+#include "runtime/PyDict.hpp"
 #include "runtime/PyObject.hpp"
 
 #include "gtest/gtest.h"
@@ -32,6 +33,14 @@ template<typename T> struct is_vector : std::false_type
 };
 
 template<typename T> struct is_vector<std::vector<T>> : std::true_type
+{
+};
+
+template<typename T> struct is_unordered_map : std::false_type
+{
+};
+
+template<typename T, typename U> struct is_unordered_map<std::unordered_map<T, U>> : std::true_type
 {
 };
 
@@ -71,6 +80,21 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 						   } },
 				el);
 			i++;
+		}
+	} else if constexpr (is_unordered_map<T>{}) {
+		ASSERT_EQ(obj->type(), PyObjectType::PY_DICT);
+		auto pydict = as<PyDict>(obj);
+		ASSERT_TRUE(pydict);
+		// FIXME: this prolongs the lifetime of items should be just be:
+		//		  for (const auto &p : pydict->items()) {...}
+		auto items = pydict->items();
+		for (const auto &p : *items) {
+			auto key = p->operator[](0);
+			auto value = p->operator[](1);
+			// only support string keys for now
+			ASSERT(as<PyString>(key))
+			auto key_string = as<PyString>(key)->value();
+			check_value(value, expected_value[key_string]);
 		}
 	} else {
 		check_value(obj, expected_value);
@@ -324,6 +348,16 @@ TEST(RunPythonProgram, BuildListLiteralWithValues)
 
 	run(program);
 	assert_interpreter_object_value("a", std::vector<int64_t>{ 1, 2, 3, 5 });
+}
+
+
+TEST(RunPythonProgram, BuildDictLiteralWithValues)
+{
+	static constexpr std::string_view program = "a = {\"a\": 1}\n";
+
+	run(program);
+	assert_interpreter_object_value(
+		"a", std::unordered_map<std::string, int64_t>{ { "a", int64_t{ 1 } } });
 }
 
 

@@ -188,8 +188,7 @@ class Modulo : public Instruction
 	Register m_rhs;
 
   public:
-	Modulo(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs)
-	{}
+	Modulo(Register dst, Register lhs, Register rhs) : m_destination(dst), m_lhs(lhs), m_rhs(rhs) {}
 	~Modulo() override {}
 	std::string to_string() const final
 	{
@@ -460,6 +459,24 @@ class BuildTuple final : public Instruction
 	BuildTuple(Register dst, std::vector<Register> srcs) : m_dst(dst), m_srcs(std::move(srcs)) {}
 
 	std::string to_string() const final { return fmt::format("BUILD_TUPLE     r{:<3}", m_dst); }
+
+	void execute(VirtualMachine &, Interpreter &) const final;
+
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+class BuildDict final : public Instruction
+{
+	Register m_dst;
+	std::vector<Register> m_keys;
+	std::vector<Register> m_values;
+
+  public:
+	BuildDict(Register dst, std::vector<Register> keys, std::vector<Register> values)
+		: m_dst(dst), m_keys(std::move(keys)), m_values(std::move(values))
+	{}
+
+	std::string to_string() const final { return fmt::format("BUILD_DICT     r{:<3}", m_dst); }
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 

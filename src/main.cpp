@@ -9,10 +9,14 @@
 // 	"	def __repr__(self):\n"
 // 	"		return \"A\"\n";
 
+// static constexpr std::string_view program =
+// 	"class A:\n"
+// 	"	a = 1\n"
+// 	"a = A()\n";
+
 static constexpr std::string_view program =
-	"class A:\n"
-	"	a = 1\n"
-	"a = A()\n";
+	"a = {\"a\": 1, \"b\":2, \"b\":2}\n";
+	// "print(a[\"a\"]\n";
 
 // static constexpr std::string_view program =
 // 	"def fibonacci(element):\n"

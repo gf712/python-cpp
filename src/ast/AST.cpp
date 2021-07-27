@@ -353,4 +353,25 @@ Register ClassDefinition::generate(size_t function_id,
 	return {};
 }
 
+
+Register Dict::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	ASSERT(m_keys.size() == m_values.size())
+
+	std::vector<Register> m_key_registers;
+	std::vector<Register> m_value_registers;
+
+	for (const auto &key : m_keys) {
+		m_key_registers.push_back(key->generate(function_id, generator, ctx));
+	}
+	for (const auto &value : m_values) {
+		m_value_registers.push_back(value->generate(function_id, generator, ctx));
+	}
+
+	const auto result_reg = generator.allocate_register();
+	generator.emit<BuildDict>(function_id, result_reg, m_key_registers, m_value_registers);
+
+	return result_reg;
+}
+
 }// namespace ast

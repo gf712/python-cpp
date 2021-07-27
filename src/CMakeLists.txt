@@ -4,7 +4,9 @@ set(INTERPRETER_SOURCE_FILES
                     interpreter/Interpreter.cpp
                     interpreter/ExecutionFrame.cpp)
 set(PARSER_SOURCE_FILES parser/Parser.cpp)
-set(RUNTIME_SOURCE_FILES runtime/PyObject.cpp runtime/PyRange.cpp)
+set(RUNTIME_SOURCE_FILES runtime/PyDict.cpp 
+                         runtime/PyObject.cpp
+                         runtime/PyRange.cpp)
 
 set(VM_SOURCE_FILES bytecode/VM.cpp 
                     bytecode/BytecodeGenerator.cpp
