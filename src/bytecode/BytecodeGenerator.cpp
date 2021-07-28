@@ -41,8 +41,8 @@ std::shared_ptr<Bytecode> BytecodeGenerator::generate_executable()
 
 	for (size_t i = 1; i < m_functions.size(); ++i) {
 		for (auto &&ins : m_functions[i]) { executable.push_back(std::move(ins)); }
-		functions.push_back(
-			FunctionMetaData{ offset, std::to_string(i), m_function_register_count[i] });
+		functions.push_back(FunctionMetaData{
+			offset, std::to_string(i), m_function_register_count[m_functions.size() - i] });
 		function_offsets[i] = offset;
 		offset += m_functions[i].size();
 	}

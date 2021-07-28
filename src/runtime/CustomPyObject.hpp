@@ -19,13 +19,17 @@ class CustomPyObject : public PyObject
 		// m_slots["__qualname__"] = [ctx](std::shared_ptr<PyTuple>, std::shared_ptr<PyDict>) {
 		// 	return PyString::from(String{ ctx.name });
 		// };
+		for (const auto &[k, v] : m_slots) { spdlog::debug("Key: '{}' {}", k, (void *)v().get()); }
 
 		for (const auto &[attr_name, attr_value] : ctx.attributes) {
+			spdlog::debug("Adding attribute to class namespace: '{}' {}",
+				attr_name,
+				(void *)attr_value.get());
 			put(attr_name, attr_value);
 		}
 	}
 
-	std::string to_string() const
+	std::string to_string() const override
 	{
 		// return fmt::format("CustomPyObject(__qualname__={})",
 		// 	m_slots.at("__qualname__")(nullptr, nullptr)->to_string());

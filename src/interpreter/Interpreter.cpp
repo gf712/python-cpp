@@ -42,7 +42,10 @@ void Interpreter::setup()
 		"print", "print", [this](const std::shared_ptr<PyTuple> &args) {
 			const std::string separator = " ";
 			for (const auto &arg : *args) {
-				std::cout << arg->repr_impl(*this)->to_string() << separator;
+				auto reprfunc = arg->get("__repr__", *this);
+				auto reprobj =
+					execute(VirtualMachine::the(), *this, reprfunc, std::shared_ptr<PyTuple>());
+				std::cout << reprobj->to_string() << separator;
 			}
 			// make sure this is flushed immediately
 			std::cout << std::endl;
@@ -75,9 +78,8 @@ void Interpreter::setup()
 		"__build_class__", "__build_class__", [this](const std::shared_ptr<PyTuple> &args) {
 			const auto &class_name = args->operator[](0);
 			const auto &function_location = args->operator[](1);
-			std::cout << fmt::format(
-				"__build_class__({}, {})", class_name->to_string(), function_location->to_string())
-					  << '\n';
+			spdlog::debug(
+				"__build_class__({}, {})", class_name->to_string(), function_location->to_string());
 
 			ASSERT(as<PyString>(class_name))
 			auto class_name_as_string = as<PyString>(class_name)->value();

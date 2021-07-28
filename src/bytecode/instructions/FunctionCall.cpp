@@ -1,6 +1,6 @@
 #include "FunctionCall.hpp"
 
-std::unique_ptr<SymbolTable> execute(VirtualMachine &vm,
+std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 	Interpreter &interpreter,
 	std::shared_ptr<PyObject> function_object,
 	const std::shared_ptr<PyTuple> &args)
@@ -30,13 +30,17 @@ std::unique_ptr<SymbolTable> execute(VirtualMachine &vm,
 			interpreter.set_execution_frame(function_frame);
 
 			size_t i = 0;
-			for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
+			if (args) {
+				for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
+			}
 
 			function_frame->set_return_address(vm.instruction_pointer());
 			vm.set_instruction_pointer(offset);
 
 			// function stack that uses RAII, so that when we exit function we pop the stack
 			// also allocates virtual registers needed by this function
+			spdlog::debug("Requesting stack frame with {} virtual registers",
+				pyfunc->code()->register_count());
 			auto frame = vm.enter_frame(pyfunc->code()->register_count());
 			function_frame->attach_frame(std::move(frame));
 		}
@@ -48,7 +52,7 @@ std::unique_ptr<SymbolTable> execute(VirtualMachine &vm,
 	} else {
 		TODO();
 	}
-	return nullptr;
+	return std::visit([](const auto &val) { return PyObject::from(val); }, vm.reg(0));
 }
 
 void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const

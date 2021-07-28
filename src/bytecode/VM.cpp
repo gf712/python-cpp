@@ -9,13 +9,18 @@
 LocalFrame::LocalFrame(size_t frame_size, VirtualMachine *vm_) : vm(vm_)
 {
 	vm->push_frame(frame_size);
+	spdlog::debug(
+		"Added frame of size {}. New stack size: {}", frame_size, vm->m_local_registers.size());
 }
 
 LocalFrame::LocalFrame(LocalFrame &&other) { vm = std::exchange(other.vm, nullptr); }
 
 LocalFrame::~LocalFrame()
 {
-	if (vm) vm->pop_frame();
+	if (vm) {
+		vm->pop_frame();
+		spdlog::debug("Popping frame. New stack size: {}", vm->m_local_registers.size());
+	}
 }
 
 VirtualMachine::VirtualMachine()
@@ -51,7 +56,8 @@ int VirtualMachine::execute_frame()
 {
 	auto frame_depth = m_local_registers.size();
 	const auto initial_ip = m_instruction_pointer;
-	while (frame_depth <= m_local_registers.size() && m_instruction_pointer < m_bytecode->instructions().size() - 1) {
+	while (frame_depth <= m_local_registers.size()
+		   && m_instruction_pointer < m_bytecode->instructions().size() - 1) {
 		// show_current_instruction(m_instruction_pointer, 5);
 		// dump();
 		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];

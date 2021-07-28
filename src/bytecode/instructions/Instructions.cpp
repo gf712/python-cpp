@@ -178,14 +178,14 @@ std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interp
 		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
 					   return lhs_value + rhs_value;
 				   },
-			[&interpreter](const std::shared_ptr<PyObject> &lhs_value,
-				const std::shared_ptr<PyObject> &rhs_value) -> std::optional<Value> {
-				return lhs_value->add_impl(rhs_value, interpreter);
-			},
 			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->add_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -204,6 +204,10 @@ std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &i
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->subtract_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -220,6 +224,10 @@ std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &i
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->multiply_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -236,6 +244,10 @@ std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interp
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->exp_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for **: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -252,6 +264,10 @@ std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &int
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->lshift_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for <<: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -268,6 +284,10 @@ std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &int
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->modulo_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,
@@ -290,6 +310,10 @@ std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &int
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->equal_impl(py_rhs, interpreter)) { return result; }
+				interpreter.raise_exception(
+					"TypeError: unsupported operand type(s) for ==: \'{}\' and \'{}\'",
+					object_name(py_lhs->type()),
+					object_name(py_rhs->type()));
 				return {};
 			} },
 		lhs,

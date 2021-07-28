@@ -134,7 +134,8 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	virtual std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
 
-	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
+	std::shared_ptr<PyObject> repr(Interpreter &interpreter) const;
+
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
@@ -147,12 +148,14 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
 
   protected:
+	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
+
 	template<typename T>
 	void put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>;
 
 	void put(std::string name, std::shared_ptr<PyObject> attribute)
 	{
-		m_slots.emplace(name, [attribute]() { return attribute; });
+		m_slots.insert_or_assign(name, [attribute = std::move(attribute)]() { return attribute; });
 	}
 
 	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
