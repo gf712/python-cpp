@@ -9,14 +9,11 @@
 // 	"	def __repr__(self):\n"
 // 	"		return \"A\"\n";
 
-// static constexpr std::string_view program =
-// 	"class A:\n"
-// 	"	a = 1\n"
-// 	"a = A()\n";
-
 static constexpr std::string_view program =
-	"a = {\"a\": 1, \"b\":2, \"b\":2}\n";
-	// "print(a[\"a\"]\n";
+	"class A:\n"
+	"	a = 1\n"
+	"foo = A()\n"
+	"print(foo.a)\n";
 
 // static constexpr std::string_view program =
 // 	"def fibonacci(element):\n"
@@ -40,8 +37,9 @@ int main()
 	Lexer lexer{ std::string(program) };
 	parser::Parser p{ lexer };
 	p.parse();
-	auto bytecode = BytecodeGenerator::compile(p.module());
 	spdlog::set_level(spdlog::level::debug);
+	p.module()->print_node("");
+	auto bytecode = BytecodeGenerator::compile(p.module());
 	spdlog::debug("Bytecode:\n {}", bytecode->to_string());
 	auto &vm = VirtualMachine::the().create(std::move(bytecode));
 	vm.execute();

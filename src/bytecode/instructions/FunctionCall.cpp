@@ -1,6 +1,6 @@
 #include "FunctionCall.hpp"
 
-std::shared_ptr<PyObject> execute(VirtualMachine &vm,
+std::unique_ptr<SymbolTable> execute(VirtualMachine &vm,
 	Interpreter &interpreter,
 	std::shared_ptr<PyObject> function_object,
 	const std::shared_ptr<PyTuple> &args)
@@ -15,27 +15,35 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 		TODO();
 	}
 
-	auto scope_name = interpreter.execution_frame()->fetch_object("__name__");
-	ASSERT(scope_name->type() == PyObjectType::PY_STRING)
 	if (auto pyfunc = as<PyFunction>(function_object)) {
-		function_name = fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
-		auto function_frame = ExecutionFrame::create(interpreter.execution_frame(), function_name);
-		const auto offset = pyfunc->code()->offset();
-		interpreter.set_execution_frame(function_frame);
+		// FIXME: this scope makes sure that the local function_frame object is destroyed
+		// 		  before the VM is executes the frame. Not sure if ExecutionFrame could be
+		//		  std::unique_ptr (might be access from multiple threads later on?)
+		{
+			auto scope_name = interpreter.execution_frame()->fetch_object("__name__");
+			ASSERT(scope_name->type() == PyObjectType::PY_STRING)
 
-		size_t i = 0;
-		for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
-		// std::visit([](const auto &val) { std::cout << val << '\n'; },
-		// function_frame->parameter(0));
-		function_frame->set_return_address(vm.instruction_pointer());
-		vm.set_instruction_pointer(offset);
+			function_name = fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
+			auto function_frame =
+				ExecutionFrame::create(interpreter.execution_frame(), function_name);
+			const auto offset = pyfunc->code()->offset();
+			interpreter.set_execution_frame(function_frame);
 
-		// function stack that uses RAII, so that when we exit function we pop the stack
-		// also allocates virtual registers needed by this function
-		auto frame = vm.enter_frame(pyfunc->code()->register_count());
-		function_frame->attach_frame(std::move(frame));
+			size_t i = 0;
+			for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
+
+			function_frame->set_return_address(vm.instruction_pointer());
+			vm.set_instruction_pointer(offset);
+
+			// function stack that uses RAII, so that when we exit function we pop the stack
+			// also allocates virtual registers needed by this function
+			auto frame = vm.enter_frame(pyfunc->code()->register_count());
+			function_frame->attach_frame(std::move(frame));
+		}
+		vm.execute_frame();
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
 		auto result = native_func->operator()(args);
+		spdlog::debug("Native function return value: {}", result->to_string());
 		vm.reg(0) = result;
 	} else {
 		TODO();

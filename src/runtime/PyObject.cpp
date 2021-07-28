@@ -1,3 +1,4 @@
+#include "AttributeError.hpp"
 #include "PyObject.hpp"
 #include "StopIterationException.hpp"
 
@@ -67,8 +68,33 @@ template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 	}
 }
 
+PyObject::PyObject(PyObjectType type) : m_type(type)
+{
+	// m_slots["__repr__"] = [this](std::shared_ptr<PyTuple>, std::shared_ptr<PyDict>) {
+	// 	return this->repr_impl(*VirtualMachine::the().interpreter());
+	// };
+	put("__repr__", [this](const std::shared_ptr<PyTuple> &) {
+		return this->repr_impl(*VirtualMachine::the().interpreter());
+	});
+};
 
-PyObject::PyObject(PyObjectType type) : m_type(type){};
+
+template<typename T>
+void PyObject::put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>
+{
+	m_slots.emplace(
+		name, [&name, func]() { return std::make_shared<PyNativeFunction>(name, func); });
+}
+
+
+std::shared_ptr<PyObject> PyObject::get(std::string name, Interpreter &interpreter) const
+{
+	if (auto it = m_slots.find(name); it != m_slots.end()) { return it->second(); }
+	interpreter.raise_exception(attribute_error(
+		fmt::format("'{}' object has no attribute '{}'", object_name(m_type), name)));
+	return nullptr;
+}
+
 
 std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
 {

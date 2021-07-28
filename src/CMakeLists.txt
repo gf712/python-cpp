@@ -10,8 +10,11 @@ set(RUNTIME_SOURCE_FILES runtime/PyDict.cpp
 
 set(VM_SOURCE_FILES bytecode/VM.cpp 
                     bytecode/BytecodeGenerator.cpp
+                    bytecode/instructions/FunctionCall.cpp
+                    bytecode/instructions/LoadAttr.cpp
                     bytecode/instructions/Instructions.cpp
-                    bytecode/instructions/FunctionCall.cpp)
+                    bytecode/instructions/ReturnValue.cpp
+                    )
 
 set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp)
 

@@ -103,8 +103,15 @@ void Interpreter::setup()
 
 					execute(vm, *this, pyfunc, class_args);
 
-					CustomPyObjectContext ctx{ class_name_as_string };
+					auto old_symbol_table = m_current_frame->release_old_symbol_table();
+					ASSERT(old_symbol_table)
 
+					std::vector<std::pair<std::string, std::shared_ptr<PyObject>>> attributes;
+					for (const auto &[name, value] : old_symbol_table->symbols) {
+						attributes.emplace_back(name, value);
+					}
+
+					CustomPyObjectContext ctx{ class_name_as_string, attributes, {} };
 					return vm.heap().allocate<CustomPyObject>(ctx, std::shared_ptr<PyTuple>{});
 				});
 		});
@@ -122,7 +129,7 @@ void Interpreter::unwind()
 				<< '\n';
 			break;
 		}
-		m_current_frame = m_current_frame->parent();
+		m_current_frame = m_current_frame->pop();
 	}
 	m_current_frame->set_exception(nullptr);
 }

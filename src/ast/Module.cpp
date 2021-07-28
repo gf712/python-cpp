@@ -1,6 +1,6 @@
 #include "AST.hpp"
 
-#include "bytecode/instructions/Instructions.hpp"
+#include "bytecode/instructions/ReturnValue.hpp"
 
 namespace ast {
 Register Module::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const

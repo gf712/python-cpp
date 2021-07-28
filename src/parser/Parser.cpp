@@ -806,6 +806,10 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			PrimaryPattern_>;
 		if (pattern1::match(p)) {
 			spdlog::debug("'.' NAME primary'");
+			auto value = p.pop_back();
+			const auto token = p.lexer().peek_token(p.token_position() - 1);
+			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
+			p.push_to_stack(std::make_shared<Attribute>(value, name, ContextType::LOAD));
 			return true;
 		}
 

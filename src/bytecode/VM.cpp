@@ -46,6 +46,33 @@ void VirtualMachine::show_current_instruction(size_t index, size_t window) const
 	std::cout << '\n';
 }
 
+
+int VirtualMachine::execute_frame()
+{
+	auto frame_depth = m_local_registers.size();
+	const auto initial_ip = m_instruction_pointer;
+	while (frame_depth <= m_local_registers.size() && m_instruction_pointer < m_bytecode->instructions().size() - 1) {
+		// show_current_instruction(m_instruction_pointer, 5);
+		// dump();
+		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
+		instruction->execute(*this, *m_interpreter);
+
+		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+			m_interpreter->unwind();
+			// restore instruction pointer
+			m_instruction_pointer = initial_ip;
+			return 1;
+		} else if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
+			// bail, an error occured
+			std::cout << m_interpreter->exception_message() << '\n';
+			m_instruction_pointer = initial_ip;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 int VirtualMachine::execute()
 {
 	// start execution in __main__

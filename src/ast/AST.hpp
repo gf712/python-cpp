@@ -758,7 +758,7 @@ class Attribute : public ASTNode
 		  m_ctx(ctx)
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final { TODO(); }
+	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	const std::string &attr() const { return m_attr; }

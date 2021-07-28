@@ -8,6 +8,7 @@
 #include <memory>
 #include <functional>
 #include <sstream>
+#include <concepts>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -98,11 +99,19 @@ inline std::string_view object_name(PyObjectType type)
 	ASSERT_NOT_REACHED()
 }
 
+class PyTuple;
+class PyDict;
+
+using SlotFunctionType =
+	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyTuple>, std::shared_ptr<PyDict>)>;
+
 class PyObject : public std::enable_shared_from_this<PyObject>
 {
 	const PyObjectType m_type;
 
   protected:
+	std::unordered_map<std::string, std::function<std::shared_ptr<PyObject>()>> m_slots;
+
   public:
 	PyObject(PyObjectType type);
 
@@ -135,7 +144,17 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
 
+	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
+
   protected:
+	template<typename T>
+	void put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>;
+
+	void put(std::string name, std::shared_ptr<PyObject> attribute)
+	{
+		m_slots.emplace(name, [attribute]() { return attribute; });
+	}
+
 	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
 	{
 		return std::static_pointer_cast<const T>(shared_from_this());

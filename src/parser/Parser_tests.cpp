@@ -764,3 +764,17 @@ TEST(Parser, ClassDefinition)
 
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, AccessAttribute)
+{
+	constexpr std::string_view program = "test = foo.bar\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("test", ContextType::STORE) },
+		std::make_shared<Attribute>(
+			std::make_shared<Name>("foo", ContextType::LOAD), "bar", ContextType::LOAD),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}

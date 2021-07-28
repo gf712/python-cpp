@@ -136,6 +136,7 @@ class VirtualMachine
 	void clear();
 
 	int execute();
+	int execute_frame();
 
 	void dump() const;
 

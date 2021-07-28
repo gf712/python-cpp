@@ -27,13 +27,14 @@ struct SymbolTable
 class ExecutionFrame
 {
 	std::unique_ptr<SymbolTable> m_symbol_table;
+	// FIXME: this is a hack to extend the lifetime of the able when instantiating classes
+	std::unique_ptr<SymbolTable> m_old_symbol_table{ nullptr };
 	std::array<Value, 16> m_parameters;
 	std::shared_ptr<ExecutionFrame> m_parent{ nullptr };
 	size_t m_return_address;
 	std::optional<LocalFrame> m_frame_info;
 	std::shared_ptr<PyObject> m_exception{ nullptr };
 	std::shared_ptr<PyObject> m_exception_to_catch{ nullptr };
-
 
   public:
 	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent,
@@ -70,6 +71,11 @@ class ExecutionFrame
 
 	const std::unique_ptr<SymbolTable> &symbol_table() const { return m_symbol_table; }
 
+	std::unique_ptr<SymbolTable> &&release_old_symbol_table()
+	{
+		return std::move(m_old_symbol_table);
+	}
+
 	void set_return_address(size_t address) { m_return_address = address; }
 	size_t return_address() const { return m_return_address; }
 
@@ -82,6 +88,11 @@ class ExecutionFrame
 	bool catch_exception(std::shared_ptr<PyObject>) const;
 
 	void set_exception_to_catch(std::shared_ptr<PyObject> exception);
+
+	std::shared_ptr<ExecutionFrame> pop() {
+		m_parent->m_old_symbol_table = std::move(m_symbol_table);
+		return m_parent;
+	}
 
   private:
 	ExecutionFrame() : m_symbol_table(std::make_unique<SymbolTable>()) {}

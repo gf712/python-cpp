@@ -2,7 +2,9 @@
 #include "bytecode/BytecodeGenerator.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
 #include "bytecode/instructions/Instructions.hpp"
+#include "bytecode/instructions/LoadAttr.hpp"
 #include "bytecode/instructions/LoadBuildClass.hpp"
+#include "bytecode/instructions/ReturnValue.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {
@@ -372,6 +374,22 @@ Register Dict::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 	generator.emit<BuildDict>(function_id, result_reg, m_key_registers, m_value_registers);
 
 	return result_reg;
+}
+
+
+Register
+	Attribute::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	auto this_value_register = m_value->generate(function_id, generator, ctx);
+
+	if (m_ctx == ContextType::LOAD) {
+		auto attribute_value_register = generator.allocate_register();
+		generator.emit<LoadAttr>(
+			function_id, attribute_value_register, this_value_register, m_attr);
+		return attribute_value_register;
+	}
+
+	TODO();
 }
 
 }// namespace ast

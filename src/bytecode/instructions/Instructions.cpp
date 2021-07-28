@@ -23,25 +23,6 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	interpreter.store_object(m_object_name, obj);
 }
 
-void ReturnValue::execute(VirtualMachine &vm, Interpreter &interpreter) const
-{
-	auto result = vm.reg(m_source);
-
-	std::visit(overloaded{ [](const auto &val) {
-							  std::ostringstream os;
-							  os << val;
-							  spdlog::debug("Return value: {}", os.str());
-						  },
-				   [](const std::shared_ptr<PyObject> &val) {
-					   spdlog::debug("Return value: {}", val->to_string());
-				   } },
-		result);
-	vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
-	interpreter.set_execution_frame(interpreter.execution_frame()->parent());
-	vm.reg(0) = result;
-}
-
-
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto code = interpreter.allocate_object<PyCode>(m_function_name + "__code__",

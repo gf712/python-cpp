@@ -435,3 +435,16 @@ TEST(RunPythonProgram, ForLoopAccumulateEvenAndOddNumbers)
 	assert_interpreter_object_value("acc_even", 2450);
 	assert_interpreter_object_value("acc_odd", 2500);
 }
+
+
+TEST(RunPythonProgram, AccessClassAttribute)
+{
+	static constexpr std::string_view program =
+		"class A:\n"
+		"	a = 1\n"
+		"foo = A()\n"
+		"result = foo.a\n";
+
+	run(program);
+	assert_interpreter_object_value("result", 1);
+}
