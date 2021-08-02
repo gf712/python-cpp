@@ -63,15 +63,19 @@ enum class ContextType { LOAD = 0, STORE = 1, DELETE = 2, UNSET = 3 };
 class ASTContext
 {
 	std::stack<std::shared_ptr<Arguments>> m_local_args;
+	std::vector<const ASTNode *> m_parent_nodes;
 
   public:
 	void push_local_args(std::shared_ptr<Arguments> args) { m_local_args.push(std::move(args)); }
-
 	void pop_local_args() { m_local_args.pop(); }
 
 	bool has_local_args() const { return !m_local_args.empty(); }
 
+	void push_node(const ASTNode *node) { m_parent_nodes.push_back(node); }
+	void pop_node() { m_parent_nodes.pop_back(); }
+
 	const std::shared_ptr<Arguments> &local_args() const { return m_local_args.top(); }
+	const std::vector<const ASTNode *> &parent_nodes() const { return m_parent_nodes; }
 };
 
 class ASTNode
@@ -87,7 +91,14 @@ class ASTNode
 	void print_node(const std::string &indent) { print_this_node(indent); }
 	ASTNodeType node_type() const { return m_node_type; }
 	virtual ~ASTNode() = default;
-	virtual Register generate(size_t function_id, BytecodeGenerator &, ASTContext &) const = 0;
+	virtual Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const = 0;
+	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+	{
+		ctx.push_node(this);
+		auto result_register = generate_impl(function_id, generator, ctx);
+		ctx.pop_node();
+		return result_register;
+	}
 
 	template<typename FuncType> void visit(FuncType &&func) const;
 };// namespace ast
@@ -129,7 +140,8 @@ class Constant : public ASTNode
 	const Value &value() const { return m_value; }
 	Value value() { return m_value; }
 
-	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
+	Register
+		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 };
 
 
@@ -161,7 +173,7 @@ class List : public ASTNode
 	ContextType context() const { return m_ctx; }
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 class Tuple : public ASTNode
@@ -192,7 +204,7 @@ class Tuple : public ASTNode
 	ContextType context() const { return m_ctx; }
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -229,7 +241,7 @@ class Dict : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
 	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -267,7 +279,7 @@ class Name final : public Variable
 
 	const std::vector<std::string> &ids() const final { return m_id; }
 
-	Register generate(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -306,7 +318,7 @@ class Assign : public Statement
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 
-	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
+	Register generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 };
 
 #define BINARY_OPERATIONS  \
@@ -347,7 +359,7 @@ class BinaryExpr : public ASTNode
 
 	OpType op_type() const { return m_op_type; }
 
-	Register generate(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
 
   private:
 	std::string_view op_type_to_string(OpType type) const
@@ -384,7 +396,7 @@ class Return : public ASTNode
 
 	std::shared_ptr<ASTNode> value() const { return m_value; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	void print_this_node(const std::string &indent) const override
 	{
@@ -417,7 +429,7 @@ class Argument final : public ASTNode
 	}
 	const std::string &name() const { return m_arg; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -450,7 +462,7 @@ class Arguments : public ASTNode
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 class FunctionDefinition final : public ASTNode
@@ -498,7 +510,7 @@ class FunctionDefinition final : public ASTNode
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
 
-	Register generate(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -541,7 +553,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 
@@ -577,7 +589,7 @@ class Call : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &args() const { return m_args; }
 	const std::vector<std::shared_ptr<ASTNode>> &keywords() const { return m_keywords; }
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 class Module : public ASTNode
@@ -589,7 +601,8 @@ class Module : public ASTNode
 
 	template<typename T> void emplace(T node) { m_body.emplace_back(std::move(node)); }
 
-	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
+	Register
+		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 
@@ -618,7 +631,7 @@ class If : public ASTNode
 		  m_orelse(std::move(orelse))
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
@@ -657,7 +670,7 @@ class For : public ASTNode
 		  m_body(std::move(body)), m_orelse(std::move(orelse)), m_type_comment(type_comment)
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &target() const { return m_target; }
 	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }
@@ -714,7 +727,7 @@ class Compare : public ASTNode
 		: ASTNode(ASTNodeType::Compare), m_lhs(std::move(lhs)), m_op(op), m_rhs(std::move(rhs))
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
 	OpType op() const { return m_op; }
@@ -758,7 +771,7 @@ class Attribute : public ASTNode
 		  m_ctx(ctx)
 	{}
 
-	Register generate(size_t, BytecodeGenerator &, ASTContext &) const final;
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	const std::string &attr() const { return m_attr; }

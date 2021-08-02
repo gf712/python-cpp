@@ -799,18 +799,24 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 	{
 		spdlog::debug("PrimaryPattern_");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
-		const auto original_stack_size = p.stack().size();
+		BlockScope primary_scope{ p };
 		// '.' NAME primary'
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
-			SingleTokenPattern<Token::TokenType::NAME>,
-			PrimaryPattern_>;
+			SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'.' NAME primary'");
-			auto value = p.pop_back();
+			spdlog::debug("'.' NAME");
+			auto value = primary_scope.parent().back();
+			primary_scope.parent().pop_back();
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
+			using pattern1a = PatternMatch<PrimaryPattern_>;
 			p.push_to_stack(std::make_shared<Attribute>(value, name, ContextType::LOAD));
-			return true;
+			if (pattern1a::match(p)) {
+				spdlog::debug("'.' NAME primary'");
+				primary_scope.parent().push_back(p.pop_back());
+				return true;
+			}
+			return false;
 		}
 
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
@@ -819,17 +825,14 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			PrimaryPattern_>;
 		if (pattern3::match(p)) {
 			spdlog::debug("'(' [arguments] ')' primary'");
-			const size_t stack_size = p.stack().size();
+			p.print_stack();
+			spdlog::debug("--------------");
 			std::vector<std::shared_ptr<ASTNode>> args;
 			std::vector<std::shared_ptr<ASTNode>> kwargs;
-			// FIXME: this takes values from the stack and then pops it later
-			// since here we traverse from left to right
-			for (size_t i = original_stack_size; i < stack_size; ++i) {
-				args.push_back(p.stack()[i]);
-			}
-			for (size_t i = original_stack_size; i < stack_size; ++i) { p.pop_back(); }
-			auto function = p.pop_back();
-			p.push_to_stack(std::make_shared<Call>(function, args, kwargs));
+			for (const auto &node : p.stack()) { args.push_back(node); }
+			auto function = primary_scope.parent().back();
+			primary_scope.parent().pop_back();
+			primary_scope.parent().push_back(std::make_shared<Call>(function, args, kwargs));
 			p.print_stack();
 			return true;
 		}

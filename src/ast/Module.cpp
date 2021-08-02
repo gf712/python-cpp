@@ -3,7 +3,7 @@
 #include "bytecode/instructions/ReturnValue.hpp"
 
 namespace ast {
-Register Module::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register Module::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	Register last;
 	for (const auto &statement : m_body) {

@@ -4,6 +4,8 @@
 #include "bytecode/instructions/Instructions.hpp"
 #include "bytecode/instructions/LoadAttr.hpp"
 #include "bytecode/instructions/LoadBuildClass.hpp"
+#include "bytecode/instructions/LoadMethod.hpp"
+#include "bytecode/instructions/MethodCall.hpp"
 #include "bytecode/instructions/ReturnValue.hpp"
 #include "interpreter/Interpreter.hpp"
 
@@ -19,7 +21,7 @@ AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
 
-Register Name::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register Name::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	auto dst_register = generator.allocate_register();
 
@@ -38,15 +40,17 @@ Register Name::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 }
 
 
-Register Constant::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &) const
+Register
+	Constant::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const
 {
 	auto dst_register = generator.allocate_register();
 	generator.emit<LoadConst>(function_id, dst_register, m_value);
 	return dst_register;
 }
 
-Register
-	BinaryExpr::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register BinaryExpr::generate_impl(size_t function_id,
+	BytecodeGenerator &generator,
+	ASTContext &ctx) const
 {
 	auto lhs_register = m_lhs->generate(function_id, generator, ctx);
 	auto rhs_register = m_rhs->generate(function_id, generator, ctx);
@@ -85,7 +89,7 @@ Register
 	ASSERT_NOT_REACHED()
 }
 
-Register FunctionDefinition::generate(size_t function_id,
+Register FunctionDefinition::generate_impl(size_t function_id,
 	BytecodeGenerator &generator,
 	ASTContext &ctx) const
 {
@@ -108,8 +112,9 @@ Register FunctionDefinition::generate(size_t function_id,
 	return {};
 }
 
-Register
-	Arguments::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register Arguments::generate_impl(size_t function_id,
+	BytecodeGenerator &generator,
+	ASTContext &ctx) const
 {
 	for (const auto &arg : m_args) { arg->generate(function_id, generator, ctx); }
 	return {};
@@ -122,9 +127,10 @@ std::vector<std::string> Arguments::argument_names() const
 	return arg_names;
 }
 
-Register Argument::generate(size_t, BytecodeGenerator &, ASTContext &) const { return {}; }
+Register Argument::generate_impl(size_t, BytecodeGenerator &, ASTContext &) const { return {}; }
 
-Register Return::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Return::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	auto src_register = m_value->generate(function_id, generator, ctx);
 	generator.emit<ReturnValue>(function_id, src_register);
@@ -132,7 +138,7 @@ Register Return::generate(size_t function_id, BytecodeGenerator &generator, ASTC
 	return 0;
 }
 
-Register Assign::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register Assign::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	const auto src_register = m_value->generate(function_id, generator, ctx);
 	ASSERT(m_targets.size() > 0)
@@ -168,25 +174,28 @@ Register Assign::generate(size_t function_id, BytecodeGenerator &generator, ASTC
 	return src_register;
 }
 
-Register Call::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Call::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	std::vector<Register> arg_registers;
 	arg_registers.reserve(m_args.size());
 
-	auto function_name_ast = as<Name>(m_function);
-	if (!function_name_ast) { TODO(); }
-	auto func_register = function_name_ast->generate(function_id, generator, ctx);
+	auto func_register = m_function->generate(function_id, generator, ctx);
 
 	for (const auto &arg : m_args) {
 		arg_registers.push_back(arg->generate(function_id, generator, ctx));
 	}
 
-	generator.emit<FunctionCall>(function_id, func_register, std::move(arg_registers));
+	if (m_function->node_type() == ASTNodeType::Attribute) {
+		generator.emit<MethodCall>(function_id, func_register, std::move(arg_registers));
+	} else {
+		generator.emit<FunctionCall>(function_id, func_register, std::move(arg_registers));
+	}
 
 	return {};
 }
 
-Register If::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register If::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	static size_t if_count = 0;
 
@@ -214,7 +223,7 @@ Register If::generate(size_t function_id, BytecodeGenerator &generator, ASTConte
 	return {};
 }
 
-Register For::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register For::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	static size_t for_loop_count = 0;
 
@@ -256,7 +265,8 @@ Register For::generate(size_t function_id, BytecodeGenerator &generator, ASTCont
 	return {};
 }
 
-Register Compare::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Compare::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	const auto lhs_reg = m_lhs->generate(function_id, generator, ctx);
 	const auto rhs_reg = m_rhs->generate(function_id, generator, ctx);
@@ -274,7 +284,8 @@ Register Compare::generate(size_t function_id, BytecodeGenerator &generator, AST
 }
 
 
-Register List::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	List::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	std::vector<Register> element_registers;
 	element_registers.reserve(m_elements.size());
@@ -290,7 +301,8 @@ Register List::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 }
 
 
-Register Tuple::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Tuple::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	std::vector<Register> element_registers;
 	element_registers.reserve(m_elements.size());
@@ -306,7 +318,7 @@ Register Tuple::generate(size_t function_id, BytecodeGenerator &generator, ASTCo
 }
 
 
-Register ClassDefinition::generate(size_t function_id,
+Register ClassDefinition::generate_impl(size_t function_id,
 	BytecodeGenerator &generator,
 	ASTContext &ctx) const
 {
@@ -356,7 +368,8 @@ Register ClassDefinition::generate(size_t function_id,
 }
 
 
-Register Dict::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Dict::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	ASSERT(m_keys.size() == m_values.size())
 
@@ -377,10 +390,17 @@ Register Dict::generate(size_t function_id, BytecodeGenerator &generator, ASTCon
 }
 
 
-Register
-	Attribute::generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register Attribute::generate_impl(size_t function_id,
+	BytecodeGenerator &generator,
+	ASTContext &ctx) const
 {
 	auto this_value_register = m_value->generate(function_id, generator, ctx);
+
+	if (ctx.parent_nodes()[ctx.parent_nodes().size() - 2]->node_type() == ASTNodeType::Call) {
+		auto method_name_register = generator.allocate_register();
+		generator.emit<LoadMethod>(function_id, method_name_register, this_value_register, m_attr);
+		return method_name_register;
+	}
 
 	if (m_ctx == ContextType::LOAD) {
 		auto attribute_value_register = generator.allocate_register();
