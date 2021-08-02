@@ -5,6 +5,7 @@
 #include <memory>
 
 static constexpr size_t KB = 1024;
+static constexpr size_t MB = 1024 * KB;
 
 struct NonCopyable
 {
@@ -26,7 +27,7 @@ class Heap
 {
 	uint8_t *m_memory;
 	uint8_t *m_static_memory;
-	size_t m_memory_size{ 1024 * KB };
+	size_t m_memory_size{ 500 * MB };
 	size_t m_static_memory_size{ 4 * KB };
 	size_t m_offset{ 0 };
 	size_t m_static_offset{ 0 };
@@ -54,7 +55,7 @@ class Heap
 
 	template<typename T, typename... Args> std::shared_ptr<T> allocate(Args &&... args)
 	{
-		if (m_offset + sizeof(T) >= m_memory_size) { return nullptr; }
+		if (m_offset + sizeof(T) >= m_memory_size) { TODO(); }
 		T *ptr = new (m_memory + m_offset) T(std::forward<Args>(args)...);
 		m_offset += sizeof(T);
 		return std::shared_ptr<T>(ptr, [](T *) { return; });
@@ -62,7 +63,7 @@ class Heap
 
 	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
 	{
-		if (m_offset + sizeof(T) >= m_static_memory_size) { return nullptr; }
+		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
 		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
 		m_static_offset += sizeof(T);
 		return std::shared_ptr<T>(ptr, [](T *) { return; });

@@ -309,12 +309,15 @@ std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &int
 			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
-				if (auto result = py_lhs->equal_impl(py_rhs, interpreter)) { return result; }
-				interpreter.raise_exception(
-					"TypeError: unsupported operand type(s) for ==: \'{}\' and \'{}\'",
-					object_name(py_lhs->type()),
-					object_name(py_rhs->type()));
-				return {};
+				if (auto result = py_lhs->equal_impl(py_rhs, interpreter)) {
+					return result;
+				} else {
+					interpreter.raise_exception(
+						"TypeError: unsupported operand type(s) for ==: \'{}\' and \'{}\'",
+						object_name(py_lhs->type()),
+						object_name(py_rhs->type()));
+					return {};
+				}
 			} },
 		lhs,
 		rhs);
