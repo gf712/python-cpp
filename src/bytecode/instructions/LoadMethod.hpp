@@ -19,7 +19,7 @@ class LoadMethod final : public Instruction
 		return fmt::format("LOAD_METHOD     r{:<3} r{:<3} ({})", m_destination, m_value_source, m_method_name);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final {TODO()}
+	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };

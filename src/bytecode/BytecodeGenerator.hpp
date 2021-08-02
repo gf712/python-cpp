@@ -9,10 +9,18 @@
 
 struct FunctionMetaData
 {
-	size_t offset;
+	size_t offset{ 0 };
 	std::string function_name;
-	size_t register_count;
+	size_t register_count{ 0 };
 };
+
+struct FunctionBlock
+{
+	FunctionMetaData metadata;
+	std::vector<std::unique_ptr<Instruction>> instructions;
+};
+
+using FunctionBlocks = std::vector<FunctionBlock>;
 
 class Bytecode
 {
@@ -21,9 +29,7 @@ class Bytecode
 	size_t m_main_local_register_count;
 
   public:
-	Bytecode(std::vector<std::unique_ptr<Instruction>> &&ins,
-		std::vector<FunctionMetaData> &&funcs,
-		size_t main_local_register_count);
+	Bytecode(FunctionBlocks &&func_blocks);
 
 	size_t start_offset() const { return m_functions.back().offset; }
 	size_t main_local_register_count() const { return m_main_local_register_count; }
@@ -84,8 +90,7 @@ class BytecodeGenerator
 	static constexpr size_t start_register = 1;
 
   private:
-	std::vector<std::vector<std::unique_ptr<Instruction>>> m_functions;
-	std::vector<size_t> m_function_register_count;
+	FunctionBlocks m_functions;
 
 	std::set<Label> m_labels;
 	std::vector<size_t> m_frame_register_count;
@@ -99,7 +104,7 @@ class BytecodeGenerator
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
 	{
 		m_functions.at(function_id)
-			.push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
+			.instructions.push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
 
 	friend std::ostream &operator<<(std::ostream &os, BytecodeGenerator &generator);
@@ -108,7 +113,7 @@ class BytecodeGenerator
 
 	const std::vector<std::unique_ptr<Instruction>> &function(size_t idx) const
 	{
-		return m_functions.at(idx);
+		return m_functions.at(idx).instructions;
 	}
 
 	Label make_label(const std::string &name, size_t function_id)
@@ -138,19 +143,22 @@ class BytecodeGenerator
 
 	size_t register_count() const { return m_frame_register_count.back(); }
 
-	Register allocate_register() { return m_frame_register_count.back()++; }
+	Register allocate_register()
+	{
+		spdlog::debug("New register: {}", m_frame_register_count.back());
+		return m_frame_register_count.back()++;
+	}
 	FunctionInfo allocate_function();
 
 	void enter_function() { m_frame_register_count.emplace_back(start_register); }
 
-	void exit_function()
+	void exit_function(size_t function_id)
 	{
-		m_function_register_count.push_back(register_count());
+		m_functions[function_id].metadata.register_count = register_count();
 		m_frame_register_count.pop_back();
 	}
 
   private:
 	std::shared_ptr<Bytecode> generate_executable();
-	void relocate_labels(const std::vector<std::unique_ptr<Instruction>> &executable,
-		const std::vector<size_t> &offsets);
+	void relocate_labels(const FunctionBlocks &functions, const std::vector<size_t> &offsets);
 };

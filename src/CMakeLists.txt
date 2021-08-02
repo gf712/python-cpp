@@ -12,7 +12,9 @@ set(VM_SOURCE_FILES bytecode/VM.cpp
                     bytecode/BytecodeGenerator.cpp
                     bytecode/instructions/FunctionCall.cpp
                     bytecode/instructions/LoadAttr.cpp
+                    bytecode/instructions/LoadMethod.cpp
                     bytecode/instructions/Instructions.cpp
+                    bytecode/instructions/MethodCall.cpp
                     bytecode/instructions/ReturnValue.cpp
                     )
 

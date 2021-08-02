@@ -71,7 +71,7 @@ template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 PyObject::PyObject(PyObjectType type) : m_type(type)
 {
 	put("__repr__", [this](const std::shared_ptr<PyTuple> &) {
-		return this->repr(*VirtualMachine::the().interpreter());
+		return this->repr_impl(*VirtualMachine::the().interpreter());
 	});
 };
 
@@ -93,17 +93,11 @@ std::shared_ptr<PyObject> PyObject::get(std::string name, Interpreter &interpret
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> PyObject::repr(Interpreter &interpreter) const
-{
-	if (auto result = repr_impl(interpreter); !result) {
-		return PyString::from(
-			String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
-	} else {
-		return result;
-	}
-}
 
-std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const { return nullptr; }
+std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
+{
+	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
+}
 
 std::shared_ptr<PyObject> PyObject::iter_impl(Interpreter &interpreter) const
 {
@@ -152,18 +146,16 @@ std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &
 
 std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
 {
-	return std::visit(
-		[](const auto &value) { return PyString::from(String{ fmt::format("{}", value) }); },
-		m_value.value);
+	return PyString::from(String{ to_string() });
 }
 
 
 std::string PyNameConstant::to_string() const
 {
-	if (std::get_if<NoneType>(&m_value.value)) {
+	if (std::holds_alternative<NoneType>(m_value.value)) {
 		return "None";
 	} else {
-		bool bool_value = std::get_if<bool>(&m_value.value);
+		bool bool_value = std::get<bool>(m_value.value);
 		return bool_value ? "True" : "False";
 	}
 }

@@ -42,9 +42,14 @@ void Interpreter::setup()
 		"print", "print", [this](const std::shared_ptr<PyTuple> &args) {
 			const std::string separator = " ";
 			for (const auto &arg : *args) {
+				spdlog::debug("arg function ptr: {}", (void *)arg.get());
 				auto reprfunc = arg->get("__repr__", *this);
-				auto reprobj =
-					execute(VirtualMachine::the(), *this, reprfunc, std::shared_ptr<PyTuple>());
+				spdlog::debug("Repr function ptr: {}", (void *)reprfunc.get());
+				auto reprobj = execute(VirtualMachine::the(),
+					*this,
+					reprfunc,
+					VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }));
+				spdlog::debug("repr result: {}", reprobj->to_string());
 				std::cout << reprobj->to_string() << separator;
 			}
 			// make sure this is flushed immediately

@@ -9,7 +9,7 @@ FunctionInfo::FunctionInfo(size_t function_id_, BytecodeGenerator *generator_)
 	generator->enter_function();
 }
 
-FunctionInfo::~FunctionInfo() { generator->exit_function(); }
+FunctionInfo::~FunctionInfo() { generator->exit_function(function_id); }
 
 BytecodeGenerator::BytecodeGenerator() : m_frame_register_count({ start_register })
 {
@@ -21,43 +21,48 @@ BytecodeGenerator::~BytecodeGenerator() {}
 
 FunctionInfo BytecodeGenerator::allocate_function()
 {
-	m_functions.emplace_back();
+	auto &new_func = m_functions.emplace_back();
+	new_func.metadata.function_name = std::to_string(m_functions.size() - 1);
 	return FunctionInfo{ m_functions.size() - 1, this };
 }
 
-void BytecodeGenerator::relocate_labels(const std::vector<std::unique_ptr<Instruction>> &executable,
+void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions,
 	const std::vector<size_t> &offsets)
 {
-	for (const auto &ins : executable) { ins->relocate(*this, offsets); }
+	for (const auto &block : functions) {
+		for (const auto &ins : block.instructions) { ins->relocate(*this, offsets); }
+	}
 }
 
 std::shared_ptr<Bytecode> BytecodeGenerator::generate_executable()
 {
-	std::vector<std::unique_ptr<Instruction>> executable;
-	std::vector<FunctionMetaData> functions;
-	std::vector<size_t> function_offsets;
-	function_offsets.resize(m_functions.size());
-	size_t offset = 0;
-
-	for (size_t i = 1; i < m_functions.size(); ++i) {
-		for (auto &&ins : m_functions[i]) { executable.push_back(std::move(ins)); }
-		functions.push_back(FunctionMetaData{
-			offset, std::to_string(i), m_function_register_count[m_functions.size() - i] });
-		function_offsets[i] = offset;
-		offset += m_functions[i].size();
-	}
-
 	// make sure that at the end of compiling code we are back to __main__ frame
 	ASSERT(m_frame_register_count.size() == 1)
 
-	for (auto &&ins : m_functions[0]) { executable.push_back(std::move(ins)); }
-	functions.push_back(FunctionMetaData{ offset, "__main__", m_frame_register_count.back() });
-	function_offsets[0] = offset;
+	FunctionBlocks functions;
+	std::vector<size_t> function_offsets;
+	function_offsets.resize(m_functions.size());
+	size_t offset = 0;
+	spdlog::debug("m_functions size: {}", m_functions.size());
+	for (size_t i = 1; i < m_functions.size(); ++i) {
+		auto &new_function_block = functions.emplace_back(std::move(m_functions[i]));
+		spdlog::debug("function {} requires {} virtual registers",
+			new_function_block.metadata.function_name,
+			new_function_block.metadata.register_count);
+		new_function_block.metadata.offset = offset;
+		function_offsets[i] = offset;
+		offset += new_function_block.instructions.size();
+	}
 
-	relocate_labels(executable, function_offsets);
+	auto &main_function_block = functions.emplace_back(std::move(m_functions.front()));
+	main_function_block.metadata.offset = offset;
+	function_offsets.front() = offset;
+	spdlog::debug(
+		"__main__ requires {} virtual registers", main_function_block.metadata.register_count);
 
-	return std::make_shared<Bytecode>(
-		std::move(executable), std::move(functions), register_count());
+	relocate_labels(functions, function_offsets);
+
+	return std::make_shared<Bytecode>(std::move(functions));
 }
 
 
@@ -65,17 +70,26 @@ std::shared_ptr<Bytecode> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNod
 {
 	auto generator = BytecodeGenerator();
 	ast::ASTContext ctx;
-	node->generate(0, generator, ctx);
+	node->generate_impl(0, generator, ctx);
+	// allocate registers for __main__
+	generator.m_functions.front().metadata.register_count = generator.register_count();
 	return generator.generate_executable();
 }
 
 
-Bytecode::Bytecode(std::vector<std::unique_ptr<Instruction>> &&ins,
-	std::vector<FunctionMetaData> &&funcs,
-	size_t main_local_register_count)
-	: m_instructions(std::move(ins)), m_functions(std::move(funcs)),
-	  m_main_local_register_count(main_local_register_count)
-{}
+Bytecode::Bytecode(FunctionBlocks &&func_blocks)
+{
+	for (size_t i = 0; i < func_blocks.size() - 1; ++i) {
+		auto &func = func_blocks.at(i);
+		for (auto &&ins : func.instructions) { m_instructions.push_back(std::move(ins)); }
+		m_functions.push_back(std::move(func.metadata));
+	}
+	auto &main_func = func_blocks.back();
+	for (auto &&ins : main_func.instructions) { m_instructions.push_back(std::move(ins)); }
+	m_functions.push_back(std::move(main_func.metadata));
+
+	m_main_local_register_count = main_func.metadata.register_count;
+}
 
 
 std::string Bytecode::to_string() const
@@ -84,7 +98,7 @@ std::string Bytecode::to_string() const
 	std::ostringstream os;
 	size_t func_idx = 0;
 	for (const auto &function_metadata : m_functions) {
-		size_t function_end;
+		size_t function_end{ 0 };
 		if (func_idx < m_functions.size() - 1) {
 			function_end = m_functions[func_idx + 1].offset;
 		} else {

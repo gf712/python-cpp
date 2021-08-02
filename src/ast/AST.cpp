@@ -21,7 +21,8 @@ AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
 
-Register Name::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Name::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	auto dst_register = generator.allocate_register();
 
@@ -102,6 +103,13 @@ Register FunctionDefinition::generate_impl(size_t function_id,
 		node->generate(this_function_info.function_id, generator, ctx);
 	}
 
+	// always return None
+	// this can later on be optimised away
+	auto none_value_register = generator.allocate_register();
+	generator.emit<LoadConst>(
+		this_function_info.function_id, none_value_register, NameConstant{ NoneType{} });
+	generator.emit<ReturnValue>(this_function_info.function_id, none_value_register);
+
 	std::vector<std::string> arg_names;
 	for (const auto &arg_name : m_args->argument_names()) { arg_names.push_back(arg_name); }
 
@@ -138,7 +146,8 @@ Register
 	return 0;
 }
 
-Register Assign::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+Register
+	Assign::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	const auto src_register = m_value->generate(function_id, generator, ctx);
 	ASSERT(m_targets.size() > 0)
@@ -187,7 +196,12 @@ Register
 	}
 
 	if (m_function->node_type() == ASTNodeType::Attribute) {
-		generator.emit<MethodCall>(function_id, func_register, std::move(arg_registers));
+		auto attr_value = as<Attribute>(m_function)->value();
+		auto this_name = as<Name>(attr_value);
+		ASSERT(this_name);
+		ASSERT(this_name->ids().size() == 1);
+		generator.emit<MethodCall>(
+			function_id, func_register, this_name->ids()[0], std::move(arg_registers));
 	} else {
 		generator.emit<FunctionCall>(function_id, func_register, std::move(arg_registers));
 	}
@@ -396,7 +410,14 @@ Register Attribute::generate_impl(size_t function_id,
 {
 	auto this_value_register = m_value->generate(function_id, generator, ctx);
 
-	if (ctx.parent_nodes()[ctx.parent_nodes().size() - 2]->node_type() == ASTNodeType::Call) {
+	const auto *parent_node = ctx.parent_nodes()[ctx.parent_nodes().size() - 2];
+	auto parent_node_type = parent_node->node_type();
+
+	// the parent is a Call AST node and this is the function that is being called, then this must
+	// be a method
+	// "foo.bar()" -> .bar() is the function being called by parent AST node and this attribute
+	if (parent_node_type == ASTNodeType::Call
+		&& static_cast<const Call *>(parent_node)->function().get() == this) {
 		auto method_name_register = generator.allocate_register();
 		generator.emit<LoadMethod>(function_id, method_name_register, this_value_register, m_attr);
 		return method_name_register;

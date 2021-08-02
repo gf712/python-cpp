@@ -134,8 +134,6 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	virtual std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
 
-	std::shared_ptr<PyObject> repr(Interpreter &interpreter) const;
-
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
@@ -143,13 +141,13 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	virtual std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> hash_impl(Interpreter &interpreter) const;
 
+	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
+
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
 
 	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
 
   protected:
-	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
-
 	template<typename T>
 	void put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>;
 
@@ -261,9 +259,8 @@ class PyObjectNumber final : public PyObject
 	~PyObjectNumber() {}
 	std::string to_string() const override
 	{
-		std::ostringstream os;
-		os << m_value;
-		return fmt::format("PyObjectNumber {}", os.str());
+		return std::visit(
+			[](const auto &value) { return fmt::format("{}", value); }, m_value.value);
 	}
 
 	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
@@ -282,14 +279,6 @@ class PyObjectNumber final : public PyObject
   private:
 	PyObjectNumber(Number number) : PyObject(PyObjectType::PY_NUMBER), m_value(number)
 	{
-		// m_attributes.emplace("__repr__",
-		// 	std::make_shared<PyNativeFunction>([this](const std::shared_ptr<PyObject> &) {
-		// 		return PyString::create(this->to_string());
-		// 	}));
-		// m_attributes.emplace(
-		// 	"__add__", std::make_shared<PyFunction>([this](const std::shared_ptr<PyObject> &) {
-		// 		return PyString::create(this->to_string());
-		// 	}));
 	}
 };
 
