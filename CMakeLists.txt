@@ -27,7 +27,7 @@ FetchContent_MakeAvailable(gtest)
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::GMock ALIAS gmock)
 add_library(GTest::Main ALIAS gtest_main)
-
+include(cmake/linenoise.cmake)
 
 add_subdirectory(src)
 add_subdirectory(integration)

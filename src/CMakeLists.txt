@@ -33,3 +33,6 @@ set(TEST_PROGRAM main.cpp)
 add_executable(test ${TEST_PROGRAM})
 target_link_libraries(test PRIVATE python-cpp)
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)
+
+add_executable(python repl/repl.cpp)
+target_link_libraries(python PRIVATE linenoise python-cpp)
