@@ -5,6 +5,7 @@ set(INTERPRETER_SOURCE_FILES
                     interpreter/ExecutionFrame.cpp)
 set(PARSER_SOURCE_FILES parser/Parser.cpp)
 set(RUNTIME_SOURCE_FILES runtime/PyDict.cpp 
+                         runtime/PyNumber.cpp
                          runtime/PyObject.cpp
                          runtime/PyRange.cpp)
 

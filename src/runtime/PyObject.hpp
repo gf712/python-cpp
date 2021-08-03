@@ -101,16 +101,26 @@ inline std::string_view object_name(PyObjectType type)
 
 class PyTuple;
 class PyDict;
+class PyFunction;
+class PyObject;
 
-using SlotFunctionType =
-	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyTuple>, std::shared_ptr<PyDict>)>;
+using ReprSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
+using IterSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
+
 
 class PyObject : public std::enable_shared_from_this<PyObject>
 {
 	const PyObjectType m_type;
 
   protected:
-	std::unordered_map<std::string, std::function<std::shared_ptr<PyObject>()>> m_slots;
+	struct Slots
+	{
+		std::variant<ReprSlotFunctionType, std::shared_ptr<PyFunction>> repr;
+		std::variant<IterSlotFunctionType, std::shared_ptr<PyFunction>> iter;
+	};
+
+	Slots m_slots;
+	std::unordered_map<std::string, std::shared_ptr<PyObject>> m_attributes;
 
   public:
 	PyObject(PyObjectType type);
@@ -147,14 +157,10 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 
 	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
 
-  protected:
-	template<typename T>
-	void put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>;
+	const Slots &slots() const { return m_slots; }
 
-	void put(std::string name, std::shared_ptr<PyObject> attribute)
-	{
-		m_slots.insert_or_assign(name, [attribute = std::move(attribute)]() { return attribute; });
-	}
+  protected:
+	void put(std::string name, std::shared_ptr<PyObject>);
 
 	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
 	{
@@ -248,39 +254,6 @@ class PyString : public PyObject
 	PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s)) {}
 };
 
-class PyObjectNumber final : public PyObject
-{
-	friend class Heap;
-
-	Number m_value;
-
-  public:
-	static std::shared_ptr<PyObjectNumber> create(const Number &number);
-	~PyObjectNumber() {}
-	std::string to_string() const override
-	{
-		return std::visit(
-			[](const auto &value) { return fmt::format("{}", value); }, m_value.value);
-	}
-
-	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> subtract_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-
-	const Number &value() const { return m_value; }
-
-  private:
-	PyObjectNumber(Number number) : PyObject(PyObjectType::PY_NUMBER), m_value(number)
-	{
-	}
-};
 
 class PyBytes : public PyObject
 {
@@ -411,6 +384,7 @@ class PyTuple : public PyObject
 	// std::shared_ptr<PyTupleIterator> cend() const;
 
 	const std::vector<Value> &elements() const { return m_elements; }
+	size_t size() const { return m_elements.size(); }
 	std::shared_ptr<PyObject> operator[](size_t idx) const;
 };
 
@@ -474,14 +448,6 @@ template<> inline std::shared_ptr<PyString> as(std::shared_ptr<PyObject> node)
 {
 	if (node->type() == PyObjectType::PY_STRING) {
 		return std::static_pointer_cast<PyString>(node);
-	}
-	return nullptr;
-}
-
-template<> inline std::shared_ptr<PyObjectNumber> as(std::shared_ptr<PyObject> node)
-{
-	if (node->type() == PyObjectType::PY_NUMBER) {
-		return std::static_pointer_cast<PyObjectNumber>(node);
 	}
 	return nullptr;
 }

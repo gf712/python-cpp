@@ -2,11 +2,12 @@
 
 #include "bytecode/instructions/FunctionCall.hpp"
 
+#include "runtime/CustomPyObject.hpp"
+#include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyRange.hpp"
 #include "runtime/StopIterationException.hpp"
 #include "runtime/Value.hpp"
-#include "runtime/PyRange.hpp"
-#include "runtime/CustomPyObject.hpp"
 
 #include <iostream>
 
@@ -15,7 +16,7 @@ Interpreter::Interpreter() {}
 namespace {
 std::optional<int64_t> to_integer(const std::shared_ptr<PyObject> &obj, Interpreter &interpreter)
 {
-	if (auto pynumber = as<PyObjectNumber>(obj)) {
+	if (auto pynumber = as<PyNumber>(obj)) {
 		if (auto int_value = std::get_if<int64_t>(&pynumber->value().value)) { return *int_value; }
 		interpreter.raise_exception(
 			"TypeError: '{}' object cannot be interpreted as an integer", object_name(obj->type()));
@@ -42,13 +43,23 @@ void Interpreter::setup()
 		"print", "print", [this](const std::shared_ptr<PyTuple> &args) {
 			const std::string separator = " ";
 			for (const auto &arg : *args) {
-				spdlog::debug("arg function ptr: {}", (void *)arg.get());
-				auto reprfunc = arg->get("__repr__", *this);
-				spdlog::debug("Repr function ptr: {}", (void *)reprfunc.get());
-				auto reprobj = execute(VirtualMachine::the(),
-					*this,
-					reprfunc,
-					VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }));
+				spdlog::debug("arg function ptr: {}", static_cast<void *>(arg.get()));
+				auto reprfunc = arg->slots().repr;
+				std::shared_ptr<PyObject> reprobj;
+				if (std::holds_alternative<ReprSlotFunctionType>(reprfunc)) {
+					auto repr_native = std::get<ReprSlotFunctionType>(reprfunc);
+					spdlog::debug(
+						"Repr native function ptr: {}", static_cast<void *>(&repr_native));
+					reprobj = repr_native();
+				} else {
+					auto pyfunc = std::get<std::shared_ptr<PyFunction>>(reprfunc);
+					spdlog::debug(
+						"Repr native function ptr: {}", static_cast<void *>(pyfunc.get()));
+					reprobj = execute(VirtualMachine::the(),
+						*this,
+						pyfunc,
+						VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }));
+				}
 				spdlog::debug("repr result: {}", reprobj->to_string());
 				std::cout << reprobj->to_string() << separator;
 			}
@@ -58,19 +69,48 @@ void Interpreter::setup()
 		});
 
 	allocate_object<PyNativeFunction>("iter", "iter", [this](const std::shared_ptr<PyTuple> &args) {
+		ASSERT(args->size() == 1)
 		const auto &arg = args->operator[](0);
-		return arg->iter_impl(*this);
+		auto iterfunc = arg->slots().iter;
+		if (std::holds_alternative<ReprSlotFunctionType>(iterfunc)) {
+			auto iter_native = std::get<ReprSlotFunctionType>(iterfunc);
+			spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
+			return iter_native();
+		} else {
+			auto pyfunc = std::get<std::shared_ptr<PyFunction>>(iterfunc);
+			spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc.get()));
+			return execute(VirtualMachine::the(),
+				*this,
+				pyfunc,
+				VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }));
+		}
 	});
 
 	allocate_object<PyNativeFunction>("next", "next", [this](const std::shared_ptr<PyTuple> &args) {
+		ASSERT(args->size() == 1)
+		std::shared_ptr<PyObject> next_result{ nullptr };
 		const auto &arg = args->operator[](0);
-		auto result = arg->next_impl(*this);
-		if (!result) { raise_exception(stop_iteration("")); }
-		return result;
+		auto iterfunc = arg->slots().iter;
+		if (std::holds_alternative<ReprSlotFunctionType>(iterfunc)) {
+			auto iter_native = std::get<ReprSlotFunctionType>(iterfunc);
+			spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
+			next_result = iter_native();
+		} else {
+			auto pyfunc = std::get<std::shared_ptr<PyFunction>>(iterfunc);
+			spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc.get()));
+			next_result = execute(VirtualMachine::the(),
+				*this,
+				pyfunc,
+				VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }));
+		}
+
+		if (!next_result) { raise_exception(stop_iteration("")); }
+		return next_result;
 	});
 
 	allocate_object<PyNativeFunction>(
 		"range", "range", [this](const std::shared_ptr<PyTuple> &args) {
+			ASSERT(args->size() == 1)
 			const auto &arg = args->operator[](0);
 			auto &heap = VirtualMachine::the().heap();
 			if (auto pynumber = to_integer(arg, *this)) {
@@ -81,6 +121,7 @@ void Interpreter::setup()
 
 	allocate_object<PyNativeFunction>(
 		"__build_class__", "__build_class__", [this](const std::shared_ptr<PyTuple> &args) {
+			ASSERT(args->size() == 2)
 			const auto &class_name = args->operator[](0);
 			const auto &function_location = args->operator[](1);
 			spdlog::debug(
@@ -89,8 +130,8 @@ void Interpreter::setup()
 			ASSERT(as<PyString>(class_name))
 			auto class_name_as_string = as<PyString>(class_name)->value();
 
-			ASSERT(as<PyObjectNumber>(function_location))
-			auto pynumber = as<PyObjectNumber>(function_location)->value();
+			ASSERT(as<PyNumber>(function_location))
+			auto pynumber = as<PyNumber>(function_location)->value();
 			ASSERT(std::get_if<int64_t>(&pynumber.value))
 			auto function_id = std::get<int64_t>(pynumber.value);
 

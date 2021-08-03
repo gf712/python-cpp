@@ -1,3 +1,4 @@
+#include "PyNumber.hpp"
 #include "PyRange.hpp"
 #include "StopIterationException.hpp"
 
@@ -38,7 +39,7 @@ std::shared_ptr<PyObject> PyRangeIterator::repr_impl(Interpreter &) const
 std::shared_ptr<PyObject> PyRangeIterator::next_impl(Interpreter &interpreter)
 {
 	if (m_current_index < m_pyrange->stop()) {
-		auto result = PyObjectNumber::from(Number{ m_current_index });
+		auto result = PyNumber::from(Number{ m_current_index });
 		m_current_index += m_pyrange->step();
 		return result;
 	}

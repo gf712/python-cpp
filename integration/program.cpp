@@ -3,6 +3,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 
 #include "gtest/gtest.h"
@@ -48,7 +49,7 @@ template<typename T> void check_value(std::shared_ptr<PyObject> obj, T expected_
 {
 	if constexpr (std::is_integral_v<T>) {
 		ASSERT_EQ(obj->type(), PyObjectType::PY_NUMBER);
-		auto pynum = as<PyObjectNumber>(obj);
+		auto pynum = as<PyNumber>(obj);
 		ASSERT_TRUE(pynum);
 		ASSERT_EQ(std::get<int64_t>(pynum->value().value), expected_value);
 	} else if constexpr (std::is_same_v<T, const char *> || std::is_same_v<T, std::string>) {

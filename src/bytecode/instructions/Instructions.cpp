@@ -1,5 +1,6 @@
 #include "Instructions.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/StopIterationException.hpp"
 
@@ -8,7 +9,7 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	const auto &value = vm.reg(m_source);
 	auto obj = std::visit(
 		overloaded{ [](const Number &n) {
-					   return std::static_pointer_cast<PyObject>(PyObjectNumber::create(n));
+					   return std::static_pointer_cast<PyObject>(PyNumber::create(n));
 				   },
 			[](const String &s) {
 				return std::static_pointer_cast<PyObject>(PyString::create(s.s));

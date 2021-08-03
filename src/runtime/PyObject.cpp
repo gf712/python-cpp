@@ -1,5 +1,6 @@
 #include "AttributeError.hpp"
 #include "PyObject.hpp"
+#include "PyNumber.hpp"
 #include "StopIterationException.hpp"
 
 #include "bytecode/VM.hpp"
@@ -43,7 +44,7 @@ template<> std::shared_ptr<PyObject> PyObject::from(const std::shared_ptr<PyObje
 
 template<> std::shared_ptr<PyObject> PyObject::from(const Number &value)
 {
-	return PyObjectNumber::create(value);
+	return PyNumber::create(value);
 }
 
 template<> std::shared_ptr<PyObject> PyObject::from(const String &value)
@@ -70,24 +71,21 @@ template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 
 PyObject::PyObject(PyObjectType type) : m_type(type)
 {
-	put("__repr__", [this](const std::shared_ptr<PyTuple> &) {
-		return this->repr_impl(*VirtualMachine::the().interpreter());
-	});
+	m_slots =
+		Slots{ .repr = [this]() { return this->repr_impl(*VirtualMachine::the().interpreter()); },
+			.iter = [this]() { return this->iter_impl(*VirtualMachine::the().interpreter()); } };
 };
 
 
-template<typename T>
-void PyObject::put(std::string name, T &&func) requires std::invocable<T, std::shared_ptr<PyTuple>>
+void PyObject::put(std::string name, std::shared_ptr<PyObject> value)
 {
-	m_slots.insert_or_assign(name, [name, func = std::forward<T>(func)]() {
-		return std::make_shared<PyNativeFunction>(name, func);
-	});
+	m_attributes.insert_or_assign(name, value);
 }
 
 
 std::shared_ptr<PyObject> PyObject::get(std::string name, Interpreter &interpreter) const
 {
-	if (auto it = m_slots.find(name); it != m_slots.end()) { return it->second(); }
+	if (auto it = m_attributes.find(name); it != m_attributes.end()) { return it->second; }
 	interpreter.raise_exception(attribute_error(
 		fmt::format("'{}' object has no attribute '{}'", object_name(m_type), name)));
 	return nullptr;
@@ -144,7 +142,7 @@ std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &
 	}
 }
 
-std::shared_ptr<PyObject> PyObjectNumber::repr_impl(Interpreter &) const
+std::shared_ptr<PyObject> PyNumber::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
 }
@@ -210,16 +208,6 @@ std::shared_ptr<PyObject> PyObject::equal_impl(const std::shared_ptr<PyObject> &
 	return PyObject::from(NameConstant{ false });
 }
 
-std::shared_ptr<PyObject> PyObjectNumber::equal_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &) const
-{
-	if (auto pynum = as<PyObjectNumber>(obj)) {
-		const bool comparisson = m_value == pynum->value();
-		return PyObject::from(NameConstant{ comparisson });
-	}
-	return nullptr;
-}
-
 
 PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args)
 	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_register_count(register_count),
@@ -233,51 +221,6 @@ PyFunction::PyFunction(std::string name, std::shared_ptr<PyCode> code)
 {
 	m_code = std::move(code);
 	// m_attributes["__code__"] = m_code;
-}
-
-
-std::shared_ptr<PyObject> PyObjectNumber::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
-{
-	if (auto rhs = as<PyObjectNumber>(obj)) {
-		return PyObjectNumber::create(m_value + rhs->value());
-	} else {
-		interpreter.raise_exception(
-			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
-		return nullptr;
-	}
-}
-
-
-std::shared_ptr<PyObject> PyObjectNumber::subtract_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
-{
-	if (auto rhs = as<PyObjectNumber>(obj)) {
-		return PyObjectNumber::create(m_value - rhs->value());
-	} else {
-		interpreter.raise_exception(
-			"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
-		return nullptr;
-	}
-}
-
-
-std::shared_ptr<PyObject> PyObjectNumber::modulo_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
-{
-	if (auto rhs = as<PyObjectNumber>(obj)) {
-		return PyObjectNumber::create(m_value % rhs->value());
-	} else {
-		interpreter.raise_exception(
-			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
-		return nullptr;
-	}
 }
 
 
@@ -457,10 +400,10 @@ std::shared_ptr<PyString> PyString::create(const std::string &value)
 	return heap.allocate<PyString>(value);
 }
 
-std::shared_ptr<PyObjectNumber> PyObjectNumber::create(const Number &number)
+std::shared_ptr<PyNumber> PyNumber::create(const Number &number)
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyObjectNumber>(number);
+	return heap.allocate<PyNumber>(number);
 }
 
 std::shared_ptr<PyBytes> PyBytes::create(const Bytes &value)

@@ -40,15 +40,15 @@ static constexpr std::string_view program =
 
 int main()
 {
-	// spdlog::set_level(spdlog::level::debug);
+	spdlog::set_level(spdlog::level::debug);
 	Lexer lexer{ std::string(program) };
 	parser::Parser p{ lexer };
 	p.parse();
-	spdlog::set_level(spdlog::level::debug);
 	p.module()->print_node("");
 	auto bytecode = BytecodeGenerator::compile(p.module());
 	spdlog::debug("Bytecode:\n {}", bytecode->to_string());
 	auto &vm = VirtualMachine::the().create(std::move(bytecode));
+	// spdlog::set_level(spdlog::level::debug);
 	vm.execute();
 	// vm.dump();
 }
