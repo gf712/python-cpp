@@ -115,3 +115,8 @@ std::string Bytecode::to_string() const
 
 	return os.str();
 }
+
+void Bytecode::add_instructions(std::unique_ptr<Instruction> &&ins)
+{
+	m_instructions.push_back(std::move(ins));
+}

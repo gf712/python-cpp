@@ -17,6 +17,7 @@ set(VM_SOURCE_FILES bytecode/VM.cpp
                     bytecode/instructions/Instructions.cpp
                     bytecode/instructions/MethodCall.cpp
                     bytecode/instructions/ReturnValue.cpp
+                    bytecode/instructions/StoreAttr.cpp
                     )
 
 set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp)

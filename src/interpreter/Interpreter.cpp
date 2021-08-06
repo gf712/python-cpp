@@ -65,7 +65,8 @@ void Interpreter::setup()
 			}
 			// make sure this is flushed immediately
 			std::cout << std::endl;
-			return py_none();
+			auto none = py_none();
+			return none;
 		});
 
 	allocate_object<PyNativeFunction>("iter", "iter", [this](const std::shared_ptr<PyTuple> &args) {

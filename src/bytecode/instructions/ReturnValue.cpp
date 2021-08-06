@@ -14,7 +14,10 @@ void ReturnValue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 					   spdlog::debug("Return value: {}", val->to_string());
 				   } },
 		result);
-	vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
-	interpreter.set_execution_frame(interpreter.execution_frame()->pop());
+	if (interpreter.execution_frame()->parent()) {
+		vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
+		interpreter.set_execution_frame(interpreter.execution_frame()->pop());
+	}
+
 	vm.reg(0) = result;
 }

@@ -42,9 +42,8 @@ PyDictItemsIterator PyDictItems::begin() const
 
 PyDictItemsIterator PyDictItems::end() const
 {
-	auto result = PyDictItemsIterator(shared_from_this_as<PyDictItems>());
-	result.m_current_iterator = m_pydict->map().end();
-	return result;
+	auto end_position = std::distance(m_pydict->map().begin(), m_pydict->map().end());
+	return PyDictItemsIterator(shared_from_this_as<PyDictItems>(), end_position);
 }
 
 std::string PyDictItems::to_string() const
@@ -52,8 +51,15 @@ std::string PyDictItems::to_string() const
 	std::ostringstream os;
 	os << "dict_items([";
 	auto it = begin();
+	auto end_it = end();
+	if (it == end_it) {
+		os << "])";
+		return os.str();
+	}
+	std::advance(end_it, -1);
 
-	while (std::next(it) != end()) {
+	while (true) {
+		if (it == end_it) break;
 		os << (*it)->to_string() << ", ";
 		std::advance(it, 1);
 	}

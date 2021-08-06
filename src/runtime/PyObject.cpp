@@ -347,9 +347,7 @@ PyTupleIterator PyTuple::begin() const { return PyTupleIterator(shared_from_this
 
 PyTupleIterator PyTuple::end() const
 {
-	auto end = PyTupleIterator(shared_from_this_as<PyTuple>());
-	end.m_current_index = m_elements.size();
-	return end;
+	return PyTupleIterator(shared_from_this_as<PyTuple>(), m_elements.size());
 }
 
 std::shared_ptr<PyObject> PyTuple::operator[](size_t idx) const
@@ -425,26 +423,40 @@ std::shared_ptr<PyNameConstant> PyNameConstant::create(const NameConstant &value
 }
 
 
-std::shared_ptr<PyObject> py_none()
+class Env
 {
-	static std::shared_ptr<PyObject> none = nullptr;
-	if (!none) { none = PyNameConstant::create(NameConstant{ NoneType{} }); }
-	return none;
-}
+  public:
+	static std::shared_ptr<PyObject> py_true() { return Env::instance().m_py_true; }
+	static std::shared_ptr<PyObject> py_false() { return Env::instance().m_py_false; }
+	static std::shared_ptr<PyObject> py_none()
+	{
+		spdlog::debug("none {}", (void *)Env::instance().m_py_none.get());
+		return Env::instance().m_py_none;
+	}
 
-std::shared_ptr<PyObject> py_true()
-{
-	static std::shared_ptr<PyObject> true_value = nullptr;
-	if (!true_value) { true_value = PyNameConstant::create(NameConstant{ true }); }
-	return true_value;
-}
+  private:
+	std::shared_ptr<PyObject> m_py_true;
+	std::shared_ptr<PyObject> m_py_false;
+	std::shared_ptr<PyObject> m_py_none;
 
-std::shared_ptr<PyObject> py_false()
-{
-	static std::shared_ptr<PyObject> false_value = nullptr;
-	if (!false_value) { false_value = PyNameConstant::create(NameConstant{ false }); }
-	return false_value;
-}
+	static Env &instance()
+	{
+		static Env instance{};
+		return instance;
+	}
+
+	Env()
+	{
+		m_py_true = PyNameConstant::create(NameConstant{ true });
+		m_py_false = PyNameConstant::create(NameConstant{ false });
+		m_py_none = PyNameConstant::create(NameConstant{ NoneType{} });
+	}
+};
+
+std::shared_ptr<PyObject> py_true() { return Env::py_true(); }
+std::shared_ptr<PyObject> py_false() { return Env::py_false(); }
+std::shared_ptr<PyObject> py_none() { return Env::py_none(); }
+
 
 std::shared_ptr<PyObject> py_ellipsis()
 {

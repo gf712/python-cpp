@@ -24,39 +24,59 @@ std::optional<std::string> getline(const std::string &prompt)
 }
 
 
-void run(std::string_view program)
+class InteractivePython
 {
-	static std::shared_ptr<ast::Module> main_module{ nullptr };
-	Lexer lexer{ std::string(program) };
-	parser::Parser p{ lexer };
-	p.parse();
-	if (!main_module) {
-		main_module = p.module();
-	} else {
-		for (const auto &node : p.module()->body()) { main_module->emplace(node); }
-	}
-	auto bytecode = BytecodeGenerator::compile(main_module);
-	auto &vm = VirtualMachine::the();
-	vm.clear();
-	vm.create(std::move(bytecode));
-	vm.execute();
-}
+  public:
+	InteractivePython() {}
 
+	std::shared_ptr<PyObject> interpret_statement(std::string statement)
+	{
+		Lexer lexer{ statement };
+		parser::Parser parser{ lexer };
+		parser.parse();
+		if (!m_main_module) {
+			m_main_module = parser.module();
+		} else {
+			for (const auto &node : parser.module()->body()) { m_main_module->emplace(node); }
+		}
+		auto bytecode = BytecodeGenerator::compile(m_main_module);
+		auto &vm = VirtualMachine::the();
+		return vm.execute_statement(bytecode);
+	}
+
+  private:
+	std::shared_ptr<ast::Module> m_main_module{ nullptr };
+};
 
 }// namespace repl
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    if (argc > 1) {
-        if (strcmp(argv[1], "--debug") == 0) {
-        	spdlog::set_level(spdlog::level::debug);
-        }
-    }
+	if (argc > 1) {
+		if (strcmp(argv[1], "--debug") == 0) { spdlog::set_level(spdlog::level::debug); }
+	}
 	linenoiseHistoryLoad("history.txt");
 
-	while (auto line = repl::getline("python> ")) {
+	repl::InteractivePython interactive_interpreter;
+
+	static constexpr std::string_view major_version = "3";
+	static constexpr std::string_view minor_version = "10";
+	static constexpr std::string_view build_version = "0a";
+	static constexpr std::string_view compiler = "Clang 11.0.0";
+	static constexpr std::string_view platform = "Linux";
+
+	std::cout << fmt::format("Python {}.{}.{}\n", major_version, minor_version, build_version);
+	std::cout << fmt::format("[{}] :: {}\n", compiler, platform);
+	std::cout << "Type \"help\", \"copyright\", \"credits\" or \"license\" for more information.";
+	std::cout << std::endl;
+
+	while (auto line = repl::getline(">>> ")) {
 		(*line) += "\n";
-		repl::run(*line);
+		auto result = interactive_interpreter.interpret_statement(*line);
+		if (result.get() != py_none().get()) {
+			std::cout << result->repr_impl(*VirtualMachine::the().interpreter())->to_string()
+					  << '\n';
+		}
 	}
 
 	return 0;

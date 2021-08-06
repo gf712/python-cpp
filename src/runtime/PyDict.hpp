@@ -69,6 +69,12 @@ class PyDictItemsIterator : public PyObject
 		  m_current_iterator(m_pydictitems->m_pydict->map().begin())
 	{}
 
+	PyDictItemsIterator(std::shared_ptr<const PyDictItems> pydict, size_t position)
+		: PyDictItemsIterator(pydict)
+	{
+		std::advance(m_current_iterator, position);
+	}
+
 	std::string to_string() const override;
 
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;

@@ -13,6 +13,5 @@ class ReturnValue final : public Instruction
 	std::string to_string() const final { return fmt::format("RETURN_VALUE    r{:<3}", m_source); }
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
-
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };

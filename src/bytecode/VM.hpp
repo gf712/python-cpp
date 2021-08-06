@@ -1,25 +1,12 @@
 #pragma once
 
 #include "forward.hpp"
+#include "utilities.hpp"
 #include "runtime/Value.hpp"
 #include <memory>
 
 static constexpr size_t KB = 1024;
 static constexpr size_t MB = 1024 * KB;
-
-struct NonCopyable
-{
-	NonCopyable() = default;
-	NonCopyable(const NonCopyable &) = delete;
-	NonCopyable &operator=(const NonCopyable &) = delete;
-};
-
-struct NonMoveable
-{
-	NonMoveable() = default;
-	NonMoveable(NonMoveable &&) = delete;
-	NonMoveable &operator=(NonMoveable &&) = delete;
-};
 
 class Heap
 	: NonCopyable
@@ -108,6 +95,8 @@ class VirtualMachine
 		vm.push_generator(generator);
 		return vm;
 	}
+
+	std::shared_ptr<PyObject> execute_statement(std::shared_ptr<Bytecode> bytecode);
 
 	void push_generator(std::shared_ptr<Bytecode> generator);
 

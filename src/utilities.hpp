@@ -20,3 +20,17 @@ template<class... Ts> struct overloaded : Ts...
 };
 // explicit deduction guide (not needed as of C++20)
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+struct NonCopyable
+{
+	NonCopyable() = default;
+	NonCopyable(const NonCopyable &) = delete;
+	NonCopyable &operator=(const NonCopyable &) = delete;
+};
+
+struct NonMoveable
+{
+	NonMoveable() = default;
+	NonMoveable(NonMoveable &&) = delete;
+	NonMoveable &operator=(NonMoveable &&) = delete;
+};

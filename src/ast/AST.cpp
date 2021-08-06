@@ -7,6 +7,7 @@
 #include "bytecode/instructions/LoadMethod.hpp"
 #include "bytecode/instructions/MethodCall.hpp"
 #include "bytecode/instructions/ReturnValue.hpp"
+#include "bytecode/instructions/StoreAttr.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {
@@ -175,6 +176,10 @@ Register
 				for (const auto &var : ast_name->ids()) {
 					generator.emit<StoreName>(function_id, var, src_register);
 				}
+			} else if (auto ast_attr = as<Attribute>(target)) {
+				auto dst_register = ast_attr->value()->generate(function_id, generator, ctx);
+				generator.emit<StoreAttr>(
+					function_id, dst_register, src_register, ast_attr->attr());
 			} else {
 				TODO();
 			}

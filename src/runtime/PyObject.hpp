@@ -108,7 +108,10 @@ using ReprSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
 using IterSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
 
 
-class PyObject : public std::enable_shared_from_this<PyObject>
+class PyObject
+	: public std::enable_shared_from_this<PyObject>
+	, NonCopyable
+	, NonMoveable
 {
 	const PyObjectType m_type;
 
@@ -156,12 +159,11 @@ class PyObject : public std::enable_shared_from_this<PyObject>
 	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
 
 	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
+	void put(std::string name, std::shared_ptr<PyObject>);
 
 	const Slots &slots() const { return m_slots; }
 
   protected:
-	void put(std::string name, std::shared_ptr<PyObject>);
-
 	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
 	{
 		return std::static_pointer_cast<const T>(shared_from_this());
@@ -305,9 +307,7 @@ class PyEllipsis : public PyObject
 class PyNameConstant : public PyObject
 {
 	friend class Heap;
-	friend std::shared_ptr<PyObject> py_none();
-	friend std::shared_ptr<PyObject> py_false();
-	friend std::shared_ptr<PyObject> py_true();
+	friend class Env;
 
 	NameConstant m_value;
 
@@ -401,6 +401,12 @@ class PyTupleIterator : public PyObject
 	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple)
 		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(std::move(pytuple))
 	{}
+
+	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple, size_t position)
+		: PyTupleIterator(pytuple)
+	{
+		m_current_index = position;
+	}
 
 	std::string to_string() const override;
 

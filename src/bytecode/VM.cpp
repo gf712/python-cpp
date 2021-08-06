@@ -1,6 +1,7 @@
 #include "BytecodeGenerator.hpp"
 #include "VM.hpp"
 #include "instructions/Instructions.hpp"
+#include "instructions/ReturnValue.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/PyObject.hpp"
 
@@ -150,4 +151,46 @@ size_t VirtualMachine::function_register_count(size_t func_id)
 	ASSERT(func_id >= 1)
 	func_id--;
 	return m_bytecode->functions()[func_id].register_count;
+}
+
+std::shared_ptr<PyObject> VirtualMachine::execute_statement(std::shared_ptr<Bytecode> bytecode)
+{
+	static bool requires_setup = true;
+	if (requires_setup) {
+		spdlog::debug("Setting up interpreter");
+		m_interpreter->setup();
+		m_instruction_pointer = 0;
+		FunctionBlock main_block{ .metadata = FunctionMetaData{ .function_name = "__main__" } };
+		FunctionBlocks program_blocks;
+		program_blocks.emplace_back(std::move(main_block));
+		m_bytecode = std::make_shared<Bytecode>(std::move(program_blocks));
+		requires_setup = false;
+	}
+
+	for (auto &&ins : bytecode->instructions()) { m_bytecode->add_instructions(std::move(ins)); }
+
+	spdlog::debug("bytecode: \n{}", m_bytecode->to_string());
+
+	spdlog::debug("Adding {} registers", bytecode->main_local_register_count());
+	m_local_registers.emplace_back(bytecode->main_local_register_count(), nullptr);
+	while (m_instruction_pointer < m_bytecode->instructions().size()) {
+		// show_current_instruction(m_instruction_pointer, 5);
+		// dump();
+		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
+		instruction->execute(*this, *m_interpreter);
+
+		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+			m_interpreter->unwind();
+			// restore instruction pointer
+			std::cout << m_interpreter->exception_message() << '\n';
+			return PyString::create(m_interpreter->exception_message());
+		}
+		if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
+			// bail, an error occured
+			std::cout << m_interpreter->exception_message() << '\n';
+			return PyString::create(m_interpreter->exception_message());
+		}
+	}
+	// return return value which is located in r0
+	return std::visit([](const auto &value) { return PyObject::from(value); }, reg(0));
 }

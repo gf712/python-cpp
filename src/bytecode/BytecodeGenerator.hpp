@@ -35,6 +35,10 @@ class Bytecode
 	size_t main_local_register_count() const { return m_main_local_register_count; }
 
 	const std::vector<std::unique_ptr<Instruction>> &instructions() const { return m_instructions; }
+	std::vector<std::unique_ptr<Instruction>> &instructions() { return m_instructions; }
+
+	void add_instructions(std::unique_ptr<Instruction> &&ins);
+
 	const std::vector<FunctionMetaData> &functions() const { return m_functions; }
 
 	size_t function_offset(size_t function_id) const { return m_functions[function_id - 1].offset; }
