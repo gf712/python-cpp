@@ -120,8 +120,13 @@ struct ApplyInBetweenPattern : Pattern<ApplyInBetweenPattern<MainPatternType, In
 
 		if (!MainPatternType_::match(p)) { return false; }
 
+		auto original_token_position = p.token_position();
 		while (InBetweenPattern_::match(p)) {
-			if (!MainPatternType_::match(p)) { break; }
+			if (!MainPatternType_::match(p)) {
+				p.token_position() = original_token_position;
+				break;
+			}
+			original_token_position = p.token_position();
 		}
 		spdlog::debug(
 			"ApplyInBetweenPattern: {}", p.lexer().peek_token(p.token_position())->to_string());
@@ -160,7 +165,7 @@ struct ZeroOrOnePattern : Pattern<ZeroOrOnePattern<PatternTypes...>>
 	}
 };
 
-template<size_t TypeIdx, typename PatternTuple> struct GroupPattern_
+template<size_t TypeIdx, typename PatternTuple> struct OrPattern_
 {
 	static bool match(Parser &p)
 	{
@@ -170,7 +175,7 @@ template<size_t TypeIdx, typename PatternTuple> struct GroupPattern_
 			if (std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
 				return true;
 			} else {
-				return GroupPattern_<TypeIdx + 1, PatternTuple>::match(p);
+				return OrPattern_<TypeIdx + 1, PatternTuple>::match(p);
 			}
 		}
 	}
@@ -181,7 +186,32 @@ template<typename... PatternTypes> struct OrPattern : Pattern<OrPattern<PatternT
 {
 	static bool matches_impl(Parser &p)
 	{
-		return GroupPattern_<0, std::tuple<PatternTypes...>>::match(p);
+		return OrPattern_<0, std::tuple<PatternTypes...>>::match(p);
+	}
+};
+
+template<size_t TypeIdx, typename PatternTuple> struct GroupPatterns_
+{
+	static bool match(Parser &p)
+	{
+		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
+			return std::tuple_element_t<TypeIdx, PatternTuple>::matches(p);
+		} else {
+			if (!std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
+				return false;
+			} else {
+				return GroupPatterns_<TypeIdx + 1, PatternTuple>::match(p);
+			}
+		}
+	}
+};
+
+
+template<typename... PatternTypes> struct GroupPatterns : Pattern<GroupPatterns<PatternTypes...>>
+{
+	static bool matches_impl(Parser &p)
+	{
+		return GroupPatterns_<0, std::tuple<PatternTypes...>>::match(p);
 	}
 };
 
@@ -190,9 +220,8 @@ template<typename PatternsType> struct SingleTokenPattern_
 {
 	static bool match(Parser &p)
 	{
-		if (PatternsType::head == p.lexer().peek_token(p.token_position())->token_type()) {
-			return true;
-		}
+		const auto this_token = p.lexer().peek_token(p.token_position())->token_type();
+		if (PatternsType::head == this_token) { return true; }
 		if constexpr (PatternsType::size == 1) {
 			return false;
 		} else {
@@ -748,6 +777,60 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 };
 
 
+struct KwargsOrStarredPattern : Pattern<KwargsOrStarredPattern>
+{
+	// kwarg_or_starred:
+	//     | NAME '=' expression
+	//     | starred_expression
+	static bool matches_impl(Parser &p)
+	{
+		const auto token = p.lexer().peek_token(p.token_position());
+		std::string maybe_name{ p.lexer().get(token->start(), token->end()) };
+		spdlog::debug("kwarg_or_starred");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
+			SingleTokenPattern<Token::TokenType::EQUAL>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("NAME '=' expression");
+			p.push_to_stack(std::make_shared<Keyword>(maybe_name, p.pop_back()));
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct KwargsPattern : Pattern<KwargsPattern>
+{
+	// kwargs:
+	//     | ','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+
+	//     | ','.kwarg_or_starred+
+	//     | ','.kwarg_or_double_starred+
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("kwargs");
+		using pattern2 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<KwargsOrStarredPattern,
+			SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern2::match(p)) {
+			spdlog::debug("','.kwarg_or_starred+");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct StarredExpressionPattern : Pattern<StarredExpressionPattern>
+{
+	// starred_expression:
+	//     | '*' expression
+	static bool matches_impl(Parser &)
+	{
+		spdlog::debug("StarredExpressionPattern");
+		return false;
+	}
+};
+
+
 struct ArgsPattern : Pattern<ArgsPattern>
 {
 	// args:
@@ -756,12 +839,24 @@ struct ArgsPattern : Pattern<ArgsPattern>
 	static bool matches_impl(Parser &p)
 	{
 		spdlog::debug("ArgsPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
-		using pattern1 = PatternMatch<ApplyInBetweenPattern<NamedExpressionPattern,
-			SingleTokenPattern<Token::TokenType::COMMA>>>;
+		spdlog::debug(
+			"Testing pattern: ','.(starred_expression | named_expression !'=')+ [',' kwargs ]");
+		using pattern1 = PatternMatch<
+			ApplyInBetweenPattern<
+				OrPattern<StarredExpressionPattern,
+					GroupPatterns<NamedExpressionPattern,
+						NegativeLookAhead<SingleTokenPattern<Token::TokenType::EQUAL>>>>,
+				SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>, KwargsPattern>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("','.(starred_expression | named_expression !'=')+ [',' kwargs ]'");
 			spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+			return true;
+		}
+		using pattern2 = PatternMatch<KwargsPattern>;
+		spdlog::debug("Testing pattern: kwargs");
+		if (pattern2::match(p)) {
+			spdlog::debug("kwargs");
 			return true;
 		}
 		return false;
@@ -828,8 +923,14 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			p.print_stack();
 			spdlog::debug("--------------");
 			std::vector<std::shared_ptr<ASTNode>> args;
-			std::vector<std::shared_ptr<ASTNode>> kwargs;
-			for (const auto &node : p.stack()) { args.push_back(node); }
+			std::vector<std::shared_ptr<Keyword>> kwargs;
+			for (const auto &node : p.stack()) {
+				if (auto keyword_node = as<Keyword>(node)) {
+					kwargs.push_back(keyword_node);
+				} else {
+					args.push_back(node);
+				}
+			}
 			auto function = primary_scope.parent().back();
 			primary_scope.parent().pop_back();
 			primary_scope.parent().push_back(std::make_shared<Call>(function, args, kwargs));
@@ -849,6 +950,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::COMMA,
 			Token::TokenType::RPAREN,
 			Token::TokenType::COLON,
+			Token::TokenType::EQUAL,
 			Token::TokenType::EQEQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
@@ -1067,6 +1169,7 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
+			Token::TokenType::EQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) { return true; }
@@ -1132,6 +1235,7 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
+			Token::TokenType::EQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) { return true; }

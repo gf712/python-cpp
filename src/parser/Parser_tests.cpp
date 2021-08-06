@@ -337,6 +337,20 @@ void compare_attribute(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
+void compare_keyword(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Keyword);
+
+	const auto result_arg = as<Keyword>(result)->arg();
+	const auto expected_arg = as<Keyword>(expected)->arg();
+	ASSERT_EQ(result_arg, expected_arg);
+
+	const auto result_value = as<Keyword>(result)->value();
+	const auto expected_value = as<Keyword>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -402,6 +416,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Attribute: {
 		compare_attribute(result, expected);
+		break;
+	}
+	case ASTNodeType::Keyword: {
+		compare_keyword(result, expected);
 		break;
 	}
 	default: {
@@ -522,6 +540,7 @@ TEST(Parser, FunctionDefinition)
 	assert_generates_ast(program, expected_ast);
 }
 
+
 TEST(Parser, MultilineFunctionDefinition)
 {
 	constexpr std::string_view program =
@@ -561,7 +580,7 @@ TEST(Parser, SimpleIfStatement)
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
-			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<Keyword>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{}// orelse
 		));
 
@@ -581,11 +600,11 @@ TEST(Parser, SimpleIfElseStatement)
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Hello, World!") },
-			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<Keyword>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Goodbye!") },
-				std::vector<std::shared_ptr<ASTNode>>{}) }// orelse
+				std::vector<std::shared_ptr<Keyword>>{}) }// orelse
 		));
 
 	assert_generates_ast(program, expected_ast);
@@ -690,11 +709,11 @@ TEST(Parser, SimpleForLoopWithFunctionCall)
 		std::make_shared<Name>("x", ContextType::STORE),// target
 		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
-			std::vector<std::shared_ptr<ASTNode>>{}),// iter
+			std::vector<std::shared_ptr<Keyword>>{}),// iter
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("x", ContextType::LOAD) },
-			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<Keyword>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{},// orelse
 		""// type_comment
 		));
@@ -716,15 +735,15 @@ TEST(Parser, ForLoopWithElseBlock)
 		std::make_shared<Name>("x", ContextType::STORE),// target
 		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 10 }) },
-			std::vector<std::shared_ptr<ASTNode>>{}),// iter
+			std::vector<std::shared_ptr<Keyword>>{}),// iter
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("x", ContextType::LOAD) },
-			std::vector<std::shared_ptr<ASTNode>>{}) },// body
+			std::vector<std::shared_ptr<Keyword>>{}) },// body
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("ELSE!") },
-				std::vector<std::shared_ptr<ASTNode>>{}),
+				std::vector<std::shared_ptr<Keyword>>{}),
 		},// orelse
 		""// type_comment
 		));
@@ -790,5 +809,30 @@ TEST(Parser, CallMethod)
 			std::make_shared<Name>("foo", ContextType::LOAD), "bar", ContextType::LOAD)),
 		""));
 
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionCallWithKwarg)
+{
+	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=',')\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Constant>("Hello"), std::make_shared<Constant>("world!") },
+		std::vector{ std::make_shared<Keyword>("sep", std::make_shared<Constant>(",")) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionCallWithKwargAsResultFromAnotherFunction)
+{
+	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=my_separator())\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Constant>("Hello"), std::make_shared<Constant>("world!") },
+		std::vector{ std::make_shared<Keyword>("sep",
+			std::make_shared<Call>(std::make_shared<Name>("my_separator", ContextType::LOAD))) }));
 	assert_generates_ast(program, expected_ast);
 }

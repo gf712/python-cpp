@@ -30,6 +30,7 @@ namespace ast {
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
+	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
@@ -113,9 +114,12 @@ class Constant : public ASTNode
 	void print_this_node(const std::string &indent) const override
 	{
 		spdlog::debug("{}Constant", indent);
-		std::visit(overloaded{ [&indent](const auto &value) {
-								  spdlog::debug("{}  - value: {}", indent, value.to_string());
+		std::visit(overloaded{ [&indent](const String &value) {
+								  spdlog::debug("{}  - value: \"{}\"", indent, value.to_string());
 							  },
+					   [&indent](const auto &value) {
+						   spdlog::debug("{}  - value: {}", indent, value.to_string());
+					   },
 					   [&indent](const std::shared_ptr<PyObject> &value) {
 						   spdlog::debug("{}  - value: {}", indent, value->to_string());
 					   } },
@@ -318,7 +322,8 @@ class Assign : public Statement
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 
-	Register generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
+	Register
+		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 };
 
 #define BINARY_OPERATIONS  \
@@ -457,10 +462,15 @@ class Arguments : public ASTNode
 		spdlog::debug("{}  - args:", indent);
 		std::string new_indent = indent + std::string(6, ' ');
 		for (const auto &arg : m_args) { arg->print_node(new_indent); }
+		spdlog::debug("{}  - kwargs:", indent);
+		for (const auto &arg : m_kwargs) { arg->print_node(new_indent); }
 	}
 
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
+
+	void push_kwarg(std::shared_ptr<Argument> arg) { m_kwargs.push_back(std::move(arg)); }
+	std::vector<std::string> keyword_argument_names() const;
 
 	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
@@ -514,6 +524,34 @@ class FunctionDefinition final : public ASTNode
 };
 
 
+class Keyword : public ASTNode
+{
+	const std::string m_arg;
+	std::shared_ptr<ASTNode> m_value;
+
+  public:
+	Keyword(std::string arg, std::shared_ptr<ASTNode> value)
+		: ASTNode(ASTNodeType::Keyword), m_arg(std::move(arg))
+	{
+		m_value = std::move(value);
+	}
+
+	void print_this_node(const std::string &indent) const final
+	{
+		spdlog::debug("{}Keyword", indent);
+		spdlog::debug("{}  - arg: {}", indent, m_arg);
+		spdlog::debug("{}  - value:", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		m_value->print_node(new_indent);
+	}
+
+	const std::string &arg() const { return m_arg; }
+	std::shared_ptr<ASTNode> value() const { return m_value; }
+
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+};
+
+
 class ClassDefinition final : public ASTNode
 {
 	const std::string m_class_name;
@@ -561,7 +599,7 @@ class Call : public ASTNode
 {
 	std::shared_ptr<ASTNode> m_function;
 	std::vector<std::shared_ptr<ASTNode>> m_args;
-	std::vector<std::shared_ptr<ASTNode>> m_keywords;
+	std::vector<std::shared_ptr<Keyword>> m_keywords;
 
 	void print_this_node(const std::string &indent) const final
 	{
@@ -578,7 +616,7 @@ class Call : public ASTNode
   public:
 	Call(std::shared_ptr<ASTNode> function,
 		std::vector<std::shared_ptr<ASTNode>> args,
-		std::vector<std::shared_ptr<ASTNode>> keywords)
+		std::vector<std::shared_ptr<Keyword>> keywords)
 		: ASTNode(ASTNodeType::Call), m_function(std::move(function)), m_args(std::move(args)),
 		  m_keywords(std::move(keywords))
 	{}
@@ -587,7 +625,7 @@ class Call : public ASTNode
 
 	const std::shared_ptr<ASTNode> &function() const { return m_function; }
 	const std::vector<std::shared_ptr<ASTNode>> &args() const { return m_args; }
-	const std::vector<std::shared_ptr<ASTNode>> &keywords() const { return m_keywords; }
+	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 
 	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };

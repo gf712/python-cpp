@@ -85,6 +85,7 @@ TEST(Lexer, FunctionDefinition)
 	assert_generates_tokens(program, expected_tokens);
 }
 
+
 TEST(Lexer, FunctionDefinitionAndCall)
 {
 	constexpr std::string_view program =
