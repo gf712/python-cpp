@@ -12,6 +12,7 @@ set(RUNTIME_SOURCE_FILES runtime/PyDict.cpp
 set(VM_SOURCE_FILES bytecode/VM.cpp 
                     bytecode/BytecodeGenerator.cpp
                     bytecode/instructions/FunctionCall.cpp
+                    bytecode/instructions/FunctionCallWithKeywords.cpp
                     bytecode/instructions/LoadAttr.cpp
                     bytecode/instructions/LoadMethod.cpp
                     bytecode/instructions/Instructions.cpp

@@ -29,7 +29,7 @@ class ExecutionFrame
 	std::unique_ptr<SymbolTable> m_symbol_table;
 	// FIXME: this is a hack to extend the lifetime of the able when instantiating classes
 	std::unique_ptr<SymbolTable> m_old_symbol_table{ nullptr };
-	std::array<Value, 16> m_parameters;
+	std::array<std::optional<Value>, 16> m_parameters;
 	std::shared_ptr<ExecutionFrame> m_parent{ nullptr };
 	size_t m_return_address;
 	std::optional<LocalFrame> m_frame_info;
@@ -40,13 +40,13 @@ class ExecutionFrame
 	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent,
 		const std::string &scope_name);
 
-	const Value &parameter(size_t parameter_idx) const
+	const std::optional<Value> &parameter(size_t parameter_idx) const
 	{
 		ASSERT(parameter_idx < m_parameters.size());
 		return m_parameters[parameter_idx];
 	}
 
-	Value &parameter(size_t parameter_idx)
+	std::optional<Value> &parameter(size_t parameter_idx)
 	{
 		ASSERT(parameter_idx < m_parameters.size());
 		return m_parameters[parameter_idx];

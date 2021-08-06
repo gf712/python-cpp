@@ -1,6 +1,7 @@
 #include "AST.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
+#include "bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "bytecode/instructions/Instructions.hpp"
 #include "bytecode/instructions/LoadAttr.hpp"
 #include "bytecode/instructions/LoadBuildClass.hpp"
@@ -192,12 +193,22 @@ Register
 	Call::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
 	std::vector<Register> arg_registers;
+	std::vector<Register> keyword_registers;
+	std::vector<std::string> keywords;
+
 	arg_registers.reserve(m_args.size());
+	keyword_registers.reserve(m_keywords.size());
+	keywords.reserve(m_keywords.size());
 
 	auto func_register = m_function->generate(function_id, generator, ctx);
 
 	for (const auto &arg : m_args) {
 		arg_registers.push_back(arg->generate(function_id, generator, ctx));
+	}
+
+	for (const auto &keyword : m_keywords) {
+		keyword_registers.push_back(keyword->generate(function_id, generator, ctx));
+		keywords.push_back(keyword->arg());
 	}
 
 	if (m_function->node_type() == ASTNodeType::Attribute) {
@@ -208,7 +219,15 @@ Register
 		generator.emit<MethodCall>(
 			function_id, func_register, this_name->ids()[0], std::move(arg_registers));
 	} else {
-		generator.emit<FunctionCall>(function_id, func_register, std::move(arg_registers));
+		if (keyword_registers.empty()) {
+			generator.emit<FunctionCall>(function_id, func_register, std::move(arg_registers));
+		} else {
+			generator.emit<FunctionCallWithKeywords>(function_id,
+				func_register,
+				std::move(arg_registers),
+				std::move(keyword_registers),
+				std::move(keywords));
+		}
 	}
 
 	return {};
@@ -437,5 +456,13 @@ Register Attribute::generate_impl(size_t function_id,
 
 	TODO();
 }
+
+
+Register
+	Keyword::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	return m_value->generate(function_id, generator, ctx);
+}
+
 
 }// namespace ast

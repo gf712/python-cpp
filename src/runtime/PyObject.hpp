@@ -212,17 +212,22 @@ class PyTuple;
 class PyNativeFunction : public PyObject
 {
 	std::string m_name;
-	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyTuple>)> m_function;
+	std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &,
+		const std::shared_ptr<PyDict> &)>
+		m_function;
 
   public:
 	PyNativeFunction(std::string name,
-		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &)> function)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)), m_function(function)
+		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &,
+			const std::shared_ptr<PyDict> &)> function)
+		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
+		  m_function(std::move(function))
 	{}
 
-	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyTuple> &args)
+	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyTuple> &args,
+		const std::shared_ptr<PyDict> &kwargs)
 	{
-		return m_function(args);
+		return m_function(args, kwargs);
 	}
 
 	std::string to_string() const override
@@ -398,6 +403,12 @@ class PyTupleIterator : public PyObject
 	size_t m_current_index{ 0 };
 
   public:
+	using difference_type = std::vector<Value>::difference_type;
+	using value_type = std::shared_ptr<PyObject>;
+	using pointer = value_type *;
+	using reference = value_type &;
+	using iterator_category = std::forward_iterator_tag;
+
 	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple)
 		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(std::move(pytuple))
 	{}
@@ -416,6 +427,7 @@ class PyTupleIterator : public PyObject
 	bool operator==(const PyTupleIterator &) const;
 	std::shared_ptr<PyObject> operator*() const;
 	PyTupleIterator &operator++();
+	PyTupleIterator &operator--();
 };
 
 

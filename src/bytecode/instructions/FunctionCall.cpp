@@ -1,9 +1,11 @@
 #include "FunctionCall.hpp"
+#include "runtime/PyDict.hpp"
 
 std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 	Interpreter &interpreter,
 	std::shared_ptr<PyObject> function_object,
-	const std::shared_ptr<PyTuple> &args)
+	const std::shared_ptr<PyTuple> &args,
+	const std::shared_ptr<PyDict> &kwargs)
 {
 	std::string function_name;
 
@@ -23,15 +25,41 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 			auto scope_name = interpreter.execution_frame()->fetch_object("__name__");
 			ASSERT(scope_name->type() == PyObjectType::PY_STRING)
 
-			function_name = fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
+			auto scoped_function_name =
+				fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
 			auto function_frame =
-				ExecutionFrame::create(interpreter.execution_frame(), function_name);
+				ExecutionFrame::create(interpreter.execution_frame(), scoped_function_name);
 			const auto offset = pyfunc->code()->offset();
 			interpreter.set_execution_frame(function_frame);
 
 			size_t i = 0;
 			if (args) {
 				for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
+			}
+			if (kwargs) {
+				const auto &argnames = pyfunc->code()->args();
+				for (const auto &[key, value] : kwargs->map()) {
+					ASSERT(std::holds_alternative<String>(key))
+					auto key_str = std::get<String>(key);
+					auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
+					if (arg_iter == argnames.end()) {
+						interpreter.raise_exception(
+							fmt::format("TypeError: {}() got an unexpected keyword argument '{}'",
+								function_name,
+								key_str.s));
+						return nullptr;
+					}
+					auto &arg =
+						function_frame->parameter(std::distance(argnames.begin(), arg_iter));
+					if (arg.has_value()) {
+						interpreter.raise_exception(
+							fmt::format("TypeError: {}() got multiple values for argument '{}'",
+								function_name,
+								key_str.s));
+						return nullptr;
+					}
+					arg = value;
+				}
 			}
 
 			function_frame->set_return_address(vm.instruction_pointer());
@@ -46,7 +74,7 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 		}
 		vm.execute_frame();
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
-		auto result = native_func->operator()(args);
+		auto result = native_func->operator()(args, kwargs);
 		spdlog::debug("Native function return value: {}", result->to_string());
 		vm.reg(0) = result;
 	} else {
@@ -68,5 +96,5 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 	ASSERT(args_tuple);
 
-	::execute(vm, interpreter, function_object, args_tuple);
+	::execute(vm, interpreter, function_object, args_tuple, nullptr);
 }

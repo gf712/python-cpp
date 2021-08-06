@@ -824,6 +824,18 @@ TEST(Parser, FunctionCallWithKwarg)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, FunctionCallWithOnlyKwargs)
+{
+	constexpr std::string_view program = "add(a=1, b=2)\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("add", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector{ std::make_shared<Keyword>("a", std::make_shared<Constant>(int64_t{ 1 })),
+			std::make_shared<Keyword>("b", std::make_shared<Constant>(int64_t{ 2 })) }));
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, FunctionCallWithKwargAsResultFromAnotherFunction)
 {
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=my_separator())\n";

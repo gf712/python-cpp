@@ -17,5 +17,6 @@ void MethodCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 	ASSERT(args_tuple);
 
-	::execute(vm, interpreter, function_object, args_tuple);
+	// TODO: add support for kwargs
+	::execute(vm, interpreter, function_object, args_tuple, nullptr);
 }

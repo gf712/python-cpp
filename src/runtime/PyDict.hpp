@@ -25,7 +25,6 @@ class PyDict : public PyObject
 	std::string to_string() const override;
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
 
-  private:
 	const std::unordered_map<Value, Value, ValueHash> &map() const { return m_map; }
 };
 

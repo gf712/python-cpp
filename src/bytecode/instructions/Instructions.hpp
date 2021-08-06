@@ -291,7 +291,9 @@ class LoadFast final : public Instruction
 		// 		std::cout << "Arg-" << m_parameter_index << ':' << val << '\n';
 		// 	},
 		// 	interpreter.execution_frame()->parameter(m_parameter_index));
-		vm.reg(m_destination) = interpreter.execution_frame()->parameter(m_parameter_index);
+		auto maybe_value = interpreter.execution_frame()->parameter(m_parameter_index);
+		ASSERT(maybe_value)
+		vm.reg(m_destination) = *maybe_value;
 	}
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}

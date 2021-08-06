@@ -217,9 +217,8 @@ PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::s
 }
 
 PyFunction::PyFunction(std::string name, std::shared_ptr<PyCode> code)
-	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name))
+	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(std::move(code))
 {
-	m_code = std::move(code);
 	// m_attributes["__code__"] = m_code;
 }
 
@@ -383,6 +382,12 @@ bool PyTupleIterator::operator==(const PyTupleIterator &other) const
 PyTupleIterator &PyTupleIterator::operator++()
 {
 	m_current_index++;
+	return *this;
+}
+
+PyTupleIterator &PyTupleIterator::operator--()
+{
+	m_current_index--;
 	return *this;
 }
 
