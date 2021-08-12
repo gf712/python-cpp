@@ -15,18 +15,23 @@ std::string PyDict::to_string() const
 	while (std::next(it) != m_map.end()) {
 		std::visit(
 			overloaded{ [&os](const std::shared_ptr<PyObject> &key) {
-						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
-							  << ": ";
+						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string();
 					   },
-				[&os](const auto &key) { os << key << ": "; } },
+				[&os](const auto &key) { os << key; } },
 			it->first);
+		os << ": ";
 		std::visit(
-			overloaded{ [&os](const std::shared_ptr<PyObject> &value) {
-						   os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string()
-							  << ", ";
-					   },
-				[&os](const auto &value) { os << value << ", "; } },
+			overloaded{
+				[&os, this](const std::shared_ptr<PyObject> &value) {
+					if (value.get() == this) {
+						os << "{...}";
+					} else {
+						os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+					}
+				},
+				[&os](const auto &value) { os << value; } },
 			it->second);
+		os << ", ";
 
 		std::advance(it, 1);
 	}
@@ -38,9 +43,14 @@ std::string PyDict::to_string() const
 			[&os](const auto &key) { os << key << ": "; } },
 		it->first);
 	std::visit(
-		overloaded{ [&os](const std::shared_ptr<PyObject> &value) {
-					   os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
-				   },
+		overloaded{
+			[&os, this](const std::shared_ptr<PyObject> &value) {
+				if (value.get() == this) {
+					os << "{...}";
+				} else {
+					os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+				}
+			},
 			[&os](const auto &value) { os << value; } },
 		it->second);
 	os << "}";

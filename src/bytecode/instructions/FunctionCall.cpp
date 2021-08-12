@@ -25,18 +25,10 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 		// 		  before the VM is executes the frame. Not sure if ExecutionFrame could be
 		//		  std::unique_ptr (might be access from multiple threads later on?)
 		{
-			auto scope_name = std::get<std::shared_ptr<PyObject>>(
-				(*interpreter.execution_frame()->locals())[String{ "__name__" }]);
-			ASSERT(scope_name->type() == PyObjectType::PY_STRING)
-
-			auto scoped_function_name =
-				fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
-			auto function_locals =
-				std::make_unique<PyDict>(interpreter.execution_frame()->globals()->map());
-			function_locals->insert(String{ "__name__" }, PyString::create(scoped_function_name));
+			auto function_locals = VirtualMachine::the().heap().allocate<PyDict>();
 			auto function_frame = ExecutionFrame::create(interpreter.execution_frame(),
 				interpreter.execution_frame()->globals(),
-				std::move(function_locals),
+				function_locals,
 				ns);
 			const auto offset = pyfunc->code()->offset();
 			interpreter.set_execution_frame(function_frame);
@@ -87,7 +79,7 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 		spdlog::debug("Frame: {}", (void *)execution_frame.get());
 		spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
 		spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
-		if (ns) { spdlog::debug("Namespace: {}", ns->to_string()); }
+		if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
 		auto result = native_func->operator()(args, kwargs);
 		spdlog::debug("Native function return value: {}", result->to_string());

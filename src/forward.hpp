@@ -11,7 +11,7 @@ class Bytecode;
 class BytecodeGenerator;
 class Interpreter;
 class Instruction;
-class PyObject;
+
 namespace parser {
 class Parser;
 }

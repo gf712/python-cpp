@@ -9,7 +9,7 @@ ExecutionFrame::ExecutionFrame() {}
 
 std::shared_ptr<ExecutionFrame> ExecutionFrame::create(std::shared_ptr<ExecutionFrame> parent,
 	std::shared_ptr<PyDict> globals,
-	std::unique_ptr<PyDict> &&locals,
+	std::shared_ptr<PyDict> locals,
 	std::shared_ptr<PyDict> ns)
 {
 	auto new_frame = std::shared_ptr<ExecutionFrame>(new ExecutionFrame{});
@@ -58,7 +58,7 @@ void ExecutionFrame::put_global(const std::string &name, std::shared_ptr<PyObjec
 }
 
 
-const std::unique_ptr<PyDict> &ExecutionFrame::locals() const { return m_locals; }
+const std::shared_ptr<PyDict> &ExecutionFrame::locals() const { return m_locals; }
 
 const std::shared_ptr<PyDict> &ExecutionFrame::globals() const { return m_globals; }
 

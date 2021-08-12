@@ -227,14 +227,7 @@ std::shared_ptr<PyObject> locals(const std::shared_ptr<PyTuple> &,
 	const std::shared_ptr<PyDict> &,
 	Interpreter &interpreter)
 {
-	// TODO: would it be better to just make ExecutionFrame::m_locals
-	//		 a shared_ptr instead of unique_ptr?
-	//		 otherwise we build a new PyDict each time this function
-	//		 is called. It will also be distinct from ExecutionFrame::m_locals
-	//		 which means it won't update when new variables are added to the
-	//		 local scope
-	return VirtualMachine::the().heap().allocate<PyDict>(
-		interpreter.execution_frame()->locals()->map());
+	return interpreter.execution_frame()->locals();
 }
 }// namespace
 

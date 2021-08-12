@@ -15,7 +15,7 @@ class ExecutionFrame
 	std::array<std::optional<Value>, 16> m_parameters;
 	std::shared_ptr<PyModule> m_builtins;
 	std::shared_ptr<PyDict> m_globals;
-	std::unique_ptr<PyDict> m_locals;
+	std::shared_ptr<PyDict> m_locals;
 	std::shared_ptr<PyDict> m_ns;
 	std::shared_ptr<ExecutionFrame> m_parent{ nullptr };
 	size_t m_return_address;
@@ -26,7 +26,7 @@ class ExecutionFrame
   public:
 	static std::shared_ptr<ExecutionFrame> create(std::shared_ptr<ExecutionFrame> parent,
 		std::shared_ptr<PyDict> globals,
-		std::unique_ptr<PyDict> &&locals,
+		std::shared_ptr<PyDict> locals,
 		std::shared_ptr<PyDict> ns);
 
 	const std::optional<Value> &parameter(size_t parameter_idx) const
@@ -62,7 +62,7 @@ class ExecutionFrame
 	std::shared_ptr<ExecutionFrame> exit();
 
 	const std::shared_ptr<PyDict> &globals() const;
-	const std::unique_ptr<PyDict> &locals() const;
+	const std::shared_ptr<PyDict> &locals() const;
 	const std::shared_ptr<PyModule> &builtins() const;
 
   private:

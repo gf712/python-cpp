@@ -7,12 +7,9 @@
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	auto code = interpreter.allocate_object<PyCode>(m_function_name + "__code__",
-		vm.function_offset(m_function_id),
-		vm.function_register_count(m_function_id),
-		m_args);
-	interpreter.allocate_object<PyFunction>(
-		m_function_name, m_function_name, std::static_pointer_cast<PyCode>(code));
+	auto code = vm.heap().allocate<PyCode>(
+		vm.function_offset(m_function_id), vm.function_register_count(m_function_id), m_args);
+	interpreter.allocate_object<PyFunction>(m_function_name, m_function_name, code);
 }
 
 
