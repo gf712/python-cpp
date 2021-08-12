@@ -7,16 +7,20 @@ class PyDictItemsIterator;
 
 class PyDict : public PyObject
 {
+  public:
+	using MapType = std::unordered_map<Value, Value, ValueHash, ValueEqual>;
+
+  private:
 	friend class Heap;
 	friend PyDictItems;
 	friend PyDictItemsIterator;
 
-	std::unordered_map<Value, Value, ValueHash> m_map;
+	MapType m_map;
 
   public:
-	PyDict(std::unordered_map<Value, Value, ValueHash> map)
-		: PyObject(PyObjectType::PY_DICT), m_map(std::move(map))
-	{}
+	PyDict(MapType &&map) : PyObject(PyObjectType::PY_DICT), m_map(std::move(map)) {}
+	PyDict(const MapType &map) : PyObject(PyObjectType::PY_DICT), m_map(map) {}
+	PyDict() : PyObject(PyObjectType::PY_DICT) {}
 
 	std::shared_ptr<PyDictItems> items() const;
 
@@ -25,7 +29,10 @@ class PyDict : public PyObject
 	std::string to_string() const override;
 	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
 
-	const std::unordered_map<Value, Value, ValueHash> &map() const { return m_map; }
+	const MapType &map() const { return m_map; }
+
+	void insert(const Value &key, const Value &value);
+	Value operator[](Value key) const;
 };
 
 class PyDictItems : public PyObject
@@ -54,10 +61,10 @@ class PyDictItemsIterator : public PyObject
 	friend PyDictItems;
 
 	std::shared_ptr<const PyDictItems> m_pydictitems;
-	std::unordered_map<Value, Value, ValueHash>::const_iterator m_current_iterator;
+	PyDict::MapType::const_iterator m_current_iterator;
 
   public:
-	using difference_type = std::unordered_map<Value, Value, ValueHash>::difference_type;
+	using difference_type = PyDict::MapType::difference_type;
 	using value_type = std::shared_ptr<PyTuple>;
 	using pointer = value_type *;
 	using reference = value_type &;

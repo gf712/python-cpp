@@ -4,21 +4,28 @@ set(INTERPRETER_SOURCE_FILES
                     interpreter/Interpreter.cpp
                     interpreter/ExecutionFrame.cpp)
 set(PARSER_SOURCE_FILES parser/Parser.cpp)
-set(RUNTIME_SOURCE_FILES runtime/PyDict.cpp 
+set(RUNTIME_SOURCE_FILES runtime/CustomPyObject.cpp
+                         runtime/PyBuiltins.cpp
+                         runtime/PyDict.cpp 
                          runtime/PyNumber.cpp
                          runtime/PyObject.cpp
-                         runtime/PyRange.cpp)
+                         runtime/PyRange.cpp
+                         runtime/PyString.cpp
+                         runtime/Value.cpp)
 
 set(VM_SOURCE_FILES bytecode/VM.cpp 
                     bytecode/BytecodeGenerator.cpp
                     bytecode/instructions/FunctionCall.cpp
                     bytecode/instructions/FunctionCallWithKeywords.cpp
                     bytecode/instructions/LoadAttr.cpp
+                    bytecode/instructions/LoadBuildClass.cpp
+                    bytecode/instructions/LoadName.cpp
                     bytecode/instructions/LoadMethod.cpp
                     bytecode/instructions/Instructions.cpp
                     bytecode/instructions/MethodCall.cpp
                     bytecode/instructions/ReturnValue.cpp
                     bytecode/instructions/StoreAttr.cpp
+                    bytecode/instructions/StoreName.cpp
                     )
 
 set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp)

@@ -6,9 +6,11 @@
 #include "bytecode/instructions/LoadAttr.hpp"
 #include "bytecode/instructions/LoadBuildClass.hpp"
 #include "bytecode/instructions/LoadMethod.hpp"
+#include "bytecode/instructions/LoadName.hpp"
 #include "bytecode/instructions/MethodCall.hpp"
 #include "bytecode/instructions/ReturnValue.hpp"
 #include "bytecode/instructions/StoreAttr.hpp"
+#include "bytecode/instructions/StoreName.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {

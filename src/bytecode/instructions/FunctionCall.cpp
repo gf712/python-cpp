@@ -1,11 +1,14 @@
 #include "FunctionCall.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyString.hpp"
+
 
 std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 	Interpreter &interpreter,
 	std::shared_ptr<PyObject> function_object,
 	const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs)
+	const std::shared_ptr<PyDict> &kwargs,
+	std::shared_ptr<PyDict> ns)
 {
 	std::string function_name;
 
@@ -22,13 +25,19 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 		// 		  before the VM is executes the frame. Not sure if ExecutionFrame could be
 		//		  std::unique_ptr (might be access from multiple threads later on?)
 		{
-			auto scope_name = interpreter.execution_frame()->fetch_object("__name__");
+			auto scope_name = std::get<std::shared_ptr<PyObject>>(
+				(*interpreter.execution_frame()->locals())[String{ "__name__" }]);
 			ASSERT(scope_name->type() == PyObjectType::PY_STRING)
 
 			auto scoped_function_name =
 				fmt::format("{}.{}", as<PyString>(scope_name)->value(), function_name);
-			auto function_frame =
-				ExecutionFrame::create(interpreter.execution_frame(), scoped_function_name);
+			auto function_locals =
+				std::make_unique<PyDict>(interpreter.execution_frame()->globals()->map());
+			function_locals->insert(String{ "__name__" }, PyString::create(scoped_function_name));
+			auto function_frame = ExecutionFrame::create(interpreter.execution_frame(),
+				interpreter.execution_frame()->globals(),
+				std::move(function_locals),
+				ns);
 			const auto offset = pyfunc->code()->offset();
 			interpreter.set_execution_frame(function_frame);
 
@@ -72,7 +81,13 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 			auto frame = vm.enter_frame(pyfunc->code()->register_count());
 			function_frame->attach_frame(std::move(frame));
 		}
+		const auto &execution_frame = interpreter.execution_frame();
 		vm.execute_frame();
+
+		spdlog::debug("Frame: {}", (void *)execution_frame.get());
+		spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
+		spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
+		if (ns) { spdlog::debug("Namespace: {}", ns->to_string()); }
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
 		auto result = native_func->operator()(args, kwargs);
 		spdlog::debug("Native function return value: {}", result->to_string());
@@ -96,5 +111,5 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 	ASSERT(args_tuple);
 
-	::execute(vm, interpreter, function_object, args_tuple, nullptr);
+	::execute(vm, interpreter, function_object, args_tuple, nullptr, nullptr);
 }

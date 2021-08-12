@@ -28,4 +28,5 @@ std::shared_ptr<PyObject> execute(VirtualMachine &,
 	Interpreter &,
 	std::shared_ptr<PyObject> func_object,
 	const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs);
+	const std::shared_ptr<PyDict> &kwargs,
+	std::shared_ptr<PyDict> ns);

@@ -94,6 +94,10 @@ struct Number
 			value,
 			rhs.value);
 	}
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
+	bool operator==(const Bytes &) const { return false; }
+	bool operator==(const Ellipsis &) const { return false; }
+	bool operator==(const NameConstant &) const;
 };
 
 struct String
@@ -106,6 +110,11 @@ struct String
 	}
 
 	bool operator==(const String &rhs) const { return s == rhs.s; }
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
+	bool operator==(const Bytes &) const { return false; }
+	bool operator==(const Ellipsis &) const { return false; }
+	bool operator==(const NameConstant &) const { return false; }
+	bool operator==(const Number &) const { return false; }
 
 	std::string to_string() const { return s; }
 };
@@ -129,6 +138,11 @@ struct Bytes
 	{
 		return std::equal(b.begin(), b.end(), rhs.b.begin(), rhs.b.end());
 	}
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
+	bool operator==(const String &) const { return false; }
+	bool operator==(const Ellipsis &) const { return false; }
+	bool operator==(const NameConstant &) const { return false; }
+	bool operator==(const Number &) const { return false; }
 };
 
 struct Ellipsis
@@ -139,9 +153,13 @@ struct Ellipsis
 		return os << Ellipsis::ellipsis_repr;
 	}
 
-	bool operator==(const Ellipsis &) const { return true; }
-
 	std::string to_string() const { return std::string(ellipsis_repr); }
+
+	bool operator==(const Ellipsis &) const { return true; }
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
+	bool operator==(const Bytes &) const { return false; }
+	bool operator==(const String &) const { return false; }
+	bool operator==(const Number &) const { return false; }
 };
 
 struct NoneType
@@ -153,6 +171,7 @@ struct NoneType
 	template<typename T> bool operator==(T &&) const { return false; }
 
 	std::string to_string() const { return "None"; }
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
 };
 
 struct NameConstant
@@ -170,6 +189,12 @@ struct NameConstant
 		return std::visit(
 			[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
 	}
+	bool operator==(const std::shared_ptr<PyObject> &other) const;
+	bool operator==(const Ellipsis &) const { return false; }
+	bool operator==(const Bytes &) const { return false; }
+	bool operator==(const String &) const { return false; }
+	bool operator==(const Number &) const;
+
 
 	std::string to_string() const
 	{

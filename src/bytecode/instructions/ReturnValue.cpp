@@ -16,7 +16,7 @@ void ReturnValue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		result);
 	if (interpreter.execution_frame()->parent()) {
 		vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
-		interpreter.set_execution_frame(interpreter.execution_frame()->pop());
+		interpreter.set_execution_frame(interpreter.execution_frame()->exit());
 	}
 
 	vm.reg(0) = result;

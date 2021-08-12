@@ -4,6 +4,7 @@
 #include "instructions/ReturnValue.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
 
 #include <iostream>
 
@@ -14,7 +15,7 @@ LocalFrame::LocalFrame(size_t frame_size, VirtualMachine *vm_) : vm(vm_)
 		"Added frame of size {}. New stack size: {}", frame_size, vm->m_local_registers.size());
 }
 
-LocalFrame::LocalFrame(LocalFrame &&other) { vm = std::exchange(other.vm, nullptr); }
+LocalFrame::LocalFrame(LocalFrame &&other) : vm(std::exchange(other.vm, nullptr)) {}
 
 LocalFrame::~LocalFrame()
 {

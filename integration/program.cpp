@@ -5,6 +5,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
 
 #include "gtest/gtest.h"
 
@@ -65,7 +66,13 @@ template<typename T> void check_value(std::shared_ptr<PyObject> obj, T expected_
 template<typename T> void assert_interpreter_object_value(std::string name, T expected_value)
 {
 	auto &vm = VirtualMachine::the();
-	auto obj = vm.interpreter()->fetch_object(name);
+	for (const auto &[k, v] : vm.interpreter()->execution_frame()->locals()->map()) {
+		spdlog::debug(
+			"Key: {}, Value: {}", PyObject::from(k)->to_string(), PyObject::from(v)->to_string());
+	}
+	auto value = vm.interpreter()->execution_frame()->locals()->map().at(String{ name });
+	ASSERT_TRUE(std::holds_alternative<std::shared_ptr<PyObject>>(value));
+	auto obj = std::get<std::shared_ptr<PyObject>>(value);
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
 		ASSERT_EQ(obj->type(), PyObjectType::PY_LIST);

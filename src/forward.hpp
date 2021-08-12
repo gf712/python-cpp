@@ -25,4 +25,11 @@ struct Ellipsis;
 struct NoneType;
 struct NameConstant;
 
+class PyDict;
+class PyFunction;
+class PyModule;
+class PyObject;
+class PyTuple;
+
+
 using Register = uint8_t;

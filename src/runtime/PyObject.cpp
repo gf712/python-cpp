@@ -1,9 +1,11 @@
 #include "AttributeError.hpp"
-#include "PyObject.hpp"
 #include "PyNumber.hpp"
+#include "PyObject.hpp"
+#include "PyString.hpp"
 #include "StopIterationException.hpp"
 
 #include "bytecode/VM.hpp"
+#include "bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
 
 
@@ -32,10 +34,49 @@ size_t ValueHash::operator()(const Value &value) const
 				}
 			},
 			[](const std::shared_ptr<PyObject> &obj) -> size_t {
-				return reinterpret_cast<size_t>(static_cast<const void *>(obj.get()));
+				if (std::holds_alternative<std::monostate>(obj->slots().hash)) {
+					return reinterpret_cast<size_t>(static_cast<const void *>(obj.get()));
+				} else if (std::holds_alternative<HashSlotFunctionType>(obj->slots().hash)) {
+					return std::get<HashSlotFunctionType>(obj->slots().hash)();
+				} else {
+					auto &vm = VirtualMachine::the();
+					auto args = vm.heap().allocate<PyTuple>(std::vector{ obj });
+					auto function_object = std::get<std::shared_ptr<PyFunction>>(obj->slots().hash);
+					auto result =
+						execute(vm, *vm.interpreter(), function_object, args, nullptr, nullptr);
+					if (result->type() != PyObjectType::PY_NUMBER) {
+						vm.interpreter()->raise_exception("");
+						return 0;
+					}
+					return std::visit([](const auto &value) { return static_cast<size_t>(value); },
+						as<PyNumber>(result)->value().value);
+				}
 			} },
 		value);
 }
+
+
+bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) const
+{
+	return std::visit(
+		overloaded{ [](const auto &lhs, const auto &rhs) { return lhs == rhs; },
+			[](const std::shared_ptr<PyObject> &lhs, const std::shared_ptr<PyObject> &rhs) {
+				if (lhs.get() == rhs.get()) { return true; }
+				if (std::holds_alternative<std::monostate>(lhs->slots().richcompare)) {
+					return lhs.get() == rhs.get();
+				} else if (std::holds_alternative<RichCompareSlotFunctionType>(
+							   lhs->slots().richcompare)) {
+					return std::get<RichCompareSlotFunctionType>(lhs->slots().richcompare)(
+							   rhs, RichCompare::Py_EQ)
+						   == py_true();
+				} else {
+					TODO();
+				}
+			} },
+		lhs_value,
+		rhs_value);
+}
+
 
 template<> std::shared_ptr<PyObject> PyObject::from(const std::shared_ptr<PyObject> &value)
 {
@@ -69,11 +110,19 @@ template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 	}
 }
 
+template<> std::shared_ptr<PyObject> PyObject::from(const Value &value)
+{
+	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
+}
+
+
 PyObject::PyObject(PyObjectType type) : m_type(type)
 {
 	m_slots =
 		Slots{ .repr = [this]() { return this->repr_impl(*VirtualMachine::the().interpreter()); },
-			.iter = [this]() { return this->iter_impl(*VirtualMachine::the().interpreter()); } };
+			.iter = [this]() { return this->iter_impl(*VirtualMachine::the().interpreter()); },
+			.hash = {},
+			.richcompare = {} };
 };
 
 
@@ -119,28 +168,13 @@ std::shared_ptr<PyObject> PyObject::len_impl(Interpreter &interpreter) const
 }
 
 
-std::shared_ptr<PyObject> PyObject::hash_impl(Interpreter &interpreter) const
+size_t PyObject::hash_impl(Interpreter &interpreter) const
 {
 	interpreter.raise_exception(
 		fmt::format("TypeError: object of type '{}' has no hash()", object_name(type())));
-	return nullptr;
+	return 0;
 }
 
-
-std::shared_ptr<PyObject> PyString::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ m_value });
-}
-
-std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
-{
-	if (auto obj_string = as<PyString>(obj)) {
-		return m_value == obj_string->value() ? py_true() : py_false();
-	} else {
-		return PyObject::equal_impl(obj, interpreter);
-	}
-}
 
 std::shared_ptr<PyObject> PyNumber::repr_impl(Interpreter &) const
 {
@@ -209,6 +243,27 @@ std::shared_ptr<PyObject> PyObject::equal_impl(const std::shared_ptr<PyObject> &
 }
 
 
+std::shared_ptr<PyObject> PyObject::richcompare_impl(const std::shared_ptr<PyObject> &other,
+	RichCompare op,
+	Interpreter &interpreter) const
+{
+	static constexpr std::string_view opstrings[] = { "<", "<=", "==", "!=", ">", ">=" };
+	switch (op) {
+	case RichCompare::Py_EQ:
+		return this == other.get() ? py_true() : py_false();
+	case RichCompare::Py_NE:
+		return this != other.get() ? py_true() : py_false();
+	default:
+		interpreter.raise_exception(
+			"TypeError: '{}' not supported between instances of '{}' and '{}'",
+			opstrings[static_cast<int>(op)],
+			object_name(this->type()),
+			object_name(other->type()));
+	}
+	return nullptr;
+}
+
+
 PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args)
 	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_register_count(register_count),
 	  m_args(std::move(args))
@@ -222,20 +277,6 @@ PyFunction::PyFunction(std::string name, std::shared_ptr<PyCode> code)
 	// m_attributes["__code__"] = m_code;
 }
 
-
-std::shared_ptr<PyObject> PyString::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
-{
-	if (auto rhs = as<PyString>(obj)) {
-		return PyString::create(m_value + rhs->value());
-	} else {
-		interpreter.raise_exception(
-			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
-		return nullptr;
-	}
-}
 
 std::shared_ptr<PyObject> PyBytes::add_impl(const std::shared_ptr<PyObject> &obj,
 	Interpreter &interpreter) const

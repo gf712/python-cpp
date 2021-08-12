@@ -1,6 +1,7 @@
 #include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "PyDict.hpp"
+#include "PyString.hpp"
 #include "StopIterationException.hpp"
 
 std::string PyDict::to_string() const
@@ -12,13 +13,36 @@ std::string PyDict::to_string() const
 
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
-		std::visit([&os](const auto &key) { os << key << ": "; }, it->first);
-		std::visit([&os](const auto &value) { os << value << ", "; }, it->second);
+		std::visit(
+			overloaded{ [&os](const std::shared_ptr<PyObject> &key) {
+						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
+							  << ": ";
+					   },
+				[&os](const auto &key) { os << key << ": "; } },
+			it->first);
+		std::visit(
+			overloaded{ [&os](const std::shared_ptr<PyObject> &value) {
+						   os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string()
+							  << ", ";
+					   },
+				[&os](const auto &value) { os << value << ", "; } },
+			it->second);
 
 		std::advance(it, 1);
 	}
-	std::visit([&os](const auto &key) { os << key << ": "; }, it->first);
-	std::visit([&os](const auto &value) { os << value; }, it->second);
+	std::visit(
+		overloaded{ [&os](const std::shared_ptr<PyObject> &key) {
+					   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
+						  << ": ";
+				   },
+			[&os](const auto &key) { os << key << ": "; } },
+		it->first);
+	std::visit(
+		overloaded{ [&os](const std::shared_ptr<PyObject> &value) {
+					   os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+				   },
+			[&os](const auto &value) { os << value; } },
+		it->second);
 	os << "}";
 
 	return os.str();
@@ -33,6 +57,18 @@ std::shared_ptr<PyDictItems> PyDict::items() const
 {
 	return VirtualMachine::the().heap().allocate<PyDictItems>(shared_from_this_as<PyDict>());
 }
+
+Value PyDict::operator[](Value key) const
+{
+	if (auto iter = m_map.find(key); iter != m_map.end()) {
+		return iter->second;
+	} else {
+		return py_none();
+	}
+}
+
+void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
+
 
 PyDictItemsIterator PyDictItems::begin() const
 {

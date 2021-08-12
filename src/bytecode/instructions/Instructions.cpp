@@ -4,25 +4,6 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/StopIterationException.hpp"
 
-void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
-{
-	const auto &value = vm.reg(m_source);
-	auto obj = std::visit(
-		overloaded{ [](const Number &n) {
-					   return std::static_pointer_cast<PyObject>(PyNumber::create(n));
-				   },
-			[](const String &s) {
-				return std::static_pointer_cast<PyObject>(PyString::create(s.s));
-			},
-			[](const NameConstant &s) { return PyObject::from(s); },
-			[](const std::shared_ptr<PyObject> &obj) { return obj; },
-			[&interpreter, this](const auto &) {
-				interpreter.raise_exception("Failed to store object \"{}\"", m_object_name);
-				return std::shared_ptr<PyObject>(nullptr);
-			} },
-		value);
-	interpreter.store_object(m_object_name, obj);
-}
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
@@ -121,7 +102,7 @@ void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 
 void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 {
-	std::unordered_map<Value, Value, ValueHash> map;
+	PyDict::MapType map;
 	for (size_t i = 0; i < m_keys.size(); ++i) {
 		map.emplace(vm.reg(m_keys[i]), vm.reg(m_values[i]));
 	}

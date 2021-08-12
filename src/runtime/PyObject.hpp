@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Value.hpp"
+#include "forward.hpp"
 #include "utilities.hpp"
 
 #include <unordered_map>
@@ -32,14 +33,15 @@ enum class PyObjectType {
 	PY_BASE_EXCEPTION,
 	PY_RANGE,
 	PY_RANGE_ITERATOR,
-	PY_CUSTOM_TYPE
+	PY_CUSTOM_TYPE,
+	PY_MODULE
 };
 
 inline std::string_view object_name(PyObjectType type)
 {
 	switch (type) {
 	case PyObjectType::PY_STRING: {
-		return "string";
+		return "str";
 	}
 	case PyObjectType::PY_NUMBER: {
 		return "number";
@@ -95,17 +97,27 @@ inline std::string_view object_name(PyObjectType type)
 	case PyObjectType::PY_CUSTOM_TYPE: {
 		return "object";
 	}
+	case PyObjectType::PY_MODULE: {
+		return "module";
+	}
 	}
 	ASSERT_NOT_REACHED()
 }
 
-class PyTuple;
-class PyDict;
-class PyFunction;
-class PyObject;
+enum class RichCompare {
+	Py_LT = 0,// <
+	Py_LE = 1,// <=
+	Py_EQ = 2,// ==
+	Py_NE = 3,// !=
+	Py_GT = 4,// >
+	Py_GE = 5,// >=
+};
 
 using ReprSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
 using IterSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
+using HashSlotFunctionType = std::function<size_t()>;
+using RichCompareSlotFunctionType =
+	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyObject>, RichCompare)>;
 
 
 class PyObject
@@ -120,6 +132,9 @@ class PyObject
 	{
 		std::variant<ReprSlotFunctionType, std::shared_ptr<PyFunction>> repr;
 		std::variant<IterSlotFunctionType, std::shared_ptr<PyFunction>> iter;
+		std::variant<std::monostate, HashSlotFunctionType, std::shared_ptr<PyFunction>> hash;
+		std::variant<std::monostate, RichCompareSlotFunctionType, std::shared_ptr<PyFunction>>
+			richcompare;
 	};
 
 	Slots m_slots;
@@ -149,10 +164,14 @@ class PyObject
 
 	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const;
+	virtual std::shared_ptr<PyObject> richcompare_impl(const std::shared_ptr<PyObject> &,
+		RichCompare,
+		Interpreter &interpreter) const;
+
 	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
 	virtual std::shared_ptr<PyObject> next_impl(Interpreter &interpreter);
 	virtual std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> hash_impl(Interpreter &interpreter) const;
+	virtual size_t hash_impl(Interpreter &interpreter) const;
 
 	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
 
@@ -236,29 +255,6 @@ class PyNativeFunction : public PyObject
 	}
 
 	const std::string &name() const { return m_name; }
-};
-
-class PyString : public PyObject
-{
-	friend class Heap;
-	std::string m_value;
-
-  public:
-	static std::shared_ptr<PyString> create(const std::string &value);
-
-	~PyString() override = default;
-	const std::string &value() const { return m_value; }
-
-	std::string to_string() const override { return fmt::format("{}", m_value); }
-
-	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
-
-  private:
-	PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s)) {}
 };
 
 
@@ -356,6 +352,11 @@ class PyList : public PyObject
 struct ValueHash
 {
 	size_t operator()(const Value &value) const;
+};
+
+struct ValueEqual
+{
+	bool operator()(const Value &lhs, const Value &rhs) const;
 };
 
 class PyTupleIterator;
@@ -461,19 +462,19 @@ template<> inline std::shared_ptr<PyFunction> as(std::shared_ptr<PyObject> node)
 	return nullptr;
 }
 
-
-template<> inline std::shared_ptr<PyString> as(std::shared_ptr<PyObject> node)
-{
-	if (node->type() == PyObjectType::PY_STRING) {
-		return std::static_pointer_cast<PyString>(node);
-	}
-	return nullptr;
-}
-
 template<> inline std::shared_ptr<PyNameConstant> as(std::shared_ptr<PyObject> node)
 {
 	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
 		return std::static_pointer_cast<PyNameConstant>(node);
+	}
+	return nullptr;
+}
+
+
+template<> inline std::shared_ptr<PyBytes> as(std::shared_ptr<PyObject> node)
+{
+	if (node->type() == PyObjectType::PY_BYTES) {
+		return std::static_pointer_cast<PyBytes>(node);
 	}
 	return nullptr;
 }

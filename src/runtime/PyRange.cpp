@@ -1,5 +1,6 @@
 #include "PyNumber.hpp"
 #include "PyRange.hpp"
+#include "PyString.hpp"
 #include "StopIterationException.hpp"
 
 #include "interpreter/Interpreter.hpp"

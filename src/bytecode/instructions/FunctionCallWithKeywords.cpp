@@ -16,7 +16,7 @@ void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &interpre
 
 	ASSERT(args_tuple);
 
-	std::unordered_map<Value, Value, ValueHash> map;
+	PyDict::MapType map;
 
 	ASSERT(m_kwargs.size() == m_keywords.size())
 
@@ -27,5 +27,5 @@ void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &interpre
 	auto args_dict = vm.heap().allocate<PyDict>(map);
 	ASSERT(args_dict);
 
-	::execute(vm, interpreter, function_object, args_tuple, args_dict);
+	::execute(vm, interpreter, function_object, args_tuple, args_dict, nullptr);
 }

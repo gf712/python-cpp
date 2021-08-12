@@ -236,36 +236,6 @@ class LeftShift : public Instruction
 };
 
 
-class LoadName final : public Instruction
-{
-	Register m_destination;
-	std::string m_object_name;
-
-  public:
-	LoadName(Register destination, std::string object_name)
-		: m_destination(destination), m_object_name(std::move(object_name))
-	{}
-	~LoadName() override {}
-	std::string to_string() const final
-	{
-		return fmt::format("LOAD_NAME       r{:<3} \"{}\"", m_destination, m_object_name);
-	}
-
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
-	{
-		auto obj = interpreter.fetch_object(m_object_name);
-		if (!obj) {
-			// std::cout << interpreter.execution_frame()->symbol_table()->to_string() << '\n';
-			interpreter.raise_exception("NameError: name '{:s}' is not defined", m_object_name);
-			return;
-		}
-		vm.reg(m_destination) = obj;
-	}
-
-	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
-};
-
-
 class LoadFast final : public Instruction
 {
 	Register m_destination;
@@ -343,26 +313,6 @@ class MakeFunction : public Instruction
 		return fmt::format("MAKE_FUNCTION   {:<3} ({})", m_function_id, m_function_name);
 	}
 	void execute(VirtualMachine &, Interpreter &) const final;
-
-	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
-};
-
-
-class StoreName final : public Instruction
-{
-	std::string m_object_name;
-	Register m_source;
-
-  public:
-	StoreName(std::string object_name, Register source)
-		: m_object_name(std::move(object_name)), m_source(source)
-	{}
-	std::string to_string() const final
-	{
-		return fmt::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
-	}
-
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
 };
