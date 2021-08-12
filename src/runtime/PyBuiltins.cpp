@@ -229,6 +229,38 @@ std::shared_ptr<PyObject> locals(const std::shared_ptr<PyTuple> &,
 {
 	return interpreter.execution_frame()->locals();
 }
+
+
+std::shared_ptr<PyObject>
+	id(const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &, Interpreter &)
+{
+	ASSERT(args->size() == 1)
+	return PyNumber::create(
+		Number{ static_cast<int64_t>(reinterpret_cast<intptr_t>(args->operator[](0).get())) });
+}
+
+
+std::shared_ptr<PyObject> hex(const std::shared_ptr<PyTuple> &args,
+	const std::shared_ptr<PyDict> &,
+	Interpreter &interpreter)
+{
+	ASSERT(args->size() == 1)
+	if (auto pynumber = as<PyNumber>(args->operator[](0))) {
+		if (std::holds_alternative<int64_t>(pynumber->value().value)) {
+			return PyString::create(
+				fmt::format("{0:#x}", std::get<int64_t>(pynumber->value().value)));
+		} else {
+			// FIXME: when float is separated from integer fix this
+			interpreter.raise_exception(
+				"TypeError: 'float' object cannot be interpreted as an integer",
+				object_name(args->operator[](0)->type()));
+		}
+	} else {
+		interpreter.raise_exception("TypeError: '{}' object cannot be interpreted as an integer",
+			object_name(args->operator[](0)->type()));
+	}
+	return nullptr;
+}
 }// namespace
 
 
@@ -236,34 +268,6 @@ std::shared_ptr<PyModule> fetch_builtins(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto builtin_module = heap.allocate<PyModule>(PyString::create("builtins"));
-
-	builtin_module->insert(PyString::create("print"),
-		heap.allocate<PyNativeFunction>("print",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return print(args, kwargs, interpreter);
-			}));
-
-	builtin_module->insert(PyString::create("iter"),
-		heap.allocate<PyNativeFunction>("iter",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return iter(args, kwargs, interpreter);
-			}));
-
-	builtin_module->insert(PyString::create("next"),
-		heap.allocate<PyNativeFunction>("next",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return next(args, kwargs, interpreter);
-			}));
-
-	builtin_module->insert(PyString::create("range"),
-		heap.allocate<PyNativeFunction>("range",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return range(args, kwargs, interpreter);
-			}));
 
 	builtin_module->insert(PyString::create("__build_class__"),
 		heap.allocate<PyNativeFunction>("__build_class__",
@@ -279,11 +283,49 @@ std::shared_ptr<PyModule> fetch_builtins(Interpreter &interpreter)
 				return globals(args, kwargs, interpreter);
 			}));
 
+	builtin_module->insert(PyString::create("hex"),
+		heap.allocate<PyNativeFunction>("hex",
+			[&interpreter](const std::shared_ptr<PyTuple> &args,
+				const std::shared_ptr<PyDict> &kwargs) { return hex(args, kwargs, interpreter); }));
+
+	builtin_module->insert(PyString::create("id"),
+		heap.allocate<PyNativeFunction>("id",
+			[&interpreter](const std::shared_ptr<PyTuple> &args,
+				const std::shared_ptr<PyDict> &kwargs) { return id(args, kwargs, interpreter); }));
+
+	builtin_module->insert(PyString::create("iter"),
+		heap.allocate<PyNativeFunction>("iter",
+			[&interpreter](
+				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
+				return iter(args, kwargs, interpreter);
+			}));
+
 	builtin_module->insert(PyString::create("locals"),
 		heap.allocate<PyNativeFunction>("locals",
 			[&interpreter](
 				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
 				return locals(args, kwargs, interpreter);
+			}));
+
+	builtin_module->insert(PyString::create("next"),
+		heap.allocate<PyNativeFunction>("next",
+			[&interpreter](
+				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
+				return next(args, kwargs, interpreter);
+			}));
+
+	builtin_module->insert(PyString::create("print"),
+		heap.allocate<PyNativeFunction>("print",
+			[&interpreter](
+				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
+				return print(args, kwargs, interpreter);
+			}));
+
+	builtin_module->insert(PyString::create("range"),
+		heap.allocate<PyNativeFunction>("range",
+			[&interpreter](
+				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
+				return range(args, kwargs, interpreter);
 			}));
 
 	return builtin_module;
