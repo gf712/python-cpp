@@ -1013,7 +1013,7 @@ struct PowerPattern : Pattern<PowerPattern>
 		if (pattern1::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::EXP, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::EXP, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1067,7 +1067,7 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern1::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::MULTIPLY, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MULTIPLY, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1083,7 +1083,7 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern4::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MODULO, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1134,7 +1134,7 @@ struct SumPattern_ : Pattern<SumPattern_>
 			p.print_stack();
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::PLUS, lhs, rhs);
 			p.push_to_stack(binary_op);
 			p.print_stack();
 			return true;
@@ -1150,11 +1150,11 @@ struct SumPattern_ : Pattern<SumPattern_>
 			if (auto rhs_binop = as<BinaryExpr>(rhs)) {
 				auto node = std::static_pointer_cast<ASTNode>(rhs_binop);
 				auto binary_op =
-					std::make_shared<BinaryExpr>(BinaryExpr::OpType::MINUS, lhs, leftmost(node));
+					std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, leftmost(node));
 				leftmost(node) = binary_op;
 				p.push_to_stack(node);
 			} else {
-				auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::MINUS, lhs, rhs);
+				auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, rhs);
 				p.push_to_stack(binary_op);
 			}
 			return true;
@@ -1216,7 +1216,7 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 		if (pattern1::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryExpr::OpType::LEFTSHIFT, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::LEFTSHIFT, lhs, rhs);
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1492,6 +1492,77 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 	}
 };
 
+
+struct SingleTargetPattern : Pattern<SingleTargetPattern>
+{
+	// single_target:
+	//     | single_subscript_attribute_target
+	//     | NAME
+	//     | '(' single_target ')'
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("SingleTargetPattern");
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
+		if (pattern2::match(p)) {
+			spdlog::debug("NAME");
+			const auto token = p.lexer().peek_token(p.token_position() - 1);
+			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
+			p.push_to_stack(std::make_shared<Name>(name, ContextType::STORE));
+			return true;
+		}
+
+		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+			SingleTargetPattern,
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
+		if (pattern3::match(p)) {
+			spdlog::debug("'(' single_target ')'");
+			return true;
+		}
+
+		return false;
+	}
+};
+
+
+struct AugAssignPattern : Pattern<AugAssignPattern>
+{
+	// augassign:
+	//     | '+='
+	//     | '-='
+	//     | '*='
+	//     | '@='
+	//     | '/='
+	//     | '%='
+	//     | '&='
+	//     | '|='
+	//     | '^='
+	//     | '<<='
+	//     | '>>='
+	//     | '**='
+	//     | '//='
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUSEQUAL>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'+='");
+			const auto &lhs = p.pop_back();
+			// defer rhs assignment to caller. Am I shooting myself in the foot?
+			// at least a null dereference goes with a bang...
+			p.push_to_stack(std::make_shared<AugAssign>(lhs, BinaryOpType::PLUS, nullptr));
+			return true;
+		}
+
+		return false;
+	}
+};
+
+
+struct YieldExpressionPattern : Pattern<YieldExpressionPattern>
+{
+	static bool matches_impl(Parser &) { return false; }
+};
+
+
 struct AssignmentPattern : Pattern<AssignmentPattern>
 {
 	// assignment:
@@ -1519,6 +1590,18 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 			auto assignment = std::make_shared<Assign>(targets, expressions, "");
 			p.push_to_stack(assignment);
 			assignment->print_node("");
+			return true;
+		}
+
+		using pattern4 = PatternMatch<SingleTargetPattern,
+			AugAssignPattern,
+			OrPattern<YieldExpressionPattern, StarExpressionsPattern>>;
+		if (pattern4::match(p)) {
+			spdlog::debug("single_target augassign ~ (yield_expr | star_expressions)");
+			const auto &rhs = p.pop_back();
+			auto aug_assign = p.pop_back();
+			as<AugAssign>(aug_assign)->set_value(rhs);
+			p.push_to_stack(aug_assign);
 			return true;
 		}
 		return false;

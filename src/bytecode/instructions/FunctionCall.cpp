@@ -1,7 +1,7 @@
 #include "FunctionCall.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyString.hpp"
-
+#include "runtime/TypeError.hpp"
 
 std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 	Interpreter &interpreter,
@@ -44,19 +44,16 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 					auto key_str = std::get<String>(key);
 					auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
 					if (arg_iter == argnames.end()) {
-						interpreter.raise_exception(
-							fmt::format("TypeError: {}() got an unexpected keyword argument '{}'",
-								function_name,
-								key_str.s));
+						type_error("{}() got an unexpected keyword argument '{}'",
+							function_name,
+							key_str.s);
 						return nullptr;
 					}
 					auto &arg =
 						function_frame->parameter(std::distance(argnames.begin(), arg_iter));
 					if (arg.has_value()) {
-						interpreter.raise_exception(
-							fmt::format("TypeError: {}() got multiple values for argument '{}'",
-								function_name,
-								key_str.s));
+						type_error(
+							"{}() got multiple values for argument '{}'", function_name, key_str.s);
 						return nullptr;
 					}
 					arg = value;

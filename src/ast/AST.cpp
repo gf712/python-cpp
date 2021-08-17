@@ -62,33 +62,33 @@ Register BinaryExpr::generate_impl(size_t function_id,
 	auto dst_register = generator.allocate_register();
 
 	switch (m_op_type) {
-	case OpType::PLUS: {
+	case BinaryOpType::PLUS: {
 		generator.emit<Add>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::MINUS: {
+	case BinaryOpType::MINUS: {
 		generator.emit<Subtract>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::MULTIPLY: {
+	case BinaryOpType::MULTIPLY: {
 		generator.emit<Multiply>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::EXP: {
+	case BinaryOpType::EXP: {
 		generator.emit<Exp>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::MODULO: {
+	case BinaryOpType::MODULO: {
 		generator.emit<Modulo>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::SLASH:
+	case BinaryOpType::SLASH:
 		TODO()
-	case OpType::LEFTSHIFT: {
+	case BinaryOpType::LEFTSHIFT: {
 		generator.emit<LeftShift>(function_id, dst_register, lhs_register, rhs_register);
 		return dst_register;
 	}
-	case OpType::RIGHTSHIFT:
+	case BinaryOpType::RIGHTSHIFT:
 		TODO()
 	}
 	ASSERT_NOT_REACHED()

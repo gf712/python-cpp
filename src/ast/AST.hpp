@@ -21,6 +21,7 @@ namespace ast {
 	__AST_NODE_TYPE(Arguments)          \
 	__AST_NODE_TYPE(Attribute)          \
 	__AST_NODE_TYPE(Assign)             \
+	__AST_NODE_TYPE(AugAssign)          \
 	__AST_NODE_TYPE(BinaryExpr)         \
 	__AST_NODE_TYPE(Call)               \
 	__AST_NODE_TYPE(ClassDefinition)    \
@@ -336,22 +337,34 @@ class Assign : public Statement
 	__BINARY_OP(LEFTSHIFT) \
 	__BINARY_OP(RIGHTSHIFT)
 
+enum class BinaryOpType {
+#define __BINARY_OP(x) x,
+	BINARY_OPERATIONS
+#undef __BINARY_OP
+};
+
+inline std::string_view stringify_binary_op(BinaryOpType op)
+{
+	switch (op) {
+#define __BINARY_OP(x)    \
+	case BinaryOpType::x: \
+		return #x;
+		BINARY_OPERATIONS
+#undef __BINARY_OP
+	}
+	ASSERT_NOT_REACHED()
+}
+
 class BinaryExpr : public ASTNode
 {
   public:
-	enum class OpType {
-#define __BINARY_OP(x) x,
-		BINARY_OPERATIONS
-#undef __BINARY_OP
-	};
-
   private:
-	const OpType m_op_type;
+	const BinaryOpType m_op_type;
 	std::shared_ptr<ASTNode> m_lhs;
 	std::shared_ptr<ASTNode> m_rhs;
 
   public:
-	BinaryExpr(OpType op_type, std::shared_ptr<ASTNode> lhs, std::shared_ptr<ASTNode> rhs)
+	BinaryExpr(BinaryOpType op_type, std::shared_ptr<ASTNode> lhs, std::shared_ptr<ASTNode> rhs)
 		: ASTNode(ASTNodeType::BinaryExpr), m_op_type(op_type), m_lhs(std::move(lhs)),
 		  m_rhs(std::move(rhs))
 	{}
@@ -362,33 +375,54 @@ class BinaryExpr : public ASTNode
 	const std::shared_ptr<ASTNode> &rhs() const { return m_rhs; }
 	std::shared_ptr<ASTNode> &rhs() { return m_rhs; }
 
-	OpType op_type() const { return m_op_type; }
+	BinaryOpType op_type() const { return m_op_type; }
 
 	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
 
   private:
-	std::string_view op_type_to_string(OpType type) const
-	{
-		switch (type) {
-#define __BINARY_OP(x) \
-	case OpType::x:    \
-		return #x;
-			BINARY_OPERATIONS
-#undef __BINARY_OP
-		}
-		ASSERT_NOT_REACHED()
-	}
-
 	void print_this_node(const std::string &indent) const override
 	{
 		spdlog::debug("{}BinaryOp", indent);
-		spdlog::debug("{}  - op_type: {}", indent, op_type_to_string(m_op_type));
+		spdlog::debug("{}  - op_type: {}", indent, stringify_binary_op(m_op_type));
 		spdlog::debug("{}  - lhs:", indent);
 		std::string new_indent = indent + std::string(6, ' ');
 		m_lhs->print_node(new_indent);
 		spdlog::debug("{}  - rhs:", indent);
 		m_rhs->print_node(new_indent);
 	}
+};
+
+
+class AugAssign : public Statement
+{
+	std::shared_ptr<ASTNode> m_target;
+	BinaryOpType m_op;
+	std::shared_ptr<ASTNode> m_value;
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}AugAssign", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - target:", indent);
+		m_target->print_node(new_indent);
+		spdlog::debug("{}  - op: {}", indent, stringify_binary_op(m_op));
+		spdlog::debug("{}  - value:", indent);
+		m_value->print_node(new_indent);
+	}
+
+  public:
+	AugAssign(std::shared_ptr<ASTNode> target, BinaryOpType op, std::shared_ptr<ASTNode> value)
+		: Statement(ASTNodeType::AugAssign), m_target(std::move(target)), m_op(op),
+		  m_value(std::move(value))
+	{}
+
+	const std::shared_ptr<ASTNode> &target() const { return m_target; }
+	BinaryOpType op() const { return m_op; }
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
+
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO(); }
 };
 
 class Return : public ASTNode

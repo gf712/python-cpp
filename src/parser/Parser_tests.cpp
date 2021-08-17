@@ -351,6 +351,25 @@ void compare_keyword(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
+void compare_augmented_assign(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::AugAssign);
+
+	const auto result_target = as<AugAssign>(result)->target();
+	const auto expected_target = as<AugAssign>(expected)->target();
+	dispatch(result_target, expected_target);
+
+	const auto result_op = as<AugAssign>(result)->op();
+	const auto expected_op = as<AugAssign>(expected)->op();
+	ASSERT_EQ(result_op, expected_op);
+
+	const auto result_value = as<AugAssign>(result)->value();
+	const auto expected_value = as<AugAssign>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -420,6 +439,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Keyword: {
 		compare_keyword(result, expected);
+		break;
+	}
+	case ASTNodeType::AugAssign: {
+		compare_augmented_assign(result, expected);
 		break;
 	}
 	default: {
@@ -492,7 +515,7 @@ TEST(Parser, BinaryOperationWithAssignment)
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
-		std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+		std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
 			std::make_shared<Constant>(static_cast<int64_t>(1)),
 			std::make_shared<Constant>(static_cast<int64_t>(2))),
 		""));
@@ -507,7 +530,7 @@ TEST(Parser, BinaryOperationModulo)
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
-		std::make_shared<BinaryExpr>(BinaryExpr::OpType::MODULO,
+		std::make_shared<BinaryExpr>(BinaryOpType::MODULO,
 			std::make_shared<Constant>(int64_t{ 3 }),
 			std::make_shared<Constant>(int64_t{ 4 })),
 		""));
@@ -528,7 +551,7 @@ TEST(Parser, FunctionDefinition)
 			std::make_shared<Argument>("b", "", ""),
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
 				std::make_shared<Name>("a", ContextType::LOAD),
 				std::make_shared<Name>("b", ContextType::LOAD))),
 		},// body
@@ -557,7 +580,7 @@ TEST(Parser, MultilineFunctionDefinition)
 										 "constant", ContextType::STORE) },
 				std::make_shared<Constant>(static_cast<int64_t>(1)),
 				""),
-			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryExpr::OpType::PLUS,
+			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
 				std::make_shared<Name>("a", ContextType::LOAD),
 				std::make_shared<Name>("constant", ContextType::LOAD))),
 		},// body
@@ -846,5 +869,19 @@ TEST(Parser, FunctionCallWithKwargAsResultFromAnotherFunction)
 			std::make_shared<Constant>("Hello"), std::make_shared<Constant>("world!") },
 		std::vector{ std::make_shared<Keyword>("sep",
 			std::make_shared<Call>(std::make_shared<Name>("my_separator", ContextType::LOAD))) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, AugmentedAssign)
+{
+	constexpr std::string_view program = "a += b\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<AugAssign>(std::make_shared<Name>("a", ContextType::STORE),
+			BinaryOpType::PLUS,
+			std::make_shared<Name>("b", ContextType::LOAD)));
+
 	assert_generates_ast(program, expected_ast);
 }
