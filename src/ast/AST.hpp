@@ -422,7 +422,7 @@ class AugAssign : public Statement
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO(); }
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 };
 
 class Return : public ASTNode

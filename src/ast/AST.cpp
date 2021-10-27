@@ -2,6 +2,7 @@
 #include "bytecode/BytecodeGenerator.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
 #include "bytecode/instructions/FunctionCallWithKeywords.hpp"
+#include "bytecode/instructions/InplaceAdd.hpp"
 #include "bytecode/instructions/Instructions.hpp"
 #include "bytecode/instructions/LoadAttr.hpp"
 #include "bytecode/instructions/LoadBuildClass.hpp"
@@ -466,5 +467,45 @@ Register
 	return m_value->generate(function_id, generator, ctx);
 }
 
+
+Register AugAssign::generate_impl(size_t function_id,
+	BytecodeGenerator &generator,
+	ASTContext &ctx) const
+{
+	const auto lhs_register = m_target->generate(function_id, generator, ctx);
+	const auto rhs_register = m_value->generate(function_id, generator, ctx);
+	switch (m_op) {
+	case BinaryOpType::PLUS: {
+		generator.emit<InplaceAdd>(function_id, lhs_register, rhs_register);
+	} break;
+	case BinaryOpType::MINUS: {
+		TODO()
+	} break;
+	case BinaryOpType::MULTIPLY: {
+		TODO()
+	} break;
+	case BinaryOpType::EXP: {
+		TODO()
+	} break;
+	case BinaryOpType::MODULO: {
+		TODO()
+	} break;
+	case BinaryOpType::SLASH:
+		TODO()
+	case BinaryOpType::LEFTSHIFT: {
+		TODO()
+	} break;
+	case BinaryOpType::RIGHTSHIFT:
+		TODO()
+	}
+
+	if (auto named_target = as<Name>(m_target)) {
+		if (named_target->ids().size() != 1) { TODO() }
+		generator.emit<StoreName>(function_id, named_target->ids()[0], lhs_register);
+	} else {
+		TODO()
+	}
+	return lhs_register;
+}
 
 }// namespace ast

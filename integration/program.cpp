@@ -503,3 +503,16 @@ TEST(RunPythonProgram, CallFunctionWithKeyword)
 	assert_interpreter_object_value("d", -7);
 	assert_interpreter_object_value("e", -19);
 }
+
+
+TEST(RunPythonProgram, AugmentedAssign)
+{
+	static constexpr std::string_view program =
+		"a = 1\n"
+		"b = 10\n"
+		"a += b\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 11);
+	assert_interpreter_object_value("b", 10);
+}
