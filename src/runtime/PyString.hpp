@@ -12,6 +12,8 @@ class PyString : public PyObject
 	static std::shared_ptr<PyString> create(const std::string &value);
 
 	const std::string &value() const { return m_value; }
+	std::vector<int32_t> codepoints() const;
+	std::optional<int32_t> codepoint() const;
 
 	std::string to_string() const override { return fmt::format("{}", m_value); }
 
@@ -21,6 +23,7 @@ class PyString : public PyObject
 	size_t hash_impl(Interpreter &interpreter) const override;
 	std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
 		Interpreter &interpreter) const override;
+	std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const override;
 	std::shared_ptr<PyObject> richcompare_impl(const std::shared_ptr<PyObject> &,
 		RichCompare,
 		Interpreter &interpreter) const override;

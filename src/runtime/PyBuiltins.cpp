@@ -5,6 +5,7 @@
 #include "PyNumber.hpp"
 #include "PyRange.hpp"
 #include "StopIterationException.hpp"
+#include "TypeError.hpp"
 
 #include "bytecode/instructions/FunctionCall.hpp"
 #include "bytecode/VM.hpp"
@@ -261,6 +262,26 @@ std::shared_ptr<PyObject> hex(const std::shared_ptr<PyTuple> &args,
 	}
 	return nullptr;
 }
+
+std::shared_ptr<PyObject> ord(const std::shared_ptr<PyTuple> &args,
+	const std::shared_ptr<PyDict> &,
+	Interpreter &interpreter)
+{
+	ASSERT(args->size() == 1)
+	if (auto pystr = as<PyString>(args->operator[](0))) {
+		if (auto codepoint = pystr->codepoint()) {
+			return PyNumber::create(Number{ static_cast<int64_t>(*codepoint) });
+		} else {
+			auto size = pystr->len_impl(interpreter);
+			type_error("ord() expected a character, but string of length {} found",
+				as<PyNumber>(size)->value().to_string());
+		}
+	} else {
+		interpreter.raise_exception("TypeError: ord() expected string of length 1, but {} found",
+			object_name(args->operator[](0)->type()));
+	}
+	return nullptr;
+}
 }// namespace
 
 
@@ -313,6 +334,11 @@ std::shared_ptr<PyModule> fetch_builtins(Interpreter &interpreter)
 				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
 				return next(args, kwargs, interpreter);
 			}));
+
+	builtin_module->insert(PyString::create("ord"),
+		heap.allocate<PyNativeFunction>("ord",
+			[&interpreter](const std::shared_ptr<PyTuple> &args,
+				const std::shared_ptr<PyDict> &kwargs) { return ord(args, kwargs, interpreter); }));
 
 	builtin_module->insert(PyString::create("print"),
 		heap.allocate<PyNativeFunction>("print",

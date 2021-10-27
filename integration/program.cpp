@@ -516,3 +516,13 @@ TEST(RunPythonProgram, AugmentedAssign)
 	assert_interpreter_object_value("a", 11);
 	assert_interpreter_object_value("b", 10);
 }
+
+
+TEST(RunPythonProgram, BuiltinOrd)
+{
+	static constexpr std::string_view program =
+		"smiley_codepoint = ord(\"😃\")\n";
+
+	run(program);
+	assert_interpreter_object_value("smiley_codepoint", 128515);
+}
