@@ -1,4 +1,6 @@
 #include "ast/AST.hpp"
+#include "ast/optimizers/ConstantFolding.hpp"
+
 #include "BytecodeGenerator.hpp"
 #include "instructions/Instructions.hpp"
 
@@ -66,8 +68,11 @@ std::shared_ptr<Bytecode> BytecodeGenerator::generate_executable()
 }
 
 
-std::shared_ptr<Bytecode> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node)
+std::shared_ptr<Bytecode> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node, compiler::OptimizationLevel lvl)
 {
+	if (lvl > compiler::OptimizationLevel::None) {
+		ast::optimizer::constant_folding(node);
+	}
 	auto generator = BytecodeGenerator();
 	ast::ASTContext ctx;
 	node->generate_impl(0, generator, ctx);

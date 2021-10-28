@@ -128,6 +128,7 @@ class Constant : public ASTNode
 	}
 
   public:
+	explicit Constant(Value value) : ASTNode(ASTNodeType::Constant), m_value(value) {}
 	explicit Constant(double value) : ASTNode(ASTNodeType::Constant), m_value(Number{ value }) {}
 	explicit Constant(int64_t value) : ASTNode(ASTNodeType::Constant), m_value(Number{ value }) {}
 	explicit Constant(bool value) : ASTNode(ASTNodeType::Constant), m_value(NameConstant{ value })
@@ -322,6 +323,7 @@ class Assign : public Statement
 
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	void set_value(std::shared_ptr<ASTNode> v) { m_value = std::move(v); }
 
 	Register
 		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
@@ -677,6 +679,7 @@ class Module : public ASTNode
 		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>>& body() { return m_body; }
 
   private:
 	void print_this_node(const std::string &indent) const override
@@ -862,6 +865,10 @@ class Attribute : public ASTNode
 };
 
 template<typename NodeType> std::shared_ptr<NodeType> as(std::shared_ptr<ASTNode> node);
+
+#define __AST_NODE_TYPE(x) template<> std::shared_ptr<x> as(std::shared_ptr<ASTNode> node);
+AST_NODE_TYPES
+#undef __AST_NODE_TYPE
 
 template<typename FuncType> void ASTNode::visit(FuncType &&func) const
 {

@@ -17,7 +17,7 @@ void run(std::string_view program)
 	// spdlog::set_level(spdlog::level::debug);
 	p.module()->print_node("");
 	// spdlog::set_level(spdlog::level::info);
-	auto bytecode = BytecodeGenerator::compile(p.module());
+	auto bytecode = BytecodeGenerator::compile(p.module(), compiler::OptimizationLevel::None);
 	ASSERT_FALSE(bytecode->instructions().empty());
 	auto &vm = VirtualMachine::the();
 	vm.clear();

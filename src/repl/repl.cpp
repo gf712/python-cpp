@@ -6,6 +6,7 @@
 #include <string>
 #include <optional>
 
+#include "ast/optimizers/ConstantFolding.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
 #include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -39,7 +40,7 @@ class InteractivePython
 		} else {
 			for (const auto &node : parser.module()->body()) { m_main_module->emplace(node); }
 		}
-		auto bytecode = BytecodeGenerator::compile(m_main_module);
+		auto bytecode = BytecodeGenerator::compile(m_main_module, compiler::OptimizationLevel::None);
 		auto &vm = VirtualMachine::the();
 		return vm.execute_statement(bytecode);
 	}

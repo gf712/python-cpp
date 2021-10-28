@@ -3,6 +3,8 @@
 #include "forward.hpp"
 #include "utilities.hpp"
 
+#include "ast/optimizers/ConstantFolding.hpp"
+
 #include <vector>
 #include <memory>
 #include <set>
@@ -103,7 +105,7 @@ class BytecodeGenerator
 	BytecodeGenerator();
 	~BytecodeGenerator();
 
-	static std::shared_ptr<Bytecode> compile(std::shared_ptr<ast::ASTNode> node);
+	static std::shared_ptr<Bytecode> compile(std::shared_ptr<ast::ASTNode> node, compiler::OptimizationLevel lvl);
 
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
 	{

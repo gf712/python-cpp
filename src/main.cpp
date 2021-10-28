@@ -45,7 +45,7 @@ int main()
 	parser::Parser p{ lexer };
 	p.parse();
 	p.module()->print_node("");
-	auto bytecode = BytecodeGenerator::compile(p.module());
+	auto bytecode = BytecodeGenerator::compile(p.module(), compiler::OptimizationLevel::None);
 	spdlog::debug("Bytecode:\n {}", bytecode->to_string());
 	auto &vm = VirtualMachine::the().create(std::move(bytecode));
 	// spdlog::set_level(spdlog::level::debug);

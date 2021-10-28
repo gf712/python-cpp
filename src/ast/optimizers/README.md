@@ -1,0 +1,2 @@
+This folder contains AST optimizers. These are optimizations that can be performed quite easily on an AST and don't require additional runtime information, e.g. constant folding or dead code elimination.
+Runtime optimizations, such as the ones provided by JIT compilation, will be located in a different folder.

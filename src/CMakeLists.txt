@@ -1,5 +1,6 @@
 set(AST_SOURCE_FILES ast/AST.cpp 
-                     ast/Module.cpp)
+	             ast/Module.cpp
+		     ast/optimizers/ConstantFolding.cpp)
 set(INTERPRETER_SOURCE_FILES 
                     interpreter/Interpreter.cpp
                     interpreter/ExecutionFrame.cpp)
@@ -28,7 +29,7 @@ set(VM_SOURCE_FILES bytecode/VM.cpp
                     bytecode/instructions/StoreName.cpp
                     )
 
-set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp)
+set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp ast/optimizers/Optimizers_tests.cpp)
 
 add_library(python-cpp ${AST_SOURCE_FILES} ${INTERPRETER_SOURCE_FILES} ${PARSER_SOURCE_FILES} ${RUNTIME_SOURCE_FILES} ${VM_SOURCE_FILES})
 add_executable(unittests ${UNITTEST_SOURCES})
