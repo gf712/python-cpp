@@ -2,68 +2,8 @@
 
 #include "forward.hpp"
 #include "utilities.hpp"
+#include "Heap.hpp"
 #include "runtime/Value.hpp"
-#include <memory>
-
-static constexpr size_t KB = 1024;
-static constexpr size_t MB = 1024 * KB;
-
-class Heap
-	: NonCopyable
-	, NonMoveable
-{
-	uint8_t *m_memory;
-	uint8_t *m_static_memory;
-	size_t m_memory_size{ 500 * MB };
-	size_t m_static_memory_size{ 4 * KB };
-	size_t m_offset{ 0 };
-	size_t m_static_offset{ 0 };
-
-  public:
-	static Heap &the()
-	{
-		static auto heap = Heap();
-		return heap;
-	}
-
-	~Heap()
-	{
-		free(m_memory);
-		free(m_static_memory);
-		m_memory = nullptr;
-		m_static_memory = nullptr;
-	}
-
-	void reset()
-	{
-		memset(m_memory, 0, m_memory_size);
-		m_offset = 0;
-	}
-
-	template<typename T, typename... Args> std::shared_ptr<T> allocate(Args &&... args)
-	{
-		if (m_offset + sizeof(T) >= m_memory_size) { TODO(); }
-		T *ptr = new (m_memory + m_offset) T(std::forward<Args>(args)...);
-		m_offset += sizeof(T);
-		return std::shared_ptr<T>(ptr, [](T *) { return; });
-	}
-
-	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
-	{
-		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
-		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
-		m_static_offset += sizeof(T);
-		return std::shared_ptr<T>(ptr, [](T *) { return; });
-	}
-
-  private:
-	Heap()
-	{
-		m_memory = static_cast<uint8_t *>(malloc(m_memory_size));
-		m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size));
-	}
-};
-
 
 class VirtualMachine;
 

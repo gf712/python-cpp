@@ -16,6 +16,7 @@ set(RUNTIME_SOURCE_FILES runtime/CustomPyObject.cpp
 
 set(VM_SOURCE_FILES bytecode/VM.cpp 
                     bytecode/BytecodeGenerator.cpp
+                    bytecode/Heap.cpp
                     bytecode/instructions/FunctionCall.cpp
                     bytecode/instructions/FunctionCallWithKeywords.cpp
                     bytecode/instructions/LoadAttr.cpp
