@@ -85,3 +85,12 @@ void Block::deallocate(uint8_t *ptr)
 	spdlog::error("Failed to find memory piece of ptr {}", (void *)ptr);
 	std::abort();
 }
+
+void Heap::collect_garbage()
+{
+	// collect_roots();
+
+	// mark_live_objects();
+
+	// sweep_dead_objects();
+}

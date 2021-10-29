@@ -21,8 +21,8 @@ class PyRange : public PyObject
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	int64_t start() const { return m_start; }
 	int64_t stop() const { return m_stop; }
@@ -34,16 +34,17 @@ class PyRangeIterator : public PyObject
 {
 	friend class Heap;
 
-	std::shared_ptr<const PyRange> m_pyrange;
+	const PyRange &m_pyrange;
 	int64_t m_current_index;
 
   public:
-	PyRangeIterator(std::shared_ptr<const PyRange> pyrange)
-		: PyObject(PyObjectType::PY_RANGE_ITERATOR), m_pyrange(std::move(pyrange)), m_current_index(m_pyrange->start())
+	PyRangeIterator(const PyRange &pyrange)
+		: PyObject(PyObjectType::PY_RANGE_ITERATOR), m_pyrange(pyrange),
+		  m_current_index(m_pyrange.start())
 	{}
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> next_impl(Interpreter &interpreter) override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *next_impl(Interpreter &interpreter) override;
 };

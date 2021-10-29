@@ -30,7 +30,7 @@ class InteractivePython
   public:
 	InteractivePython() {}
 
-	std::shared_ptr<PyObject> interpret_statement(std::string statement)
+	PyObject *interpret_statement(std::string statement)
 	{
 		Lexer lexer{ statement };
 		parser::Parser parser{ lexer };
@@ -40,7 +40,8 @@ class InteractivePython
 		} else {
 			for (const auto &node : parser.module()->body()) { m_main_module->emplace(node); }
 		}
-		auto bytecode = BytecodeGenerator::compile(m_main_module, compiler::OptimizationLevel::None);
+		auto bytecode =
+			BytecodeGenerator::compile(m_main_module, compiler::OptimizationLevel::None);
 		auto &vm = VirtualMachine::the();
 		return vm.execute_statement(bytecode);
 	}
@@ -73,8 +74,8 @@ int main(int argc, char **argv)
 
 	while (auto line = repl::getline(">>> ")) {
 		(*line) += "\n";
-		auto result = interactive_interpreter.interpret_statement(*line);
-		if (result.get() != py_none().get()) {
+		auto *result = interactive_interpreter.interpret_statement(*line);
+		if (result != py_none()) {
 			std::cout << result->repr_impl(*VirtualMachine::the().interpreter())->to_string()
 					  << '\n';
 		}

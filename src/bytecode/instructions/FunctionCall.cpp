@@ -3,12 +3,12 @@
 #include "runtime/PyString.hpp"
 #include "runtime/TypeError.hpp"
 
-std::shared_ptr<PyObject> execute(VirtualMachine &vm,
+PyObject *execute(VirtualMachine &vm,
 	Interpreter &interpreter,
-	std::shared_ptr<PyObject> function_object,
-	const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs,
-	std::shared_ptr<PyDict> ns)
+	PyObject *function_object,
+	PyTuple *args,
+	PyDict *kwargs,
+	PyDict *ns)
 {
 	std::string function_name;
 
@@ -90,13 +90,13 @@ std::shared_ptr<PyObject> execute(VirtualMachine &vm,
 void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto func = vm.reg(m_function_name);
-	ASSERT(std::get_if<std::shared_ptr<PyObject>>(&func));
-	auto function_object = std::get<std::shared_ptr<PyObject>>(func);
+	ASSERT(std::get_if<PyObject *>(&func));
+	auto function_object = std::get<PyObject *>(func);
 
 	std::vector<Value> args;
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }
 
-	auto args_tuple = vm.heap().allocate<PyTuple>(args);
+	auto *args_tuple = PyTuple::create(args);
 
 	ASSERT(args_tuple);
 

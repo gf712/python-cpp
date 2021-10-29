@@ -18,8 +18,8 @@ void Interpreter::setup()
 			{ String{ "__name__" }, PyString::create("__main__") },
 			{ String{ "__doc__" }, py_none() },
 			{ String{ "__package__" }, py_none() } });
-	auto locals = std::make_unique<PyDict>(globals->map());
-	m_current_frame = ExecutionFrame::create(nullptr, globals, std::move(locals), nullptr);
+	auto *locals = VirtualMachine::the().heap().allocate<PyDict>(globals->map());
+	m_current_frame = ExecutionFrame::create(nullptr, globals, locals, nullptr);
 	m_global_frame = m_current_frame;
 }
 
@@ -30,9 +30,7 @@ void Interpreter::unwind()
 		// don't unwind beyond the main frame
 		if (!m_current_frame->parent()) {
 			// uncaught exception
-			std::cout
-				<< std::static_pointer_cast<BaseException>(m_current_frame->exception())->what()
-				<< '\n';
+			std::cout << static_cast<BaseException *>(m_current_frame->exception())->what() << '\n';
 			break;
 		}
 		m_current_frame = m_current_frame->exit();

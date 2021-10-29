@@ -8,17 +8,14 @@
 void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &value = vm.reg(m_source);
-	auto obj = std::visit(
-		overloaded{
-			[](const Number &n) { return std::static_pointer_cast<PyObject>(PyNumber::create(n)); },
-			[](const String &s) {
-				return std::static_pointer_cast<PyObject>(PyString::create(s.s));
-			},
-			[](const NameConstant &s) { return PyObject::from(s); },
-			[](const std::shared_ptr<PyObject> &obj) { return obj; },
-			[&interpreter, this](const auto &) {
+	auto *obj = std::visit(
+		overloaded{ [](const Number &n) -> PyObject * { return PyNumber::create(n); },
+			[](const String &s) -> PyObject * { return PyString::create(s.s); },
+			[](const NameConstant &s) -> PyObject * { return PyObject::from(s); },
+			[](PyObject *obj) -> PyObject * { return obj; },
+			[&interpreter, this](const auto &) -> PyObject * {
 				interpreter.raise_exception("Failed to store object \"{}\"", m_object_name);
-				return std::shared_ptr<PyObject>(nullptr);
+				return nullptr;
 			} },
 		value);
 

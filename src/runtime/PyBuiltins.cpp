@@ -14,7 +14,7 @@
 #include <iostream>
 
 namespace {
-std::optional<int64_t> to_integer(const std::shared_ptr<PyObject> &obj, Interpreter &interpreter)
+std::optional<int64_t> to_integer(const PyObject *obj, Interpreter &interpreter)
 {
 	if (auto pynumber = as<PyNumber>(obj)) {
 		if (auto int_value = std::get_if<int64_t>(&pynumber->value().value)) { return *int_value; }
@@ -25,20 +25,18 @@ std::optional<int64_t> to_integer(const std::shared_ptr<PyObject> &obj, Interpre
 }
 
 
-std::shared_ptr<PyFunction> make_function(const std::string &function_name,
+PyFunction *make_function(const std::string &function_name,
 	int64_t function_id,
 	const std::vector<std::string> &argnames)
 {
 	auto &vm = VirtualMachine::the();
 	auto code = vm.heap().allocate<PyCode>(
 		vm.function_offset(function_id), vm.function_register_count(function_id), argnames);
-	return vm.heap().allocate<PyFunction>(function_name, std::static_pointer_cast<PyCode>(code));
+	return vm.heap().allocate<PyFunction>(function_name, static_cast<PyCode *>(code));
 }
 
 
-std::shared_ptr<PyObject> print(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs,
-	Interpreter &interpreter)
+PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
 	std::string separator = " ";
 	if (kwargs) {
@@ -63,8 +61,8 @@ std::shared_ptr<PyObject> print(const std::shared_ptr<PyTuple> &args,
 			spdlog::debug("Repr native function ptr: {}", static_cast<void *>(&repr_native));
 			return repr_native();
 		} else {
-			auto pyfunc = std::get<std::shared_ptr<PyFunction>>(reprfunc);
-			spdlog::debug("Repr native function ptr: {}", static_cast<void *>(pyfunc.get()));
+			auto pyfunc = std::get<PyFunction *>(reprfunc);
+			spdlog::debug("Repr native function ptr: {}", static_cast<void *>(pyfunc));
 			return execute(VirtualMachine::the(),
 				interpreter,
 				pyfunc,
@@ -83,14 +81,14 @@ std::shared_ptr<PyObject> print(const std::shared_ptr<PyTuple> &args,
 	--arg_it_end;
 
 	while (arg_it != arg_it_end) {
-		spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).get()));
+		spdlog::debug("arg function ptr: {}", static_cast<void *>(*arg_it));
 		auto reprobj = reprfunc(*arg_it);
 		spdlog::debug("repr result: {}", reprobj->to_string());
 		std::cout << reprobj->to_string() << separator;
 		std::advance(arg_it, 1);
 	}
 
-	spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).get()));
+	spdlog::debug("arg function ptr: {}", static_cast<void *>(*arg_it));
 	auto reprobj = reprfunc(*arg_it);
 	spdlog::debug("repr result: {}", reprobj->to_string());
 	std::cout << reprobj->to_string();
@@ -101,9 +99,7 @@ std::shared_ptr<PyObject> print(const std::shared_ptr<PyTuple> &args,
 }
 
 
-std::shared_ptr<PyObject> iter(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs,
-	Interpreter &interpreter)
+PyObject *iter(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
 	const auto &arg = args->operator[](0);
@@ -117,8 +113,8 @@ std::shared_ptr<PyObject> iter(const std::shared_ptr<PyTuple> &args,
 		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
 		return iter_native();
 	} else {
-		auto pyfunc = std::get<std::shared_ptr<PyFunction>>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc.get()));
+		auto pyfunc = std::get<PyFunction *>(iterfunc);
+		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc));
 		return execute(VirtualMachine::the(),
 			interpreter,
 			pyfunc,
@@ -129,16 +125,14 @@ std::shared_ptr<PyObject> iter(const std::shared_ptr<PyTuple> &args,
 }
 
 
-std::shared_ptr<PyObject> next(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &kwargs,
-	Interpreter &interpreter)
+PyObject *next(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
 	if (kwargs) {
 		interpreter.raise_exception("TypeError: next() takes no keyword arguments");
 		return py_none();
 	}
-	std::shared_ptr<PyObject> next_result{ nullptr };
+	PyObject *next_result{ nullptr };
 	const auto &arg = args->operator[](0);
 	auto iterfunc = arg->slots().iter;
 	if (std::holds_alternative<ReprSlotFunctionType>(iterfunc)) {
@@ -146,8 +140,8 @@ std::shared_ptr<PyObject> next(const std::shared_ptr<PyTuple> &args,
 		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
 		next_result = iter_native();
 	} else {
-		auto pyfunc = std::get<std::shared_ptr<PyFunction>>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc.get()));
+		auto pyfunc = std::get<PyFunction *>(iterfunc);
+		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc));
 		next_result = execute(VirtualMachine::the(),
 			interpreter,
 			pyfunc,
@@ -161,23 +155,17 @@ std::shared_ptr<PyObject> next(const std::shared_ptr<PyTuple> &args,
 }
 
 
-std::shared_ptr<PyObject> range(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *range(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
 	const auto &arg = args->operator[](0);
 	auto &heap = VirtualMachine::the().heap();
-	if (auto pynumber = to_integer(arg, interpreter)) {
-		return std::static_pointer_cast<PyObject>(heap.allocate<PyRange>(*pynumber));
-	}
+	if (auto pynumber = to_integer(arg, interpreter)) { return heap.allocate<PyRange>(*pynumber); }
 	return py_none();
 }
 
 
-std::shared_ptr<PyObject> build_class(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 2)
 	const auto &class_name = args->operator[](0);
@@ -193,13 +181,13 @@ std::shared_ptr<PyObject> build_class(const std::shared_ptr<PyTuple> &args,
 	ASSERT(std::get_if<int64_t>(&pynumber.value))
 	auto function_id = std::get<int64_t>(pynumber.value);
 
-	auto pyfunc = make_function(class_name_as_string, function_id, std::vector<std::string>{});
+	auto *pyfunc = make_function(class_name_as_string, function_id, std::vector<std::string>{});
 
 	auto &vm = VirtualMachine::the();
 
 	return vm.heap().allocate<PyNativeFunction>(class_name_as_string,
 		[class_name, &interpreter, pyfunc, class_name_as_string](
-			const std::shared_ptr<PyTuple> &call_args, const std::shared_ptr<PyDict> &call_kwargs) {
+			const PyTuple *call_args, PyDict *call_kwargs) {
 			spdlog::debug("Calling __build_class__");
 
 			std::vector args_vector{ class_name };
@@ -208,42 +196,34 @@ std::shared_ptr<PyObject> build_class(const std::shared_ptr<PyTuple> &args,
 			auto &vm = VirtualMachine::the();
 			auto class_args = vm.heap().allocate<PyTuple>(args_vector);
 
-			auto ns = vm.heap().allocate<PyDict>();
+			auto *ns = vm.heap().allocate<PyDict>();
 			execute(vm, interpreter, pyfunc, class_args, call_kwargs, ns);
 
 			CustomPyObjectContext ctx{ class_name_as_string, ns };
-			return vm.heap().allocate<CustomPyObject>(ctx, std::shared_ptr<PyTuple>{});
+			return vm.heap().allocate<CustomPyObject>(ctx, PyTuple::create());
 		});
 }
 
-std::shared_ptr<PyObject> globals(const std::shared_ptr<PyTuple> &,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *globals(const PyTuple *, const PyDict *, Interpreter &interpreter)
 {
 	return interpreter.execution_frame()->globals();
 }
 
 
-std::shared_ptr<PyObject> locals(const std::shared_ptr<PyTuple> &,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *locals(const PyTuple *, const PyDict *, Interpreter &interpreter)
 {
 	return interpreter.execution_frame()->locals();
 }
 
 
-std::shared_ptr<PyObject>
-	id(const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &, Interpreter &)
+PyObject *id(const PyTuple *args, const PyDict *, Interpreter &)
 {
 	ASSERT(args->size() == 1)
 	return PyNumber::create(
-		Number{ static_cast<int64_t>(reinterpret_cast<intptr_t>(args->operator[](0).get())) });
+		Number{ static_cast<int64_t>(reinterpret_cast<intptr_t>(args->operator[](0))) });
 }
 
-
-std::shared_ptr<PyObject> hex(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
 	if (auto pynumber = as<PyNumber>(args->operator[](0))) {
@@ -263,9 +243,7 @@ std::shared_ptr<PyObject> hex(const std::shared_ptr<PyTuple> &args,
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> ord(const std::shared_ptr<PyTuple> &args,
-	const std::shared_ptr<PyDict> &,
-	Interpreter &interpreter)
+PyObject *ord(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
 	if (auto pystr = as<PyString>(args->operator[](0))) {
@@ -285,74 +263,61 @@ std::shared_ptr<PyObject> ord(const std::shared_ptr<PyTuple> &args,
 }// namespace
 
 
-std::shared_ptr<PyModule> fetch_builtins(Interpreter &interpreter)
+PyModule *fetch_builtins(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto builtin_module = heap.allocate<PyModule>(PyString::create("builtins"));
 
 	builtin_module->insert(PyString::create("__build_class__"),
-		heap.allocate<PyNativeFunction>("__build_class__",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
+		heap.allocate<PyNativeFunction>(
+			"__build_class__", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return build_class(args, kwargs, interpreter);
 			}));
 
 	builtin_module->insert(PyString::create("globals"),
-		heap.allocate<PyNativeFunction>("globals",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return globals(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("globals", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return globals(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("hex"),
-		heap.allocate<PyNativeFunction>("hex",
-			[&interpreter](const std::shared_ptr<PyTuple> &args,
-				const std::shared_ptr<PyDict> &kwargs) { return hex(args, kwargs, interpreter); }));
+		heap.allocate<PyNativeFunction>("hex", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return hex(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("id"),
-		heap.allocate<PyNativeFunction>("id",
-			[&interpreter](const std::shared_ptr<PyTuple> &args,
-				const std::shared_ptr<PyDict> &kwargs) { return id(args, kwargs, interpreter); }));
+		heap.allocate<PyNativeFunction>("id", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return id(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("iter"),
-		heap.allocate<PyNativeFunction>("iter",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return iter(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("iter", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return iter(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("locals"),
-		heap.allocate<PyNativeFunction>("locals",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return locals(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("locals", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return locals(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("next"),
-		heap.allocate<PyNativeFunction>("next",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return next(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("next", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return next(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("ord"),
-		heap.allocate<PyNativeFunction>("ord",
-			[&interpreter](const std::shared_ptr<PyTuple> &args,
-				const std::shared_ptr<PyDict> &kwargs) { return ord(args, kwargs, interpreter); }));
+		heap.allocate<PyNativeFunction>("ord", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return ord(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("print"),
-		heap.allocate<PyNativeFunction>("print",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return print(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("print", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return print(args, kwargs, interpreter);
+		}));
 
 	builtin_module->insert(PyString::create("range"),
-		heap.allocate<PyNativeFunction>("range",
-			[&interpreter](
-				const std::shared_ptr<PyTuple> &args, const std::shared_ptr<PyDict> &kwargs) {
-				return range(args, kwargs, interpreter);
-			}));
+		heap.allocate<PyNativeFunction>("range", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return range(args, kwargs, interpreter);
+		}));
 
 	return builtin_module;
 }

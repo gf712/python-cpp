@@ -3,7 +3,7 @@
 #include "Value.hpp"
 
 
-bool Number::operator==(const std::shared_ptr<PyObject> &other) const
+bool Number::operator==(const PyObject *other) const
 {
 	if (auto other_pynumber = as<PyNumber>(other)) {
 		return *this == other_pynumber->value();
@@ -16,13 +16,13 @@ bool Number::operator==(const std::shared_ptr<PyObject> &other) const
 bool Number::operator==(const NameConstant &other) const
 {
 	if (std::holds_alternative<NoneType>(other.value)) { return false; }
-	if (*this == Number{ 0 }) { return std::get<bool>(other.value) == false; }
-	if (*this == Number{ 1 }) { return std::get<bool>(other.value) == true; }
+	if (*this == Number{ int64_t{ 0 } }) { return std::get<bool>(other.value) == false; }
+	if (*this == Number{ int64_t{ 1 } }) { return std::get<bool>(other.value) == true; }
 	return false;
 }
 
 
-bool String::operator==(const std::shared_ptr<PyObject> &other) const
+bool String::operator==(const PyObject *other) const
 {
 	if (auto other_pystr = as<PyString>(other)) {
 		return s == other_pystr->value();
@@ -32,7 +32,7 @@ bool String::operator==(const std::shared_ptr<PyObject> &other) const
 }
 
 
-bool Bytes::operator==(const std::shared_ptr<PyObject> &other) const
+bool Bytes::operator==(const PyObject *other) const
 {
 	if (auto other_pybytes = as<PyBytes>(other)) {
 		return *this == other_pybytes->value();
@@ -41,19 +41,13 @@ bool Bytes::operator==(const std::shared_ptr<PyObject> &other) const
 	}
 }
 
-bool Ellipsis::operator==(const std::shared_ptr<PyObject> &other) const
-{
-	return other == py_ellipsis();
-}
+bool Ellipsis::operator==(const PyObject *other) const { return other == py_ellipsis(); }
 
 
-bool NoneType::operator==(const std::shared_ptr<PyObject> &other) const
-{
-	return other == py_none();
-}
+bool NoneType::operator==(const PyObject *other) const { return other == py_none(); }
 
 
-bool NameConstant::operator==(const std::shared_ptr<PyObject> &other) const
+bool NameConstant::operator==(const PyObject *other) const
 {
 	if (std::holds_alternative<NoneType>(value)) { return other == py_none(); }
 	const auto bool_value = std::get<bool>(value);
@@ -70,8 +64,8 @@ bool NameConstant::operator==(const Number &other) const
 	if (std::holds_alternative<NoneType>(value)) { return false; }
 	const short bool_value = std::get<bool>(value);
 	if (bool_value) {
-		return other == Number{ 1 };
+		return other == Number{ int64_t{ 1 } };
 	} else {
-		return other == Number{ 0 };
+		return other == Number{ int64_t{ 0 } };
 	}
 }

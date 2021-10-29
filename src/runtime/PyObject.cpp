@@ -11,7 +11,7 @@
 
 size_t ValueHash::operator()(const Value &value) const
 {
-	return std::visit(
+	const auto result = std::visit(
 		overloaded{ [](const Number &number) -> size_t {
 					   if (std::holds_alternative<double>(number.value)) {
 						   return std::hash<double>{}(std::get<double>(number.value));
@@ -24,25 +24,25 @@ size_t ValueHash::operator()(const Value &value) const
 				return reinterpret_cast<size_t>(static_cast<const void *>(b.b.data()));
 			},
 			[](const Ellipsis &) -> size_t {
-				return reinterpret_cast<size_t>(static_cast<const void *>(py_ellipsis().get()));
+				return reinterpret_cast<size_t>(static_cast<const void *>(py_ellipsis()));
 			},
 			[](const NameConstant &c) -> size_t {
 				if (std::holds_alternative<bool>(c.value)) {
 					return std::get<bool>(c.value) ? 0 : 1;
 				} else {
-					return reinterpret_cast<size_t>(static_cast<const void *>(py_none().get()));
+					return reinterpret_cast<size_t>(static_cast<const void *>(py_none()));
 				}
 			},
-			[](const std::shared_ptr<PyObject> &obj) -> size_t {
+			[](PyObject *obj) -> size_t {
 				if (std::holds_alternative<std::monostate>(obj->slots().hash)) {
-					return reinterpret_cast<size_t>(static_cast<const void *>(obj.get()));
+					return reinterpret_cast<size_t>(static_cast<const void *>(obj));
 				} else if (std::holds_alternative<HashSlotFunctionType>(obj->slots().hash)) {
 					return std::get<HashSlotFunctionType>(obj->slots().hash)();
 				} else {
 					auto &vm = VirtualMachine::the();
-					auto args = vm.heap().allocate<PyTuple>(std::vector{ obj });
-					auto function_object = std::get<std::shared_ptr<PyFunction>>(obj->slots().hash);
-					auto result =
+					auto *args = PyTuple::create(std::vector{ obj });
+					auto *function_object = std::get<PyFunction *>(obj->slots().hash);
+					auto *result =
 						execute(vm, *vm.interpreter(), function_object, args, nullptr, nullptr);
 					if (result->type() != PyObjectType::PY_NUMBER) {
 						vm.interpreter()->raise_exception("");
@@ -53,54 +53,46 @@ size_t ValueHash::operator()(const Value &value) const
 				}
 			} },
 		value);
+	return result;
 }
 
 
 bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) const
 {
-	return std::visit(
-		overloaded{ [](const auto &lhs, const auto &rhs) { return lhs == rhs; },
-			[](const std::shared_ptr<PyObject> &lhs, const std::shared_ptr<PyObject> &rhs) {
-				if (lhs.get() == rhs.get()) { return true; }
-				if (std::holds_alternative<std::monostate>(lhs->slots().richcompare)) {
-					return lhs.get() == rhs.get();
-				} else if (std::holds_alternative<RichCompareSlotFunctionType>(
-							   lhs->slots().richcompare)) {
-					return std::get<RichCompareSlotFunctionType>(lhs->slots().richcompare)(
-							   rhs, RichCompare::Py_EQ)
-						   == py_true();
-				} else {
-					TODO();
-				}
-			} },
+	const auto result = std::visit(
+		overloaded{ [](PyObject *const lhs, PyObject *const rhs) {
+					   if (lhs == rhs) { return true; }
+					   if (std::holds_alternative<std::monostate>(lhs->slots().richcompare)) {
+						   return lhs == rhs;
+					   } else if (std::holds_alternative<RichCompareSlotFunctionType>(
+									  lhs->slots().richcompare)) {
+						   auto result = std::get<RichCompareSlotFunctionType>(
+							   lhs->slots().richcompare)(rhs, RichCompare::Py_EQ);
+						   return result == py_true();
+					   } else {
+						   TODO();
+					   }
+				   },
+			[](PyObject *const lhs, const auto &rhs) { return lhs == rhs; },
+			[](const auto &lhs, PyObject *const rhs) { return lhs == rhs; },
+			[](const auto &lhs, const auto &rhs) { return lhs == rhs; } },
 		lhs_value,
 		rhs_value);
+	return result;
 }
 
 
-template<> std::shared_ptr<PyObject> PyObject::from(const std::shared_ptr<PyObject> &value)
-{
-	return value;
-}
+template<> PyObject *PyObject::from(PyObject *const &value) { return value; }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const Number &value)
-{
-	return PyNumber::create(value);
-}
+template<> PyObject *PyObject::from(const Number &value) { return PyNumber::create(value); }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const String &value)
-{
-	return PyString::create(value.s);
-}
+template<> PyObject *PyObject::from(const String &value) { return PyString::create(value.s); }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const Bytes &value)
-{
-	return PyBytes::create(value);
-}
+template<> PyObject *PyObject::from(const Bytes &value) { return PyBytes::create(value); }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const Ellipsis &) { return py_ellipsis(); }
+template<> PyObject *PyObject::from(const Ellipsis &) { return py_ellipsis(); }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
+template<> PyObject *PyObject::from(const NameConstant &value)
 {
 	if (auto none_value = std::get_if<NoneType>(&value.value)) {
 		return py_none();
@@ -110,13 +102,13 @@ template<> std::shared_ptr<PyObject> PyObject::from(const NameConstant &value)
 	}
 }
 
-template<> std::shared_ptr<PyObject> PyObject::from(const Value &value)
+template<> PyObject *PyObject::from(const Value &value)
 {
 	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
 }
 
 
-PyObject::PyObject(PyObjectType type) : m_type(type)
+PyObject::PyObject(PyObjectType type) : Cell(), m_type(type)
 {
 	m_slots =
 		Slots{ .repr = [this]() { return this->repr_impl(*VirtualMachine::the().interpreter()); },
@@ -125,14 +117,22 @@ PyObject::PyObject(PyObjectType type) : m_type(type)
 			.richcompare = {} };
 };
 
+void PyObject::visit_graph(Visitor &visitor)
+{
+	for (const auto &[name, obj] : m_attributes) {
+		spdlog::debug("PyObject::visit_graph: {}", name);
+		visitor.visit(*obj);
+	}
+}
 
-void PyObject::put(std::string name, std::shared_ptr<PyObject> value)
+
+void PyObject::put(std::string name, PyObject *value)
 {
 	m_attributes.insert_or_assign(name, value);
 }
 
 
-std::shared_ptr<PyObject> PyObject::get(std::string name, Interpreter &interpreter) const
+PyObject *PyObject::get(std::string name, Interpreter &interpreter) const
 {
 	if (auto it = m_attributes.find(name); it != m_attributes.end()) { return it->second; }
 	interpreter.raise_exception(attribute_error(
@@ -141,26 +141,26 @@ std::shared_ptr<PyObject> PyObject::get(std::string name, Interpreter &interpret
 }
 
 
-std::shared_ptr<PyObject> PyObject::repr_impl(Interpreter &) const
+PyObject *PyObject::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
 }
 
-std::shared_ptr<PyObject> PyObject::iter_impl(Interpreter &interpreter) const
+PyObject *PyObject::iter_impl(Interpreter &interpreter) const
 {
 	interpreter.raise_exception(
 		fmt::format("TypeError: '{}' object is not iterable", object_name(type())));
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> PyObject::next_impl(Interpreter &interpreter)
+PyObject *PyObject::next_impl(Interpreter &interpreter)
 {
 	interpreter.raise_exception(
 		fmt::format("TypeError: '{}' object is not an iterator", object_name(type())));
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> PyObject::len_impl(Interpreter &interpreter) const
+PyObject *PyObject::len_impl(Interpreter &interpreter) const
 {
 	interpreter.raise_exception(
 		fmt::format("TypeError: object of type '{}' has no len()", object_name(type())));
@@ -176,10 +176,7 @@ size_t PyObject::hash_impl(Interpreter &interpreter) const
 }
 
 
-std::shared_ptr<PyObject> PyNumber::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyNumber::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
 
 
 std::string PyNameConstant::to_string() const
@@ -192,67 +189,44 @@ std::string PyNameConstant::to_string() const
 	}
 }
 
-std::shared_ptr<PyObject> PyNameConstant::repr_impl(Interpreter &) const
+PyObject *PyNameConstant::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
 }
 
 
-std::shared_ptr<PyObject> PyObject::add_impl(const std::shared_ptr<PyObject> &, Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::add_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
 
-std::shared_ptr<PyObject> PyObject::subtract_impl(const std::shared_ptr<PyObject> &,
-	Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::subtract_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
 
-std::shared_ptr<PyObject> PyObject::multiply_impl(const std::shared_ptr<PyObject> &,
-	Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::multiply_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
 
-std::shared_ptr<PyObject> PyObject::exp_impl(const std::shared_ptr<PyObject> &, Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::exp_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
 
-std::shared_ptr<PyObject> PyObject::lshift_impl(const std::shared_ptr<PyObject> &,
-	Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::lshift_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
-std::shared_ptr<PyObject> PyObject::modulo_impl(const std::shared_ptr<PyObject> &,
-	Interpreter &) const
-{
-	return nullptr;
-}
+PyObject *PyObject::modulo_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
-std::shared_ptr<PyObject> PyObject::equal_impl(const std::shared_ptr<PyObject> &,
-	Interpreter &) const
+PyObject *PyObject::equal_impl(const PyObject *, Interpreter &) const
 {
 	return PyObject::from(NameConstant{ false });
 }
 
 
-std::shared_ptr<PyObject> PyObject::richcompare_impl(const std::shared_ptr<PyObject> &other,
+PyObject *PyObject::richcompare_impl(const PyObject *other,
 	RichCompare op,
 	Interpreter &interpreter) const
 {
 	static constexpr std::string_view opstrings[] = { "<", "<=", "==", "!=", ">", ">=" };
 	switch (op) {
 	case RichCompare::Py_EQ:
-		return this == other.get() ? py_true() : py_false();
+		return this == other ? py_true() : py_false();
 	case RichCompare::Py_NE:
-		return this != other.get() ? py_true() : py_false();
+		return this != other ? py_true() : py_false();
 	default:
 		interpreter.raise_exception(
 			"TypeError: '{}' not supported between instances of '{}' and '{}'",
@@ -271,15 +245,14 @@ PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::s
 	// 	m_attributes["co_var"] = PyList::from(m_args);
 }
 
-PyFunction::PyFunction(std::string name, std::shared_ptr<PyCode> code)
-	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(std::move(code))
+PyFunction::PyFunction(std::string name, PyCode *code)
+	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(code)
 {
 	// m_attributes["__code__"] = m_code;
 }
 
 
-std::shared_ptr<PyObject> PyBytes::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyBytes::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 		object_name(type()),
@@ -287,8 +260,7 @@ std::shared_ptr<PyObject> PyBytes::add_impl(const std::shared_ptr<PyObject> &obj
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> PyEllipsis::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyEllipsis::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 		object_name(type()),
@@ -297,8 +269,7 @@ std::shared_ptr<PyObject> PyEllipsis::add_impl(const std::shared_ptr<PyObject> &
 }
 
 
-std::shared_ptr<PyObject> PyNameConstant::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyNameConstant::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 		object_name(type()),
@@ -323,15 +294,12 @@ std::string PyList::to_string() const
 	return os.str();
 }
 
-std::shared_ptr<PyObject> PyList::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyList::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
 
-std::shared_ptr<PyObject> PyList::iter_impl(Interpreter &) const
+PyObject *PyList::iter_impl(Interpreter &) const
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyListIterator>(shared_from_this_as<PyList>());
+	return heap.allocate<PyListIterator>(*this);
 }
 
 std::string PyListIterator::to_string() const
@@ -339,16 +307,16 @@ std::string PyListIterator::to_string() const
 	return fmt::format("<list_iterator at {}>", static_cast<const void *>(this));
 }
 
-std::shared_ptr<PyObject> PyListIterator::repr_impl(Interpreter &) const
+PyObject *PyListIterator::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
 }
 
-std::shared_ptr<PyObject> PyListIterator::next_impl(Interpreter &interpreter)
+PyObject *PyListIterator::next_impl(Interpreter &interpreter)
 {
-	if (m_current_index < m_pylist->elements().size())
+	if (m_current_index < m_pylist.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
-			m_pylist->elements()[m_current_index++]);
+			m_pylist.elements()[m_current_index++]);
 	interpreter.raise_exception(stop_iteration(""));
 	return nullptr;
 }
@@ -370,27 +338,20 @@ std::string PyTuple::to_string() const
 	return os.str();
 }
 
-std::shared_ptr<PyObject> PyTuple::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyTuple::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
 
-std::shared_ptr<PyObject> PyTuple::iter_impl(Interpreter &) const
+PyObject *PyTuple::iter_impl(Interpreter &) const
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyTupleIterator>(shared_from_this_as<PyTuple>());
+	return heap.allocate<PyTupleIterator>(*PyTuple::create());
 }
 
 
-PyTupleIterator PyTuple::begin() const { return PyTupleIterator(shared_from_this_as<PyTuple>()); }
+PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
 
+PyTupleIterator PyTuple::end() const { return PyTupleIterator(*this, m_elements.size()); }
 
-PyTupleIterator PyTuple::end() const
-{
-	return PyTupleIterator(shared_from_this_as<PyTuple>(), m_elements.size());
-}
-
-std::shared_ptr<PyObject> PyTuple::operator[](size_t idx) const
+PyObject *PyTuple::operator[](size_t idx) const
 {
 	return std::visit([](const auto &value) { return PyObject::from(value); }, m_elements[idx]);
 }
@@ -401,23 +362,23 @@ std::string PyTupleIterator::to_string() const
 	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
 }
 
-std::shared_ptr<PyObject> PyTupleIterator::repr_impl(Interpreter &) const
+PyObject *PyTupleIterator::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
 }
 
-std::shared_ptr<PyObject> PyTupleIterator::next_impl(Interpreter &interpreter)
+PyObject *PyTupleIterator::next_impl(Interpreter &interpreter)
 {
-	if (m_current_index < m_pytuple->elements().size())
+	if (m_current_index < m_pytuple.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
-			m_pytuple->elements()[m_current_index++]);
+			m_pytuple.elements()[m_current_index++]);
 	interpreter.raise_exception(stop_iteration(""));
 	return nullptr;
 }
 
 bool PyTupleIterator::operator==(const PyTupleIterator &other) const
 {
-	return m_pytuple.get() == other.m_pytuple.get() && m_current_index == other.m_current_index;
+	return &m_pytuple == &other.m_pytuple && m_current_index == other.m_current_index;
 }
 
 PyTupleIterator &PyTupleIterator::operator++()
@@ -432,58 +393,54 @@ PyTupleIterator &PyTupleIterator::operator--()
 	return *this;
 }
 
-std::shared_ptr<PyObject> PyTupleIterator::operator*() const
+PyObject *PyTupleIterator::operator*() const
 {
 	return std::visit([](const auto &element) { return PyObject::from(element); },
-		m_pytuple->elements()[m_current_index]);
+		m_pytuple.elements()[m_current_index]);
 }
 
-std::shared_ptr<PyString> PyString::create(const std::string &value)
+PyString *PyString::create(const std::string &value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyString>(value);
 }
 
-std::shared_ptr<PyNumber> PyNumber::create(const Number &number)
+PyNumber *PyNumber::create(const Number &number)
 {
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyNumber>(number);
 }
 
-std::shared_ptr<PyBytes> PyBytes::create(const Bytes &value)
+PyBytes *PyBytes::create(const Bytes &value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyBytes>(value);
 }
 
-std::shared_ptr<PyEllipsis> PyEllipsis::create()
+PyEllipsis *PyEllipsis::create()
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate_static<PyEllipsis>();
+	return heap.allocate_static<PyEllipsis>().get();
 }
 
-std::shared_ptr<PyNameConstant> PyNameConstant::create(const NameConstant &value)
+PyNameConstant *PyNameConstant::create(const NameConstant &value)
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate_static<PyNameConstant>(value);
+	return heap.allocate_static<PyNameConstant>(value).get();
 }
 
 
 class Env
 {
   public:
-	static std::shared_ptr<PyObject> py_true() { return Env::instance().m_py_true; }
-	static std::shared_ptr<PyObject> py_false() { return Env::instance().m_py_false; }
-	static std::shared_ptr<PyObject> py_none()
-	{
-		spdlog::debug("none {}", (void *)Env::instance().m_py_none.get());
-		return Env::instance().m_py_none;
-	}
+	static PyObject *py_true() { return Env::instance().m_py_true; }
+	static PyObject *py_false() { return Env::instance().m_py_false; }
+	static PyObject *py_none() { return Env::instance().m_py_none; }
 
   private:
-	std::shared_ptr<PyObject> m_py_true;
-	std::shared_ptr<PyObject> m_py_false;
-	std::shared_ptr<PyObject> m_py_none;
+	PyObject *m_py_true;
+	PyObject *m_py_false;
+	PyObject *m_py_none;
 
 	static Env &instance()
 	{
@@ -499,14 +456,14 @@ class Env
 	}
 };
 
-std::shared_ptr<PyObject> py_true() { return Env::py_true(); }
-std::shared_ptr<PyObject> py_false() { return Env::py_false(); }
-std::shared_ptr<PyObject> py_none() { return Env::py_none(); }
+PyObject *py_true() { return Env::py_true(); }
+PyObject *py_false() { return Env::py_false(); }
+PyObject *py_none() { return Env::py_none(); }
 
 
-std::shared_ptr<PyObject> py_ellipsis()
+PyObject *py_ellipsis()
 {
-	static std::shared_ptr<PyObject> ellipsis = nullptr;
+	static PyObject *ellipsis = nullptr;
 	if (!ellipsis) { ellipsis = PyEllipsis::create(); }
 	return ellipsis;
 }

@@ -7,7 +7,7 @@
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	auto code = vm.heap().allocate<PyCode>(
+	auto *code = vm.heap().allocate<PyCode>(
 		vm.function_offset(m_function_id), vm.function_register_count(m_function_id), m_args);
 	interpreter.allocate_object<PyFunction>(m_function_name, m_function_name, code);
 }
@@ -18,7 +18,7 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 	auto &result = vm.reg(m_test_register);
 
 	const bool test_result =
-		std::visit(overloaded{ [](const std::shared_ptr<PyObject> &obj) -> bool {
+		std::visit(overloaded{ [](PyObject *const &obj) -> bool {
 								  if (auto bool_obj = as<PyNameConstant>(obj)) {
 									  const auto value = bool_obj->value();
 									  if (auto *bool_type = std::get_if<bool>(&value.value)) {
@@ -93,8 +93,7 @@ void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 	std::vector<Value> elements;
 	for (const auto &src : m_srcs) { elements.push_back(vm.reg(src)); }
 
-	auto &heap = vm.heap();
-	vm.reg(m_dst) = heap.allocate<PyTuple>(elements);
+	vm.reg(m_dst) = PyTuple::create(elements);
 };
 
 void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
@@ -111,7 +110,7 @@ void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 void GetIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto iterable_value = vm.reg(m_src);
-	if (auto *iterable_object = std::get_if<std::shared_ptr<PyObject>>(&iterable_value)) {
+	if (auto *iterable_object = std::get_if<PyObject *>(&iterable_value)) {
 		vm.reg(m_dst) = (*iterable_object)->iter_impl(interpreter);
 	} else {
 		vm.reg(m_dst) = std::visit(
@@ -125,7 +124,7 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto iterator = vm.reg(m_src);
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
-	if (auto *iterable_object = std::get_if<std::shared_ptr<PyObject>>(&iterator)) {
+	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
 		const auto &next_value = (*iterable_object)->next_impl(interpreter);
 		if (auto last_exception = interpreter.execution_frame()->exception()) {
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {

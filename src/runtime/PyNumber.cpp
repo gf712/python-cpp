@@ -2,10 +2,9 @@
 
 #include "interpreter/Interpreter.hpp"
 
-std::shared_ptr<PyObject> PyNumber::equal_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &) const
+PyObject *PyNumber::equal_impl(const PyObject *obj, Interpreter &) const
 {
-	if (auto pynum = as<PyNumber>(obj)) {
+	if (auto *pynum = as<PyNumber>(obj)) {
 		const bool comparisson = m_value == pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
@@ -13,10 +12,9 @@ std::shared_ptr<PyObject> PyNumber::equal_impl(const std::shared_ptr<PyObject> &
 }
 
 
-std::shared_ptr<PyObject> PyNumber::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyNumber::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
-	if (auto rhs = as<PyNumber>(obj)) {
+	if (auto *rhs = as<PyNumber>(obj)) {
 		return PyNumber::create(m_value + rhs->value());
 	} else {
 		interpreter.raise_exception(
@@ -28,8 +26,7 @@ std::shared_ptr<PyObject> PyNumber::add_impl(const std::shared_ptr<PyObject> &ob
 }
 
 
-std::shared_ptr<PyObject> PyNumber::subtract_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyNumber::subtract_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	if (auto rhs = as<PyNumber>(obj)) {
 		return PyNumber::create(m_value - rhs->value());
@@ -43,8 +40,7 @@ std::shared_ptr<PyObject> PyNumber::subtract_impl(const std::shared_ptr<PyObject
 }
 
 
-std::shared_ptr<PyObject> PyNumber::modulo_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyNumber::modulo_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	if (auto rhs = as<PyNumber>(obj)) {
 		return PyNumber::create(m_value % rhs->value());
@@ -57,8 +53,7 @@ std::shared_ptr<PyObject> PyNumber::modulo_impl(const std::shared_ptr<PyObject> 
 	}
 }
 
-std::shared_ptr<PyObject> PyNumber::multiply_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyNumber::multiply_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	if (auto rhs = as<PyNumber>(obj)) {
 		return PyNumber::create(m_value * rhs->value());

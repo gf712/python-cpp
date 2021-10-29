@@ -14,7 +14,7 @@ std::string PyDict::to_string() const
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
 		std::visit(
-			overloaded{ [&os](const std::shared_ptr<PyObject> &key) {
+			overloaded{ [&os](const PyObject *key) {
 						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string();
 					   },
 				[&os](const auto &key) { os << key; } },
@@ -22,8 +22,8 @@ std::string PyDict::to_string() const
 		os << ": ";
 		std::visit(
 			overloaded{
-				[&os, this](const std::shared_ptr<PyObject> &value) {
-					if (value.get() == this) {
+				[&os, this](const PyObject *value) {
+					if (value == this) {
 						os << "{...}";
 					} else {
 						os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
@@ -36,7 +36,7 @@ std::string PyDict::to_string() const
 		std::advance(it, 1);
 	}
 	std::visit(
-		overloaded{ [&os](const std::shared_ptr<PyObject> &key) {
+		overloaded{ [&os](const PyObject *key) {
 					   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
 						  << ": ";
 				   },
@@ -44,8 +44,8 @@ std::string PyDict::to_string() const
 		it->first);
 	std::visit(
 		overloaded{
-			[&os, this](const std::shared_ptr<PyObject> &value) {
-				if (value.get() == this) {
+			[&os, this](const PyObject *value) {
+				if (value == this) {
 					os << "{...}";
 				} else {
 					os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
@@ -58,14 +58,11 @@ std::string PyDict::to_string() const
 	return os.str();
 }
 
-std::shared_ptr<PyObject> PyDict::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyDict::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
 
-std::shared_ptr<PyDictItems> PyDict::items() const
+PyDictItems *PyDict::items() const
 {
-	return VirtualMachine::the().heap().allocate<PyDictItems>(shared_from_this_as<PyDict>());
+	return VirtualMachine::the().heap().allocate<PyDictItems>(*this);
 }
 
 Value PyDict::operator[](Value key) const
@@ -80,16 +77,13 @@ Value PyDict::operator[](Value key) const
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
 
 
-PyDictItemsIterator PyDictItems::begin() const
-{
-	return PyDictItemsIterator(shared_from_this_as<PyDictItems>());
-}
+PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
 
 
 PyDictItemsIterator PyDictItems::end() const
 {
-	auto end_position = std::distance(m_pydict->map().begin(), m_pydict->map().end());
-	return PyDictItemsIterator(shared_from_this_as<PyDictItems>(), end_position);
+	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	return PyDictItemsIterator(*this, end_position);
 }
 
 std::string PyDictItems::to_string() const
@@ -119,14 +113,14 @@ std::string PyDictItemsIterator::to_string() const
 	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
 }
 
-std::shared_ptr<PyObject> PyDictItemsIterator::repr_impl(Interpreter &) const
+PyObject *PyDictItemsIterator::repr_impl(Interpreter &) const
 {
 	return PyString::from(String{ to_string() });
 }
 
-std::shared_ptr<PyObject> PyDictItemsIterator::next_impl(Interpreter &interpreter)
+PyObject *PyDictItemsIterator::next_impl(Interpreter &interpreter)
 {
-	if (m_current_iterator != m_pydictitems->m_pydict->map().end()) {
+	if (m_current_iterator != m_pydictitems.m_pydict.map().end()) {
 		auto [key, value] = *m_current_iterator;
 		m_current_iterator++;
 		return VirtualMachine::the().heap().allocate<PyTuple>(std::vector{ key, value });
@@ -137,8 +131,7 @@ std::shared_ptr<PyObject> PyDictItemsIterator::next_impl(Interpreter &interprete
 
 bool PyDictItemsIterator::operator==(const PyDictItemsIterator &other) const
 {
-	return m_pydictitems.get() == other.m_pydictitems.get()
-		   && m_current_iterator == other.m_current_iterator;
+	return &m_pydictitems == &other.m_pydictitems && m_current_iterator == other.m_current_iterator;
 }
 
 PyDictItemsIterator &PyDictItemsIterator::operator++()
@@ -147,7 +140,7 @@ PyDictItemsIterator &PyDictItemsIterator::operator++()
 	return *this;
 }
 
-std::shared_ptr<PyTuple> PyDictItemsIterator::operator*() const
+PyTuple *PyDictItemsIterator::operator*() const
 {
 	auto [key, value] = *m_current_iterator;
 	return VirtualMachine::the().heap().allocate<PyTuple>(std::vector{ key, value });

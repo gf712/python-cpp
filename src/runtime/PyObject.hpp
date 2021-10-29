@@ -3,6 +3,8 @@
 #include "Value.hpp"
 #include "forward.hpp"
 #include "utilities.hpp"
+#include "bytecode/VM.hpp"
+#include "interpreter/GarbageCollector.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -113,34 +115,30 @@ enum class RichCompare {
 	Py_GE = 5,// >=
 };
 
-using ReprSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
-using IterSlotFunctionType = std::function<std::shared_ptr<PyObject>()>;
+using ReprSlotFunctionType = std::function<PyObject *()>;
+using IterSlotFunctionType = std::function<PyObject *()>;
 using HashSlotFunctionType = std::function<size_t()>;
-using RichCompareSlotFunctionType =
-	std::function<std::shared_ptr<PyObject>(std::shared_ptr<PyObject>, RichCompare)>;
+using RichCompareSlotFunctionType = std::function<PyObject *(const PyObject *, RichCompare)>;
 
 
-class PyObject
-	: public std::enable_shared_from_this<PyObject>
-	, NonCopyable
-	, NonMoveable
+class PyObject : public Cell
 {
 	const PyObjectType m_type;
 
   protected:
 	struct Slots
 	{
-		std::variant<ReprSlotFunctionType, std::shared_ptr<PyFunction>> repr;
-		std::variant<IterSlotFunctionType, std::shared_ptr<PyFunction>> iter;
-		std::variant<std::monostate, HashSlotFunctionType, std::shared_ptr<PyFunction>> hash;
-		std::variant<std::monostate, RichCompareSlotFunctionType, std::shared_ptr<PyFunction>>
-			richcompare;
+		std::variant<ReprSlotFunctionType, PyFunction *> repr;
+		std::variant<IterSlotFunctionType, PyFunction *> iter;
+		std::variant<std::monostate, HashSlotFunctionType, PyFunction *> hash;
+		std::variant<std::monostate, RichCompareSlotFunctionType, PyFunction *> richcompare;
 	};
 
 	Slots m_slots;
-	std::unordered_map<std::string, std::shared_ptr<PyObject>> m_attributes;
+	std::unordered_map<std::string, PyObject *> m_attributes;
 
   public:
+	PyObject() = delete;
 	PyObject(PyObjectType type);
 
 	virtual ~PyObject() = default;
@@ -149,49 +147,32 @@ class PyObject
 
 	virtual std::string to_string() const = 0;
 
-	virtual std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> subtract_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> multiply_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> exp_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> lshift_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> modulo_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
+	virtual PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *subtract_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *multiply_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *exp_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *lshift_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *modulo_impl(const PyObject *obj, Interpreter &interpreter) const;
 
-	virtual std::shared_ptr<PyObject> equal_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> richcompare_impl(const std::shared_ptr<PyObject> &,
-		RichCompare,
-		Interpreter &interpreter) const;
+	virtual PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *
+		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const;
 
-	virtual std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const;
-	virtual std::shared_ptr<PyObject> next_impl(Interpreter &interpreter);
-	virtual std::shared_ptr<PyObject> len_impl(Interpreter &interpreter) const;
+	virtual PyObject *iter_impl(Interpreter &interpreter) const;
+	virtual PyObject *next_impl(Interpreter &interpreter);
+	virtual PyObject *len_impl(Interpreter &interpreter) const;
 	virtual size_t hash_impl(Interpreter &interpreter) const;
 
-	virtual std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const;
+	virtual PyObject *repr_impl(Interpreter &interpreter) const;
 
-	template<typename T> static std::shared_ptr<PyObject> from(const T &value);
+	template<typename T> static PyObject *from(const T &value);
 
-	std::shared_ptr<PyObject> get(std::string name, Interpreter &interpreter) const;
-	void put(std::string name, std::shared_ptr<PyObject>);
+	PyObject *get(std::string name, Interpreter &interpreter) const;
+	void put(std::string name, PyObject *);
 
 	const Slots &slots() const { return m_slots; }
 
-  protected:
-	template<typename T> std::shared_ptr<const T> shared_from_this_as() const
-	{
-		return std::static_pointer_cast<const T>(shared_from_this());
-	}
-
-	template<typename T> std::shared_ptr<T> shared_from_this_as()
-	{
-		return std::static_pointer_cast<T>(shared_from_this());
-	}
+	void visit_graph(Visitor &) override;
 };
 
 
@@ -215,12 +196,12 @@ class PyCode : public PyObject
 class PyFunction : public PyObject
 {
 	std::string m_name;
-	std::shared_ptr<PyCode> m_code;
+	PyCode *m_code;
 
   public:
-	PyFunction(std::string, std::shared_ptr<PyCode> code);
+	PyFunction(std::string, PyCode *code);
 
-	const std::shared_ptr<PyCode> &code() const { return m_code; }
+	const PyCode *code() const { return m_code; }
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
 	const std::string &name() const { return m_name; }
@@ -231,23 +212,15 @@ class PyTuple;
 class PyNativeFunction : public PyObject
 {
 	std::string m_name;
-	std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &,
-		const std::shared_ptr<PyDict> &)>
-		m_function;
+	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
 
   public:
-	PyNativeFunction(std::string name,
-		std::function<std::shared_ptr<PyObject>(const std::shared_ptr<PyTuple> &,
-			const std::shared_ptr<PyDict> &)> function)
+	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function)
 		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
 		  m_function(std::move(function))
 	{}
 
-	std::shared_ptr<PyObject> operator()(const std::shared_ptr<PyTuple> &args,
-		const std::shared_ptr<PyDict> &kwargs)
-	{
-		return m_function(args, kwargs);
-	}
+	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
 
 	std::string to_string() const override
 	{
@@ -265,7 +238,7 @@ class PyBytes : public PyObject
 	Bytes m_value;
 
   public:
-	static std::shared_ptr<PyBytes> create(const Bytes &number);
+	static PyBytes *create(const Bytes &number);
 	~PyBytes() = default;
 	std::string to_string() const override
 	{
@@ -274,8 +247,7 @@ class PyBytes : public PyObject
 		return fmt::format("PyBytes {}", os.str());
 	}
 
-	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
+	PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const override;
 
 	const Bytes &value() const { return m_value; }
 
@@ -287,20 +259,19 @@ class PyBytes : public PyObject
 class PyEllipsis : public PyObject
 {
 	friend class Heap;
-	friend std::shared_ptr<PyObject> py_ellipsis();
+	friend PyObject *py_ellipsis();
 
 	static constexpr Ellipsis m_value{};
 
   public:
 	std::string to_string() const override { return fmt::format("PyEllipsis"); }
 
-	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
+	PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const override;
 
 	const Ellipsis &value() const { return m_value; }
 
   private:
-	static std::shared_ptr<PyEllipsis> create();
+	static PyEllipsis *create();
 	PyEllipsis() : PyObject(PyObjectType::PY_ELLIPSIS) {}
 };
 
@@ -315,15 +286,14 @@ class PyNameConstant : public PyObject
   public:
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> add_impl(const std::shared_ptr<PyObject> &obj,
-		Interpreter &interpreter) const override;
+	PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
 
 	const NameConstant &value() const { return m_value; }
 
   private:
-	static std::shared_ptr<PyNameConstant> create(const NameConstant &);
+	static PyNameConstant *create(const NameConstant &);
 
 	PyNameConstant(const NameConstant &name)
 		: PyObject(PyObjectType::PY_CONSTANT_NAME), m_value(name)
@@ -343,8 +313,8 @@ class PyList : public PyObject
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
 };
@@ -367,21 +337,42 @@ class PyTuple : public PyObject
 
 	std::vector<Value> m_elements;
 
-  public:
-	PyTuple(std::vector<Value> elements)
+  protected:
+	PyTuple() : PyObject(PyObjectType::PY_TUPLE) {}
+
+	PyTuple(std::vector<Value> &&elements)
 		: PyObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
 	{}
 
-	PyTuple(std::vector<std::shared_ptr<PyObject>> elements) : PyObject(PyObjectType::PY_TUPLE)
+	PyTuple(const std::vector<PyObject *> &elements) : PyObject(PyObjectType::PY_TUPLE)
 	{
 		m_elements.reserve(elements.size());
-		for (auto &&el : elements) { m_elements.push_back(std::move(el)); }
+		for (auto *el : elements) { m_elements.push_back(el); }
+	}
+
+  public:
+	static PyTuple *create()
+	{
+		auto &heap = VirtualMachine::the().heap();
+		return heap.allocate<PyTuple>();
+	}
+
+	static PyTuple *create(std::vector<Value> elements)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		return heap.allocate<PyTuple>(std::move(elements));
+	}
+
+	static PyTuple *create(const std::vector<PyObject *> &elements)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		return heap.allocate<PyTuple>(elements);
 	}
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> iter_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;
@@ -391,7 +382,7 @@ class PyTuple : public PyObject
 
 	const std::vector<Value> &elements() const { return m_elements; }
 	size_t size() const { return m_elements.size(); }
-	std::shared_ptr<PyObject> operator[](size_t idx) const;
+	PyObject *operator[](size_t idx) const;
 };
 
 
@@ -400,33 +391,32 @@ class PyTupleIterator : public PyObject
 	friend class Heap;
 	friend PyTuple;
 
-	std::shared_ptr<const PyTuple> m_pytuple;
+	const PyTuple &m_pytuple;
 	size_t m_current_index{ 0 };
 
   public:
 	using difference_type = std::vector<Value>::difference_type;
-	using value_type = std::shared_ptr<PyObject>;
+	using value_type = PyObject *;
 	using pointer = value_type *;
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
 
-	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple)
-		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(std::move(pytuple))
+	PyTupleIterator(const PyTuple &pytuple)
+		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(pytuple)
 	{}
 
-	PyTupleIterator(std::shared_ptr<const PyTuple> pytuple, size_t position)
-		: PyTupleIterator(pytuple)
+	PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
 	{
 		m_current_index = position;
 	}
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> next_impl(Interpreter &interpreter) override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *next_impl(Interpreter &interpreter) override;
 
 	bool operator==(const PyTupleIterator &) const;
-	std::shared_ptr<PyObject> operator*() const;
+	PyObject *operator*() const;
 	PyTupleIterator &operator++();
 	PyTupleIterator &operator--();
 };
@@ -436,66 +426,100 @@ class PyListIterator : public PyObject
 {
 	friend class Heap;
 
-	std::shared_ptr<const PyList> m_pylist;
+	const PyList &m_pylist;
 	size_t m_current_index{ 0 };
 
   public:
-	PyListIterator(std::shared_ptr<const PyList> pylist)
-		: PyObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(std::move(pylist))
+	PyListIterator(const PyList &pylist)
+		: PyObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(pylist)
 	{}
 
 	std::string to_string() const override;
 
-	std::shared_ptr<PyObject> repr_impl(Interpreter &interpreter) const override;
-	std::shared_ptr<PyObject> next_impl(Interpreter &interpreter) override;
+	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *next_impl(Interpreter &interpreter) override;
 };
 
 
-template<typename T> std::shared_ptr<T> as(std::shared_ptr<PyObject> node);
+template<typename T> T *as(PyObject *node);
+template<typename T> const T *as(const PyObject *node);
 
 
-template<> inline std::shared_ptr<PyFunction> as(std::shared_ptr<PyObject> node)
+template<> inline PyFunction *as(PyObject *node)
 {
-	if (node->type() == PyObjectType::PY_FUNCTION) {
-		return std::static_pointer_cast<PyFunction>(node);
-	}
+	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<PyFunction *>(node); }
 	return nullptr;
 }
 
-template<> inline std::shared_ptr<PyNameConstant> as(std::shared_ptr<PyObject> node)
+template<> inline const PyFunction *as(const PyObject *node)
+{
+	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<const PyFunction *>(node); }
+	return nullptr;
+}
+
+template<> inline PyNameConstant *as(PyObject *node)
 {
 	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
-		return std::static_pointer_cast<PyNameConstant>(node);
+		return static_cast<PyNameConstant *>(node);
 	}
 	return nullptr;
 }
 
-
-template<> inline std::shared_ptr<PyBytes> as(std::shared_ptr<PyObject> node)
+template<> inline const PyNameConstant *as(const PyObject *node)
 {
-	if (node->type() == PyObjectType::PY_BYTES) {
-		return std::static_pointer_cast<PyBytes>(node);
+	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
+		return static_cast<const PyNameConstant *>(node);
 	}
 	return nullptr;
 }
 
 
-template<> inline std::shared_ptr<PyNativeFunction> as(std::shared_ptr<PyObject> node)
+template<> inline PyBytes *as(PyObject *node)
+{
+	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<PyBytes *>(node); }
+	return nullptr;
+}
+
+
+template<> inline const PyBytes *as(const PyObject *node)
+{
+	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<const PyBytes *>(node); }
+	return nullptr;
+}
+
+
+template<> inline PyNativeFunction *as(PyObject *node)
 {
 	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
-		return std::static_pointer_cast<PyNativeFunction>(node);
+		return static_cast<PyNativeFunction *>(node);
 	}
 	return nullptr;
 }
 
 
-template<> inline std::shared_ptr<PyList> as(std::shared_ptr<PyObject> node)
+template<> inline const PyNativeFunction *as(const PyObject *node)
 {
-	if (node->type() == PyObjectType::PY_LIST) { return std::static_pointer_cast<PyList>(node); }
+	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
+		return static_cast<const PyNativeFunction *>(node);
+	}
 	return nullptr;
 }
 
-std::shared_ptr<PyObject> py_none();
-std::shared_ptr<PyObject> py_true();
-std::shared_ptr<PyObject> py_false();
-std::shared_ptr<PyObject> py_ellipsis();
+
+template<> inline PyList *as(PyObject *node)
+{
+	if (node->type() == PyObjectType::PY_LIST) { return static_cast<PyList *>(node); }
+	return nullptr;
+}
+
+
+template<> inline const PyList *as(const PyObject *node)
+{
+	if (node->type() == PyObjectType::PY_LIST) { return static_cast<const PyList *>(node); }
+	return nullptr;
+}
+
+PyObject *py_none();
+PyObject *py_true();
+PyObject *py_false();
+PyObject *py_ellipsis();

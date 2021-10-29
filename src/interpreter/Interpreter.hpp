@@ -33,7 +33,7 @@ class Interpreter
 		m_exception_message = fmt::format(p, std::forward<Ts>(args)...);
 	}
 
-	template<typename... Ts> void raise_exception(std::shared_ptr<PyObject> exception)
+	template<typename... Ts> void raise_exception(PyObject *exception)
 	{
 		m_status = Status::EXCEPTION;
 		m_exception_message = "DEPRECATED :(";
@@ -47,7 +47,7 @@ class Interpreter
 		m_current_frame = std::move(frame);
 	}
 
-	void store_object(const std::string &name, const std::shared_ptr<PyObject> &obj)
+	void store_object(const std::string &name, PyObject *obj)
 	{
 		spdlog::debug("Interpreter::store_object(name={}, obj={}, current_frame={})",
 			name,
@@ -60,7 +60,7 @@ class Interpreter
 	}
 
 	template<typename PyObjectType, typename... Args>
-	std::shared_ptr<PyObject> allocate_object(const std::string &name, Args &&... args)
+	PyObject *allocate_object(const std::string &name, Args &&... args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {

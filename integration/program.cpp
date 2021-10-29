@@ -46,7 +46,7 @@ template<typename T, typename U> struct is_unordered_map<std::unordered_map<T, U
 {
 };
 
-template<typename T> void check_value(std::shared_ptr<PyObject> obj, T expected_value)
+template<typename T> void check_value(const PyObject *obj, T expected_value)
 {
 	if constexpr (std::is_integral_v<T>) {
 		ASSERT_EQ(obj->type(), PyObjectType::PY_NUMBER);
@@ -71,8 +71,8 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 			"Key: {}, Value: {}", PyObject::from(k)->to_string(), PyObject::from(v)->to_string());
 	}
 	auto value = vm.interpreter()->execution_frame()->locals()->map().at(String{ name });
-	ASSERT_TRUE(std::holds_alternative<std::shared_ptr<PyObject>>(value));
-	auto obj = std::get<std::shared_ptr<PyObject>>(value);
+	ASSERT_TRUE(std::holds_alternative<PyObject *>(value));
+	auto obj = std::get<PyObject *>(value);
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
 		ASSERT_EQ(obj->type(), PyObjectType::PY_LIST);
@@ -80,12 +80,11 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 		ASSERT_TRUE(pylist);
 		size_t i = 0;
 		for (const auto &el : pylist->elements()) {
-			std::visit(overloaded{ [&](const std::shared_ptr<PyObject> &obj) {
-									  check_value(obj, expected_value[i]);
-								  },
-						   [&](const auto &value) {
-							   check_value(PyObject::from(value), expected_value[i]);
-						   } },
+			std::visit(
+				overloaded{ [&](const PyObject *obj) { check_value(obj, expected_value[i]); },
+					[&](const auto &value) {
+						check_value(PyObject::from(value), expected_value[i]);
+					} },
 				el);
 			i++;
 		}
@@ -520,8 +519,7 @@ TEST(RunPythonProgram, AugmentedAssign)
 
 TEST(RunPythonProgram, BuiltinOrd)
 {
-	static constexpr std::string_view program =
-		"smiley_codepoint = ord(\"😃\")\n";
+	static constexpr std::string_view program = "smiley_codepoint = ord(\"😃\")\n";
 
 	run(program);
 	assert_interpreter_object_value("smiley_codepoint", 128515);

@@ -33,7 +33,7 @@ class Block
 
 			std::optional<size_t> mark_next_free_chunk()
 			{
-				spdlog::debug("chunk bit mask: {}", m_occupied_chunks.to_string());
+				spdlog::debug("mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
 				if (auto chunk_idx = next_free_chunk()) {
 					ASSERT(!m_occupied_chunks[*chunk_idx])
 					spdlog::debug("marking next free chunk -> old chunk bit mask: {}",
@@ -216,15 +216,14 @@ class Heap
 
 	void reset() { m_slab.reset(); }
 
-	template<typename T, typename... Args> std::shared_ptr<T> allocate(Args &&... args)
+	template<typename T, typename... Args> T* allocate(Args &&... args)
 	{
 		uint8_t *memory = m_slab.allocate<T>();
 		T *ptr = new (memory) T(std::forward<Args>(args)...);
-		return std::shared_ptr<T>(ptr, [](T *ptr) {
-			(void)ptr;
-			// this->m_slab.deallocate<T>(static_cast<uint8_t *>(static_cast<void *>(ptr)));
-		});
+		return ptr;
 	}
+
+    void collect_garbage();
 
 	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
 	{

@@ -117,11 +117,11 @@ void VirtualMachine::dump() const
 								  os << register_value;
 								  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
 							  },
-					   [&i](const std::shared_ptr<PyObject> &obj) {
+					   [&i](PyObject *obj) {
 						   if (obj) {
 							   std::cout << fmt::format("[{}]  {} ({})\n",
 								   i++,
-								   static_cast<const void *>(obj.get()),
+								   static_cast<const void *>(obj),
 								   obj->to_string());
 						   } else {
 							   std::cout << fmt::format("[{}]  (Empty)\n", i++);
@@ -154,7 +154,7 @@ size_t VirtualMachine::function_register_count(size_t func_id)
 	return m_bytecode->functions()[func_id].register_count;
 }
 
-std::shared_ptr<PyObject> VirtualMachine::execute_statement(std::shared_ptr<Bytecode> bytecode)
+PyObject *VirtualMachine::execute_statement(std::shared_ptr<Bytecode> bytecode)
 {
 	static bool requires_setup = true;
 	if (requires_setup) {

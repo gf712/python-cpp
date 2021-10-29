@@ -121,7 +121,7 @@ class Constant : public ASTNode
 					   [&indent](const auto &value) {
 						   spdlog::debug("{}  - value: {}", indent, value.to_string());
 					   },
-					   [&indent](const std::shared_ptr<PyObject> &value) {
+					   [&indent](PyObject *const value) {
 						   spdlog::debug("{}  - value: {}", indent, value->to_string());
 					   } },
 			m_value);
@@ -679,7 +679,7 @@ class Module : public ASTNode
 		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
-	std::vector<std::shared_ptr<ASTNode>>& body() { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 
   private:
 	void print_this_node(const std::string &indent) const override

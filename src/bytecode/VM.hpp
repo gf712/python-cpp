@@ -36,7 +36,7 @@ class VirtualMachine
 		return vm;
 	}
 
-	std::shared_ptr<PyObject> execute_statement(std::shared_ptr<Bytecode> bytecode);
+	PyObject *execute_statement(std::shared_ptr<Bytecode> bytecode);
 
 	void push_generator(std::shared_ptr<Bytecode> generator);
 

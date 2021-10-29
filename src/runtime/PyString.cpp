@@ -45,8 +45,7 @@ int32_t codepoint(const char *str, size_t length)
 
 }// namespace utf8
 
-std::shared_ptr<PyObject> PyString::add_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyString::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	if (auto rhs = as<PyString>(obj)) {
 		return PyString::create(m_value + rhs->value());
@@ -64,20 +63,16 @@ std::shared_ptr<PyObject> PyString::add_impl(const std::shared_ptr<PyObject> &ob
 PyString::PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s))
 {
 	m_slots.hash = [this]() { return this->hash_impl(*VirtualMachine::the().interpreter()); };
-	m_slots.richcompare = [this](const std::shared_ptr<PyObject> &other, RichCompare op) {
+	m_slots.richcompare = [this](const PyObject *other, RichCompare op) {
 		return this->richcompare_impl(other, op, *VirtualMachine::the().interpreter());
 	};
 }
 
 size_t PyString::hash_impl(Interpreter &) const { return std::hash<std::string>{}(m_value); }
 
-std::shared_ptr<PyObject> PyString::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ m_value });
-}
+PyObject *PyString::repr_impl(Interpreter &) const { return PyString::from(String{ m_value }); }
 
-std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &obj,
-	Interpreter &interpreter) const
+PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	if (auto obj_string = as<PyString>(obj)) {
 		return m_value == obj_string->value() ? py_true() : py_false();
@@ -87,7 +82,7 @@ std::shared_ptr<PyObject> PyString::equal_impl(const std::shared_ptr<PyObject> &
 }
 
 
-std::shared_ptr<PyObject> PyString::richcompare_impl(const std::shared_ptr<PyObject> &other,
+PyObject *PyString::richcompare_impl(const PyObject *other,
 	RichCompare op,
 	Interpreter &interpreter) const
 {
@@ -104,7 +99,7 @@ std::shared_ptr<PyObject> PyString::richcompare_impl(const std::shared_ptr<PyObj
 			return m_value <= obj_string->value() ? py_true() : py_false();
 		}
 		case RichCompare::Py_EQ: {
-			if (this == obj_string.get()) return py_true();
+			if (this == obj_string) return py_true();
 			return m_value == obj_string->value() ? py_true() : py_false();
 		}
 		case RichCompare::Py_NE: {
@@ -124,7 +119,7 @@ std::shared_ptr<PyObject> PyString::richcompare_impl(const std::shared_ptr<PyObj
 }
 
 
-std::shared_ptr<PyObject> PyString::len_impl(Interpreter &) const
+PyObject *PyString::len_impl(Interpreter &) const
 {
 	size_t size{ 0 };
 	for (auto it = m_value.begin(); it != m_value.end();) {
