@@ -123,6 +123,7 @@ void PyObject::visit_graph(Visitor &visitor)
 		spdlog::debug("PyObject::visit_graph: {}", name);
 		visitor.visit(*obj);
 	}
+	visitor.visit(*this);
 }
 
 
@@ -252,6 +253,13 @@ PyFunction::PyFunction(std::string name, PyCode *code)
 }
 
 
+void PyFunction::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	m_code->visit_graph(visitor);
+}
+
+
 PyObject *PyBytes::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {
 	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
@@ -301,6 +309,18 @@ PyObject *PyList::iter_impl(Interpreter &) const
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyListIterator>(*this);
 }
+
+
+void PyList::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	for (auto &el : m_elements) {
+		if (std::holds_alternative<PyObject *>(el)) {
+			std::get<PyObject *>(el)->visit_graph(visitor);
+		}
+	}
+}
+
 
 std::string PyListIterator::to_string() const
 {
@@ -354,6 +374,16 @@ PyTupleIterator PyTuple::end() const { return PyTupleIterator(*this, m_elements.
 PyObject *PyTuple::operator[](size_t idx) const
 {
 	return std::visit([](const auto &value) { return PyObject::from(value); }, m_elements[idx]);
+}
+
+void PyTuple::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	for (auto &el : m_elements) {
+		if (std::holds_alternative<PyObject *>(el)) {
+			std::get<PyObject *>(el)->visit_graph(visitor);
+		}
+	}
 }
 
 

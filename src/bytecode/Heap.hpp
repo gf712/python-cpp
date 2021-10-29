@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utilities.hpp"
+#include "interpreter/GarbageCollector.hpp"
 
 #include <memory>
 #include <bitset>
@@ -33,7 +34,8 @@ class Block
 
 			std::optional<size_t> mark_next_free_chunk()
 			{
-				spdlog::debug("mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
+				spdlog::debug(
+					"mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
 				if (auto chunk_idx = next_free_chunk()) {
 					ASSERT(!m_occupied_chunks[*chunk_idx])
 					spdlog::debug("marking next free chunk -> old chunk bit mask: {}",
@@ -100,6 +102,14 @@ class Block
 
 		size_t object_size() const { return m_object_size; }
 
+		void for_each_cell_alive(std::function<void(uint8_t *)> &&callback)
+		{
+			for (size_t i{ 0 }; i < m_chunk_view.m_occupied_chunks.size(); ++i) {
+				const auto bit = m_chunk_view.m_occupied_chunks[i];
+				if (bit) { callback(m_memory + i * m_object_size); }
+			}
+		}
+
 	  private:
 		uint8_t *m_memory;
 		size_t m_object_size;
@@ -115,6 +125,8 @@ class Block
 	uint8_t *allocate();
 
 	void deallocate(uint8_t *ptr);
+
+	std::vector<Chunk> &chunks() { return m_chunks; }
 
   private:
 	std::vector<Chunk> m_chunks;
@@ -134,16 +146,29 @@ class Slab
 		block512 = std::make_unique<Block>(512, 1000);
 	}
 
-	template<typename T> uint8_t *allocate()
+	std::unique_ptr<Block> &block() { return block512; }
+
+	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
 	{
-		spdlog::debug("Allocating memory for object of size {}", sizeof(T));
-		if constexpr (sizeof(T) <= 16) { return block16->allocate(); }
-		if constexpr (sizeof(T) <= 32) { return block32->allocate(); }
-		if constexpr (sizeof(T) <= 64) { return block64->allocate(); }
-		if constexpr (sizeof(T) <= 128) { return block128->allocate(); }
-		if constexpr (sizeof(T) <= 256) { return block256->allocate(); }
-		if constexpr (sizeof(T) <= 512) {
-			return block512->allocate();
+		uint8_t *ptr{ nullptr };
+		spdlog::debug("Allocating Cell object memory for object of size {}", sizeof(T));
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 16) {
+			ptr = block16->allocate();
+		}
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 32) {
+			ptr = block32->allocate();
+		}
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 64) {
+			ptr = block64->allocate();
+		}
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 128) {
+			ptr = block128->allocate();
+		}
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 256) {
+			ptr = block256->allocate();
+		}
+		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 512) {
+			ptr = block512->allocate();
 		} else {
 			[]<bool flag = false>()
 			{
@@ -151,7 +176,35 @@ class Slab
 			}
 			();
 		}
-		return nullptr;
+		return ptr;
+	}
+
+	template<typename T> uint8_t *allocate()
+	{
+		[]<bool flag = false>()
+		{
+			static_assert(flag, "only GC collected objects currently supported");
+		}
+		();
+
+		// uint8_t *ptr{ nullptr };
+		// spdlog::debug("Allocating memory for object of size {}", sizeof(T));
+		// if constexpr (sizeof(T) <= 16) { ptr = block16->allocate(); }
+		// if constexpr (sizeof(T) <= 32) { ptr = block32->allocate(); }
+		// if constexpr (sizeof(T) <= 64) { ptr = block64->allocate(); }
+		// if constexpr (sizeof(T) <= 128) { ptr = block128->allocate(); }
+		// if constexpr (sizeof(T) <= 256) { ptr = block256->allocate(); }
+		// if constexpr (sizeof(T) <= 512) {
+		// 	return block512->allocate();
+		// } else {
+		// 	[]<bool flag = false>()
+		// 	{
+		// 		static_assert(flag, "only object sizes <= 512 bytes are currently supported");
+		// 	}
+		// 	();
+		// }
+		// new (ptr + sizeof(GarbageCollected<Cell>)) T(std::forward<Args>(args)...);
+		// return ptr;
 	}
 
 	template<typename T> void deallocate(uint8_t *ptr)
@@ -216,14 +269,15 @@ class Heap
 
 	void reset() { m_slab.reset(); }
 
-	template<typename T, typename... Args> T* allocate(Args &&... args)
+	template<typename T, typename... Args> T *allocate(Args &&... args)
 	{
-		uint8_t *memory = m_slab.allocate<T>();
-		T *ptr = new (memory) T(std::forward<Args>(args)...);
-		return ptr;
+		auto *ptr = m_slab.allocate<T>();
+		T *obj = new (ptr + sizeof(GarbageCollected<Cell>)) T(std::forward<Args>(args)...);
+		new (ptr) GarbageCollected<Cell>(*obj);
+		return obj;
 	}
 
-    void collect_garbage();
+	void collect_garbage();
 
 	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
 	{
@@ -232,6 +286,8 @@ class Heap
 		m_static_offset += sizeof(T);
 		return std::shared_ptr<T>(ptr, [](T *) { return; });
 	}
+
+	Slab &slab() { return m_slab; }
 
   private:
 	Heap() { m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size)); }

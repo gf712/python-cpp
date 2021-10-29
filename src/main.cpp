@@ -55,6 +55,8 @@ int main()
 	// spdlog::debug("Bytecode:\n {}", bytecode->to_string());
 	auto &vm = VirtualMachine::the().create(std::move(bytecode));
 	spdlog::set_level(spdlog::level::debug);
+	auto gc = std::make_unique<MarkSweepGC>();
 	vm.execute();
+	gc->run(VirtualMachine::the().heap());
 	// vm.dump();
 }

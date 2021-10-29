@@ -33,6 +33,8 @@ class PyDict : public PyObject
 
 	void insert(const Value &key, const Value &value);
 	Value operator[](Value key) const;
+
+	void visit_graph(Visitor &) override;
 };
 
 class PyDictItems : public PyObject

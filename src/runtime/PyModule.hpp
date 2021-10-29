@@ -19,11 +19,7 @@ class PyModule : public PyObject
 		: PyObject(PyObjectType::PY_MODULE), m_module_name(std::move(module_name))
 	{}
 
-	void visit_graph(Visitor &visitor) override
-	{
-		PyObject::visit_graph(visitor);
-		visitor.visit(*m_module_name);
-	}
+	void visit_graph(Visitor &visitor) override;
 
 	PyObject *repr_impl(Interpreter &) const override
 	{

@@ -77,6 +77,20 @@ Value PyDict::operator[](Value key) const
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
 
 
+void PyDict::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	for (auto &[key, value] : m_map) {
+		if (std::holds_alternative<PyObject *>(value)) {
+			std::get<PyObject *>(value)->visit_graph(visitor);
+		}
+		if (std::holds_alternative<PyObject *>(key)) {
+			std::get<PyObject *>(key)->visit_graph(visitor);
+		}
+	}
+}
+
+
 PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
 
 

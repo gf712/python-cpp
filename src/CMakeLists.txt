@@ -2,12 +2,14 @@ set(AST_SOURCE_FILES ast/AST.cpp
 	             ast/Module.cpp
 		     ast/optimizers/ConstantFolding.cpp)
 set(INTERPRETER_SOURCE_FILES 
+                    interpreter/GarbageCollector.cpp
                     interpreter/Interpreter.cpp
                     interpreter/ExecutionFrame.cpp)
 set(PARSER_SOURCE_FILES parser/Parser.cpp)
 set(RUNTIME_SOURCE_FILES runtime/CustomPyObject.cpp
                          runtime/PyBuiltins.cpp
                          runtime/PyDict.cpp 
+                         runtime/PyModule.cpp
                          runtime/PyNumber.cpp
                          runtime/PyObject.cpp
                          runtime/PyRange.cpp

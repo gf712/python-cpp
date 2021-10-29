@@ -145,8 +145,6 @@ class PyObject : public Cell
 	PyObjectType type() const { return m_type; }
 	std::string_view type_string() const { return object_name(m_type); }
 
-	virtual std::string to_string() const = 0;
-
 	virtual PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const;
 	virtual PyObject *subtract_impl(const PyObject *obj, Interpreter &interpreter) const;
 	virtual PyObject *multiply_impl(const PyObject *obj, Interpreter &interpreter) const;
@@ -205,6 +203,8 @@ class PyFunction : public PyObject
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
 	const std::string &name() const { return m_name; }
+	
+	void visit_graph(Visitor &) override;
 };
 
 class PyTuple;
@@ -317,6 +317,8 @@ class PyList : public PyObject
 	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
+	
+	void visit_graph(Visitor &) override;
 };
 
 struct ValueHash
@@ -349,6 +351,8 @@ class PyTuple : public PyObject
 		m_elements.reserve(elements.size());
 		for (auto *el : elements) { m_elements.push_back(el); }
 	}
+
+	void visit_graph(Visitor &) override;
 
   public:
 	static PyTuple *create()
