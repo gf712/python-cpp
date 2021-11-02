@@ -33,6 +33,8 @@ class PyModule : public PyObject
 
 	const MapType &module_definitions() const { return m_module_definitions; }
 
+	PyString *name() const { return m_module_name; }
+
 	void insert(PyString *key, const Value &value)
 	{
 		m_module_definitions.insert_or_assign(key, value);

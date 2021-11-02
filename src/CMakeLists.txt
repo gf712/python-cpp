@@ -42,6 +42,10 @@ target_include_directories(python-cpp PUBLIC .)
 
 target_compile_options(python-cpp PRIVATE -Wall -Wextra -Werror)
 
+if (STL_SUPPORTS_BIT_CAST)
+    target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
+endif()
+
 set(TEST_PROGRAM main.cpp)
 
 add_executable(test ${TEST_PROGRAM})

@@ -27,7 +27,11 @@ LocalFrame::~LocalFrame()
 
 VirtualMachine::VirtualMachine()
 	: m_interpreter(std::make_unique<Interpreter>()), m_heap(Heap::the())
-{}
+{
+	uintptr_t *rbp;
+	asm volatile("movq %%rbp, %0" : "=r"(rbp));
+	m_heap.set_start_stack_pointer(rbp);
+}
 
 void VirtualMachine::push_generator(std::shared_ptr<Bytecode> bytecode)
 {
@@ -110,7 +114,7 @@ int VirtualMachine::execute()
 void VirtualMachine::dump() const
 {
 	size_t i = 0;
-	std::cout << "Register state: \n";
+	std::cout << "Register state: " << (void *)(m_local_registers.back().data()) << " \n";
 	for (const auto &register_ : m_local_registers.back()) {
 		std::visit(overloaded{ [&i](const auto &register_value) {
 								  std::ostringstream os;
@@ -134,9 +138,9 @@ void VirtualMachine::dump() const
 
 void VirtualMachine::clear()
 {
+	m_heap.reset();
 	m_bytecode.reset();
 	m_local_registers.clear();
-	m_heap.reset();
 	m_instruction_pointer = 0;
 }
 

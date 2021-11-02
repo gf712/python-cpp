@@ -7,12 +7,10 @@
 ExecutionFrame::ExecutionFrame() {}
 
 
-std::shared_ptr<ExecutionFrame> ExecutionFrame::create(std::shared_ptr<ExecutionFrame> parent,
-	PyDict *globals,
-	PyDict *locals,
-	PyDict *ns)
+ExecutionFrame *
+	ExecutionFrame::create(ExecutionFrame *parent, PyDict *globals, PyDict *locals, PyDict *ns)
 {
-	auto new_frame = std::shared_ptr<ExecutionFrame>(new ExecutionFrame{});
+	auto *new_frame = Heap::the().allocate<ExecutionFrame>();
 	new_frame->m_parent = parent;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
@@ -59,10 +57,45 @@ PyDict *ExecutionFrame::locals() const { return m_locals; }
 PyDict *ExecutionFrame::globals() const { return m_globals; }
 PyModule *ExecutionFrame::builtins() const { return m_builtins; }
 
-std::shared_ptr<ExecutionFrame> ExecutionFrame::exit()
+ExecutionFrame *ExecutionFrame::exit()
 {
 	if (m_ns) {
 		for (const auto &[k, v] : m_locals->map()) { m_ns->insert(k, v); }
 	}
 	return m_parent;
+}
+
+std::string ExecutionFrame::to_string() const
+{
+	const auto locals = m_locals ? m_locals->to_string() : "";
+	const auto globals = m_globals ? m_globals->to_string() : "";
+	const auto builtins = m_builtins ? m_builtins->to_string() : "";
+	const auto ns = m_ns ? m_ns->to_string() : "";
+	const void *parent = m_parent ? &m_parent : nullptr;
+
+	return fmt::format(
+		"ExecutionFrame(locals={}, globals={}, builtins={}, namespace={}, "
+		"parent={})",
+		locals,
+		globals,
+		builtins,
+		ns,
+		parent);
+}
+
+void ExecutionFrame::visit_graph(Visitor &visitor)
+{
+	visitor.visit(*this);
+	if (m_locals) m_locals->visit_graph(visitor);
+	if (m_globals) m_globals->visit_graph(visitor);
+	if (m_builtins) m_builtins->visit_graph(visitor);
+	if (m_ns) m_ns->visit_graph(visitor);
+	for (const auto &val : m_parameters) {
+		if (val.has_value() && std::holds_alternative<PyObject *>(*val)) {
+			std::get<PyObject *>(*val)->visit_graph(visitor);
+		}
+	}
+	if (m_parent) { 
+		m_parent->visit_graph(visitor); 
+	}
 }

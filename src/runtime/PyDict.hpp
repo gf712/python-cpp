@@ -52,6 +52,7 @@ class PyDictItems : public PyObject
 	PyDictItemsIterator end() const;
 
 	std::string to_string() const override;
+	void visit_graph(Visitor &) override;
 };
 
 
@@ -88,6 +89,8 @@ class PyDictItemsIterator : public PyObject
 	bool operator==(const PyDictItemsIterator &) const;
 	value_type operator*() const;
 	PyDictItemsIterator &operator++();
+	
+	void visit_graph(Visitor &) override;
 };
 
 

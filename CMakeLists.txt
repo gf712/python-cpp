@@ -29,5 +29,14 @@ add_library(GTest::GMock ALIAS gmock)
 add_library(GTest::Main ALIAS gtest_main)
 include(cmake/linenoise.cmake)
 
+include(CheckCXXSourceCompiles)
+
+check_cxx_source_compiles(
+  "#include <bit>
+  constexpr double f64v = 19880124.0;
+  constexpr auto u64v = std::bit_cast<std::uint64_t>(f64v);"
+  STL_SUPPORTS_BIT_CAST
+)
+
 add_subdirectory(src)
 add_subdirectory(integration)

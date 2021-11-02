@@ -3,7 +3,6 @@
 #include "Value.hpp"
 #include "forward.hpp"
 #include "utilities.hpp"
-#include "bytecode/VM.hpp"
 #include "interpreter/GarbageCollector.hpp"
 
 #include <unordered_map>
@@ -171,6 +170,8 @@ class PyObject : public Cell
 	const Slots &slots() const { return m_slots; }
 
 	void visit_graph(Visitor &) override;
+
+	bool is_pyobject() const override { return true; }
 };
 
 
@@ -203,7 +204,7 @@ class PyFunction : public PyObject
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
 	const std::string &name() const { return m_name; }
-	
+
 	void visit_graph(Visitor &) override;
 };
 
@@ -213,11 +214,21 @@ class PyNativeFunction : public PyObject
 {
 	std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
+	std::vector<PyObject *> m_captures;
 
   public:
 	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function)
 		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
 		  m_function(std::move(function))
+	{}
+
+	// TODO: fix tracking of lambda captures
+	template<typename... Args>
+	PyNativeFunction(std::string name,
+		std::function<PyObject *(PyTuple *, PyDict *)> function,
+		Args &&... args)
+		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
+		  m_function(std::move(function)), m_captures{ std::forward<Args>(args)... }
 	{}
 
 	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
@@ -228,6 +239,8 @@ class PyNativeFunction : public PyObject
 	}
 
 	const std::string &name() const { return m_name; }
+
+	void visit_graph(Visitor &) override;
 };
 
 
@@ -292,6 +305,8 @@ class PyNameConstant : public PyObject
 
 	const NameConstant &value() const { return m_value; }
 
+	void visit_graph(Visitor &) override {}
+
   private:
 	static PyNameConstant *create(const NameConstant &);
 
@@ -317,7 +332,7 @@ class PyList : public PyObject
 	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
-	
+
 	void visit_graph(Visitor &) override;
 };
 
@@ -355,23 +370,11 @@ class PyTuple : public PyObject
 	void visit_graph(Visitor &) override;
 
   public:
-	static PyTuple *create()
-	{
-		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<PyTuple>();
-	}
+	static PyTuple *create();
 
-	static PyTuple *create(std::vector<Value> elements)
-	{
-		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<PyTuple>(std::move(elements));
-	}
+	static PyTuple *create(std::vector<Value> elements);
 
-	static PyTuple *create(const std::vector<PyObject *> &elements)
-	{
-		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<PyTuple>(elements);
-	}
+	static PyTuple *create(const std::vector<PyObject *> &elements);
 
 	std::string to_string() const override;
 
@@ -439,6 +442,8 @@ class PyListIterator : public PyObject
 	{}
 
 	std::string to_string() const override;
+
+	void visit_graph(Visitor &) override;
 
 	PyObject *repr_impl(Interpreter &interpreter) const override;
 	PyObject *next_impl(Interpreter &interpreter) override;

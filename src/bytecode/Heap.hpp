@@ -2,6 +2,7 @@
 
 #include "utilities.hpp"
 #include "interpreter/GarbageCollector.hpp"
+#include "runtime/PyObject.hpp"
 
 #include <memory>
 #include <bitset>
@@ -34,15 +35,15 @@ class Block
 
 			std::optional<size_t> mark_next_free_chunk()
 			{
-				spdlog::debug(
-					"mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
+				// spdlog::debug(
+				// 	"mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
 				if (auto chunk_idx = next_free_chunk()) {
 					ASSERT(!m_occupied_chunks[*chunk_idx])
-					spdlog::debug("marking next free chunk -> old chunk bit mask: {}",
-						m_occupied_chunks.to_string());
+					// spdlog::debug("marking next free chunk -> old chunk bit mask: {}",
+					// 	m_occupied_chunks.to_string());
 					m_occupied_chunks.flip(*chunk_idx);
-					spdlog::debug("marking next free chunk -> new chunk bit mask: {}",
-						m_occupied_chunks.to_string());
+					// spdlog::debug("marking next free chunk -> new chunk bit mask: {}",
+					// 	m_occupied_chunks.to_string());
 					return *chunk_idx;
 				} else {
 					return {};
@@ -77,16 +78,21 @@ class Block
 			}
 		}
 
+		bool has_address(uint8_t *memory) const;
+
 		void deallocate(uint8_t *ptr)
 		{
 			uintptr_t start = reinterpret_cast<uintptr_t>(m_memory);
-			uintptr_t end =
-				reinterpret_cast<uintptr_t>(m_memory + m_object_size * ChunkView<>::ChunkCount);
+			uintptr_t end = reinterpret_cast<uintptr_t>(
+				m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
 			ASSERT(reinterpret_cast<uintptr_t>(ptr) >= start
 				   && reinterpret_cast<uintptr_t>(ptr) < end);
 			size_t ptr_idx = (reinterpret_cast<uintptr_t>(ptr) - start) / m_object_size;
 			ASSERT(ptr_idx < ChunkView<>::ChunkCount)
 			m_chunk_view.mark_chunk_as_free(ptr_idx);
+			spdlog::debug("Deallocating memory at index {}, address {}",
+				ptr_idx,
+				(void *)(m_memory + ptr_idx * m_object_size));
 		}
 
 		void set_all_in_mask(bool value)
@@ -110,9 +116,17 @@ class Block
 			}
 		}
 
-	  private:
+		void for_each_cell(std::function<void(uint8_t *)> &&callback)
+		{
+			for (size_t i{ 0 }; i < m_chunk_view.m_occupied_chunks.size(); ++i) {
+				callback(m_memory + i * m_object_size);
+			}
+		}
+
 		uint8_t *m_memory;
 		size_t m_object_size;
+
+	  private:
 		ChunkView<> m_chunk_view;
 	};
 
@@ -144,31 +158,23 @@ class Slab
 		block128 = std::make_unique<Block>(128, 1000);
 		block256 = std::make_unique<Block>(256, 1000);
 		block512 = std::make_unique<Block>(512, 1000);
+		block1024 = std::make_unique<Block>(1024, 1000);
 	}
 
-	std::unique_ptr<Block> &block() { return block512; }
+	std::unique_ptr<Block> &block_512() { return block512; }
+	std::unique_ptr<Block> &block_1024() { return block512; }
 
 	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
 	{
-		uint8_t *ptr{ nullptr };
 		spdlog::debug("Allocating Cell object memory for object of size {}", sizeof(T));
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 16) {
-			ptr = block16->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 32) {
-			ptr = block32->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 64) {
-			ptr = block64->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 128) {
-			ptr = block128->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 256) {
-			ptr = block256->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected<Cell>) <= 512) {
-			ptr = block512->allocate();
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 16) { return block16->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 32) { return block32->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 64) { return block64->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 128) { return block128->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 256) { return block256->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 512) { return block512->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) {
+			return block1024->allocate();
 		} else {
 			[]<bool flag = false>()
 			{
@@ -176,7 +182,6 @@ class Slab
 			}
 			();
 		}
-		return ptr;
 	}
 
 	template<typename T> uint8_t *allocate()
@@ -203,9 +208,11 @@ class Slab
 		// 	}
 		// 	();
 		// }
-		// new (ptr + sizeof(GarbageCollected<Cell>)) T(std::forward<Args>(args)...);
+		// new (ptr + sizeof(GarbageCollected)) T(std::forward<Args>(args)...);
 		// return ptr;
 	}
+
+	bool has_address(uint8_t *addr) const;
 
 	template<typename T> void deallocate(uint8_t *ptr)
 	{
@@ -215,8 +222,9 @@ class Slab
 		if constexpr (sizeof(T) <= 64) { return block64->deallocate(ptr); }
 		if constexpr (sizeof(T) <= 128) { return block128->deallocate(ptr); }
 		if constexpr (sizeof(T) <= 256) { return block256->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 512) {
-			return block512->deallocate(ptr);
+		if constexpr (sizeof(T) <= 512) { return block512->deallocate(ptr); }
+		if constexpr (sizeof(T) <= 1024) {
+			return block1024->deallocate(ptr);
 		} else {
 			[]<bool flag = false>()
 			{
@@ -234,6 +242,7 @@ class Slab
 		block128->reset();
 		block256->reset();
 		block512->reset();
+		block1024->reset();
 	}
 
   private:
@@ -243,6 +252,7 @@ class Slab
 	std::unique_ptr<Block> block128{ nullptr };
 	std::unique_ptr<Block> block256{ nullptr };
 	std::unique_ptr<Block> block512{ nullptr };
+	std::unique_ptr<Block> block1024{ nullptr };
 };
 
 class Heap
@@ -267,13 +277,26 @@ class Heap
 		m_static_memory = nullptr;
 	}
 
-	void reset() { m_slab.reset(); }
+	void reset()
+	{
+		collect_garbage();
+		m_slab.reset();
+	}
+
+	void set_start_stack_pointer(uintptr_t *address) { m_top_stack_pointer = address; }
+
+	uintptr_t *start_stack_pointer() const { return m_top_stack_pointer; }
 
 	template<typename T, typename... Args> T *allocate(Args &&... args)
 	{
+		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
-		T *obj = new (ptr + sizeof(GarbageCollected<Cell>)) T(std::forward<Args>(args)...);
-		new (ptr) GarbageCollected<Cell>(*obj);
+		T *obj = new (ptr + sizeof(GarbageCollected)) T(std::forward<Args>(args)...);
+		new (ptr) GarbageCollected(*obj);
+		if constexpr (std::is_base_of_v<PyObject, T>)
+			spdlog::debug("Allocated {} on the heap @{}",
+				object_name(static_cast<PyObject *>(obj)->type()),
+				(void *)obj);
 		return obj;
 	}
 
@@ -290,5 +313,7 @@ class Heap
 	Slab &slab() { return m_slab; }
 
   private:
-	Heap() { m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size)); }
+	Heap();
+	std::unique_ptr<GarbageCollector> m_gc;
+	uintptr_t *m_top_stack_pointer;
 };

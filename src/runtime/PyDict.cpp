@@ -14,7 +14,7 @@ std::string PyDict::to_string() const
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
 		std::visit(
-			overloaded{ [&os](const PyObject *key) {
+			overloaded{ [&os](PyObject *key) {
 						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string();
 					   },
 				[&os](const auto &key) { os << key; } },
@@ -22,7 +22,7 @@ std::string PyDict::to_string() const
 		os << ": ";
 		std::visit(
 			overloaded{
-				[&os, this](const PyObject *value) {
+				[&os, this](PyObject *value) {
 					if (value == this) {
 						os << "{...}";
 					} else {
@@ -36,7 +36,7 @@ std::string PyDict::to_string() const
 		std::advance(it, 1);
 	}
 	std::visit(
-		overloaded{ [&os](const PyObject *key) {
+		overloaded{ [&os](PyObject *key) {
 					   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
 						  << ": ";
 				   },
@@ -44,7 +44,7 @@ std::string PyDict::to_string() const
 		it->first);
 	std::visit(
 		overloaded{
-			[&os, this](const PyObject *value) {
+			[&os, this](PyObject *value) {
 				if (value == this) {
 					os << "{...}";
 				} else {
@@ -82,23 +82,15 @@ void PyDict::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &[key, value] : m_map) {
 		if (std::holds_alternative<PyObject *>(value)) {
-			std::get<PyObject *>(value)->visit_graph(visitor);
+			if (std::get<PyObject *>(value) != this)
+				std::get<PyObject *>(value)->visit_graph(visitor);
 		}
 		if (std::holds_alternative<PyObject *>(key)) {
-			std::get<PyObject *>(key)->visit_graph(visitor);
+			if (std::get<PyObject *>(key) != this) std::get<PyObject *>(key)->visit_graph(visitor);
 		}
 	}
 }
 
-
-PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
-
-
-PyDictItemsIterator PyDictItems::end() const
-{
-	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
-	return PyDictItemsIterator(*this, end_position);
-}
 
 std::string PyDictItems::to_string() const
 {
@@ -121,6 +113,33 @@ std::string PyDictItems::to_string() const
 	return os.str();
 }
 
+void PyDictItems::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+}
+
+PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
+
+
+PyDictItemsIterator PyDictItems::end() const
+{
+	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	return PyDictItemsIterator(*this, end_position);
+}
+
+
+void PyDictItemsIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (std::holds_alternative<PyObject *>(m_current_iterator->first)) {
+		visitor.visit(*std::get<PyObject *>(m_current_iterator->first));
+	}
+	if (std::holds_alternative<PyObject *>(m_current_iterator->second)) {
+		visitor.visit(*std::get<PyObject *>(m_current_iterator->second));
+	}
+	visitor.visit(*const_cast<PyDictItems *>(&m_pydictitems));
+}
 
 std::string PyDictItemsIterator::to_string() const
 {

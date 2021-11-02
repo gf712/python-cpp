@@ -26,7 +26,7 @@ PyObject *execute(VirtualMachine &vm,
 		//		  std::unique_ptr (might be access from multiple threads later on?)
 		{
 			auto function_locals = VirtualMachine::the().heap().allocate<PyDict>();
-			auto function_frame = ExecutionFrame::create(interpreter.execution_frame(),
+			auto *function_frame = ExecutionFrame::create(interpreter.execution_frame(),
 				interpreter.execution_frame()->globals(),
 				function_locals,
 				ns);
@@ -70,13 +70,13 @@ PyObject *execute(VirtualMachine &vm,
 			auto frame = vm.enter_frame(pyfunc->code()->register_count());
 			function_frame->attach_frame(std::move(frame));
 		}
-		const auto &execution_frame = interpreter.execution_frame();
+		// const auto &execution_frame = interpreter.execution_frame();
 		vm.execute_frame();
 
-		spdlog::debug("Frame: {}", (void *)execution_frame.get());
-		spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
-		spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
-		if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
+		// spdlog::debug("Frame: {}", (void *)execution_frame);
+		// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
+		// spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
+		// if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
 		auto result = native_func->operator()(args, kwargs);
 		spdlog::debug("Native function return value: {}", result->to_string());
@@ -84,6 +84,7 @@ PyObject *execute(VirtualMachine &vm,
 	} else {
 		TODO();
 	}
+
 	return std::visit([](const auto &val) { return PyObject::from(val); }, vm.reg(0));
 }
 
@@ -97,7 +98,7 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }
 
 	auto *args_tuple = PyTuple::create(args);
-
+	spdlog::debug("args_tuple: {}", (void *)&args_tuple);
 	ASSERT(args_tuple);
 
 	::execute(vm, interpreter, function_object, args_tuple, nullptr, nullptr);

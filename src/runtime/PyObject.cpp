@@ -246,6 +246,7 @@ PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::s
 	// 	m_attributes["co_var"] = PyList::from(m_args);
 }
 
+
 PyFunction::PyFunction(std::string name, PyCode *code)
 	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(code)
 {
@@ -257,6 +258,13 @@ void PyFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	m_code->visit_graph(visitor);
+}
+
+
+void PyNativeFunction::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	for (auto *obj : m_captures) { obj->visit_graph(visitor); }
 }
 
 
@@ -316,7 +324,7 @@ void PyList::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &el : m_elements) {
 		if (std::holds_alternative<PyObject *>(el)) {
-			std::get<PyObject *>(el)->visit_graph(visitor);
+			if (std::get<PyObject *>(el) != this) std::get<PyObject *>(el)->visit_graph(visitor);
 		}
 	}
 }
@@ -325,6 +333,15 @@ void PyList::visit_graph(Visitor &visitor)
 std::string PyListIterator::to_string() const
 {
 	return fmt::format("<list_iterator at {}>", static_cast<const void *>(this));
+}
+
+void PyListIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	// the iterator has to keep a reference to the list
+	// otherwise GC could clean up a temporary list in a loop
+	// TODO: should visit_graph be const and the bit flags mutable?
+	const_cast<PyList &>(m_pylist).visit_graph(visitor);
 }
 
 PyObject *PyListIterator::repr_impl(Interpreter &) const
@@ -341,6 +358,23 @@ PyObject *PyListIterator::next_impl(Interpreter &interpreter)
 	return nullptr;
 }
 
+PyTuple *PyTuple::create()
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyTuple>();
+}
+
+PyTuple *PyTuple::create(std::vector<Value> elements)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyTuple>(std::move(elements));
+}
+
+PyTuple *PyTuple::create(const std::vector<PyObject *> &elements)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<PyTuple>(elements);
+}
 
 std::string PyTuple::to_string() const
 {
@@ -381,7 +415,7 @@ void PyTuple::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &el : m_elements) {
 		if (std::holds_alternative<PyObject *>(el)) {
-			std::get<PyObject *>(el)->visit_graph(visitor);
+			if (std::get<PyObject *>(el) != this) std::get<PyObject *>(el)->visit_graph(visitor);
 		}
 	}
 }

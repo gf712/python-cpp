@@ -14,8 +14,8 @@ class Interpreter
 	enum class Status { OK, EXCEPTION };
 
   private:
-	std::shared_ptr<ExecutionFrame> m_current_frame{ nullptr };
-	std::shared_ptr<ExecutionFrame> m_global_frame{ nullptr };
+	ExecutionFrame *m_current_frame{ nullptr };
+	ExecutionFrame *m_global_frame{ nullptr };
 	Status m_status{ Status::OK };
 	std::string m_exception_message;
 
@@ -40,23 +40,19 @@ class Interpreter
 		m_current_frame->set_exception(std::move(exception));
 	}
 
-	const std::shared_ptr<ExecutionFrame> &execution_frame() const { return m_current_frame; }
+	ExecutionFrame *execution_frame() const { return m_current_frame; }
+	ExecutionFrame *global_execution_frame() const { return m_global_frame; }
 
-	void set_execution_frame(std::shared_ptr<ExecutionFrame> frame)
-	{
-		m_current_frame = std::move(frame);
-	}
+	void set_execution_frame(ExecutionFrame *frame) { m_current_frame = frame; }
 
 	void store_object(const std::string &name, PyObject *obj)
 	{
 		spdlog::debug("Interpreter::store_object(name={}, obj={}, current_frame={})",
 			name,
 			obj->to_string(),
-			(void *)m_current_frame.get());
+			(void *)m_current_frame);
 		m_current_frame->put_local(name, obj);
-		if (m_current_frame.get() == m_global_frame.get()) {
-			m_current_frame->put_global(name, obj);
-		}
+		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, obj); }
 	}
 
 	template<typename PyObjectType, typename... Args>

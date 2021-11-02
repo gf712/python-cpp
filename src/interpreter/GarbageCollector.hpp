@@ -3,7 +3,9 @@
 #include <bitset>
 #include "utilities.hpp"
 
-template<typename T> class GarbageCollected
+#include <unordered_set>
+
+class GarbageCollected
 {
   public:
 	enum class Color {
@@ -12,10 +14,9 @@ template<typename T> class GarbageCollected
 		BLACK,
 	};
 
+	virtual ~GarbageCollected() = default;
 	// void *operator new(size_t) = delete;
 	// void *operator new[](size_t) = delete;
-
-	GarbageCollected(T &obj) : m_object(obj) {}
 
 	bool black() const { return m_state.all(); }
 
@@ -37,28 +38,27 @@ template<typename T> class GarbageCollected
 
   private:
 	std::bitset<2> m_state{ 0b00 };
-	T &m_object;
-
-	GarbageCollected() = delete;
 };
 
 class Cell
-	: public GarbageCollected<Cell>
+	: public GarbageCollected
 	, NonCopyable
 	, NonMoveable
 {
   public:
 	struct Visitor
 	{
-		virtual ~Visitor() {}
+		virtual ~Visitor() = default;
 		virtual void visit(Cell &) = 0;
 	};
 
   public:
-	Cell() : GarbageCollected<Cell>(*this) {}
+	Cell() = default;
 
 	virtual std::string to_string() const = 0;
 	virtual void visit_graph(Visitor &) = 0;
+
+	virtual bool is_pyobject() const { return false; }
 };
 
 
@@ -67,13 +67,20 @@ class Heap;
 class GarbageCollector
 {
   public:
+	virtual ~GarbageCollector() = default;
 	virtual void run(Heap &) const = 0;
 };
 
-class MarkSweepGC : GarbageCollector
+class MarkSweepGC : public GarbageCollector
 {
   public:
+	MarkSweepGC();
 	void run(Heap &) const override;
 
-	std::vector<Cell *> collect_roots() const;
+	std::unordered_set<Cell *> collect_roots() const;
+
+  private:
+	mutable uint8_t *m_stack_top{ nullptr };
+	size_t m_frequency;
+	mutable size_t m_iterations_since_last_sweep{ 0 };
 };

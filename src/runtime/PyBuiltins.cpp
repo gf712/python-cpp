@@ -168,8 +168,8 @@ PyObject *range(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 2)
-	const auto &class_name = args->operator[](0);
-	const auto &function_location = args->operator[](1);
+	auto *class_name = args->operator[](0);
+	auto *function_location = args->operator[](1);
 	spdlog::debug(
 		"__build_class__({}, {})", class_name->to_string(), function_location->to_string());
 
@@ -185,7 +185,9 @@ PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpre
 
 	auto &vm = VirtualMachine::the();
 
-	return vm.heap().allocate<PyNativeFunction>(class_name_as_string,
+	// TODO: fix tracking of lambda captures
+	return vm.heap().allocate<PyNativeFunction>(
+		class_name_as_string,
 		[class_name, &interpreter, pyfunc, class_name_as_string](
 			const PyTuple *call_args, PyDict *call_kwargs) {
 			spdlog::debug("Calling __build_class__");
@@ -201,7 +203,9 @@ PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpre
 
 			CustomPyObjectContext ctx{ class_name_as_string, ns };
 			return vm.heap().allocate<CustomPyObject>(ctx, PyTuple::create());
-		});
+		},
+		class_name,
+		pyfunc);
 }
 
 PyObject *globals(const PyTuple *, const PyDict *, Interpreter &interpreter)

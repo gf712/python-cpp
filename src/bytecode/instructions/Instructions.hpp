@@ -312,6 +312,7 @@ class MakeFunction : public Instruction
 	{
 		return fmt::format("MAKE_FUNCTION   {:<3} ({})", m_function_id, m_function_name);
 	}
+
 	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}

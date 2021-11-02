@@ -1,5 +1,21 @@
 #include "Heap.hpp"
+#include "interpreter/GarbageCollector.hpp"
 
+bool Block::Chunk::has_address(uint8_t *memory) const
+{
+	auto address = reinterpret_cast<uintptr_t>(memory);
+	uintptr_t start = reinterpret_cast<uintptr_t>(m_memory);
+	uintptr_t end =
+		reinterpret_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
+
+	if (address < start || address > end) { return false; }
+
+	if ((address - start) % m_object_size == 0) {
+		return m_chunk_view.m_occupied_chunks[(address - start) / m_object_size];
+	} else {
+		return false;
+	}
+}
 
 Block::Block(size_t object_size, size_t capacity)
 {
@@ -86,11 +102,31 @@ void Block::deallocate(uint8_t *ptr)
 	std::abort();
 }
 
+
+bool Slab::has_address(uint8_t *address) const
+{
+	{
+		auto &block = block512;
+		for (auto &chunk : block->chunks()) {
+			if (chunk.has_address(address)) { return true; }
+		}
+	}
+	{
+		auto &block = block1024;
+		for (auto &chunk : block->chunks()) {
+			if (chunk.has_address(address)) { return true; }
+		}
+	}
+	return false;
+}
+
+Heap::Heap()
+{
+	m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size));
+	m_gc = std::make_unique<MarkSweepGC>();
+}
+
 void Heap::collect_garbage()
 {
-	// collect_roots();
-
-	// mark_live_objects();
-
-	// sweep_dead_objects();
+	if (m_gc) m_gc->run(*this);
 }
