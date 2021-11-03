@@ -485,6 +485,25 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, BlankLine)
+{
+	constexpr std::string_view program =
+		"a = 2\n"
+		"\n"
+		"b = 2\n";
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<Constant>(static_cast<int64_t>(2)),
+		""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("b", ContextType::STORE) },
+		std::make_shared<Constant>(static_cast<int64_t>(2)),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, SimplePositiveDoubleAssignment)
 {
 	constexpr std::string_view program = "a = 2.0\n";

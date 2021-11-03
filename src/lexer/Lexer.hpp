@@ -168,6 +168,7 @@ class Lexer
 	size_t m_cursor{ 0 };
 	Position m_position;
 	std::vector<size_t> m_indent_values;
+	bool m_ignore_nl_token{ false };
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -208,6 +209,8 @@ class Lexer
 		return std::string_view{ start.pointer_to_program, size };
 	}
 
+	bool &ignore_nl_token() { return m_ignore_nl_token; }
+
   private:
 	bool read_more_tokens()
 	{
@@ -243,7 +246,10 @@ class Lexer
 		if (std::isspace(peek(0)) && !std::isblank(peek(0))) {
 			if (original_positions.column == 0) {
 				increment_row_position();
-				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+				if (!m_ignore_nl_token) {
+					m_tokens_to_emit.emplace_back(
+						Token::TokenType::NL, original_positions, m_position);
+				}
 				return true;
 			} else {
 				return false;
@@ -252,7 +258,9 @@ class Lexer
 		while (advance_if([](const char c) { return std::isblank(c); })) {}
 		if (std::isspace(peek(0))) {
 			increment_row_position();
-			m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+			if (!m_ignore_nl_token) {
+				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+			}
 			return true;
 		}
 		m_position = original_positions;

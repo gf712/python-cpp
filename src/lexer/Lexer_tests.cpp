@@ -2,19 +2,33 @@
 #include "gtest/gtest.h"
 
 namespace {
-std::vector<Token> generate_tokens(std::string_view program)
+std::vector<Token> generate_tokens(std::string_view program, bool ignore_nl_token)
 {
 	Lexer lexer{ std::string(program) };
+	lexer.ignore_nl_token() = ignore_nl_token;
 	std::vector<Token> tokens;
 	size_t i = 0;
 	while (auto token = lexer.peek_token(i++)) { tokens.push_back(std::move(*token)); }
 	return tokens;
 }
 
+void assert_generates_tokens_without_nl_token(std::string_view program,
+	const std::vector<Token::TokenType> &expected_tokens)
+{
+	const auto tokens = generate_tokens(program, true);
+	ASSERT_EQ(expected_tokens.size(), tokens.size());
+	for (size_t i = 0; i < expected_tokens.size(); ++i) {
+		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
+			<< fmt::format("Expected {}, but got {}",
+				   Token::stringify_token_type(expected_tokens[i]),
+				   Token::stringify_token_type(tokens[i].token_type()));
+	}
+}
+
 void assert_generates_tokens(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
 {
-	const auto tokens = generate_tokens(program);
+	const auto tokens = generate_tokens(program, false);
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
@@ -418,4 +432,24 @@ TEST(Lexer, BlankLine)
 		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
+}
+
+
+TEST(Lexer, IgnoreNLToken)
+{
+	constexpr std::string_view program =
+		"a = 1\n"
+		"\n"
+		"\t\n"
+		"a = 1\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens_without_nl_token(program, expected_tokens);
 }

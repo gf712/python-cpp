@@ -1,14 +1,14 @@
 #pragma once
 
 #include "ast/AST.hpp"
-#include "lexer/Lexer.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
+#include "lexer/Lexer.hpp"
 #include "utilities.hpp"
 
-#include <string_view>
 #include <memory>
-#include <variant>
+#include <string_view>
 #include <tuple>
+#include <variant>
 
 namespace parser {
 
@@ -20,10 +20,12 @@ class Parser
 	std::deque<std::deque<std::shared_ptr<ast::ASTNode>>> m_stack;
 	Lexer &m_lexer;
 	size_t m_token_position{ 0 };
+	const bool m_ignore_nl_token{ true };
 
   public:
 	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>()), m_lexer(l)
 	{
+		m_lexer.ignore_nl_token() = m_ignore_nl_token;
 		m_stack.emplace_back();
 	}
 
