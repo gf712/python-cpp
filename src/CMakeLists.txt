@@ -59,7 +59,8 @@ target_link_libraries(python-cpp PUBLIC spdlog_header_only)
 
 target_include_directories(python-cpp PUBLIC .)
 
-target_compile_options(python-cpp PRIVATE -Wall -Wextra -Werror)
+# -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
+target_compile_options(python-cpp PRIVATE -Wall -Wextra -Werror -fno-omit-frame-pointer)
 
 if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")

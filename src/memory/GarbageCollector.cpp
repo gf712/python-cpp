@@ -12,8 +12,8 @@ MarkSweepGC::MarkSweepGC() : m_frequency(1) {}
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {
-	if (!m_bottom_top) {
-		m_bottom_top = reinterpret_cast<uint8_t *>(Heap::the().start_stack_pointer());
+	if (!m_stack_bottom) {
+		m_stack_bottom = reinterpret_cast<uint8_t *>(Heap::the().start_stack_pointer());
 	}
 	std::unordered_set<Cell *> roots;
 
@@ -26,7 +26,8 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	asm volatile("movq %%rsp, %0" : "=r"(rsp_));
 
 	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
-	for (; rsp < m_bottom_top; rsp += sizeof(uintptr_t)) {
+	spdlog::debug("rps={}, stack_bottom={}", (void *)rsp, (void *)m_stack_bottom);
+	for (; rsp < m_stack_bottom; rsp += sizeof(uintptr_t)) {
 		uint8_t *address = reinterpret_cast<uint8_t *>(*reinterpret_cast<uintptr_t *>(rsp))
 						   - sizeof(GarbageCollected);
 		spdlog::debug("checking address {}, pointer address={}", (void *)address, (void *)rsp);
@@ -90,15 +91,16 @@ void MarkSweepGC::run(Heap &heap) const
 	std::array blocks = { std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() } };
 
-	// {// mark all cells as unreachable
-	// 	const auto &block = heap.slab().block();
-	// 	for (auto &chunk : block->chunks()) {
-	// 		chunk.for_each_cell([](uint8_t *memory) {
-	// 			auto *header = static_cast<GarbageCollected<Cell> *>(static_cast<void *>(memory));
-	// 			header->mark(GarbageCollected<Cell>::Color::WHITE);
-	// 		});
-	// 	}
-	// }
+	{// mark all cells as unreachable
+		for (const auto &block : blocks) {
+			for (auto &chunk : block.get()->chunks()) {
+				chunk.for_each_cell([](uint8_t *memory) {
+					auto *header = static_cast<GarbageCollected *>(static_cast<void *>(memory));
+					header->mark(GarbageCollected::Color::WHITE);
+				});
+			}
+		}
+	}
 
 	// collect roots
 	const auto roots = collect_roots();
@@ -124,8 +126,6 @@ void MarkSweepGC::run(Heap &heap) const
 						auto *obj = static_cast<PyObject *>(cell);
 						spdlog::debug("Deallocating {}@{}", object_name(obj->type()), (void *)obj);
 					}
-					// header->~GarbageCollected();
-					header->mark(GarbageCollected::Color::WHITE);
 					cell->~Cell();
 					chunk.deallocate(memory);
 				}

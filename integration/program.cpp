@@ -1,11 +1,11 @@
 #include "bytecode/BytecodeGenerator.hpp"
-#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
+#include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
 

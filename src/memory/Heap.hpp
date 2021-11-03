@@ -283,9 +283,9 @@ class Heap
 		m_slab.reset();
 	}
 
-	void set_start_stack_pointer(uintptr_t *address) { m_top_stack_pointer = address; }
+	void set_start_stack_pointer(uintptr_t *address) { m_bottom_stack_pointer = address; }
 
-	uintptr_t *start_stack_pointer() const { return m_top_stack_pointer; }
+	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
 	template<typename T, typename... Args> T *allocate(Args &&... args)
 	{
@@ -315,5 +315,5 @@ class Heap
   private:
 	Heap();
 	std::unique_ptr<GarbageCollector> m_gc;
-	uintptr_t *m_top_stack_pointer;
+	uintptr_t *m_bottom_stack_pointer;
 };

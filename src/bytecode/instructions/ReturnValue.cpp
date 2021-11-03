@@ -16,13 +16,12 @@ void ReturnValue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		result);
 	if (interpreter.execution_frame()->parent()) {
 		vm.set_instruction_pointer(interpreter.execution_frame()->return_address());
-		auto *current_frame = interpreter.execution_frame();
+		auto current_frame = std::unique_ptr<ExecutionFrame, void (*)(ExecutionFrame *)>(
+			interpreter.execution_frame(), [](ExecutionFrame *ptr) {
+				spdlog::debug("Deallocationg ExecutionFrame {}", (void *)ptr);
+				ptr->~ExecutionFrame();
+			});
 		interpreter.set_execution_frame(current_frame->exit());
-		spdlog::debug("Manually deallocationg ExecutionFrame {}", (void *)current_frame);
-		// TODO: make deallocation more developer friendly
-		current_frame->~ExecutionFrame();
-		reinterpret_cast<GarbageCollected *>((uint8_t *)current_frame - sizeof(GarbageCollected))
-			->mark(GarbageCollected::Color::WHITE);
 	}
 
 	vm.reg(0) = result;
