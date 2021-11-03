@@ -2,12 +2,12 @@
 
 #include "utilities.hpp"
 
-#include <string_view>
+#include <deque>
+#include <functional>
 #include <iostream>
 #include <optional>
+#include <string_view>
 #include <vector>
-#include <functional>
-#include <deque>
 
 #include "spdlog/fmt/fmt.h"
 #include "spdlog/spdlog.h"
@@ -46,6 +46,7 @@ template<> struct fmt::formatter<Position>
 	__TOKEN(NUMBER)           \
 	__TOKEN(STRING)           \
 	__TOKEN(NEWLINE)          \
+	__TOKEN(NL)               \
 	__TOKEN(INDENT)           \
 	__TOKEN(DEDENT)           \
 	__TOKEN(OP)               \
@@ -222,6 +223,7 @@ class Lexer
 			return true;
 		}
 
+		if (try_empty_line()) { return true; }
 		if (try_read_indent()) { return true; }
 		if (try_read_newline()) { return true; }
 		try_read_space();
@@ -230,6 +232,31 @@ class Lexer
 		if (try_read_operation()) { return true; }
 		if (try_read_number()) { return true; }
 
+		return false;
+	}
+
+	bool try_empty_line()
+	{
+		const auto original_positions = m_position;
+		const auto cursor = m_cursor;
+		// if it's a newline
+		if (std::isspace(peek(0)) && !std::isblank(peek(0))) {
+			if (original_positions.column == 0) {
+				increment_row_position();
+				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+				return true;
+			} else {
+				return false;
+			}
+		}
+		while (advance_if([](const char c) { return std::isblank(c); })) {}
+		if (std::isspace(peek(0))) {
+			increment_row_position();
+			m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+			return true;
+		}
+		m_position = original_positions;
+		m_cursor = cursor;
 		return false;
 	}
 
@@ -344,6 +371,7 @@ class Lexer
 
 	std::optional<Token::TokenType> try_read_operation_with_two_characters() const
 	{
+		if (m_cursor + 1 >= m_program.size()) return {};
 		if (std::isalnum(peek(0)) || std::isalnum(peek(1))) return {};
 		if (peek(0) == '=' && peek(1) == '=') return Token::TokenType::EQEQUAL;
 		if (peek(0) == '!' && peek(1) == '=') return Token::TokenType::NOTEQUAL;
@@ -368,6 +396,7 @@ class Lexer
 
 	std::optional<Token::TokenType> try_read_operation_with_three_characters() const
 	{
+		if (m_cursor + 2 >= m_program.size()) return {};
 		if (std::isalnum(peek(0)) || std::isalnum(peek(1)) || std::isalnum(peek(2))) return {};
 		if (peek(0) == '<' && peek(1) == '<' && peek(2) == '=')
 			return Token::TokenType::LEFTSHIFTEQUAL;
@@ -385,7 +414,9 @@ class Lexer
 		const Position original_position = m_position;
 		std::optional<Token::TokenType> type;
 
-		if (type = try_read_operation_with_two_characters(); type.has_value()) {
+		if (type = try_read_operation_with_three_characters(); type.has_value()) {
+			advance(3);
+		} else if (type = try_read_operation_with_two_characters(); type.has_value()) {
 			advance(2);
 		} else if (type = try_read_operation_with_one_character(); type.has_value()) {
 			advance(1);

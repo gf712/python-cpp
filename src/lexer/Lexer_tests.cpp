@@ -397,3 +397,25 @@ TEST(Lexer, ClassDefinition)
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
 }
+
+
+TEST(Lexer, BlankLine)
+{
+	constexpr std::string_view program =
+		"a = 1\n"
+		"\n"
+		"\t\n"
+		"a = 1\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NL,
+		Token::TokenType::NL,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
