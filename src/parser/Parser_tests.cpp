@@ -197,6 +197,30 @@ void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<AS
 	}
 }
 
+void compare_while(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::While);
+
+	const auto result_test = as<While>(result)->test();
+	const auto expected_test = as<While>(expected)->test();
+	dispatch(result_test, expected_test);
+
+	const auto result_body = as<While>(result)->body();
+	const auto expected_body = as<While>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < expected_body.size(); ++i) {
+		dispatch(result_body[i], expected_body[i]);
+	}
+
+	const auto result_orelse = as<While>(result)->orelse();
+	const auto expected_orelse = as<While>(expected)->orelse();
+	ASSERT_EQ(result_orelse.size(), expected_orelse.size());
+	for (size_t i = 0; i < result_orelse.size(); ++i) {
+		dispatch(result_orelse[i], expected_orelse[i]);
+	}
+}
+
+
 void compare_for(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::For);
@@ -443,6 +467,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::AugAssign: {
 		compare_augmented_assign(result, expected);
+		break;
+	}
+	case ASTNodeType::While: {
+		compare_while(result, expected);
 		break;
 	}
 	default: {
@@ -901,6 +929,32 @@ TEST(Parser, AugmentedAssign)
 		std::make_shared<AugAssign>(std::make_shared<Name>("a", ContextType::STORE),
 			BinaryOpType::PLUS,
 			std::make_shared<Name>("b", ContextType::LOAD)));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, WhileLoop)
+{
+	constexpr std::string_view program =
+		"while a <= 10:\n"
+		"  a += 1\n"
+		"else:\n"
+		"  print(a)\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<While>(
+		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD),
+			Compare::OpType::LtE,
+			std::make_shared<Constant>(int64_t{ 10 })),
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<AugAssign>(std::make_shared<Name>("a", ContextType::STORE),
+				BinaryOpType::PLUS,
+				std::make_shared<Constant>(int64_t{ 1 })) },
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::LOAD) },
+			std::vector<std::shared_ptr<Keyword>>{}) }));
 
 	assert_generates_ast(program, expected_ast);
 }

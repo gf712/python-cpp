@@ -1,16 +1,16 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <memory>
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <stack>
+#include <string>
+#include <vector>
 
 #include "forward.hpp"
-#include "utilities.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
+#include "utilities.hpp"
 
 #include "spdlog/spdlog.h"
 
@@ -36,7 +36,8 @@ namespace ast {
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Return)             \
-	__AST_NODE_TYPE(Tuple)
+	__AST_NODE_TYPE(Tuple)              \
+	__AST_NODE_TYPE(While)
 
 
 enum class ASTNodeType {
@@ -767,6 +768,40 @@ class For : public ASTNode
 		spdlog::debug("{}  - orelse:", indent);
 		for (const auto &el : m_orelse) { el->print_node(new_indent); }
 		spdlog::debug("{}  - type_comment:", m_type_comment);
+	}
+};
+
+
+class While : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_test;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_orelse;
+
+  public:
+	While(std::shared_ptr<ASTNode> test,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ASTNode>> orelse)
+		: ASTNode(ASTNodeType::While), m_test(std::move(test)), m_body(std::move(body)),
+		  m_orelse(std::move(orelse))
+	{}
+
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+
+	const std::shared_ptr<ASTNode> &test() const { return m_test; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}While", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - target:", indent);
+		m_test->print_node(new_indent);
+		spdlog::debug("{}  - body:", indent);
+		for (const auto &el : m_body) { el->print_node(new_indent); }
+		spdlog::debug("{}  - orelse:", indent);
 	}
 };
 

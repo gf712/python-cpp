@@ -952,6 +952,11 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			Token::TokenType::COLON,
 			Token::TokenType::EQUAL,
 			Token::TokenType::EQEQUAL,
+			Token::TokenType::NOTEQUAL,
+			Token::TokenType::LESSEQUAL,
+			Token::TokenType::LESS,
+			Token::TokenType::GREATEREQUAL,
+			Token::TokenType::GREATER,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
 		if (pattern5::match(p)) { return true; }
@@ -1169,6 +1174,11 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
+			Token::TokenType::NOTEQUAL,
+			Token::TokenType::LESSEQUAL,
+			Token::TokenType::LESS,
+			Token::TokenType::GREATEREQUAL,
+			Token::TokenType::GREATER,
 			Token::TokenType::EQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
@@ -1235,6 +1245,11 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::NAME,
 			Token::TokenType::COLON,
 			Token::TokenType::EQEQUAL,
+			Token::TokenType::NOTEQUAL,
+			Token::TokenType::LESSEQUAL,
+			Token::TokenType::LESS,
+			Token::TokenType::GREATEREQUAL,
+			Token::TokenType::GREATER,
 			Token::TokenType::EQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
@@ -1326,8 +1341,108 @@ struct EqBitwiseOrPattern : Pattern<EqBitwiseOrPattern>
 			spdlog::debug("'==' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto eq_comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Eq, rhs);
-			p.push_to_stack(eq_comparisson);
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Eq, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct NotEqBitwiseOrPattern : Pattern<NotEqBitwiseOrPattern>
+{
+	// noteq_bitwise_or: '!=' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::NOTEQUAL>, BitwiseOrPattern>;
+		spdlog::debug("NotEqBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'!=' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::NotEq, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct LtEqBitwiseOrPattern : Pattern<LtEqBitwiseOrPattern>
+{
+	// lteq_bitwise_or: '<=' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::LESSEQUAL>, BitwiseOrPattern>;
+		spdlog::debug("LtEqBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'<=' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::LtE, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct LtBitwiseOrPattern : Pattern<LtBitwiseOrPattern>
+{
+	// lteq_bitwise_or: '<' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LESS>, BitwiseOrPattern>;
+		spdlog::debug("LtBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'<' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Lt, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct GtEqBitwiseOrPattern : Pattern<GtEqBitwiseOrPattern>
+{
+	// lteq_bitwise_or: '<' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::GREATEREQUAL>, BitwiseOrPattern>;
+		spdlog::debug("GtEqBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'>=' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::GtE, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct GtBitwiseOrPattern : Pattern<GtBitwiseOrPattern>
+{
+	// lteq_bitwise_or: '<' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::GREATER>, BitwiseOrPattern>;
+		spdlog::debug("GtBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'>' bitwise_or");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Gt, rhs);
+			p.push_to_stack(comparisson);
 			return true;
 		}
 		return false;
@@ -1354,6 +1469,36 @@ struct CompareOpBitwiseOrPairPattern : Pattern<CompareOpBitwiseOrPairPattern>
 		using pattern1 = PatternMatch<EqBitwiseOrPattern>;
 		if (pattern1::match(p)) {
 			spdlog::debug("eq_bitwise_or");
+			return true;
+		}
+		// noteq_bitwise_or
+		using pattern2 = PatternMatch<NotEqBitwiseOrPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("not_eq_bitwise_or");
+			return true;
+		}
+		// lte_bitwise_or
+		using pattern3 = PatternMatch<LtEqBitwiseOrPattern>;
+		if (pattern3::match(p)) {
+			spdlog::debug("lte_bitwise_or");
+			return true;
+		}
+		// lt_bitwise_or
+		using pattern4 = PatternMatch<LtBitwiseOrPattern>;
+		if (pattern4::match(p)) {
+			spdlog::debug("lt_bitwise_or");
+			return true;
+		}
+		// gte_bitwise_or
+		using pattern5 = PatternMatch<GtEqBitwiseOrPattern>;
+		if (pattern5::match(p)) {
+			spdlog::debug("gte_bitwise_or");
+			return true;
+		}
+		// gt_bitwise_or
+		using pattern6 = PatternMatch<GtBitwiseOrPattern>;
+		if (pattern6::match(p)) {
+			spdlog::debug("gt_bitwise_or");
 			return true;
 		}
 		return false;
@@ -2144,6 +2289,47 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 	}
 };
 
+struct WhilePattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "while"; }
+};
+
+
+struct WhileStatementPattern : Pattern<WhileStatementPattern>
+{
+	// while_stmt:
+	//     | 'while' named_expression ':' block [else_block]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("WhileStatementPattern");
+		BlockScope scope{ p };
+
+		// 'while' named_expression ':' block
+		using pattern0 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, WhilePattern>,
+				NamedExpressionPattern,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern0::match(p)) {
+			spdlog::debug("'while' named_expression ':' block");
+			std::vector<std::shared_ptr<ASTNode>> orelse;
+			std::vector<std::shared_ptr<ASTNode>> body;
+			{
+				BlockScope inner_scope{ p };
+				using pattern1 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
+				if (pattern1::match(p)) { spdlog::debug("[else_block]"); }
+				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
+			}
+			auto test = p.pop_front();
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<While>(test, body, orelse));
+			return true;
+		}
+
+		return false;
+	}
+};
+
 
 struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 {
@@ -2183,6 +2369,14 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 		using pattern5 = PatternMatch<ForStatementPattern>;
 		if (pattern5::match(p)) {
 			spdlog::debug("for_stmt");
+			p.print_stack();
+			return true;
+		}
+
+		// while_stmt
+		using pattern7 = PatternMatch<WhileStatementPattern>;
+		if (pattern7::match(p)) {
+			spdlog::debug("while_stmt");
 			p.print_stack();
 			return true;
 		}
