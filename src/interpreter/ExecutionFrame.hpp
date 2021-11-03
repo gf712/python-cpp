@@ -1,7 +1,7 @@
 #pragma once
 
 #include "forward.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 
 #include "runtime/Value.hpp"
 

@@ -1,10 +1,10 @@
-#include "PyNumber.hpp"
 #include "PyRange.hpp"
+#include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
 
 #include "interpreter/Interpreter.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 
 std::string PyRange::to_string() const
 {

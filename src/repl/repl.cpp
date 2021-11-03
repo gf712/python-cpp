@@ -1,16 +1,17 @@
 #include <cstdio>
 #include <cstdlib>
+
 #include "linenoise.h"
 
 #include <iostream>
-#include <string>
 #include <optional>
+#include <string>
 
 #include "ast/optimizers/ConstantFolding.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
+#include "vm/VM.hpp"
 
 namespace repl {
 std::optional<std::string> getline(const std::string &prompt)

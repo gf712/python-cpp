@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BaseException.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 
 class AttributeError : public BaseException
 {

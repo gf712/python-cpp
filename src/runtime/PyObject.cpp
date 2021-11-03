@@ -4,7 +4,7 @@
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
 
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
 

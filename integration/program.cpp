@@ -1,5 +1,5 @@
 #include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/PyDict.hpp"

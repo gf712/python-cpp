@@ -1,49 +1,68 @@
-set(AST_SOURCE_FILES ast/AST.cpp 
-	             ast/Module.cpp
-		     ast/optimizers/ConstantFolding.cpp)
-set(INTERPRETER_SOURCE_FILES 
-                    interpreter/GarbageCollector.cpp
-                    interpreter/Interpreter.cpp
-                    interpreter/ExecutionFrame.cpp)
-set(PARSER_SOURCE_FILES parser/Parser.cpp)
-set(RUNTIME_SOURCE_FILES runtime/CustomPyObject.cpp
-                         runtime/PyBuiltins.cpp
-                         runtime/PyDict.cpp 
-                         runtime/PyModule.cpp
-                         runtime/PyNumber.cpp
-                         runtime/PyObject.cpp
-                         runtime/PyRange.cpp
-                         runtime/PyString.cpp
-                         runtime/Value.cpp)
+set(AST_SOURCE_FILES # cmake-format: sortable
+                     ast/AST.cpp ast/Module.cpp ast/optimizers/ConstantFolding.cpp)
 
-set(VM_SOURCE_FILES bytecode/VM.cpp 
-                    bytecode/BytecodeGenerator.cpp
-                    bytecode/Heap.cpp
-                    bytecode/instructions/FunctionCall.cpp
-                    bytecode/instructions/FunctionCallWithKeywords.cpp
-                    bytecode/instructions/LoadAttr.cpp
-                    bytecode/instructions/LoadBuildClass.cpp
-                    bytecode/instructions/LoadName.cpp
-                    bytecode/instructions/LoadMethod.cpp
-                    bytecode/instructions/Instructions.cpp
-                    bytecode/instructions/MethodCall.cpp
-                    bytecode/instructions/ReturnValue.cpp
-                    bytecode/instructions/StoreAttr.cpp
-                    bytecode/instructions/StoreName.cpp
-                    )
+set(BYTECODE_SOURCE_FILES
+    # cmake-format: sortable
+    bytecode/BytecodeGenerator.cpp
+    bytecode/instructions/FunctionCall.cpp
+    bytecode/instructions/FunctionCallWithKeywords.cpp
+    bytecode/instructions/Instructions.cpp
+    bytecode/instructions/LoadAttr.cpp
+    bytecode/instructions/LoadBuildClass.cpp
+    bytecode/instructions/LoadMethod.cpp
+    bytecode/instructions/LoadName.cpp
+    bytecode/instructions/MethodCall.cpp
+    bytecode/instructions/ReturnValue.cpp
+    bytecode/instructions/StoreAttr.cpp
+    bytecode/instructions/StoreName.cpp)
 
-set(UNITTEST_SOURCES lexer/Lexer_tests.cpp parser/Parser_tests.cpp ast/optimizers/Optimizers_tests.cpp)
+set(INTERPRETER_SOURCE_FILES # cmake-format: sortable
+                             interpreter/ExecutionFrame.cpp interpreter/Interpreter.cpp)
 
-add_library(python-cpp ${AST_SOURCE_FILES} ${INTERPRETER_SOURCE_FILES} ${PARSER_SOURCE_FILES} ${RUNTIME_SOURCE_FILES} ${VM_SOURCE_FILES})
+set(MEMORY_SOURCE_FILES # cmake-format: sortable
+                        memory/GarbageCollector.cpp memory/Heap.cpp)
+
+set(PARSER_SOURCE_FILES # cmake-format: sortable
+                        parser/Parser.cpp)
+
+set(RUNTIME_SOURCE_FILES
+    # cmake-format: sortable
+    runtime/CustomPyObject.cpp
+    runtime/PyBuiltins.cpp
+    runtime/PyDict.cpp
+    runtime/PyModule.cpp
+    runtime/PyNumber.cpp
+    runtime/PyObject.cpp
+    runtime/PyRange.cpp
+    runtime/PyString.cpp
+    runtime/Value.cpp)
+
+set(VM_SOURCE_FILES # cmake-format: sortable
+                    vm/VM.cpp)
+
+set(UNITTEST_SOURCES # cmake-format: sortable
+                     ast/optimizers/Optimizers_tests.cpp lexer/Lexer_tests.cpp parser/Parser_tests.cpp)
+
+add_library(
+  python-cpp
+  ${AST_SOURCE_FILES}
+  ${BYTECODE_SOURCE_FILES}
+  ${INTERPRETER_SOURCE_FILES}
+  ${MEMORY_SOURCE_FILES}
+  ${PARSER_SOURCE_FILES}
+  ${RUNTIME_SOURCE_FILES}
+  ${VM_SOURCE_FILES})
+
 add_executable(unittests ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp PUBLIC spdlog_header_only)
+
 target_include_directories(python-cpp PUBLIC .)
 
 target_compile_options(python-cpp PRIVATE -Wall -Wextra -Werror)
 
-if (STL_SUPPORTS_BIT_CAST)
-    target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
+if(STL_SUPPORTS_BIT_CAST)
+  target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
 endif()
 
 set(TEST_PROGRAM main.cpp)

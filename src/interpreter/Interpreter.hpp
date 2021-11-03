@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ExecutionFrame.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 
 #include "runtime/PyObject.hpp"
 

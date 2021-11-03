@@ -1,11 +1,11 @@
 #pragma once
 
-#include "utilities.hpp"
-#include "interpreter/GarbageCollector.hpp"
+#include "GarbageCollector.hpp"
 #include "runtime/PyObject.hpp"
+#include "utilities.hpp"
 
-#include <memory>
 #include <bitset>
+#include <memory>
 
 static constexpr size_t KB = 1024;
 static constexpr size_t MB = 1024 * KB;

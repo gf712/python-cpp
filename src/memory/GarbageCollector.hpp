@@ -80,7 +80,7 @@ class MarkSweepGC : public GarbageCollector
 	std::unordered_set<Cell *> collect_roots() const;
 
   private:
-	mutable uint8_t *m_stack_top{ nullptr };
+	mutable uint8_t *m_bottom_top{ nullptr };
 	size_t m_frequency;
 	mutable size_t m_iterations_since_last_sweep{ 0 };
 };

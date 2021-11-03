@@ -1,11 +1,10 @@
 #include "GarbageCollector.hpp"
-#include "bytecode/Heap.hpp"
-
-#include "bytecode/VM.hpp"
-#include "Interpreter.hpp"
+#include "interpreter/Interpreter.hpp"
+#include "memory/Heap.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyObject.hpp"
+#include "vm/VM.hpp"
 
 #include <csetjmp>
 
@@ -13,8 +12,8 @@ MarkSweepGC::MarkSweepGC() : m_frequency(1) {}
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {
-	if (!m_stack_top) {
-		m_stack_top = reinterpret_cast<uint8_t *>(Heap::the().start_stack_pointer());
+	if (!m_bottom_top) {
+		m_bottom_top = reinterpret_cast<uint8_t *>(Heap::the().start_stack_pointer());
 	}
 	std::unordered_set<Cell *> roots;
 
@@ -27,7 +26,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	asm volatile("movq %%rsp, %0" : "=r"(rsp_));
 
 	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
-	for (; rsp < m_stack_top; rsp += sizeof(uintptr_t)) {
+	for (; rsp < m_bottom_top; rsp += sizeof(uintptr_t)) {
 		uint8_t *address = reinterpret_cast<uint8_t *>(*reinterpret_cast<uintptr_t *>(rsp))
 						   - sizeof(GarbageCollected);
 		spdlog::debug("checking address {}, pointer address={}", (void *)address, (void *)rsp);

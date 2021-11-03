@@ -1,4 +1,4 @@
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "PyDict.hpp"
 #include "PyString.hpp"

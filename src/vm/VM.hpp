@@ -2,7 +2,7 @@
 
 #include "forward.hpp"
 #include "utilities.hpp"
-#include "Heap.hpp"
+#include "memory/Heap.hpp"
 #include "runtime/Value.hpp"
 
 class VirtualMachine;

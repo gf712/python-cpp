@@ -8,7 +8,7 @@
 #include "TypeError.hpp"
 
 #include "bytecode/instructions/FunctionCall.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
 
 #include <iostream>

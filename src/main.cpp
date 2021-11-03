@@ -1,6 +1,6 @@
 #include "parser/Parser.hpp"
 #include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 
 // static constexpr std::string_view program =
 // 	"class A:\n"

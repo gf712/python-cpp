@@ -3,7 +3,7 @@
 #include "Value.hpp"
 #include "forward.hpp"
 #include "utilities.hpp"
-#include "interpreter/GarbageCollector.hpp"
+#include "memory/GarbageCollector.hpp"
 
 #include <unordered_map>
 #include <string>

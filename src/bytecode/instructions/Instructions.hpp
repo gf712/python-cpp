@@ -3,7 +3,7 @@
 #include "forward.hpp"
 #include "ast/AST.hpp"
 #include "parser/Parser.hpp"
-#include "bytecode/VM.hpp"
+#include "vm/VM.hpp"
 #include "utilities.hpp"
 #include "interpreter/Interpreter.hpp"
 

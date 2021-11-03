@@ -1,5 +1,5 @@
 #include "Heap.hpp"
-#include "interpreter/GarbageCollector.hpp"
+#include "GarbageCollector.hpp"
 
 bool Block::Chunk::has_address(uint8_t *memory) const
 {
