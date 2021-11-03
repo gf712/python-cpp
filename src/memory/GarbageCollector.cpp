@@ -13,7 +13,7 @@ MarkSweepGC::MarkSweepGC() : m_frequency(1) {}
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {
 	if (!m_stack_bottom) {
-		m_stack_bottom = reinterpret_cast<uint8_t *>(Heap::the().start_stack_pointer());
+		m_stack_bottom = bit_cast<uint8_t *>(Heap::the().start_stack_pointer());
 	}
 	std::unordered_set<Cell *> roots;
 
@@ -28,8 +28,8 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
 	spdlog::debug("rps={}, stack_bottom={}", (void *)rsp, (void *)m_stack_bottom);
 	for (; rsp < m_stack_bottom; rsp += sizeof(uintptr_t)) {
-		uint8_t *address = reinterpret_cast<uint8_t *>(*reinterpret_cast<uintptr_t *>(rsp))
-						   - sizeof(GarbageCollected);
+		uint8_t *address =
+			bit_cast<uint8_t *>(*bit_cast<uintptr_t *>(rsp)) - sizeof(GarbageCollected);
 		spdlog::debug("checking address {}, pointer address={}", (void *)address, (void *)rsp);
 		if (VirtualMachine::the().heap().slab().has_address(address)) {
 			spdlog::debug("valid address {}", (void *)address);
@@ -82,29 +82,25 @@ struct MarkGCVisitor : Cell::Visitor
 };
 
 
-void MarkSweepGC::run(Heap &heap) const
+void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 {
-	if (m_iterations_since_last_sweep++ < m_frequency) { return; }
-
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
 	std::array blocks = { std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() } };
-
-	{// mark all cells as unreachable
-		for (const auto &block : blocks) {
-			for (auto &chunk : block.get()->chunks()) {
-				chunk.for_each_cell([](uint8_t *memory) {
-					auto *header = static_cast<GarbageCollected *>(static_cast<void *>(memory));
-					header->mark(GarbageCollected::Color::WHITE);
-				});
-			}
+	for (const auto &block : blocks) {
+		for (auto &chunk : block.get()->chunks()) {
+			chunk.for_each_cell([](uint8_t *memory) {
+				auto *header = static_cast<GarbageCollected *>(static_cast<void *>(memory));
+				header->mark(GarbageCollected::Color::WHITE);
+			});
 		}
 	}
+}
 
-	// collect roots
-	const auto roots = collect_roots();
 
+void MarkSweepGC::mark_all_live_objects(const std::unordered_set<Cell *> &roots) const
+{
 	auto mark_visitor = std::make_unique<MarkGCVisitor>();
 
 	// mark all live objects
@@ -114,7 +110,15 @@ void MarkSweepGC::run(Heap &heap) const
 		// 	(void *)&root);
 		root->visit_graph(*mark_visitor);
 	}
+}
 
+
+void MarkSweepGC::sweep(Heap &heap) const
+{
+	// TODO: once the ideal block sizes are fixed there should be an iterator
+	//       returning a list of all blocks
+	std::array blocks = { std::reference_wrapper{ heap.slab().block_512() },
+		std::reference_wrapper{ heap.slab().block_1024() } };
 	// sweep all the dead objects
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
@@ -132,6 +136,20 @@ void MarkSweepGC::run(Heap &heap) const
 			});
 		}
 	}
+}
+
+
+void MarkSweepGC::run(Heap &heap) const
+{
+	if (m_iterations_since_last_sweep++ < m_frequency) { return; }
+
+	mark_all_cell_unreachable(heap);
+
+	const auto roots = collect_roots();
+
+	mark_all_live_objects(roots);
+
+	sweep(heap);
 
 	m_iterations_since_last_sweep = 0;
 }

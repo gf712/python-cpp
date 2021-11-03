@@ -1,8 +1,8 @@
 #pragma once
 
 #include "utilities.hpp"
-#include <bitset>
 
+#include <bitset>
 #include <unordered_set>
 
 class GarbageCollected
@@ -13,10 +13,6 @@ class GarbageCollected
 		GREY,
 		BLACK,
 	};
-
-	virtual ~GarbageCollected() = default;
-	// void *operator new(size_t) = delete;
-	// void *operator new[](size_t) = delete;
 
 	bool black() const { return m_state.all(); }
 
@@ -41,8 +37,7 @@ class GarbageCollected
 };
 
 class Cell
-	: public GarbageCollected
-	, NonCopyable
+	: NonCopyable
 	, NonMoveable
 {
   public:
@@ -54,6 +49,7 @@ class Cell
 
   public:
 	Cell() = default;
+	virtual ~Cell() = default;
 
 	virtual std::string to_string() const = 0;
 	virtual void visit_graph(Visitor &) = 0;
@@ -78,6 +74,9 @@ class MarkSweepGC : public GarbageCollector
 	void run(Heap &) const override;
 
 	std::unordered_set<Cell *> collect_roots() const;
+	void mark_all_cell_unreachable(Heap &) const;
+	void mark_all_live_objects(const std::unordered_set<Cell *> &) const;
+	void sweep(Heap &heap) const;
 
   private:
 	mutable uint8_t *m_stack_bottom{ nullptr };

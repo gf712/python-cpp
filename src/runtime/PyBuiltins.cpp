@@ -224,7 +224,7 @@ PyObject *id(const PyTuple *args, const PyDict *, Interpreter &)
 {
 	ASSERT(args->size() == 1)
 	return PyNumber::create(
-		Number{ static_cast<int64_t>(reinterpret_cast<intptr_t>(args->operator[](0))) });
+		Number{ static_cast<int64_t>(bit_cast<intptr_t>(args->operator[](0))) });
 }
 
 PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)

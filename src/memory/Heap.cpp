@@ -3,10 +3,9 @@
 
 bool Block::Chunk::has_address(uint8_t *memory) const
 {
-	auto address = reinterpret_cast<uintptr_t>(memory);
-	uintptr_t start = reinterpret_cast<uintptr_t>(m_memory);
-	uintptr_t end =
-		reinterpret_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
+	auto address = bit_cast<uintptr_t>(memory);
+	uintptr_t start = bit_cast<uintptr_t>(m_memory);
+	uintptr_t end = bit_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
 
 	if (address < start || address > end) { return false; }
 
@@ -82,14 +81,12 @@ void Block::deallocate(uint8_t *ptr)
 	for (auto &mem : m_memory) {
 		const size_t object_size = m_chunks.back().object_size();
 		const size_t current_size = m_chunks.size() * 64 * object_size;
-		uintptr_t start = reinterpret_cast<uintptr_t>(mem.get());
-		uintptr_t end = reinterpret_cast<uintptr_t>(mem.get() + current_size);
+		uintptr_t start = bit_cast<uintptr_t>(mem.get());
+		uintptr_t end = bit_cast<uintptr_t>(mem.get() + current_size);
 		// if ptr not in this piece of memory move to next one
-		if (reinterpret_cast<uintptr_t>(ptr) < start || reinterpret_cast<uintptr_t>(ptr) >= end) {
-			continue;
-		}
+		if (bit_cast<uintptr_t>(ptr) < start || bit_cast<uintptr_t>(ptr) >= end) { continue; }
 
-		const size_t chunk_idx = (reinterpret_cast<uintptr_t>(ptr) - start) / (64 * object_size);
+		const size_t chunk_idx = (bit_cast<uintptr_t>(ptr) - start) / (64 * object_size);
 		ASSERT(chunk_idx < m_chunks.size())
 
 		m_chunks[chunk_idx].deallocate(ptr);
@@ -129,4 +126,11 @@ Heap::Heap()
 void Heap::collect_garbage()
 {
 	if (m_gc) m_gc->run(*this);
+}
+
+
+uint8_t *Heap::allocate_gc(uint8_t *ptr) const
+{
+	new (ptr) GarbageCollected();
+	return ptr + sizeof(GarbageCollected);
 }

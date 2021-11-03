@@ -1,12 +1,12 @@
+#include "PyObject.hpp"
 #include "AttributeError.hpp"
 #include "PyNumber.hpp"
-#include "PyObject.hpp"
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
 
-#include "vm/VM.hpp"
 #include "bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "vm/VM.hpp"
 
 
 size_t ValueHash::operator()(const Value &value) const
@@ -20,22 +20,18 @@ size_t ValueHash::operator()(const Value &value) const
 					   }
 				   },
 			[](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
-			[](const Bytes &b) -> size_t {
-				return reinterpret_cast<size_t>(static_cast<const void *>(b.b.data()));
-			},
-			[](const Ellipsis &) -> size_t {
-				return reinterpret_cast<size_t>(static_cast<const void *>(py_ellipsis()));
-			},
+			[](const Bytes &b) -> size_t { return bit_cast<size_t>(b.b.data()); },
+			[](const Ellipsis &) -> size_t { return bit_cast<size_t>(py_ellipsis()); },
 			[](const NameConstant &c) -> size_t {
 				if (std::holds_alternative<bool>(c.value)) {
 					return std::get<bool>(c.value) ? 0 : 1;
 				} else {
-					return reinterpret_cast<size_t>(static_cast<const void *>(py_none()));
+					return bit_cast<size_t>(py_none());
 				}
 			},
 			[](PyObject *obj) -> size_t {
 				if (std::holds_alternative<std::monostate>(obj->slots().hash)) {
-					return reinterpret_cast<size_t>(static_cast<const void *>(obj));
+					return bit_cast<size_t>(obj);
 				} else if (std::holds_alternative<HashSlotFunctionType>(obj->slots().hash)) {
 					return std::get<HashSlotFunctionType>(obj->slots().hash)();
 				} else {

@@ -82,15 +82,16 @@ class Block
 
 		void deallocate(uint8_t *ptr)
 		{
-			uintptr_t start = reinterpret_cast<uintptr_t>(m_memory);
-			uintptr_t end = reinterpret_cast<uintptr_t>(
-				m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
-			ASSERT(reinterpret_cast<uintptr_t>(ptr) >= start
-				   && reinterpret_cast<uintptr_t>(ptr) < end);
-			size_t ptr_idx = (reinterpret_cast<uintptr_t>(ptr) - start) / m_object_size;
+			uintptr_t start = bit_cast<uintptr_t>(m_memory);
+			uintptr_t end =
+				bit_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
+			ASSERT(bit_cast<uintptr_t>(ptr) >= start && bit_cast<uintptr_t>(ptr) < end)
+			ASSERT((bit_cast<uintptr_t>(ptr) - start) % m_object_size == 0)
+
+			size_t ptr_idx = (bit_cast<uintptr_t>(ptr) - start) / m_object_size;
 			ASSERT(ptr_idx < ChunkView<>::ChunkCount)
 			m_chunk_view.mark_chunk_as_free(ptr_idx);
-			spdlog::debug("Deallocating memory at index {}, address {}",
+			spdlog::debug("Marking memory at index {} as free, address {}",
 				ptr_idx,
 				(void *)(m_memory + ptr_idx * m_object_size));
 		}
@@ -142,6 +143,8 @@ class Block
 
 	std::vector<Chunk> &chunks() { return m_chunks; }
 
+	size_t object_size() const { return m_chunks.back().object_size(); }
+
   private:
 	std::vector<Chunk> m_chunks;
 	std::vector<std::unique_ptr<uint8_t>> m_memory;
@@ -178,7 +181,7 @@ class Slab
 		} else {
 			[]<bool flag = false>()
 			{
-				static_assert(flag, "only object sizes <= 512 bytes are currently supported");
+				static_assert(flag, "only object sizes <= 1024 bytes are currently supported");
 			}
 			();
 		}
@@ -188,7 +191,7 @@ class Slab
 	{
 		[]<bool flag = false>()
 		{
-			static_assert(flag, "only GC collected objects currently supported");
+			static_assert(flag, "only GC collected objects are currently supported");
 		}
 		();
 
@@ -213,26 +216,6 @@ class Slab
 	}
 
 	bool has_address(uint8_t *addr) const;
-
-	template<typename T> void deallocate(uint8_t *ptr)
-	{
-		spdlog::debug("Deallocating memory for object of size {}", sizeof(T));
-		if constexpr (sizeof(T) <= 16) { return block16->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 32) { return block32->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 64) { return block64->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 128) { return block128->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 256) { return block256->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 512) { return block512->deallocate(ptr); }
-		if constexpr (sizeof(T) <= 1024) {
-			return block1024->deallocate(ptr);
-		} else {
-			[]<bool flag = false>()
-			{
-				static_assert(flag, "only object sizes <= 512 bytes are currently supported");
-			}
-			();
-		}
-	}
 
 	void reset()
 	{
@@ -263,6 +246,8 @@ class Heap
 	size_t m_static_memory_size{ 4 * KB };
 	size_t m_static_offset{ 0 };
 	Slab m_slab;
+	std::unique_ptr<GarbageCollector> m_gc;
+	uintptr_t *m_bottom_stack_pointer;
 
   public:
 	static Heap &the()
@@ -291,8 +276,10 @@ class Heap
 	{
 		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
-		T *obj = new (ptr + sizeof(GarbageCollected)) T(std::forward<Args>(args)...);
-		new (ptr) GarbageCollected(*obj);
+
+		uint8_t *obj_ptr = allocate_gc(ptr);
+		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
+
 		if constexpr (std::is_base_of_v<PyObject, T>)
 			spdlog::debug("Allocated {} on the heap @{}",
 				object_name(static_cast<PyObject *>(obj)->type()),
@@ -313,7 +300,7 @@ class Heap
 	Slab &slab() { return m_slab; }
 
   private:
+	uint8_t *allocate_gc(uint8_t *ptr) const;
+
 	Heap();
-	std::unique_ptr<GarbageCollector> m_gc;
-	uintptr_t *m_bottom_stack_pointer;
 };
