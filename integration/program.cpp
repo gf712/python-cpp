@@ -5,6 +5,7 @@
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 #include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
@@ -533,10 +534,20 @@ TEST(RunPythonProgram, WhileLoop)
 		"acc = 0\n"
 		"i = 0\n"
 		"while i <= 10:\n"
-		// "   print(i)\n"
 		"	acc += i\n"
 		"	i += 1\n";
 
 	run(program);
 	assert_interpreter_object_value("acc", 55);
+}
+
+
+TEST(RunPythonProgram, UnpackAssignment)
+{
+	static constexpr std::string_view program =
+		"a, b = 1, 2\n";
+
+	run(program);
+	assert_interpreter_object_value("a", 1);
+	assert_interpreter_object_value("b", 2);
 }

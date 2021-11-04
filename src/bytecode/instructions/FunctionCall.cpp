@@ -1,6 +1,7 @@
 #include "FunctionCall.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/TypeError.hpp"
 
 PyObject *execute(VirtualMachine &vm,

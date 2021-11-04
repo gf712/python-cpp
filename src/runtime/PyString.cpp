@@ -29,7 +29,7 @@ int32_t codepoint(const char *str, size_t length)
 {
 	if (length < 1) return -1;
 	unsigned char u0 = str[0];
-	if (u0 >= 0 && u0 <= 127) return u0;
+	if (u0 <= 127) return u0;
 	if (length < 2) return -1;
 	unsigned char u1 = str[1];
 	if (u0 >= 192 && u0 <= 223) return (u0 - 192) * 64 + (u1 - 128);

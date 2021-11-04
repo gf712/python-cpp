@@ -194,6 +194,7 @@ class Slab
 			static_assert(flag, "only GC collected objects are currently supported");
 		}
 		();
+		return nullptr;
 
 		// uint8_t *ptr{ nullptr };
 		// spdlog::debug("Allocating memory for object of size {}", sizeof(T));

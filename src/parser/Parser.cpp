@@ -1626,10 +1626,25 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 	// 	| star_expression
 	static bool matches_impl(Parser &p)
 	{
+		size_t initial_stack_size = p.stack().size();
+		// star_expression (',' star_expression )+ [',']
+		using pattern1 = PatternMatch<StarExpressionPattern,
+			OneOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, StarExpressionPattern>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			auto result = std::make_shared<Tuple>(ContextType::LOAD);
+			std::vector<std::shared_ptr<ASTNode>> expressions;
+			while (p.stack().size() > initial_stack_size) { expressions.push_back(p.pop_back()); }
+			std::for_each(expressions.rbegin(), expressions.rend(), [&result](const auto &el) {
+				result->append(el);
+			});
+			p.push_to_stack(result);
+			return true;
+		}
 		// star_expression ','
-		// using pattern2 =
-		// 	PatternMatch<StarExpressionPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
-		// if (pattern2::match(tokens, p)) { return true; }
+		using pattern2 =
+			PatternMatch<StarExpressionPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
+		if (pattern2::match(p)) { return true; }
 		// star_expression
 		using pattern3 = PatternMatch<StarExpressionPattern>;
 		if (pattern3::match(p)) { return true; }
@@ -1725,14 +1740,25 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 		if (pattern3::match(p)) {
 			spdlog::debug(
 				"(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
-			std::vector<std::shared_ptr<ASTNode>> targets;
+			auto targets = std::make_shared<Tuple>(ContextType::STORE);
 			auto expressions = p.pop_back();
 			const auto &stack = p.stack();
-			for (size_t i = start_position; i < stack.size(); ++i) { targets.push_back(stack[i]); }
+			for (size_t i = start_position; i < stack.size(); ++i) { targets->append(stack[i]); }
 			while (p.stack().size() > start_position) { p.pop_back(); }
 			p.print_stack();
 			expressions->print_node("");
-			auto assignment = std::make_shared<Assign>(targets, expressions, "");
+
+			auto assignment = [&]() {
+				if (targets->elements().size() == 1) {
+					return std::make_shared<Assign>(
+						std::vector<std::shared_ptr<ASTNode>>{ targets->elements().back() },
+						expressions,
+						"");
+				} else {
+					return std::make_shared<Assign>(
+						std::vector<std::shared_ptr<ASTNode>>{ targets }, expressions, "");
+				}
+			}();
 			p.push_to_stack(assignment);
 			assignment->print_node("");
 			return true;

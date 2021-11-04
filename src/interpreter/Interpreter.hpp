@@ -36,7 +36,7 @@ class Interpreter
 	template<typename... Ts> void raise_exception(PyObject *exception)
 	{
 		m_status = Status::EXCEPTION;
-		m_exception_message = "DEPRECATED :(";
+		// m_exception_message = "DEPRECATED :(";
 		m_current_frame->set_exception(std::move(exception));
 	}
 

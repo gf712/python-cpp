@@ -12,6 +12,7 @@
 #include "bytecode/instructions/ReturnValue.hpp"
 #include "bytecode/instructions/StoreAttr.hpp"
 #include "bytecode/instructions/StoreName.hpp"
+#include "bytecode/instructions/UnpackSequence.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {
@@ -184,6 +185,17 @@ Register
 				auto dst_register = ast_attr->value()->generate(function_id, generator, ctx);
 				generator.emit<StoreAttr>(
 					function_id, dst_register, src_register, ast_attr->attr());
+			} else if (auto ast_tuple = as<Tuple>(target)) {
+				std::vector<Register> dst_registers;
+				for (size_t i = 0; i < ast_tuple->elements().size(); ++i) {
+					dst_registers.push_back(generator.allocate_register());
+				}
+				generator.emit<UnpackSequence>(function_id, dst_registers, src_register);
+				size_t idx{ 0 };
+				for (const auto &dst_register : dst_registers) {
+					const auto &el = ast_tuple->elements()[idx++];
+					generator.emit<StoreName>(function_id, as<Name>(el)->ids()[0], dst_register);
+				}
 			} else {
 				TODO();
 			}
@@ -242,9 +254,8 @@ Register If::generate_impl(size_t function_id, BytecodeGenerator &generator, AST
 
 	ASSERT(!m_body.empty())
 
-	auto orelse_start_label =
-		generator.make_label(fmt::format("ORELSE_{}", if_count++), function_id);
-	auto end_label = generator.make_label(fmt::format("END_{}", if_count), function_id);
+	auto orelse_start_label = generator.make_label(fmt::format("ORELSE_{}", if_count), function_id);
+	auto end_label = generator.make_label(fmt::format("END_{}", if_count++), function_id);
 
 	// if
 	const auto test_result_register = m_test->generate(function_id, generator, ctx);
@@ -271,9 +282,9 @@ Register For::generate_impl(size_t function_id, BytecodeGenerator &generator, AS
 	ASSERT(!m_body.empty())
 
 	auto forloop_start_label =
-		generator.make_label(fmt::format("FOR_START_{}", for_loop_count++), function_id);
+		generator.make_label(fmt::format("FOR_START_{}", for_loop_count), function_id);
 	auto forloop_end_label =
-		generator.make_label(fmt::format("FOR_END_{}", for_loop_count), function_id);
+		generator.make_label(fmt::format("FOR_END_{}", for_loop_count++), function_id);
 
 	// generate the iterator
 	const auto iterator_func_register = m_iter->generate(function_id, generator, ctx);
@@ -315,9 +326,9 @@ Register
 	ASSERT(!m_body.empty())
 
 	auto while_loop_start_label =
-		generator.make_label(fmt::format("WHILE_START_{}", while_loop_count++), function_id);
+		generator.make_label(fmt::format("WHILE_START_{}", while_loop_count), function_id);
 	auto while_loop_end_label =
-		generator.make_label(fmt::format("WHILE_END_{}", while_loop_count), function_id);
+		generator.make_label(fmt::format("WHILE_END_{}", while_loop_count++), function_id);
 
 	// test
 	generator.bind(while_loop_start_label);
@@ -349,6 +360,9 @@ Register
 	} break;
 	case OpType::LtE: {
 		generator.emit<LessThanEquals>(function_id, result_reg, lhs_reg, rhs_reg);
+	} break;
+	case OpType::Lt: {
+		generator.emit<LessThan>(function_id, result_reg, lhs_reg, rhs_reg);
 	} break;
 	default: {
 		TODO()

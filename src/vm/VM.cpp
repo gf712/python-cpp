@@ -68,7 +68,7 @@ int VirtualMachine::execute_frame()
 		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
 		instruction->execute(*this, *m_interpreter);
 
-		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+		if (m_interpreter->execution_frame()->exception()) {
 			m_interpreter->unwind();
 			// restore instruction pointer
 			m_instruction_pointer = initial_ip;
@@ -96,7 +96,7 @@ int VirtualMachine::execute()
 		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
 		instruction->execute(*this, *m_interpreter);
 
-		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+		if (m_interpreter->execution_frame()->exception()) {
 			m_interpreter->unwind();
 			// restore instruction pointer
 			return 1;
@@ -183,7 +183,7 @@ PyObject *VirtualMachine::execute_statement(std::shared_ptr<Bytecode> bytecode)
 		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
 		instruction->execute(*this, *m_interpreter);
 
-		if (auto exception_obj = m_interpreter->execution_frame()->exception()) {
+		if (m_interpreter->execution_frame()->exception()) {
 			m_interpreter->unwind();
 			// restore instruction pointer
 			std::cout << m_interpreter->exception_message() << '\n';

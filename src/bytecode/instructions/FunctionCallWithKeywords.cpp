@@ -2,6 +2,7 @@
 #include "FunctionCallWithKeywords.hpp"
 
 #include "runtime/PyDict.hpp"
+#include "runtime/PyTuple.hpp"
 
 
 void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &interpreter) const

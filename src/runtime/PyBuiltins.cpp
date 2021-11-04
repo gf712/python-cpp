@@ -4,6 +4,7 @@
 #include "PyModule.hpp"
 #include "PyNumber.hpp"
 #include "PyRange.hpp"
+#include "PyTuple.hpp"
 #include "StopIterationException.hpp"
 #include "TypeError.hpp"
 
@@ -108,8 +109,8 @@ PyObject *iter(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 		interpreter.raise_exception("TypeError: iter() takes no keyword arguments");
 		return py_none();
 	}
-	if (std::holds_alternative<ReprSlotFunctionType>(iterfunc)) {
-		auto iter_native = std::get<ReprSlotFunctionType>(iterfunc);
+	if (std::holds_alternative<IterSlotFunctionType>(iterfunc)) {
+		auto iter_native = std::get<IterSlotFunctionType>(iterfunc);
 		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
 		return iter_native();
 	} else {

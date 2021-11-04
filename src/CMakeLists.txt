@@ -14,7 +14,8 @@ set(BYTECODE_SOURCE_FILES
     bytecode/instructions/MethodCall.cpp
     bytecode/instructions/ReturnValue.cpp
     bytecode/instructions/StoreAttr.cpp
-    bytecode/instructions/StoreName.cpp)
+    bytecode/instructions/StoreName.cpp
+    bytecode/instructions/UnpackSequence.cpp)
 
 set(INTERPRETER_SOURCE_FILES # cmake-format: sortable
                              interpreter/ExecutionFrame.cpp interpreter/Interpreter.cpp)
@@ -35,6 +36,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyObject.cpp
     runtime/PyRange.cpp
     runtime/PyString.cpp
+    runtime/PyTuple.cpp
     runtime/Value.cpp)
 
 set(VM_SOURCE_FILES # cmake-format: sortable

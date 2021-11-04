@@ -87,7 +87,7 @@ struct Number
 			value,
 			rhs.value);
 	}
-	
+
 	bool operator==(const Number &rhs) const;
 	bool operator<=(const Number &rhs) const;
 	bool operator<(const Number &rhs) const;

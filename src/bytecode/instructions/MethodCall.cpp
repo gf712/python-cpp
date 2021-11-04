@@ -3,6 +3,7 @@
 
 #include "runtime/PyDict.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 
 
 void MethodCall::execute(VirtualMachine &vm, Interpreter &interpreter) const

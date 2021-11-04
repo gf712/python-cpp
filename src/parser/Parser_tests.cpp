@@ -507,11 +507,47 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 	auto expected_ast = std::make_shared<Module>();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
-		std::make_shared<Constant>(static_cast<int64_t>(2)),
+		std::make_shared<Constant>(int64_t{ 2 }),
 		""));
 
 	assert_generates_ast(program, expected_ast);
 }
+
+// TEST(Parser, MultipleAssignments)
+// {
+// 	constexpr std::string_view program = "a = b = 1\n";
+
+// 	auto expected_ast = std::make_shared<Module>();
+// 	expected_ast->emplace(std::make_shared<Assign>(
+// 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
+// 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE),
+// 				std::make_shared<Name>("b", ContextType::STORE) },
+// 			ContextType::STORE) },
+// 		std::make_shared<Constant>(int64_t{ 0 }),
+// 		""));
+
+// 	assert_generates_ast(program, expected_ast);
+// }
+
+TEST(Parser, MultipleAssignmentsWithStructuredBinding)
+{
+	constexpr std::string_view program = "a, b = 0, 1\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE),
+				std::make_shared<Name>("b", ContextType::STORE) },
+			ContextType::STORE) },
+		std::make_shared<Tuple>(
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 0 }),
+				std::make_shared<Constant>(int64_t{ 1 }) },
+			ContextType::LOAD),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 
 TEST(Parser, BlankLine)
 {

@@ -6,7 +6,7 @@ namespace ast {
 Register
 	Module::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
-	Register last;
+	Register last{ 0 };
 	for (const auto &statement : m_body) {
 		last = statement->generate(function_id, generator, ctx);
 	}
