@@ -152,6 +152,10 @@ class PyObject : public Cell
 	virtual PyObject *modulo_impl(const PyObject *obj, Interpreter &interpreter) const;
 
 	virtual PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *less_than_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *less_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *greater_than_impl(const PyObject *obj, Interpreter &interpreter) const;
+	virtual PyObject *greater_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const;
 	virtual PyObject *
 		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const;
 

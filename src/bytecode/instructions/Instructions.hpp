@@ -15,6 +15,7 @@ std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &i
 std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 class Instruction
@@ -366,6 +367,25 @@ class Equal final : public Instruction
 	std::string to_string() const final
 	{
 		return fmt::format("EQUAL            r{:<3} r{:<3} r{:<3}", m_dst, m_lhs, m_rhs);
+	}
+
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+
+	void relocate(BytecodeGenerator &, const std::vector<size_t> &) final {}
+};
+
+class LessThanEquals final : public Instruction
+{
+	Register m_dst;
+	Register m_lhs;
+	Register m_rhs;
+
+  public:
+	LessThanEquals(Register dst, Register lhs, Register rhs) : m_dst(dst), m_lhs(lhs), m_rhs(rhs) {}
+
+	std::string to_string() const final
+	{
+		return fmt::format("LESS_THAN_EQ    r{:<3} r{:<3} r{:<3}", m_dst, m_lhs, m_rhs);
 	}
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;

@@ -1,6 +1,7 @@
+#include "Value.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
-#include "Value.hpp"
+#include "vm/VM.hpp"
 
 
 bool Number::operator==(const PyObject *other) const
@@ -19,6 +20,44 @@ bool Number::operator==(const NameConstant &other) const
 	if (*this == Number{ int64_t{ 0 } }) { return std::get<bool>(other.value) == false; }
 	if (*this == Number{ int64_t{ 1 } }) { return std::get<bool>(other.value) == true; }
 	return false;
+}
+
+bool Number::operator==(const Number &rhs) const
+{
+	return std::visit(
+		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value == rhs_value; },
+		value,
+		rhs.value);
+}
+bool Number::operator<=(const Number &rhs) const
+{
+	return std::visit(
+		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value <= rhs_value; },
+		value,
+		rhs.value);
+}
+bool Number::operator<(const Number &rhs) const
+{
+	return std::visit(
+		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value < rhs_value; },
+		value,
+		rhs.value);
+}
+
+bool Number::operator>(const Number &rhs) const
+{
+	return std::visit(
+		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value > rhs_value; },
+		value,
+		rhs.value);
+}
+
+bool Number::operator>=(const Number &rhs) const
+{
+	return std::visit(
+		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value >= rhs_value; },
+		value,
+		rhs.value);
 }
 
 

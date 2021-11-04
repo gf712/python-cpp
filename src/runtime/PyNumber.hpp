@@ -22,6 +22,10 @@ class PyNumber final : public PyObject
 
 	PyObject *repr_impl(Interpreter &interpreter) const override;
 	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *less_than_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *less_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *greater_than_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *greater_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
 
 	const Number &value() const { return m_value; }
 

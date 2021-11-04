@@ -3,12 +3,12 @@
 #include "forward.hpp"
 #include "utilities.hpp"
 
-#include <variant>
-#include <sstream>
-#include <vector>
-#include <memory>
-#include <cstddef>
 #include <cmath>
+#include <cstddef>
+#include <memory>
+#include <sstream>
+#include <variant>
+#include <vector>
 
 struct Number
 {
@@ -87,13 +87,13 @@ struct Number
 			value,
 			rhs.value);
 	}
-	bool operator==(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) { return lhs_value == rhs_value; },
-			value,
-			rhs.value);
-	}
+	
+	bool operator==(const Number &rhs) const;
+	bool operator<=(const Number &rhs) const;
+	bool operator<(const Number &rhs) const;
+	bool operator>(const Number &rhs) const;
+	bool operator>=(const Number &rhs) const;
+
 	bool operator==(const PyObject *other) const;
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const Ellipsis &) const { return false; }

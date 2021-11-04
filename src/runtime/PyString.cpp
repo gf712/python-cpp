@@ -1,4 +1,5 @@
 #include "PyString.hpp"
+#include "TypeError.hpp"
 
 #include "interpreter/Interpreter.hpp"
 
@@ -72,49 +73,17 @@ size_t PyString::hash_impl(Interpreter &) const { return std::hash<std::string>{
 
 PyObject *PyString::repr_impl(Interpreter &) const { return PyString::from(String{ m_value }); }
 
-PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &interpreter) const
+
+PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const
 {
+	if (this == obj) return py_true();
 	if (auto obj_string = as<PyString>(obj)) {
 		return m_value == obj_string->value() ? py_true() : py_false();
 	} else {
-		return PyObject::equal_impl(obj, interpreter);
-	}
-}
-
-
-PyObject *PyString::richcompare_impl(const PyObject *other,
-	RichCompare op,
-	Interpreter &interpreter) const
-{
-	spdlog::debug("PyString::richcompare_impl: Compare {} to {} using {} op",
-		to_string(),
-		other->to_string(),
-		static_cast<int>(op));
-	if (auto obj_string = as<PyString>(other)) {
-		switch (op) {
-		case RichCompare::Py_LT: {
-			return m_value < obj_string->value() ? py_true() : py_false();
-		}
-		case RichCompare::Py_LE: {
-			return m_value <= obj_string->value() ? py_true() : py_false();
-		}
-		case RichCompare::Py_EQ: {
-			if (this == obj_string) return py_true();
-			return m_value == obj_string->value() ? py_true() : py_false();
-		}
-		case RichCompare::Py_NE: {
-			return m_value != obj_string->value() ? py_true() : py_false();
-		}
-		case RichCompare::Py_GT: {
-			return m_value > obj_string->value() ? py_true() : py_false();
-		}
-		case RichCompare::Py_GE: {
-			return m_value >= obj_string->value() ? py_true() : py_false();
-		}
-		}
-		return m_value == obj_string->value() ? py_true() : py_false();
-	} else {
-		return PyObject::richcompare_impl(other, op, interpreter);
+		type_error("'==' not supported between instances of '{}' and '{}'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
 	}
 }
 

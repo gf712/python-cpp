@@ -786,7 +786,7 @@ class While : public ASTNode
 		  m_orelse(std::move(orelse))
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }

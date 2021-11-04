@@ -22,8 +22,6 @@ class PyString : public PyObject
 	size_t hash_impl(Interpreter &interpreter) const override;
 	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *len_impl(Interpreter &interpreter) const override;
-	PyObject *
-		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const override;
 
   private:
 	PyString(std::string s);

@@ -208,32 +208,63 @@ PyObject *PyObject::lshift_impl(const PyObject *, Interpreter &) const { return 
 
 PyObject *PyObject::modulo_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
-PyObject *PyObject::equal_impl(const PyObject *, Interpreter &) const
+PyObject *PyObject::equal_impl(const PyObject *other, Interpreter &) const
 {
-	return PyObject::from(NameConstant{ false });
+	return this == other ? py_true() : py_false();
 }
 
+
+PyObject *PyObject::less_than_impl(const PyObject *other, Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: '<' not supported between instances of '{}' and '{}'",
+		object_name(this->type()),
+		object_name(other->type()));
+	return nullptr;
+}
+
+PyObject *PyObject::less_than_equal_impl(const PyObject *other, Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: '<=' not supported between instances of '{}' and '{}'",
+		object_name(this->type()),
+		object_name(other->type()));
+	return nullptr;
+}
+
+PyObject *PyObject::greater_than_impl(const PyObject *other, Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: '>' not supported between instances of '{}' and '{}'",
+		object_name(this->type()),
+		object_name(other->type()));
+	return nullptr;
+}
+
+PyObject *PyObject::greater_than_equal_impl(const PyObject *other, Interpreter &interpreter) const
+{
+	interpreter.raise_exception("TypeError: '>=' not supported between instances of '{}' and '{}'",
+		object_name(this->type()),
+		object_name(other->type()));
+	return nullptr;
+}
 
 PyObject *PyObject::richcompare_impl(const PyObject *other,
 	RichCompare op,
 	Interpreter &interpreter) const
 {
-	static constexpr std::string_view opstrings[] = { "<", "<=", "==", "!=", ">", ">=" };
 	switch (op) {
 	case RichCompare::Py_EQ:
-		return this == other ? py_true() : py_false();
+		return equal_impl(other, interpreter);
 	case RichCompare::Py_NE:
-		return this != other ? py_true() : py_false();
-	default:
-		interpreter.raise_exception(
-			"TypeError: '{}' not supported between instances of '{}' and '{}'",
-			opstrings[static_cast<int>(op)],
-			object_name(this->type()),
-			object_name(other->type()));
+		return equal_impl(other, interpreter) ? py_false() : py_true();
+	case RichCompare::Py_LE:
+		return less_than_equal_impl(other, interpreter);
+	case RichCompare::Py_LT:
+		return less_than_impl(other, interpreter);
+	case RichCompare::Py_GE:
+		return greater_than_equal_impl(other, interpreter);
+	case RichCompare::Py_GT:
+		return greater_than_impl(other, interpreter);
 	}
-	return nullptr;
 }
-
 
 PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args)
 	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_register_count(register_count),

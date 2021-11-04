@@ -526,3 +526,17 @@ TEST(RunPythonProgram, BuiltinOrd)
 	run(program);
 	assert_interpreter_object_value("smiley_codepoint", 128515);
 }
+
+TEST(RunPythonProgram, WhileLoop)
+{
+	static constexpr std::string_view program =
+		"acc = 0\n"
+		"i = 0\n"
+		"while i <= 10:\n"
+		// "   print(i)\n"
+		"	acc += i\n"
+		"	i += 1\n";
+
+	run(program);
+	assert_interpreter_object_value("acc", 55);
+}

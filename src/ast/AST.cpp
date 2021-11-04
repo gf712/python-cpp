@@ -273,7 +273,7 @@ Register For::generate_impl(size_t function_id, BytecodeGenerator &generator, AS
 	auto forloop_start_label =
 		generator.make_label(fmt::format("FOR_START_{}", for_loop_count++), function_id);
 	auto forloop_end_label =
-		generator.make_label(fmt::format("END_START_{}", for_loop_count), function_id);
+		generator.make_label(fmt::format("FOR_END_{}", for_loop_count), function_id);
 
 	// generate the iterator
 	const auto iterator_func_register = m_iter->generate(function_id, generator, ctx);
@@ -306,6 +306,36 @@ Register For::generate_impl(size_t function_id, BytecodeGenerator &generator, AS
 	return {};
 }
 
+
+Register
+	While::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
+{
+	static size_t while_loop_count = 0;
+
+	ASSERT(!m_body.empty())
+
+	auto while_loop_start_label =
+		generator.make_label(fmt::format("WHILE_START_{}", while_loop_count++), function_id);
+	auto while_loop_end_label =
+		generator.make_label(fmt::format("WHILE_END_{}", while_loop_count), function_id);
+
+	// test
+	generator.bind(while_loop_start_label);
+	const auto test_result_register = m_test->generate(function_id, generator, ctx);
+	generator.emit<JumpIfFalse>(function_id, test_result_register, while_loop_end_label);
+
+	// body
+	for (const auto &el : m_body) { el->generate(function_id, generator, ctx); }
+	generator.emit<Jump>(function_id, while_loop_start_label);
+
+	// orelse
+	generator.bind(while_loop_end_label);
+	for (const auto &el : m_orelse) { el->generate(function_id, generator, ctx); }
+
+	return {};
+}
+
+
 Register
 	Compare::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
 {
@@ -316,6 +346,9 @@ Register
 	switch (m_op) {
 	case OpType::Eq: {
 		generator.emit<Equal>(function_id, result_reg, lhs_reg, rhs_reg);
+	} break;
+	case OpType::LtE: {
+		generator.emit<LessThanEquals>(function_id, result_reg, lhs_reg, rhs_reg);
 	} break;
 	default: {
 		TODO()
