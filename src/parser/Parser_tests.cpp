@@ -394,6 +394,27 @@ void compare_augmented_assign(const std::shared_ptr<ASTNode> &result,
 }
 
 
+void compare_import(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Import);
+
+	const auto result_names = as<Import>(result)->names();
+	const auto expected_names = as<Import>(expected)->names();
+	ASSERT_EQ(result_names.size(), expected_names.size());
+
+	for (size_t i = 0; i < result_names.size(); ++i) {
+		ASSERT_EQ(result_names[i], expected_names[i]);
+	}
+
+	const auto result_asname = as<Import>(result)->asname();
+	const auto expected_asname = as<Import>(expected)->asname();
+	ASSERT_EQ(result_asname.has_value(), expected_asname.has_value());
+
+	if (expected_asname.has_value()) { ASSERT_EQ(*result_asname, *expected_asname); }
+}
+
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -471,6 +492,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::While: {
 		compare_while(result, expected);
+		break;
+	}
+	case ASTNodeType::Import: {
+		compare_import(result, expected);
 		break;
 	}
 	default: {
@@ -991,6 +1016,38 @@ TEST(Parser, WhileLoop)
 			std::make_shared<Name>("print", ContextType::LOAD),
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::LOAD) },
 			std::vector<std::shared_ptr<Keyword>>{}) }));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, Import)
+{
+	constexpr std::string_view program = "import fibo\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Import>(std::vector<std::string>{ "fibo" }));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportAs)
+{
+	constexpr std::string_view program = "import fibo as f\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(std::make_shared<Import>(std::vector<std::string>{ "fibo" }, "f"));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportDottedAs)
+{
+	constexpr std::string_view program = "import fibo.nac.ci as f\n";
+
+	auto expected_ast = std::make_shared<Module>();
+	expected_ast->emplace(
+		std::make_shared<Import>(std::vector<std::string>{ "fibo", "nac", "ci" }, "f"));
 
 	assert_generates_ast(program, expected_ast);
 }

@@ -1,5 +1,6 @@
 #include "UnpackSequence.hpp"
 
+#include "runtime/PyList.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyTuple.hpp"

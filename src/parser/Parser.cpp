@@ -1804,6 +1804,167 @@ struct ReturnStatementPattern : Pattern<ReturnStatementPattern>
 	}
 };
 
+
+struct ImportPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "import"; }
+};
+
+
+struct AsPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "as"; }
+};
+
+
+struct DottedNamePattern_ : Pattern<DottedNamePattern_>
+{
+	//  dotted_name':
+	//	   | '.' NAME dotted_name'
+	//	   | ϵ
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("dotted_name");
+		const auto token = p.lexer().peek_token(p.token_position() + 1);
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			DottedNamePattern_>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'.' NAME dotted_name'");
+			std::string name{ p.lexer().get(token->start(), token->end()) };
+			p.push_to_stack(std::make_shared<Constant>(name));
+			return true;
+		}
+		using pattern2 = PatternMatch<
+			LookAhead<SingleTokenPattern<Token::TokenType::NEWLINE, Token::TokenType::NAME>>>;
+		if (pattern2::match(p)) {
+			spdlog::debug("ϵ");
+			return true;
+		}
+
+		return false;
+	}
+};
+
+struct DottedNamePattern : Pattern<DottedNamePattern>
+{
+	//  dotted_name:
+	// 	   NAME dotted_name'
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("dotted_name");
+		const auto token = p.lexer().peek_token(p.token_position());
+		std::string name{ p.lexer().get(token->start(), token->end()) };
+		size_t stack_position = p.stack().size();
+		using pattern2 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::NAME>, DottedNamePattern_>;
+		if (pattern2::match(p)) {
+			spdlog::debug("NAME dotted_name'");
+			std::static_pointer_cast<Import>(p.stack()[stack_position - 1])->add_dotted_name(name);
+			while (p.stack().size() > stack_position) {
+				const auto &node = p.pop_back();
+				std::string value =
+					std::get<String>(static_pointer_cast<Constant>(node)->value()).s;
+				std::static_pointer_cast<Import>(p.stack()[stack_position - 1])
+					->add_dotted_name(value);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+
+struct DottedAsNamePattern : Pattern<DottedAsNamePattern>
+{
+	// dotted_as_name:
+	//     | dotted_name' ['as' NAME ]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("dotted_as_name");
+		using pattern1 = PatternMatch<DottedNamePattern>;
+		if (pattern1::match(p)) {
+			using pattern1a =
+				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>,
+					SingleTokenPattern<Token::TokenType::NAME>>;
+			if (pattern1a::match(p)) {
+				spdlog::debug("['as' NAME ]");
+				const auto token = p.lexer().peek_token(p.token_position() - 1);
+				std::string asname{ p.lexer().get(token->start(), token->end()) };
+				std::static_pointer_cast<Import>(p.stack().back())->set_asname(asname);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+
+struct DottedAsNamesPattern : Pattern<DottedAsNamesPattern>
+{
+	// dotted_as_names:
+	//     | ','.dotted_as_name+
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("dotted_as_names");
+		using pattern1 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<DottedAsNamePattern,
+			SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("','.dotted_as_name+");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct ImportNamePattern : Pattern<ImportNamePattern>
+{
+	// import_name: 'import' dotted_as_names
+	static bool matches_impl(Parser &p)
+	{
+		p.push_to_stack(std::make_shared<Import>());
+		spdlog::debug("import_name");
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ImportPattern>,
+				DottedAsNamesPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'import' dotted_as_names");
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct ImportFromPattern : Pattern<ImportFromPattern>
+{
+	// import_from:
+	// | 'from' ('.' | '...')* dotted_name 'import' import_from_targets
+	// | 'from' ('.' | '...')+ 'import' import_from_targets
+	static bool matches_impl(Parser &)
+	{
+		spdlog::debug("import_from");
+		return false;
+	}
+};
+
+
+struct ImportStatementPattern : Pattern<ImportStatementPattern>
+{
+	// import_stmt: import_name | import_from
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("import_stmt");
+		using pattern1 = PatternMatch<ImportNamePattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("import_name");
+			return true;
+		}
+		using pattern2 = PatternMatch<ImportFromPattern>;
+		spdlog::debug("import_from");
+		if (pattern2::match(p)) { return true; }
+		return false;
+	}
+};
+
 struct SmallStatementPattern : Pattern<SmallStatementPattern>
 {
 	// small_stmt:
@@ -1835,6 +1996,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern3 = PatternMatch<ReturnStatementPattern>;
 		if (pattern3::match(p)) {
 			spdlog::debug("return_stmt");
+			return true;
+		}
+		using pattern4 = PatternMatch<ImportStatementPattern>;
+		if (pattern4::match(p)) {
+			spdlog::debug("import_stmt");
 			return true;
 		}
 		return false;

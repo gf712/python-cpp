@@ -17,19 +17,5 @@ class CustomPyObject : public PyObject
 	std::string to_string() const override { return fmt::format("CustomPyObject"); }
 
   private:
-	bool update_slot_if_special(const std::string &name, PyObject *value)
-	{
-		if (!name.starts_with("__")) { return false; }
-
-		if (name == "__repr__") {
-			auto pyfunc = as<PyFunction>(value);
-			ASSERT(pyfunc)
-			m_slots.repr = std::move(pyfunc);
-		} else {
-			spdlog::debug("{} is not a special name, skipping", name);
-			return false;
-		}
-
-		return true;
-	}
+	bool update_slot_if_special(const std::string &name, PyObject *value);
 };

@@ -5,9 +5,9 @@
 
 #include "ast/optimizers/ConstantFolding.hpp"
 
-#include <vector>
 #include <memory>
 #include <set>
+#include <vector>
 
 struct FunctionMetaData
 {
@@ -72,10 +72,14 @@ class Label
 
 	const std::string &name() const { return m_label_name; }
 
-	bool operator<(const Label &other) const
+	size_t hash() const
 	{
-		return (m_label_name < other.name()) || (m_function_id < other.function_id());
+		size_t seed = std::hash<std::string>{}(m_label_name);
+		seed ^= std::hash<size_t>{}(m_function_id) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
 	}
+
+	bool operator<(const Label &other) const { return hash() < other.hash(); }
 };
 
 class BytecodeGenerator;
@@ -105,7 +109,8 @@ class BytecodeGenerator
 	BytecodeGenerator();
 	~BytecodeGenerator();
 
-	static std::shared_ptr<Bytecode> compile(std::shared_ptr<ast::ASTNode> node, compiler::OptimizationLevel lvl);
+	static std::shared_ptr<Bytecode> compile(std::shared_ptr<ast::ASTNode> node,
+		compiler::OptimizationLevel lvl);
 
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
 	{

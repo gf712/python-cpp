@@ -157,48 +157,38 @@ Register
 {
 	const auto src_register = m_value->generate(function_id, generator, ctx);
 	ASSERT(m_targets.size() > 0)
-	if (ctx.has_local_args()) {
-		const auto &local_args = ctx.local_args();
-		const auto &arg_names = local_args->argument_names();
-		for (const auto &target : m_targets) {
-			if (auto ast_name = as<Name>(target)) {
-				for (const auto &var : ast_name->ids()) {
+
+	for (const auto &target : m_targets) {
+		if (auto ast_name = as<Name>(target)) {
+			for (const auto &var : ast_name->ids()) {
+				if (ctx.has_local_args()) {
+					const auto &local_args = ctx.local_args();
+					const auto &arg_names = local_args->argument_names();
 					if (auto it = std::find(arg_names.begin(), arg_names.end(), var);
 						it != arg_names.end()) {
 						const size_t arg_index = std::distance(arg_names.begin(), it);
 						generator.emit<StoreFast>(function_id, arg_index, var, src_register);
-					} else {
-						generator.emit<StoreName>(function_id, var, src_register);
+						continue;
 					}
 				}
-			} else {
-				TODO();
+				generator.emit<StoreName>(function_id, var, src_register);
 			}
-		}
-	} else {
-		for (const auto &target : m_targets) {
-			if (auto ast_name = as<Name>(target)) {
-				for (const auto &var : ast_name->ids()) {
-					generator.emit<StoreName>(function_id, var, src_register);
-				}
-			} else if (auto ast_attr = as<Attribute>(target)) {
-				auto dst_register = ast_attr->value()->generate(function_id, generator, ctx);
-				generator.emit<StoreAttr>(
-					function_id, dst_register, src_register, ast_attr->attr());
-			} else if (auto ast_tuple = as<Tuple>(target)) {
-				std::vector<Register> dst_registers;
-				for (size_t i = 0; i < ast_tuple->elements().size(); ++i) {
-					dst_registers.push_back(generator.allocate_register());
-				}
-				generator.emit<UnpackSequence>(function_id, dst_registers, src_register);
-				size_t idx{ 0 };
-				for (const auto &dst_register : dst_registers) {
-					const auto &el = ast_tuple->elements()[idx++];
-					generator.emit<StoreName>(function_id, as<Name>(el)->ids()[0], dst_register);
-				}
-			} else {
-				TODO();
+		} else if (auto ast_attr = as<Attribute>(target)) {
+			auto dst_register = ast_attr->value()->generate(function_id, generator, ctx);
+			generator.emit<StoreAttr>(function_id, dst_register, src_register, ast_attr->attr());
+		} else if (auto ast_tuple = as<Tuple>(target)) {
+			std::vector<Register> dst_registers;
+			for (size_t i = 0; i < ast_tuple->elements().size(); ++i) {
+				dst_registers.push_back(generator.allocate_register());
 			}
+			generator.emit<UnpackSequence>(function_id, dst_registers, src_register);
+			size_t idx{ 0 };
+			for (const auto &dst_register : dst_registers) {
+				const auto &el = ast_tuple->elements()[idx++];
+				generator.emit<StoreName>(function_id, as<Name>(el)->ids()[0], dst_register);
+			}
+		} else {
+			TODO();
 		}
 	}
 	return src_register;
@@ -487,9 +477,9 @@ Register Attribute::generate_impl(size_t function_id,
 	const auto *parent_node = ctx.parent_nodes()[ctx.parent_nodes().size() - 2];
 	auto parent_node_type = parent_node->node_type();
 
-	// the parent is a Call AST node and this is the function that is being called, then this must
-	// be a method
-	// "foo.bar()" -> .bar() is the function being called by parent AST node and this attribute
+	// the parent is a Call AST node and this is the function that is being called, then this
+	// must be a method "foo.bar()" -> .bar() is the function being called by parent AST node
+	// and this attribute
 	if (parent_node_type == ASTNodeType::Call
 		&& static_cast<const Call *>(parent_node)->function().get() == this) {
 		auto method_name_register = generator.allocate_register();

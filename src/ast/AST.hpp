@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstddef>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <stack>
 #include <string>
@@ -31,6 +31,7 @@ namespace ast {
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
+	__AST_NODE_TYPE(Import)             \
 	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
@@ -55,6 +56,7 @@ inline std::string_view node_type_to_string(ASTNodeType node_type)
 		AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 	}
+	ASSERT_NOT_REACHED()
 }
 
 #define __AST_NODE_TYPE(x) class x;
@@ -897,6 +899,52 @@ class Attribute : public ASTNode
 		m_value->print_node(new_indent);
 		spdlog::debug("{}  - attr: \"{}\"", indent, m_attr);
 		spdlog::debug("{}  - ctx: {}", indent, static_cast<int>(m_ctx));
+	}
+};
+
+
+class Import : public ASTNode
+{
+	std::vector<std::string> m_names;
+	std::optional<std::string> m_asname;
+
+  public:
+	Import() : ASTNode(ASTNodeType::Import) {}
+
+	Import(std::vector<std::string> names) : ASTNode(ASTNodeType::Import), m_names(std::move(names))
+	{}
+
+	Import(std::vector<std::string> names, std::optional<std::string> asname)
+		: ASTNode(ASTNodeType::Import), m_names(std::move(names)), m_asname(std::move(asname))
+	{}
+
+
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+
+	const std::optional<std::string> &asname() const { return m_asname; }
+	const std::vector<std::string> &names() const { return m_names; }
+	std::string dotted_name() const
+	{
+		return std::accumulate(
+			std::next(m_names.begin()), m_names.end(), *m_names.begin(), [](auto rhs, auto lhs) {
+				return std::move(rhs) + "." + lhs;
+			});
+	}
+	void set_asname(std::string name) { m_asname = std::move(name); }
+
+	void add_dotted_name(std::string name) { m_names.push_back(std::move(name)); }
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}Import", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		if (m_asname.has_value()) {
+			spdlog::debug("{}  - asname: \"{}\"", indent, *m_asname);
+		} else {
+			spdlog::debug("{}  - asname: null", indent);
+		}
+		spdlog::debug("{}  - name: {}", indent, dotted_name());
 	}
 };
 

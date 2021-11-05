@@ -8,7 +8,8 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		std::visit([](const auto &val) { return PyObject::from(val)->to_string(); }, this_value));
 	if (auto *this_obj = std::get_if<PyObject *>(&this_value)) {
 		auto maybe_method = (*this_obj)->get(m_method_name, interpreter);
-		ASSERT(maybe_method->type() == PyObjectType::PY_FUNCTION)
+		ASSERT(maybe_method->type() == PyObjectType::PY_FUNCTION
+			   || maybe_method->type() == PyObjectType::PY_NATIVE_FUNCTION)
 		vm.reg(m_destination) = std::move(maybe_method);
 	} else {
 		TODO();

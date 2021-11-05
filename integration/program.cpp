@@ -2,6 +2,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyList.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
@@ -544,8 +545,7 @@ TEST(RunPythonProgram, WhileLoop)
 
 TEST(RunPythonProgram, UnpackAssignment)
 {
-	static constexpr std::string_view program =
-		"a, b = 1, 2\n";
+	static constexpr std::string_view program = "a, b = 1, 2\n";
 
 	run(program);
 	assert_interpreter_object_value("a", 1);

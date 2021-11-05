@@ -31,6 +31,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/CustomPyObject.cpp
     runtime/PyBuiltins.cpp
     runtime/PyDict.cpp
+    runtime/PyList.cpp
     runtime/PyModule.cpp
     runtime/PyNumber.cpp
     runtime/PyObject.cpp

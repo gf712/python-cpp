@@ -1,5 +1,5 @@
-#include "CustomPyObject.hpp"
 #include "PyBuiltins.hpp"
+#include "CustomPyObject.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
 #include "PyNumber.hpp"
@@ -9,8 +9,8 @@
 #include "TypeError.hpp"
 
 #include "bytecode/instructions/FunctionCall.hpp"
-#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "vm/VM.hpp"
 
 #include <iostream>
 
@@ -40,8 +40,10 @@ PyFunction *make_function(const std::string &function_name,
 PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
 	std::string separator = " ";
+	std::string end = "\n";
 	if (kwargs) {
 		static const Value separator_keyword = String{ "sep" };
+		static const Value end_keyword = String{ "end" };
 
 		if (auto it = kwargs->map().find(separator_keyword); it != kwargs->map().end()) {
 			auto maybe_str = it->second;
@@ -53,6 +55,17 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 				return nullptr;
 			}
 			separator = std::get<String>(maybe_str).s;
+		}
+		if (auto it = kwargs->map().find(end_keyword); it != kwargs->map().end()) {
+			auto maybe_str = it->second;
+			if (!std::holds_alternative<String>(maybe_str)) {
+				auto obj =
+					std::visit([](const auto &value) { return PyObject::from(value); }, maybe_str);
+				interpreter.raise_exception(
+					"TypeError: end must be None or a string, not {}", object_name(obj->type()));
+				return nullptr;
+			}
+			end = std::get<String>(maybe_str).s;
 		}
 	}
 	auto reprfunc = [&interpreter](const auto &arg) {
@@ -92,10 +105,8 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 	spdlog::debug("arg function ptr: {}", static_cast<void *>(*arg_it));
 	auto reprobj = reprfunc(*arg_it);
 	spdlog::debug("repr result: {}", reprobj->to_string());
-	std::cout << reprobj->to_string();
+	std::cout << reprobj->to_string() << end;
 
-	// make sure this is flushed immediately with a newline
-	std::cout << std::endl;
 	return py_none();
 }
 
