@@ -2,10 +2,11 @@
 #include "gtest/gtest.h"
 
 namespace {
-std::vector<Token> generate_tokens(std::string_view program, bool ignore_nl_token)
+std::vector<Token>
+	generate_tokens(std::string_view program, bool ignore_nl_token, bool ignore_comments)
 {
-	Lexer lexer{ std::string(program) };
 	lexer.ignore_nl_token() = ignore_nl_token;
+	lexer.ignore_comments() = ignore_comments;
 	std::vector<Token> tokens;
 	size_t i = 0;
 	while (auto token = lexer.peek_token(i++)) { tokens.push_back(std::move(*token)); }
@@ -15,26 +16,47 @@ std::vector<Token> generate_tokens(std::string_view program, bool ignore_nl_toke
 void assert_generates_tokens_without_nl_token(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
 {
-	const auto tokens = generate_tokens(program, true);
+	const auto tokens = generate_tokens(program, true, false);
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {}",
+			<< fmt::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
-				   Token::stringify_token_type(tokens[i].token_type()));
+				   Token::stringify_token_type(tokens[i].token_type()),
+				   i);
 	}
 }
+
+
+void assert_generates_tokens_without_comment_tokens(std::string_view program,
+	const std::vector<Token::TokenType> &expected_tokens)
+{
+	const auto tokens = generate_tokens(program, true, true);
+	for (const auto& t: tokens) {
+		std::cout << t.to_string() << '\n';
+	}
+	ASSERT_EQ(expected_tokens.size(), tokens.size());
+	for (size_t i = 0; i < expected_tokens.size(); ++i) {
+		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
+			<< fmt::format("Expected {}, but got {} at position {}",
+				   Token::stringify_token_type(expected_tokens[i]),
+				   Token::stringify_token_type(tokens[i].token_type()),
+				   i);
+	}
+}
+
 
 void assert_generates_tokens(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
 {
-	const auto tokens = generate_tokens(program, false);
+	const auto tokens = generate_tokens(program, false, false);
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {}",
+			<< fmt::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
-				   Token::stringify_token_type(tokens[i].token_type()));
+				   Token::stringify_token_type(tokens[i].token_type()),
+				   i);
 	}
 }
 }// namespace
@@ -452,4 +474,51 @@ TEST(Lexer, IgnoreNLToken)
 		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens_without_nl_token(program, expected_tokens);
+}
+
+
+TEST(Lexer, Comments)
+{
+	constexpr std::string_view program =
+		"import math #important module \n"
+		"# get the pi constant \n"
+		"PI = math.pi\n"
+		"# do something useful \n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::COMMENT,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::COMMENT,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NAME,
+		Token::TokenType::DOT,
+		Token::TokenType::NAME,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::COMMENT,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+
+TEST(Lexer, IgnoreCommentsAndNL)
+{
+	constexpr std::string_view program =
+		"import math #important module \n"
+		"# get the pi constant \n"
+		"PI = math.pi\n"
+		"# do something useful \n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NAME,
+		Token::TokenType::DOT,
+		Token::TokenType::NAME,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
 }

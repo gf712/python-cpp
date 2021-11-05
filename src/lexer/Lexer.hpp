@@ -169,6 +169,7 @@ class Lexer
 	Position m_position;
 	std::vector<size_t> m_indent_values;
 	bool m_ignore_nl_token{ false };
+	bool m_ignore_comments{ false };
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -210,6 +211,7 @@ class Lexer
 	}
 
 	bool &ignore_nl_token() { return m_ignore_nl_token; }
+	bool &ignore_comments() { return m_ignore_comments; }
 
   private:
 	bool read_more_tokens()
@@ -230,6 +232,7 @@ class Lexer
 		if (try_read_indent()) { return true; }
 		if (try_read_newline()) { return true; }
 		try_read_space();
+		if (try_read_comment()) { return true; }
 		if (try_read_name()) { return true; }
 		if (try_read_string()) { return true; }
 		if (try_read_operation()) { return true; }
@@ -238,17 +241,59 @@ class Lexer
 		return false;
 	}
 
+	bool try_read_comment()
+	{
+		if (peek(0) == '#') {
+			const auto original_position = m_position;
+			advance(1);
+			advance_while([](const char c) {
+				// TODO: make newline check platform agnostic
+				//       in windows this can be "\r\n"
+				return std::isalnum(c) || c != '\n';
+			});
+
+			if (!m_ignore_comments) {
+				m_tokens_to_emit.emplace_back(
+					Token::TokenType::COMMENT, original_position, m_position);
+			} else {
+				increment_row_position();
+				const auto current_position = m_position;
+				// the comment is essentially removed from the source
+				// which means a line with only a comment becomes NL
+				// otherwise it's just a NEWLINE
+				if (original_position.column == 0 && m_ignore_nl_token) {
+					if (m_cursor > m_program.size()) {
+						m_tokens_to_emit.emplace_back(
+							Token::TokenType::NEWLINE, current_position, m_position);
+					}
+				} else if (!m_ignore_nl_token) {
+					m_tokens_to_emit.emplace_back(
+						Token::TokenType::NL, original_position, m_position);
+					m_tokens_to_emit.emplace_back(
+						Token::TokenType::NEWLINE, current_position, m_position);
+				} else {
+					m_tokens_to_emit.emplace_back(
+						Token::TokenType::NEWLINE, current_position, m_position);
+				}
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
 	bool try_empty_line()
 	{
-		const auto original_positions = m_position;
+		const auto original_position = m_position;
 		const auto cursor = m_cursor;
 		// if it's a newline
 		if (std::isspace(peek(0)) && !std::isblank(peek(0))) {
-			if (original_positions.column == 0) {
+			if (original_position.column == 0) {
 				increment_row_position();
 				if (!m_ignore_nl_token) {
 					m_tokens_to_emit.emplace_back(
-						Token::TokenType::NL, original_positions, m_position);
+						Token::TokenType::NL, original_position, m_position);
 				}
 				return true;
 			} else {
@@ -259,11 +304,11 @@ class Lexer
 		if (std::isspace(peek(0))) {
 			increment_row_position();
 			if (!m_ignore_nl_token) {
-				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_positions, m_position);
+				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_position, m_position);
 			}
 			return true;
 		}
-		m_position = original_positions;
+		m_position = original_position;
 		m_cursor = cursor;
 		return false;
 	}
