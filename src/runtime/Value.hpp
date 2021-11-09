@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../forward.hpp"
 #include "forward.hpp"
 #include "utilities.hpp"
 

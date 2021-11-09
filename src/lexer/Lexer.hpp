@@ -42,6 +42,7 @@ template<> struct fmt::formatter<Position>
 #define ENUMERATE_TOKENS      \
 	__TOKEN(EOF_)             \
 	__TOKEN(ENDMARKER)        \
+	__TOKEN(COMMENT)          \
 	__TOKEN(NAME)             \
 	__TOKEN(NUMBER)           \
 	__TOKEN(STRING)           \
@@ -160,6 +161,8 @@ class Token
 
 #undef ENUMERATE_TOKENS
 
+std::optional<std::string> read_file(const std::string &filename);
+
 class Lexer
 {
 
@@ -170,6 +173,7 @@ class Lexer
 	std::vector<size_t> m_indent_values;
 	bool m_ignore_nl_token{ false };
 	bool m_ignore_comments{ false };
+	const std::string m_filename;
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -177,10 +181,26 @@ class Lexer
 	Lexer &operator=(const Lexer &) = delete;
 	Lexer &operator=(Lexer &&) = delete;
 
-  public:
-	Lexer(std::string program)
-		: m_program(std::move(program)), m_position({ 0, 0, &m_program[0] }), m_indent_values({ 0 })
+	Lexer(std::string &&program, std::string &&filename)
+		: m_program(std::move(program)), m_position({ 0, 0, &m_program[0] }),
+		  m_indent_values({ 0 }), m_filename(std::move(filename))
 	{}
+
+  public:
+	static Lexer create(std::string program, std::string filename)
+	{
+		return Lexer(std::move(program), std::move(filename));
+	}
+
+	static Lexer create(std::string filename)
+	{
+		auto program = read_file(filename);
+		if (!program.has_value()) { std::abort(); }
+		auto &&p = std::move(program).value();
+		return Lexer(std::move(p), std::move(filename));
+	}
+
+	const std::string &filename() const { return m_filename; }
 
 	std::optional<Token> next_token()
 	{

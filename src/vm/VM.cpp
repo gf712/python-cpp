@@ -1,120 +1,147 @@
 #include "VM.hpp"
-#include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/instructions/Instructions.hpp"
+#include "executable/Program.hpp"
+#include "executable/bytecode/Bytecode.hpp"
+#include "executable/bytecode/BytecodeGenerator.hpp"
+#include "executable/bytecode/instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "interpreter/InterpreterSession.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 
 #include <iostream>
 
-LocalFrame::LocalFrame(size_t frame_size, VirtualMachine *vm_) : vm(vm_)
+#define DEBUG_VM 0
+
+StackFrame::StackFrame(size_t frame_size,
+	InstructionVector::const_iterator return_address,
+	VirtualMachine *vm_)
+	: registers(frame_size, nullptr), return_address(return_address), vm(vm_)
 {
-	vm->push_frame(frame_size);
-	spdlog::debug(
-		"Added frame of size {}. New stack size: {}", frame_size, vm->m_local_registers.size());
+	spdlog::debug("Added frame of size {}. New stack size: {}", frame_size, vm->m_stack.size());
 }
 
-LocalFrame::LocalFrame(LocalFrame &&other) : vm(std::exchange(other.vm, nullptr)) {}
+StackFrame::StackFrame(StackFrame &&other)
+	: registers(std::move(other.registers)), return_address(other.return_address),
+	  vm(std::exchange(other.vm, nullptr))
+{}
 
-LocalFrame::~LocalFrame()
+StackFrame::~StackFrame()
 {
-	if (vm) {
-		vm->pop_frame();
-		spdlog::debug("Popping frame. New stack size: {}", vm->m_local_registers.size());
-	}
+	if (vm) { spdlog::debug("Popping frame. New stack size: {}", vm->m_stack.size()); }
 }
+
 
 VirtualMachine::VirtualMachine()
-	: m_interpreter(std::make_unique<Interpreter>()), m_heap(Heap::the())
+	: m_heap(Heap::the()), m_interpreter_session(std::make_unique<InterpreterSession>())
 {
 	uintptr_t *rbp;
 	asm volatile("movq %%rbp, %0" : "=r"(rbp));
 	m_heap.set_start_stack_pointer(rbp);
 }
 
-void VirtualMachine::push_generator(std::shared_ptr<Bytecode> bytecode)
+
+int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame_size)
 {
-	ASSERT(!m_bytecode)
-	m_bytecode = std::move(bytecode);
-	m_local_registers.emplace_back(m_bytecode->main_local_register_count(), nullptr);
+	ASSERT(function->backend() == FunctionExecutionBackend::BYTECODE)
+	const auto func_ip = std::static_pointer_cast<Bytecode>(function)->begin();
+	int result = EXIT_SUCCESS;
+
+	push_frame(frame_size);
+	const auto stack_size = m_stack.size();
+	for (m_instruction_pointer = func_ip;; ++m_instruction_pointer) {
+		const auto &instruction = *m_instruction_pointer;
+		// spdlog::info(instruction->to_string());
+		instruction->execute(*this, interpreter());
+
+		// we left the current stack frame in the previous instruction
+		if (m_stack.size() != stack_size) { break; }
+		// dump();
+		if (interpreter().execution_frame()->exception()) {
+			interpreter().unwind();
+			break;
+		} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
+			// bail, an error occured
+			std::cout << interpreter().exception_message() << '\n';
+			break;
+		}
+	}
+
+	return result;
+}
+
+void VirtualMachine::ret() { pop_frame(); }
+
+int VirtualMachine::execute(std::shared_ptr<Program> program)
+{
+	const size_t frame_size = program->main_stack_size();
+	// push frame BEFORE setting the ip, so that we can save the return address
+	push_frame(frame_size);
+
+	m_instruction_pointer = program->begin();
+	const auto end = program->end();
+	const auto stack_size = m_stack.size();
+	// can only initialize interpreter after creating the initial stack frame
+	m_interpreter_session->start_new_interpreter(program);
+	const auto initial_ip = m_instruction_pointer;
+	for (; m_instruction_pointer != end; ++m_instruction_pointer) {
+		ASSERT((*m_instruction_pointer).get())
+		const auto &instruction = *m_instruction_pointer;
+		// spdlog::info(instruction->to_string());
+		instruction->execute(*this, interpreter());
+		// we left the current stack frame in the previous instruction
+		if (m_stack.size() != stack_size) { break; }
+		// dump();
+		if (interpreter().execution_frame()->exception()) {
+			interpreter().unwind();
+			// restore instruction pointer
+			m_instruction_pointer = initial_ip;
+			return EXIT_FAILURE;
+		} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
+			// bail, an error occured
+			std::cout << interpreter().exception_message() << '\n';
+			m_instruction_pointer = initial_ip;
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+Interpreter &VirtualMachine::interpreter() { return m_interpreter_session->interpreter(); }
+
+
+const Interpreter &VirtualMachine::interpreter() const
+{
+	return m_interpreter_session->interpreter();
 }
 
 
 void VirtualMachine::show_current_instruction(size_t index, size_t window) const
 {
-	size_t start = std::max(
-		int64_t{ 0 }, static_cast<int64_t>(index) - static_cast<int64_t>((window - 1) / 2));
-	size_t end = std::min(index + (window - 1) / 2 + 1, m_bytecode->instructions().size());
+	TODO()
+	(void)index;
+	(void)window;
 
-	for (size_t i = start; i < end; ++i) {
-		if (i == index) {
-			std::cout << "->" << m_bytecode->instructions()[i]->to_string() << '\n';
-		} else {
-			std::cout << "  " << m_bytecode->instructions()[i]->to_string() << '\n';
-		}
-	}
-	std::cout << '\n';
+	// size_t start = std::max(
+	// 	int64_t{ 0 }, static_cast<int64_t>(index) - static_cast<int64_t>((window - 1) / 2));
+	// size_t end = std::min(index + (window - 1) / 2 + 1, m_bytecode->instructions().size());
+
+	// for (size_t i = start; i < end; ++i) {
+	// 	if (i == index) {
+	// 		std::cout << "->" << m_bytecode->instructions()[i]->to_string() << '\n';
+	// 	} else {
+	// 		std::cout << "  " << m_bytecode->instructions()[i]->to_string() << '\n';
+	// 	}
+	// }
+	// std::cout << '\n';
 }
 
-
-int VirtualMachine::execute_frame()
-{
-	auto frame_depth = m_local_registers.size();
-	const auto initial_ip = m_instruction_pointer;
-	while (frame_depth <= m_local_registers.size()
-		   && m_instruction_pointer < m_bytecode->instructions().size() - 1) {
-		// show_current_instruction(m_instruction_pointer, 5);
-		// dump();
-		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
-		instruction->execute(*this, *m_interpreter);
-
-		if (m_interpreter->execution_frame()->exception()) {
-			m_interpreter->unwind();
-			// restore instruction pointer
-			m_instruction_pointer = initial_ip;
-			return 1;
-		} else if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
-			// bail, an error occured
-			std::cout << m_interpreter->exception_message() << '\n';
-			m_instruction_pointer = initial_ip;
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int VirtualMachine::execute()
-{
-	// start execution in __main__
-	m_interpreter->setup();
-	m_instruction_pointer = m_bytecode->start_offset();
-
-	while (m_instruction_pointer < m_bytecode->instructions().size() - 1) {
-		// show_current_instruction(m_instruction_pointer, 5);
-		// dump();
-		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
-		instruction->execute(*this, *m_interpreter);
-
-		if (m_interpreter->execution_frame()->exception()) {
-			m_interpreter->unwind();
-			// restore instruction pointer
-			return 1;
-		} else if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
-			// bail, an error occured
-			std::cout << m_interpreter->exception_message() << '\n';
-			return 1;
-		}
-	}
-
-	return 0;
-}
 
 void VirtualMachine::dump() const
 {
 	size_t i = 0;
-	std::cout << "Register state: " << (void *)(m_local_registers.back().data()) << " \n";
-	for (const auto &register_ : m_local_registers.back()) {
+	std::cout << "Register state: " << (void *)(registers().data()) << " \n";
+	for (const auto &register_ : registers()) {
 		std::visit(overloaded{ [&i](const auto &register_value) {
 								  std::ostringstream os;
 								  os << register_value;
@@ -138,63 +165,13 @@ void VirtualMachine::dump() const
 void VirtualMachine::clear()
 {
 	m_heap.reset();
-	m_bytecode.reset();
-	m_local_registers.clear();
-	m_instruction_pointer = 0;
+	while (!m_stack.empty()) m_stack.pop();
+	// should instruction pointer be optional?
+	// m_instruction_pointer = nullptr;
 }
 
-size_t VirtualMachine::function_offset(size_t func_id)
+
+void VirtualMachine::shutdown_interpreter(Interpreter &interpreter)
 {
-	ASSERT(func_id >= 1)
-	func_id--;
-	return m_bytecode->functions()[func_id].offset;
-}
-
-size_t VirtualMachine::function_register_count(size_t func_id)
-{
-	ASSERT(func_id >= 1)
-	func_id--;
-	return m_bytecode->functions()[func_id].register_count;
-}
-
-PyObject *VirtualMachine::execute_statement(std::shared_ptr<Bytecode> bytecode)
-{
-	static bool requires_setup = true;
-	if (requires_setup) {
-		spdlog::debug("Setting up interpreter");
-		m_interpreter->setup();
-		m_instruction_pointer = 0;
-		FunctionBlock main_block{ .metadata = FunctionMetaData{ .function_name = "__main__" } };
-		FunctionBlocks program_blocks;
-		program_blocks.emplace_back(std::move(main_block));
-		m_bytecode = std::make_shared<Bytecode>(std::move(program_blocks));
-		requires_setup = false;
-	}
-
-	for (auto &&ins : bytecode->instructions()) { m_bytecode->add_instructions(std::move(ins)); }
-
-	spdlog::debug("bytecode: \n{}", m_bytecode->to_string());
-
-	spdlog::debug("Adding {} registers", bytecode->main_local_register_count());
-	m_local_registers.emplace_back(bytecode->main_local_register_count(), nullptr);
-	while (m_instruction_pointer < m_bytecode->instructions().size()) {
-		// show_current_instruction(m_instruction_pointer, 5);
-		// dump();
-		const auto &instruction = m_bytecode->instructions()[m_instruction_pointer++];
-		instruction->execute(*this, *m_interpreter);
-
-		if (m_interpreter->execution_frame()->exception()) {
-			m_interpreter->unwind();
-			// restore instruction pointer
-			std::cout << m_interpreter->exception_message() << '\n';
-			return PyString::create(m_interpreter->exception_message());
-		}
-		if (m_interpreter->status() == Interpreter::Status::EXCEPTION) {
-			// bail, an error occured
-			std::cout << m_interpreter->exception_message() << '\n';
-			return PyString::create(m_interpreter->exception_message());
-		}
-	}
-	// return return value which is located in r0
-	return std::visit([](const auto &value) { return PyObject::from(value); }, reg(0));
+	m_interpreter_session->shutdown(interpreter);
 }

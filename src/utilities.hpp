@@ -13,7 +13,9 @@
 		std::abort();                                                               \
 	}
 
-#define ASSERT_NOT_REACHED() __builtin_unreachable();
+#define ASSERT_NOT_REACHED()                                            \
+	spdlog::error("Reached unexpected line {}:{}", __FILE__, __LINE__); \
+	__builtin_unreachable();
 
 template<class... Ts> struct overloaded : Ts...
 {

@@ -63,9 +63,9 @@ PyObject *PyString::add_impl(const PyObject *obj, Interpreter &interpreter) cons
 
 PyString::PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s))
 {
-	m_slots.hash = [this]() { return this->hash_impl(*VirtualMachine::the().interpreter()); };
+	m_slots.hash = [this]() { return this->hash_impl(VirtualMachine::the().interpreter()); };
 	m_slots.richcompare = [this](const PyObject *other, RichCompare op) {
-		return this->richcompare_impl(other, op, *VirtualMachine::the().interpreter());
+		return this->richcompare_impl(other, op, VirtualMachine::the().interpreter());
 	};
 }
 

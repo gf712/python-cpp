@@ -1,18 +1,19 @@
 #include "AST.hpp"
-#include "bytecode/BytecodeGenerator.hpp"
-#include "bytecode/instructions/FunctionCall.hpp"
-#include "bytecode/instructions/FunctionCallWithKeywords.hpp"
-#include "bytecode/instructions/InplaceAdd.hpp"
-#include "bytecode/instructions/Instructions.hpp"
-#include "bytecode/instructions/LoadAttr.hpp"
-#include "bytecode/instructions/LoadBuildClass.hpp"
-#include "bytecode/instructions/LoadMethod.hpp"
-#include "bytecode/instructions/LoadName.hpp"
-#include "bytecode/instructions/MethodCall.hpp"
-#include "bytecode/instructions/ReturnValue.hpp"
-#include "bytecode/instructions/StoreAttr.hpp"
-#include "bytecode/instructions/StoreName.hpp"
-#include "bytecode/instructions/UnpackSequence.hpp"
+#include "executable/bytecode/BytecodeGenerator.hpp"
+#include "executable/bytecode/instructions/FunctionCall.hpp"
+#include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
+#include "executable/bytecode/instructions/ImportName.hpp"
+#include "executable/bytecode/instructions/InplaceAdd.hpp"
+#include "executable/bytecode/instructions/Instructions.hpp"
+#include "executable/bytecode/instructions/LoadAttr.hpp"
+#include "executable/bytecode/instructions/LoadBuildClass.hpp"
+#include "executable/bytecode/instructions/LoadMethod.hpp"
+#include "executable/bytecode/instructions/LoadName.hpp"
+#include "executable/bytecode/instructions/MethodCall.hpp"
+#include "executable/bytecode/instructions/ReturnValue.hpp"
+#include "executable/bytecode/instructions/StoreAttr.hpp"
+#include "executable/bytecode/instructions/StoreName.hpp"
+#include "executable/bytecode/instructions/UnpackSequence.hpp"
 #include "interpreter/Interpreter.hpp"
 
 namespace ast {
@@ -101,7 +102,6 @@ Register FunctionDefinition::generate_impl(size_t function_id,
 	ASTContext &ctx) const
 {
 	ctx.push_local_args(m_args);
-
 	auto this_function_info = generator.allocate_function();
 	m_args->generate(this_function_info.function_id, generator, ctx);
 
@@ -110,7 +110,7 @@ Register FunctionDefinition::generate_impl(size_t function_id,
 	}
 
 	// always return None
-	// this can later on be optimised away
+	// this can be optimised away later on
 	auto none_value_register = generator.allocate_register();
 	generator.emit<LoadConst>(
 		this_function_info.function_id, none_value_register, NameConstant{ NoneType{} });
@@ -120,7 +120,7 @@ Register FunctionDefinition::generate_impl(size_t function_id,
 	for (const auto &arg_name : m_args->argument_names()) { arg_names.push_back(arg_name); }
 
 	generator.emit<MakeFunction>(
-		function_id, m_function_name, this_function_info.function_id, arg_names);
+		function_id, this_function_info.function_id, m_function_name, arg_names);
 
 	ctx.pop_local_args();
 	return {};
@@ -543,6 +543,19 @@ Register AugAssign::generate_impl(size_t function_id,
 		TODO()
 	}
 	return lhs_register;
+}
+
+
+Register Import::generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const
+{
+	auto module_register = generator.allocate_register();
+	generator.emit<ImportName>(function_id, module_register, m_names);
+	if (m_asname.has_value()) {
+		generator.emit<StoreName>(function_id, *m_asname, module_register);
+	} else {
+		generator.emit<StoreName>(function_id, m_names[0], module_register);
+	}
+	return {};
 }
 
 }// namespace ast

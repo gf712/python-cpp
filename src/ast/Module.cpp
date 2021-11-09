@@ -1,6 +1,6 @@
 #include "AST.hpp"
 
-#include "bytecode/instructions/ReturnValue.hpp"
+#include "executable/bytecode/instructions/ReturnValue.hpp"
 
 namespace ast {
 Register

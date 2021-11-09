@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ast/AST.hpp"
-#include "bytecode/BytecodeGenerator.hpp"
+#include "executable/bytecode/BytecodeGenerator.hpp"
 #include "lexer/Lexer.hpp"
 #include "utilities.hpp"
 
@@ -21,11 +21,14 @@ class Parser
 	Lexer &m_lexer;
 	size_t m_token_position{ 0 };
 	const bool m_ignore_nl_token{ true };
+	const bool m_ignore_comments{ true };
 
   public:
-	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>()), m_lexer(l)
+	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>(l.filename())), m_lexer(l)
 	{
 		m_lexer.ignore_nl_token() = m_ignore_nl_token;
+		m_lexer.ignore_comments() = m_ignore_comments;
+
 		m_stack.emplace_back();
 	}
 

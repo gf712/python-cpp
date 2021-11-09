@@ -245,7 +245,7 @@ class Heap
 {
 	uint8_t *m_static_memory;
 	size_t m_static_memory_size{ 4 * KB };
-	size_t m_static_offset{ 0 };
+	size_t m_static_offset{ 8 };
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;
 	uintptr_t *m_bottom_stack_pointer;

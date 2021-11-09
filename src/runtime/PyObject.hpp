@@ -2,15 +2,16 @@
 
 #include "Value.hpp"
 #include "forward.hpp"
-#include "utilities.hpp"
 #include "memory/GarbageCollector.hpp"
+#include "runtime/forward.hpp"
+#include "utilities.hpp"
 
-#include <unordered_map>
-#include <string>
-#include <memory>
-#include <functional>
-#include <sstream>
 #include <concepts>
+#include <functional>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <unordered_map>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -35,7 +36,7 @@ enum class PyObjectType {
 	PY_RANGE,
 	PY_RANGE_ITERATOR,
 	PY_CUSTOM_TYPE,
-	PY_MODULE
+	PY_MODULE,
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -179,75 +180,6 @@ class PyObject : public Cell
 };
 
 
-class PyCode : public PyObject
-{
-	size_t m_pos;
-	size_t m_register_count;
-	std::vector<std::string> m_args;
-
-  public:
-	PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args);
-
-	size_t offset() const { return m_pos; }
-	size_t register_count() const { return m_register_count; }
-	const std::vector<std::string> &args() const { return m_args; }
-
-	std::string to_string() const override { return fmt::format("PyCode"); }
-};
-
-
-class PyFunction : public PyObject
-{
-	std::string m_name;
-	PyCode *m_code;
-
-  public:
-	PyFunction(std::string, PyCode *code);
-
-	const PyCode *code() const { return m_code; }
-
-	std::string to_string() const override { return fmt::format("PyFunction"); }
-	const std::string &name() const { return m_name; }
-
-	void visit_graph(Visitor &) override;
-};
-
-class PyTuple;
-
-class PyNativeFunction : public PyObject
-{
-	std::string m_name;
-	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
-	std::vector<PyObject *> m_captures;
-
-  public:
-	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
-		  m_function(std::move(function))
-	{}
-
-	// TODO: fix tracking of lambda captures
-	template<typename... Args>
-	PyNativeFunction(std::string name,
-		std::function<PyObject *(PyTuple *, PyDict *)> function,
-		Args &&... args)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
-		  m_function(std::move(function)), m_captures{ std::forward<Args>(args)... }
-	{}
-
-	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
-
-	std::string to_string() const override
-	{
-		return fmt::format("PyNativeFunction {}", static_cast<const void *>(&m_function));
-	}
-
-	const std::string &name() const { return m_name; }
-
-	void visit_graph(Visitor &) override;
-};
-
-
 class PyBytes : public PyObject
 {
 	friend class Heap;
@@ -335,18 +267,6 @@ template<typename T> T *as(PyObject *node);
 template<typename T> const T *as(const PyObject *node);
 
 
-template<> inline PyFunction *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<PyFunction *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyFunction *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<const PyFunction *>(node); }
-	return nullptr;
-}
-
 template<> inline PyNameConstant *as(PyObject *node)
 {
 	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
@@ -374,24 +294,6 @@ template<> inline PyBytes *as(PyObject *node)
 template<> inline const PyBytes *as(const PyObject *node)
 {
 	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<const PyBytes *>(node); }
-	return nullptr;
-}
-
-
-template<> inline PyNativeFunction *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
-		return static_cast<PyNativeFunction *>(node);
-	}
-	return nullptr;
-}
-
-
-template<> inline const PyNativeFunction *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
-		return static_cast<const PyNativeFunction *>(node);
-	}
 	return nullptr;
 }
 

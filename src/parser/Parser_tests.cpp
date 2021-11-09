@@ -507,7 +507,7 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 
 void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expected_module)
 {
-	Lexer lexer{ std::string(program) };
+	auto lexer = Lexer::create(std::string(program), "_parser_test_.py");
 	parser::Parser p{ lexer };
 	spdlog::set_level(spdlog::level::debug);
 	p.parse();
@@ -524,12 +524,17 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 	expected_module->print_node("");
 	spdlog::set_level(spdlog::level::info);
 }
+
+std::shared_ptr<Module> create_test_module()
+{
+	return std::make_shared<Module>("_parser_test_.py");
+}
 }// namespace
 
 TEST(Parser, SimplePositiveIntegerAssignment)
 {
 	constexpr std::string_view program = "a = 2\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>(int64_t{ 2 }),
@@ -542,7 +547,7 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 // {
 // 	constexpr std::string_view program = "a = b = 1\n";
 
-// 	auto expected_ast = std::make_shared<Module>();
+// 	auto expected_ast = create_test_module();
 // 	expected_ast->emplace(std::make_shared<Assign>(
 // 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
 // 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE),
@@ -558,7 +563,7 @@ TEST(Parser, MultipleAssignmentsWithStructuredBinding)
 {
 	constexpr std::string_view program = "a, b = 0, 1\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE),
@@ -580,7 +585,7 @@ TEST(Parser, BlankLine)
 		"a = 2\n"
 		"\n"
 		"b = 2\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>(static_cast<int64_t>(2)),
@@ -596,7 +601,7 @@ TEST(Parser, BlankLine)
 TEST(Parser, SimplePositiveDoubleAssignment)
 {
 	constexpr std::string_view program = "a = 2.0\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>(static_cast<double>(2.0)),
@@ -608,7 +613,7 @@ TEST(Parser, SimplePositiveDoubleAssignment)
 TEST(Parser, SimpleStringAssignment)
 {
 	constexpr std::string_view program = "a = \"2\"\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>("2"),
@@ -620,7 +625,7 @@ TEST(Parser, SimpleStringAssignment)
 TEST(Parser, BinaryOperationWithAssignment)
 {
 	constexpr std::string_view program = "a = 1 + 2\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
@@ -635,7 +640,7 @@ TEST(Parser, BinaryOperationWithAssignment)
 TEST(Parser, BinaryOperationModulo)
 {
 	constexpr std::string_view program = "a = 3 % 4\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<BinaryExpr>(BinaryOpType::MODULO,
@@ -652,7 +657,7 @@ TEST(Parser, FunctionDefinition)
 	constexpr std::string_view program =
 		"def add(a, b):\n"
 		"   return a + b\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
 		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
 			std::make_shared<Argument>("a", "", ""),
@@ -678,7 +683,7 @@ TEST(Parser, MultilineFunctionDefinition)
 		"def plus_one(a):\n"
 		"   constant = 1\n"
 		"   return a + constant\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("plus_one",// function_name
 		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
 			std::make_shared<Argument>("a", "", ""),
@@ -706,7 +711,7 @@ TEST(Parser, SimpleIfStatement)
 	constexpr std::string_view program =
 		"if True:\n"
 		"   print(\"Hello, World!\")\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
@@ -726,7 +731,7 @@ TEST(Parser, SimpleIfElseStatement)
 		"else:\n"
 		"   print(\"Goodbye!\")\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<If>(std::make_shared<Constant>(true),// test
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
 			std::make_shared<Name>("print", ContextType::LOAD),
@@ -748,7 +753,7 @@ TEST(Parser, IfStatementWithComparisson)
 		"if a == 1:\n"
 		"   a = 2\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>(static_cast<int64_t>(1)),
@@ -772,7 +777,7 @@ TEST(Parser, LiteralList)
 {
 	constexpr std::string_view program = "a = [1, 2, 3, 5]\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<List>(
@@ -792,7 +797,7 @@ TEST(Parser, LiteralTuple)
 {
 	constexpr std::string_view program = "a = (1, 2, 3, 5)\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Tuple>(
@@ -812,7 +817,7 @@ TEST(Parser, LiteralDict)
 {
 	constexpr std::string_view program = "a = {\"a\": 1, b:2}\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Dict>(
@@ -835,7 +840,7 @@ TEST(Parser, SimpleForLoopWithFunctionCall)
 		"for x in range(10):\n"
 		"	print(x)\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<For>(
 		std::make_shared<Name>("x", ContextType::STORE),// target
 		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
@@ -861,7 +866,7 @@ TEST(Parser, ForLoopWithElseBlock)
 		"else:\n"
 		"	print(\"ELSE!\")\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<For>(
 		std::make_shared<Name>("x", ContextType::STORE),// target
 		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD),
@@ -889,7 +894,7 @@ TEST(Parser, ClassDefinition)
 		"	def __init__(self, value):\n"
 		"		self.value = value\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<ClassDefinition>("A",// class name
 		nullptr,// arguments
 		std::vector<std::shared_ptr<ast::ASTNode>>{
@@ -919,7 +924,7 @@ TEST(Parser, AccessAttribute)
 {
 	constexpr std::string_view program = "test = foo.bar\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("test", ContextType::STORE) },
 		std::make_shared<Attribute>(
@@ -933,7 +938,7 @@ TEST(Parser, CallMethod)
 {
 	constexpr std::string_view program = "test = foo.bar()\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("test", ContextType::STORE) },
 		std::make_shared<Call>(std::make_shared<Attribute>(
@@ -947,7 +952,7 @@ TEST(Parser, FunctionCallWithKwarg)
 {
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=',')\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Constant>("Hello"), std::make_shared<Constant>("world!") },
@@ -959,7 +964,7 @@ TEST(Parser, FunctionCallWithOnlyKwargs)
 {
 	constexpr std::string_view program = "add(a=1, b=2)\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("add", ContextType::LOAD),
 		std::vector<std::shared_ptr<ASTNode>>{},
 		std::vector{ std::make_shared<Keyword>("a", std::make_shared<Constant>(int64_t{ 1 })),
@@ -971,7 +976,7 @@ TEST(Parser, FunctionCallWithKwargAsResultFromAnotherFunction)
 {
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=my_separator())\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Constant>("Hello"), std::make_shared<Constant>("world!") },
@@ -985,7 +990,7 @@ TEST(Parser, AugmentedAssign)
 {
 	constexpr std::string_view program = "a += b\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(
 		std::make_shared<AugAssign>(std::make_shared<Name>("a", ContextType::STORE),
 			BinaryOpType::PLUS,
@@ -1003,7 +1008,7 @@ TEST(Parser, WhileLoop)
 		"else:\n"
 		"  print(a)\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<While>(
 		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD),
 			Compare::OpType::LtE,
@@ -1025,7 +1030,7 @@ TEST(Parser, Import)
 {
 	constexpr std::string_view program = "import fibo\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Import>(std::vector<std::string>{ "fibo" }));
 
 	assert_generates_ast(program, expected_ast);
@@ -1035,7 +1040,7 @@ TEST(Parser, ImportAs)
 {
 	constexpr std::string_view program = "import fibo as f\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Import>(std::vector<std::string>{ "fibo" }, "f"));
 
 	assert_generates_ast(program, expected_ast);
@@ -1045,7 +1050,7 @@ TEST(Parser, ImportDottedAs)
 {
 	constexpr std::string_view program = "import fibo.nac.ci as f\n";
 
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(
 		std::make_shared<Import>(std::vector<std::string>{ "fibo", "nac", "ci" }, "f"));
 

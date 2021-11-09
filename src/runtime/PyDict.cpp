@@ -16,7 +16,7 @@ std::string PyDict::to_string() const
 	while (std::next(it) != m_map.end()) {
 		std::visit(
 			overloaded{ [&os](PyObject *key) {
-						   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+						   os << key->repr_impl(VirtualMachine::the().interpreter())->to_string();
 					   },
 				[&os](const auto &key) { os << key; } },
 			it->first);
@@ -27,7 +27,7 @@ std::string PyDict::to_string() const
 					if (value == this) {
 						os << "{...}";
 					} else {
-						os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+						os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
 					}
 				},
 				[&os](const auto &value) { os << value; } },
@@ -38,7 +38,7 @@ std::string PyDict::to_string() const
 	}
 	std::visit(
 		overloaded{ [&os](PyObject *key) {
-					   os << key->repr_impl(*VirtualMachine::the().interpreter())->to_string()
+					   os << key->repr_impl(VirtualMachine::the().interpreter())->to_string()
 						  << ": ";
 				   },
 			[&os](const auto &key) { os << key << ": "; } },
@@ -49,7 +49,7 @@ std::string PyDict::to_string() const
 				if (value == this) {
 					os << "{...}";
 				} else {
-					os << value->repr_impl(*VirtualMachine::the().interpreter())->to_string();
+					os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
 				}
 			},
 			[&os](const auto &value) { os << value; } },

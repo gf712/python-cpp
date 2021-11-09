@@ -11,13 +11,15 @@ class PyModule : public PyObject
   private:
 	friend class Heap;
 
-	MapType m_module_definitions;
+	MapType m_symbol_table;
 	PyString *m_module_name;
 
+	std::shared_ptr<Program> m_program;
+
   public:
-	PyModule(PyString *module_name)
-		: PyObject(PyObjectType::PY_MODULE), m_module_name(std::move(module_name))
-	{}
+	PyModule(PyString *module_name);
+
+	static PyModule *create(PyString *);
 
 	void visit_graph(Visitor &visitor) override;
 
@@ -31,13 +33,14 @@ class PyModule : public PyObject
 		return fmt::format("<module '{}'>", m_module_name->to_string());
 	}
 
-	const MapType &module_definitions() const { return m_module_definitions; }
+	const MapType &symbol_table() const { return m_symbol_table; }
 
 	PyString *name() const { return m_module_name; }
 
 	void insert(PyString *key, const Value &value)
 	{
-		m_module_definitions.insert_or_assign(key, value);
+		m_symbol_table.insert_or_assign(key, value);
+		m_attributes.insert_or_assign(key->value(), PyObject::from(value));
 	}
 };
 

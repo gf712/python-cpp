@@ -1,5 +1,5 @@
-#include "ast/AST.hpp"
 #include "ConstantFolding.hpp"
+#include "ast/AST.hpp"
 
 #include "parser/Parser.hpp"
 
@@ -453,18 +453,20 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 }
 
-void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expected_module, compiler::OptimizationLevel lvl)
+void assert_generates_ast(std::string_view program,
+	std::shared_ptr<Module> expected_module,
+	compiler::OptimizationLevel lvl)
 {
-	Lexer lexer{ std::string(program) };
+	auto lexer = Lexer::create(std::string(program), "_optimizers_dummy_.py");
 	parser::Parser p{ lexer };
 	spdlog::set_level(spdlog::level::debug);
 	p.parse();
 	// spdlog::set_level(spdlog::level::info);
 
-    if (lvl > compiler::OptimizationLevel::None) {
-        auto module = p.module();
-        ast::optimizer::constant_folding(module);
-    }
+	if (lvl > compiler::OptimizationLevel::None) {
+		auto module = p.module();
+		ast::optimizer::constant_folding(module);
+	}
 
 	size_t i = 0;
 	for (const auto &node : p.module()->body()) {
@@ -477,12 +479,17 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 	expected_module->print_node("");
 	spdlog::set_level(spdlog::level::info);
 }
+
+std::shared_ptr<Module> create_test_module()
+{
+	return std::make_shared<Module>("_optimizers_dummy_.py");
+}
 }// namespace
 
 TEST(Optimizer, ConstantFoldIntegerAddition)
 {
 	constexpr std::string_view program = "a = 1 + 1\n";
-	auto expected_ast = std::make_shared<Module>();
+	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
 		std::make_shared<Constant>(static_cast<int64_t>(2)),

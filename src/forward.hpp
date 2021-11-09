@@ -1,16 +1,19 @@
 #pragma once
 
-#include <variant>
 #include <cstdint>
 
 namespace ast {
 class ASTNode;
-}
+class Module;
+}// namespace ast
 
 class Bytecode;
 class BytecodeGenerator;
+class Function;
 class Interpreter;
+class InterpreterSession;
 class Instruction;
+class Program;
 
 namespace parser {
 class Parser;
@@ -24,12 +27,5 @@ struct Bytes;
 struct Ellipsis;
 struct NoneType;
 struct NameConstant;
-
-class PyDict;
-class PyFunction;
-class PyModule;
-class PyObject;
-class PyTuple;
-
 
 using Register = uint8_t;

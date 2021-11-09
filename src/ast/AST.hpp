@@ -672,10 +672,11 @@ class Call : public ASTNode
 
 class Module : public ASTNode
 {
+	std::string m_filename;
 	std::vector<std::shared_ptr<ASTNode>> m_body;
 
   public:
-	Module() : ASTNode(ASTNodeType::Module) {}
+	Module(std::string filename) : ASTNode(ASTNodeType::Module), m_filename(std::move(filename)) {}
 
 	template<typename T> void emplace(T node) { m_body.emplace_back(std::move(node)); }
 
@@ -684,6 +685,8 @@ class Module : public ASTNode
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
+
+	const std::string &filename() const { return m_filename; }
 
   private:
 	void print_this_node(const std::string &indent) const override
@@ -918,8 +921,7 @@ class Import : public ASTNode
 		: ASTNode(ASTNodeType::Import), m_names(std::move(names)), m_asname(std::move(asname))
 	{}
 
-
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
 
 	const std::optional<std::string> &asname() const { return m_asname; }
 	const std::vector<std::string> &names() const { return m_names; }

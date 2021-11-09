@@ -3,22 +3,31 @@ set(AST_SOURCE_FILES # cmake-format: sortable
 
 set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
-    bytecode/BytecodeGenerator.cpp
-    bytecode/instructions/FunctionCall.cpp
-    bytecode/instructions/FunctionCallWithKeywords.cpp
-    bytecode/instructions/Instructions.cpp
-    bytecode/instructions/LoadAttr.cpp
-    bytecode/instructions/LoadBuildClass.cpp
-    bytecode/instructions/LoadMethod.cpp
-    bytecode/instructions/LoadName.cpp
-    bytecode/instructions/MethodCall.cpp
-    bytecode/instructions/ReturnValue.cpp
-    bytecode/instructions/StoreAttr.cpp
-    bytecode/instructions/StoreName.cpp
-    bytecode/instructions/UnpackSequence.cpp)
+    executable/bytecode/Bytecode.cpp
+    executable/bytecode/BytecodeGenerator.cpp
+    executable/bytecode/instructions/FunctionCall.cpp
+    executable/bytecode/instructions/FunctionCallWithKeywords.cpp
+    executable/bytecode/instructions/ImportName.cpp
+    executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/LoadAttr.cpp
+    executable/bytecode/instructions/LoadBuildClass.cpp
+    executable/bytecode/instructions/LoadMethod.cpp
+    executable/bytecode/instructions/LoadName.cpp
+    executable/bytecode/instructions/MethodCall.cpp
+    executable/bytecode/instructions/ReturnValue.cpp
+    executable/bytecode/instructions/StoreAttr.cpp
+    executable/bytecode/instructions/StoreName.cpp
+    executable/bytecode/instructions/UnpackSequence.cpp)
 
-set(INTERPRETER_SOURCE_FILES # cmake-format: sortable
-                             interpreter/ExecutionFrame.cpp interpreter/Interpreter.cpp)
+set(EXECUTABLE_SOURCE_FILES # cmake-format: sortable
+                            executable/Program.cpp)
+
+set(LEXER_SOURCE_FILES # cmake-format: sortable
+                       lexer/Lexer.cpp)
+
+set(INTERPRETER_SOURCE_FILES
+    # cmake-format: sortable
+    interpreter/ExecutionFrame.cpp interpreter/Interpreter.cpp interpreter/InterpreterSession.cpp)
 
 set(MEMORY_SOURCE_FILES # cmake-format: sortable
                         memory/GarbageCollector.cpp memory/Heap.cpp)
@@ -29,8 +38,10 @@ set(PARSER_SOURCE_FILES # cmake-format: sortable
 set(RUNTIME_SOURCE_FILES
     # cmake-format: sortable
     runtime/CustomPyObject.cpp
-    runtime/PyBuiltins.cpp
+    runtime/modules/BuiltinsModule.cpp
+    runtime/modules/SysModule.cpp
     runtime/PyDict.cpp
+    runtime/PyFunction.cpp
     runtime/PyList.cpp
     runtime/PyModule.cpp
     runtime/PyNumber.cpp
@@ -43,13 +54,20 @@ set(RUNTIME_SOURCE_FILES
 set(VM_SOURCE_FILES # cmake-format: sortable
                     vm/VM.cpp)
 
-set(UNITTEST_SOURCES # cmake-format: sortable
-                     ast/optimizers/Optimizers_tests.cpp lexer/Lexer_tests.cpp parser/Parser_tests.cpp)
+set(UNITTEST_SOURCES
+    # cmake-format: sortable
+    ast/optimizers/Optimizers_tests.cpp
+    executable/bytecode/Bytecode_tests.cpp
+    executable/bytecode/BytecodeGenerator_tests.cpp
+    lexer/Lexer_tests.cpp
+    parser/Parser_tests.cpp)
 
 add_library(
   python-cpp
   ${AST_SOURCE_FILES}
   ${BYTECODE_SOURCE_FILES}
+  ${EXECUTABLE_SOURCE_FILES}
+  ${LEXER_SOURCE_FILES}
   ${INTERPRETER_SOURCE_FILES}
   ${MEMORY_SOURCE_FILES}
   ${PARSER_SOURCE_FILES}
@@ -69,10 +87,6 @@ if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
 endif()
 
-set(TEST_PROGRAM main.cpp)
-
-add_executable(test ${TEST_PROGRAM})
-target_link_libraries(test PRIVATE python-cpp)
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)
 
 add_executable(python repl/repl.cpp)

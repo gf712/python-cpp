@@ -1,5 +1,6 @@
 #include "PyList.hpp"
 #include "PyDict.hpp"
+#include "PyFunction.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"

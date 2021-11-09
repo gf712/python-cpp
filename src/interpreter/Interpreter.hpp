@@ -1,14 +1,17 @@
 #pragma once
 
 #include "ExecutionFrame.hpp"
-#include "vm/VM.hpp"
 
-#include "runtime/PyObject.hpp"
+#include "forward.hpp"
+#include "runtime/forward.hpp"
+#include "vm/VM.hpp"
 
 #include <string>
 #include <string_view>
 
 class Interpreter
+	: NonCopyable
+	, NonMoveable
 {
   public:
 	enum class Status { OK, EXCEPTION };
@@ -16,8 +19,12 @@ class Interpreter
   private:
 	ExecutionFrame *m_current_frame{ nullptr };
 	ExecutionFrame *m_global_frame{ nullptr };
+	std::vector<PyModule *> m_available_modules;
+	PyModule *m_module;
 	Status m_status{ Status::OK };
 	std::string m_exception_message;
+	std::string m_entry_script;
+	std::shared_ptr<Program> m_program;
 
   public:
 	Interpreter();
@@ -67,7 +74,23 @@ class Interpreter
 		}
 	}
 
+	PyModule *get_imported_module(PyString *) const;
+
+	PyModule *module() const { return m_module; }
+
 	void unwind();
 
-	void setup();
+	void setup(std::shared_ptr<Program> program);
+	void setup_main_interpreter(std::shared_ptr<Program> program);
+
+	const std::string &entry_script() const { return m_entry_script; }
+
+	const std::shared_ptr<Function> &functions(size_t idx) const;
+
+	PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
+
+	PyObject *call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs);
+
+  private:
+	void internal_setup(PyString *name, std::string entry_script, size_t local_registers);
 };

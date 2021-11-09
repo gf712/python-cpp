@@ -1,11 +1,13 @@
 #include "PyObject.hpp"
+
 #include "AttributeError.hpp"
+#include "PyFunction.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "StopIterationException.hpp"
 
-#include "bytecode/instructions/FunctionCall.hpp"
+#include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
@@ -40,9 +42,9 @@ size_t ValueHash::operator()(const Value &value) const
 					auto *args = PyTuple::create(std::vector{ obj });
 					auto *function_object = std::get<PyFunction *>(obj->slots().hash);
 					auto *result =
-						execute(vm, *vm.interpreter(), function_object, args, nullptr, nullptr);
+						execute(vm.interpreter(), function_object, args, nullptr, nullptr);
 					if (result->type() != PyObjectType::PY_NUMBER) {
-						vm.interpreter()->raise_exception("");
+						vm.interpreter().raise_exception("");
 						return 0;
 					}
 					return std::visit([](const auto &value) { return static_cast<size_t>(value); },
@@ -108,8 +110,8 @@ template<> PyObject *PyObject::from(const Value &value)
 PyObject::PyObject(PyObjectType type) : Cell(), m_type(type)
 {
 	m_slots =
-		Slots{ .repr = [this]() { return this->repr_impl(*VirtualMachine::the().interpreter()); },
-			.iter = [this]() { return this->iter_impl(*VirtualMachine::the().interpreter()); },
+		Slots{ .repr = [this]() { return this->repr_impl(VirtualMachine::the().interpreter()); },
+			.iter = [this]() { return this->iter_impl(VirtualMachine::the().interpreter()); },
 			.hash = {},
 			.richcompare = {} };
 };
@@ -117,7 +119,7 @@ PyObject::PyObject(PyObjectType type) : Cell(), m_type(type)
 void PyObject::visit_graph(Visitor &visitor)
 {
 	for (const auto &[name, obj] : m_attributes) {
-		spdlog::debug("PyObject::visit_graph: {}", name);
+		spdlog::trace("PyObject::visit_graph: {}", name);
 		visitor.visit(*obj);
 	}
 	visitor.visit(*this);
@@ -266,34 +268,6 @@ PyObject *PyObject::richcompare_impl(const PyObject *other,
 		return greater_than_impl(other, interpreter);
 	}
 	ASSERT_NOT_REACHED()
-}
-
-PyCode::PyCode(const size_t pos, const size_t register_count, std::vector<std::string> args)
-	: PyObject(PyObjectType::PY_CODE), m_pos(pos), m_register_count(register_count),
-	  m_args(std::move(args))
-{
-	// 	m_attributes["co_var"] = PyList::from(m_args);
-}
-
-
-PyFunction::PyFunction(std::string name, PyCode *code)
-	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(code)
-{
-	// m_attributes["__code__"] = m_code;
-}
-
-
-void PyFunction::visit_graph(Visitor &visitor)
-{
-	PyObject::visit_graph(visitor);
-	m_code->visit_graph(visitor);
-}
-
-
-void PyNativeFunction::visit_graph(Visitor &visitor)
-{
-	PyObject::visit_graph(visitor);
-	for (auto *obj : m_captures) { obj->visit_graph(visitor); }
 }
 
 

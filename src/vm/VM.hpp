@@ -1,44 +1,43 @@
 #pragma once
 
+#include "executable/FunctionBlock.hpp"
 #include "forward.hpp"
-#include "utilities.hpp"
 #include "memory/Heap.hpp"
 #include "runtime/Value.hpp"
+#include "utilities.hpp"
+
+#include <stack>
 
 class VirtualMachine;
 
-struct LocalFrame
+using Registers = std::vector<Value>;
+
+struct StackFrame : NonCopyable
 {
-	VirtualMachine *vm;
-	LocalFrame(size_t frame_size, VirtualMachine *);
-	LocalFrame(const LocalFrame &) = delete;
-	LocalFrame(LocalFrame &&);
-	~LocalFrame();
+	Registers registers;
+	InstructionVector::const_iterator return_address;
+	VirtualMachine *vm{ nullptr };
+
+	StackFrame(size_t frame_size,
+		InstructionVector::const_iterator return_address,
+		VirtualMachine *);
+	StackFrame(StackFrame &&);
+	~StackFrame();
 };
 
 class VirtualMachine
 	: NonCopyable
 	, NonMoveable
 {
-	std::shared_ptr<Bytecode> m_bytecode;
-	std::unique_ptr<Interpreter> m_interpreter;
-	std::vector<std::vector<Value>> m_local_registers;
-	size_t m_instruction_pointer{ 0 };
+	std::stack<StackFrame> m_stack;
+	InstructionVector::const_iterator m_instruction_pointer;
 	Heap &m_heap;
+	std::unique_ptr<InterpreterSession> m_interpreter_session;
 
-	friend LocalFrame;
+	friend StackFrame;
 
   public:
-	VirtualMachine &create(std::shared_ptr<Bytecode> generator)
-	{
-		auto &vm = VirtualMachine::the();
-		vm.push_generator(generator);
-		return vm;
-	}
-
-	PyObject *execute_statement(std::shared_ptr<Bytecode> bytecode);
-
-	void push_generator(std::shared_ptr<Bytecode> generator);
+	int execute(std::shared_ptr<Program> program);
 
 	static VirtualMachine &the()
 	{
@@ -46,39 +45,84 @@ class VirtualMachine
 		return *vm;
 	}
 
-	Value &reg(size_t idx) { return m_local_registers.back()[idx]; }
-	const Value &reg(size_t idx) const { return m_local_registers.back()[idx]; }
+	Value &reg(size_t idx)
+	{
+		ASSERT(idx < registers().size())
+		return registers()[idx];
+	}
 
-	std::vector<Value> &registers() { return m_local_registers.back(); }
-	const std::vector<Value> &registers() const { return m_local_registers.back(); }
+	const Value &reg(size_t idx) const
+	{
+		ASSERT(idx < registers().size())
+		return registers()[idx];
+	}
+
+	Registers &registers()
+	{
+		ASSERT(!m_stack.empty())
+		return m_stack.top().registers;
+	}
+	const Registers &registers() const
+	{
+		ASSERT(!m_stack.empty())
+		return m_stack.top().registers;
+	}
 
 	Heap &heap() { return m_heap; }
 
-	std::unique_ptr<Interpreter> &interpreter() { return m_interpreter; }
-	const std::unique_ptr<Interpreter> &interpreter() const { return m_interpreter; }
+	Interpreter &interpreter();
+	const Interpreter &interpreter() const;
 
-	size_t function_offset(size_t func_id);
-	size_t function_register_count(size_t func_id);
+	void set_instruction_pointer(InstructionVector::const_iterator pos)
+	{
+		m_instruction_pointer = pos;
+	}
 
-	void set_instruction_pointer(size_t pos) { m_instruction_pointer = pos; }
-	size_t instruction_pointer() const { return m_instruction_pointer; }
+	const InstructionVector::const_iterator &instruction_pointer() const
+	{
+		return m_instruction_pointer;
+	}
 
 	void clear();
 
-	int execute();
-	int execute_frame();
-
 	void dump() const;
 
-	LocalFrame enter_frame(size_t frame_size) { return LocalFrame{ frame_size, this }; }
+	int call(const std::shared_ptr<Function> &, size_t frame_size);
+	void ret();
+
+	void shutdown_interpreter(Interpreter &);
 
   private:
 	VirtualMachine();
-	VirtualMachine(std::unique_ptr<BytecodeGenerator> &&generator);
+
+	int execute_internal(std::shared_ptr<Program> program);
 
 	void show_current_instruction(size_t index, size_t window) const;
 
-	void push_frame(size_t frame_size) { m_local_registers.emplace_back(frame_size, nullptr); }
+	void push_frame(size_t frame_size)
+	{
+		if (m_stack.empty()) {
+			// the stack of main doesn't need a return address, since once it is popped
+			// we shut down and there is nothing left to do
+			m_stack.push(StackFrame{ frame_size, InstructionVector::const_iterator{}, this });
+		} else {
+			// return address is the instruction after the current instruction
+			const auto return_address = m_instruction_pointer;
+			m_stack.push(StackFrame{ frame_size, return_address, this });
+		}
+	}
 
-	void pop_frame() { m_local_registers.pop_back(); }
+	void pop_frame()
+	{
+		if (m_stack.size() > 1) {
+			auto return_value = m_stack.top().registers[0];
+			ASSERT((*m_stack.top().return_address).get());
+			m_instruction_pointer = m_stack.top().return_address;
+			m_stack.pop();
+			m_stack.top().registers[0] = std::move(return_value);
+		} else {
+			// FIXME: this is an ugly way to keep the state of the interpreter
+			// m_stack.pop();
+		}
+	}
 };

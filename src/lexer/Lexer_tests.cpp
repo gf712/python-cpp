@@ -5,6 +5,7 @@ namespace {
 std::vector<Token>
 	generate_tokens(std::string_view program, bool ignore_nl_token, bool ignore_comments)
 {
+	auto lexer = Lexer::create(std::string(program), "_test_dummy_.py");
 	lexer.ignore_nl_token() = ignore_nl_token;
 	lexer.ignore_comments() = ignore_comments;
 	std::vector<Token> tokens;

@@ -7,11 +7,15 @@
 ExecutionFrame::ExecutionFrame() {}
 
 
-ExecutionFrame *
-	ExecutionFrame::create(ExecutionFrame *parent, PyDict *globals, PyDict *locals, PyDict *ns)
+ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
+	size_t register_count,
+	PyDict *globals,
+	PyDict *locals,
+	PyDict *ns)
 {
 	auto *new_frame = Heap::the().allocate<ExecutionFrame>();
 	new_frame->m_parent = parent;
+	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
 	new_frame->m_ns = ns;
@@ -19,8 +23,9 @@ ExecutionFrame *
 	if (new_frame->m_parent) {
 		new_frame->m_builtins = new_frame->m_parent->m_builtins;
 	} else {
-		// check return is not None?
-		// assert that this is indeed a heap allocated PyModule
+		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
+		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
+			   == PyObjectType::PY_MODULE)
 		new_frame->m_builtins =
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
 	}
@@ -95,7 +100,5 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 			std::get<PyObject *>(*val)->visit_graph(visitor);
 		}
 	}
-	if (m_parent) { 
-		m_parent->visit_graph(visitor); 
-	}
+	if (m_parent) { m_parent->visit_graph(visitor); }
 }

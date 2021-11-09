@@ -5,29 +5,33 @@
 
 #include "runtime/Value.hpp"
 
-#include <unordered_map>
 #include <memory>
+#include <unordered_map>
 
 
 class ExecutionFrame : public Cell
 {
 	friend Heap;
+	friend Interpreter;
 
+  protected:
 	// parameters
 	std::array<std::optional<Value>, 16> m_parameters;
+	size_t m_register_count;
 	PyModule *m_builtins;
 	PyDict *m_globals;
 	PyDict *m_locals;
 	PyDict *m_ns;
 	ExecutionFrame *m_parent{ nullptr };
-	size_t m_return_address;
-	std::optional<LocalFrame> m_frame_info;
 	PyObject *m_exception{ nullptr };
 	PyObject *m_exception_to_catch{ nullptr };
 
   public:
-	static ExecutionFrame *
-		create(ExecutionFrame *parent, PyDict *globals, PyDict *locals, PyDict *ns);
+	static ExecutionFrame *create(ExecutionFrame *parent,
+		size_t register_count,
+		PyDict *globals,
+		PyDict *locals,
+		PyDict *ns);
 
 	const std::optional<Value> &parameter(size_t parameter_idx) const
 	{
@@ -45,11 +49,6 @@ class ExecutionFrame : public Cell
 	void put_global(const std::string &name, PyObject *obj);
 
 	ExecutionFrame *parent() const { return m_parent; }
-
-	void set_return_address(size_t address) { m_return_address = address; }
-	size_t return_address() const { return m_return_address; }
-
-	void attach_frame(LocalFrame &&frame) { m_frame_info.emplace(std::move(frame)); }
 
 	void set_exception(PyObject *exception);
 
