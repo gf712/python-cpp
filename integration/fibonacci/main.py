@@ -1,5 +1,8 @@
 # test file
 import fibo # test module
+import sys
+
+print(sys.argv)
 
 print(fibo.greeting)
 

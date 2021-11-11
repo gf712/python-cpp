@@ -23,9 +23,14 @@ static PyString *s_sys__ = nullptr;
 
 Interpreter::Interpreter() {}
 
-void Interpreter::internal_setup(PyString *name, std::string entry_script, size_t local_registers)
+void Interpreter::internal_setup(PyString *name,
+	std::string entry_script,
+	std::vector<std::string> argv,
+	size_t local_registers)
 {
 	m_entry_script = std::move(entry_script);
+	m_argv = std::move(argv);
+
 	auto &heap = VirtualMachine::the().heap();
 
 	if (!s_sys__) { s_sys__ = heap.allocate_static<PyString>("sys").get(); }
@@ -51,7 +56,7 @@ void Interpreter::internal_setup(PyString *name, std::string entry_script, size_
 void Interpreter::setup(std::shared_ptr<Program> program)
 {
 	PyString *name = PyString::create(fs::path(program->filename()).stem());
-	internal_setup(name, program->filename(), program->main_stack_size());
+	internal_setup(name, program->filename(), program->argv(), program->main_stack_size());
 	m_program = std::move(program);
 }
 
@@ -60,7 +65,7 @@ void Interpreter::setup_main_interpreter(std::shared_ptr<Program> program)
 	auto &heap = VirtualMachine::the().heap();
 
 	if (!s_main__) { s_main__ = heap.allocate_static<PyString>("__main__").get(); }
-	internal_setup(s_main__, program->filename(), program->main_stack_size());
+	internal_setup(s_main__, program->filename(), program->argv(), program->main_stack_size());
 	m_program = std::move(program);
 }
 

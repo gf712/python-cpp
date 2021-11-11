@@ -36,22 +36,20 @@ std::string PyDict::to_string() const
 
 		std::advance(it, 1);
 	}
-	std::visit(
-		overloaded{ [&os](PyObject *key) {
-					   os << key->repr_impl(VirtualMachine::the().interpreter())->to_string()
-						  << ": ";
-				   },
-			[&os](const auto &key) { os << key << ": "; } },
+	std::visit(overloaded{ [&os](PyObject *key) {
+							  os << key->repr_impl(VirtualMachine::the().interpreter())->to_string()
+								 << ": ";
+						  },
+				   [&os](const auto &key) { os << key << ": "; } },
 		it->first);
 	std::visit(
-		overloaded{
-			[&os, this](PyObject *value) {
-				if (value == this) {
-					os << "{...}";
-				} else {
-					os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
-				}
-			},
+		overloaded{ [&os, this](PyObject *value) {
+					   if (value == this) {
+						   os << "{...}";
+					   } else {
+						   os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
+					   }
+				   },
 			[&os](const auto &value) { os << value; } },
 		it->second);
 	os << "}";

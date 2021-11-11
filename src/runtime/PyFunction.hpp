@@ -1,6 +1,8 @@
 #pragma once
 
 #include "PyObject.hpp"
+#include "PyTuple.hpp"
+
 
 class PyCode : public PyObject
 {
@@ -48,7 +50,6 @@ class PyFunction : public PyObject
 	void visit_graph(Visitor &) override;
 };
 
-class PyTuple;
 
 class PyNativeFunction : public PyObject
 {

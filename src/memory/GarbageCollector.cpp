@@ -1,5 +1,6 @@
 #include "GarbageCollector.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "interpreter/InterpreterSession.hpp"
 #include "memory/Heap.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
@@ -48,8 +49,10 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 		}
 	}
 
-	auto *execution_frame = VirtualMachine::the().interpreter().execution_frame();
-	if (execution_frame) { roots.insert(execution_frame); }
+	for (const auto &interpreter : VirtualMachine::the().interpreter_session()->interpreters()) {
+		auto *execution_frame = interpreter->execution_frame();
+		if (execution_frame) { roots.insert(execution_frame); }
+	}
 
 	return roots;
 }
@@ -58,21 +61,19 @@ struct MarkGCVisitor : Cell::Visitor
 {
 	void visit(Cell &cell)
 	{
-		uint8_t *cell_start = static_cast<uint8_t *>(static_cast<void *>(&cell));
-		auto *obj_header = static_cast<GarbageCollected *>(
-			static_cast<void *>(cell_start - sizeof(GarbageCollected)));
+		uint8_t *cell_start = bit_cast<uint8_t *>(&cell);
+		auto *obj_header = bit_cast<GarbageCollected *>(cell_start - sizeof(GarbageCollected));
 
 		if (obj_header->black()) {
-			// spdlog::trace("Already visited {}@{}, skipping",
-			// 	object_name(static_cast<PyObject *>(&cell)->type()),
-			// 	(void *)&cell);
+			if (cell.is_pyobject()) {
+				spdlog::trace("Already visited {}@{}, skipping",
+					object_name(static_cast<PyObject *>(&cell)->type()),
+					(void *)&cell);
+			}
 			return;
 		}
 		if (cell.is_pyobject()) {
 			auto *obj = static_cast<PyObject *>(&cell);
-			// spdlog::trace("object {} address @{}",
-			// 	object_name(static_cast<PyObject *>(obj)->type()),
-			// 	(void *)obj);
 			spdlog::trace("Visiting {}@{}", object_name(obj->type()), (void *)&obj);
 		}
 
@@ -105,9 +106,7 @@ void MarkSweepGC::mark_all_live_objects(const std::unordered_set<Cell *> &roots)
 
 	// mark all live objects
 	for (auto *root : roots) {
-		// spdlog::trace("Visiting root {}@{}",
-		// 	object_name(static_cast<PyObject *>(root)->type()),
-		// 	(void *)&root);
+		spdlog::trace("Visiting root {}", (void *)root);
 		root->visit_graph(*mark_visitor);
 	}
 }

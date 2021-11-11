@@ -15,3 +15,17 @@ DEFINE_MODULE(test, m) {
         ;
 }
 ```
+
+and/or 
+
+```C++
+EXPORT_MODULE(MyModule) // where mymodule is a PyModule
+```
+
+and/or
+
+```C++
+DEFINE_MODULE(test, m) { 
+    class_<MyClass>(m, "MyClass") // where MyClass inherits from PyObject
+}
+```

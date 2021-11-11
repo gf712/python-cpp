@@ -92,6 +92,11 @@ class VirtualMachine
 
 	void shutdown_interpreter(Interpreter &);
 
+	const std::unique_ptr<InterpreterSession> &interpreter_session() const
+	{
+		return m_interpreter_session;
+	}
+
   private:
 	VirtualMachine();
 

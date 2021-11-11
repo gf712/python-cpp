@@ -41,6 +41,7 @@ class BytecodeGenerator : NonCopyable
 	~BytecodeGenerator();
 
 	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
+		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
 
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
@@ -102,6 +103,6 @@ class BytecodeGenerator : NonCopyable
 	void exit_function(size_t function_id);
 
   private:
-	std::shared_ptr<Program> generate_executable(std::string);
+	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
 	void relocate_labels(const FunctionBlocks &functions);
 };

@@ -18,7 +18,7 @@ std::shared_ptr<Program> generate_bytecode_executable(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	return BytecodeGenerator::compile(module, compiler::OptimizationLevel::None);
+	return BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None);
 }
 }// namespace
 

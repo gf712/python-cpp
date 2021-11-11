@@ -26,6 +26,10 @@ class InterpreterSession
 		return *m_interpreters.back();
 	}
 
+	const std::list<std::unique_ptr<Interpreter>>& interpreters() const {
+		return m_interpreters;
+	} 
+
 	void shutdown(Interpreter &interpreter)
 	{
 		const size_t initial_size = m_interpreters.size();

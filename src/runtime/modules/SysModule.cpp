@@ -19,6 +19,16 @@ PyList *create_sys_paths(Interpreter &interpreter)
 
 	return path_list;
 }
+
+PyList *create_sys_argv(Interpreter &interpreter)
+{
+	auto &heap = VirtualMachine::the().heap();
+	auto *argv_list = heap.allocate<PyList>();
+	for (const auto &arg : interpreter.argv()) { argv_list->append(PyString::create(arg)); }
+
+	return argv_list;
+}
+
 }// namespace
 
 PyModule *sys_module(Interpreter &interpreter)
@@ -32,6 +42,7 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module = heap.allocate<PyModule>(PyString::create("sys"));
 
 	s_sys_module->insert(PyString::create("path"), create_sys_paths(interpreter));
+	s_sys_module->insert(PyString::create("argv"), create_sys_argv(interpreter));
 
 	return s_sys_module;
 }

@@ -24,6 +24,7 @@ class Interpreter
 	Status m_status{ Status::OK };
 	std::string m_exception_message;
 	std::string m_entry_script;
+	std::vector<std::string> m_argv;
 	std::shared_ptr<Program> m_program;
 
   public:
@@ -84,6 +85,7 @@ class Interpreter
 	void setup_main_interpreter(std::shared_ptr<Program> program);
 
 	const std::string &entry_script() const { return m_entry_script; }
+	const std::vector<std::string> &argv() const { return m_argv; }
 
 	const std::shared_ptr<Function> &functions(size_t idx) const;
 
@@ -92,5 +94,8 @@ class Interpreter
 	PyObject *call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs);
 
   private:
-	void internal_setup(PyString *name, std::string entry_script, size_t local_registers);
+	void internal_setup(PyString *name,
+		std::string entry_script,
+		std::vector<std::string> argv,
+		size_t local_registers);
 };

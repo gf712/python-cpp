@@ -36,7 +36,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	//        object.
 	//        The current issue with visiting globals is that it will create a cycle
 	//        and the visitor currently doesn't handle cycles
-	// if (m_globals) m_globals->visit_graph(visitor);
+	if (m_globals) visitor.visit(*m_globals);
 }
 
 

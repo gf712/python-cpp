@@ -1,8 +1,8 @@
 #include "Program.hpp"
 
 
-Program::Program(FunctionBlocks &&func_blocks, std::string filename)
-	: m_filename(std::move(filename))
+Program::Program(FunctionBlocks &&func_blocks, std::string filename, std::vector<std::string> argv)
+	: m_filename(std::move(filename)), m_argv(std::move(argv))
 {
 	const auto instruction_count = std::accumulate(func_blocks.begin(),
 		func_blocks.end(),

@@ -7,12 +7,13 @@
 class Program : NonCopyable
 {
 	std::string m_filename;
+	std::vector<std::string> m_argv;
 	InstructionVector m_instructions;
 	std::vector<std::shared_ptr<Function>> m_functions;
 	std::shared_ptr<Function> m_main_function;
 
   public:
-	Program(FunctionBlocks &&func_blocks, std::string filename);
+	Program(FunctionBlocks &&func_blocks, std::string filename, std::vector<std::string> argv);
 
 	auto begin() const
 	{
@@ -28,6 +29,7 @@ class Program : NonCopyable
 	}
 	size_t main_stack_size() const { return m_main_function->registers_needed(); }
 	const std::string &filename() const { return m_filename; }
+	const std::vector<std::string> &argv() const { return m_argv; }
 
 	void set_filename(std::string filename) { m_filename = std::move(filename); }
 

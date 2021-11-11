@@ -45,7 +45,7 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 	}
 }
 
-std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename)
+std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename, std::vector<std::string> argv)
 {
 	ASSERT(m_frame_register_count.size() == 1)
 	// make sure that at the end of compiling code we are back to __main__ frame
@@ -80,11 +80,12 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 
 	relocate_labels(m_functions);
 
-	return std::make_shared<Program>(std::move(m_functions), filename);
+	return std::make_shared<Program>(std::move(m_functions), filename, argv);
 }
 
 
 std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node,
+	std::vector<std::string> argv,
 	compiler::OptimizationLevel lvl)
 {
 	auto module = as<ast::Module>(node);
@@ -98,6 +99,6 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 	node->generate_impl(0, generator, ctx);
 	// allocate registers for __main__
 	generator.m_functions.front().metadata.register_count = generator.register_count();
-	auto executable = generator.generate_executable(module->filename());
+	auto executable = generator.generate_executable(module->filename(), argv);
 	return executable;
 }
