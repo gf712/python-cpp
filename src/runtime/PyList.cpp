@@ -29,6 +29,8 @@ PyList *PyList::create(std::vector<Value> elements)
 	return VirtualMachine::the().heap().allocate<PyList>(elements);
 }
 
+PyList *PyList::create() { return VirtualMachine::the().heap().allocate<PyList>(); }
+
 PyObject *PyList::append(PyObject *obj)
 {
 	m_elements.push_back(obj);

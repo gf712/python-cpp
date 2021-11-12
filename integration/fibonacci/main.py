@@ -14,3 +14,6 @@ print(fibo.fib2(10))
 
 # test fib3
 print(fibo.fib3(10))
+
+print("main", dir())
+print("fibo", dir(fibo))

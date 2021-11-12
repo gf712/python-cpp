@@ -2,6 +2,7 @@
 #include "runtime/CustomPyObject.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyList.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyRange.hpp"
@@ -288,6 +289,40 @@ PyObject *ord(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	}
 	return nullptr;
 }
+
+PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+{
+	ASSERT(args->size() < 2)
+	auto dir_list = PyList::create();
+	if (args->size() == 0) {
+		for (const auto &[k, _] : interpreter.execution_frame()->locals()->map()) {
+			dir_list->append(PyObject::from(k));
+		}
+	} else {
+		const auto &arg = args->elements()[0];
+
+		// If the object is a module object, the list contains the names of the module’s attributes.
+		if (std::holds_alternative<PyObject *>(arg) && as<PyModule>(std::get<PyObject *>(arg))) {
+			auto *pymodule = as<PyModule>(std::get<PyObject *>(arg));
+			for (const auto &[k, _] : pymodule->symbol_table()) {
+				dir_list->append(k); 
+			}
+		}
+		// If the object is a type or class object, the list contains the names of its attributes,
+		// and recursively of the attributes of its bases.
+
+		// Otherwise, the list contains the object’s attributes’ names, the names of its class’s
+		// attributes, and recursively of the attributes of its class’s base classes.
+		else {
+			auto object = PyObject::from(arg);
+			for (const auto &[k, _] : object->attributes()) {
+				dir_list->append(PyString::create(k));
+			}
+		}
+	}
+	// FIXME, this list should be ordered alphabetically
+	return dir_list;
+}
 }// namespace
 
 
@@ -306,6 +341,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 			"__build_class__", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return build_class(args, kwargs, interpreter);
 			}));
+
+	s_builtin_module->insert(PyString::create("dir"),
+		heap.allocate<PyNativeFunction>("dir", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return dir(args, kwargs, interpreter);
+		}));
 
 	s_builtin_module->insert(PyString::create("globals"),
 		heap.allocate<PyNativeFunction>("globals", [&interpreter](PyTuple *args, PyDict *kwargs) {

@@ -9,8 +9,6 @@ class PyList : public PyObject
 	std::vector<Value> m_elements;
 
   public:
-	PyList();
-	PyList(std::vector<Value> elements);
 	static PyList *create(std::vector<Value> elements);
 	static PyList *create();
 
@@ -24,6 +22,10 @@ class PyList : public PyObject
 	void visit_graph(Visitor &) override;
 
 	PyObject *append(PyObject *);
+
+  private:
+	PyList();
+	PyList(std::vector<Value> elements);
 };
 
 

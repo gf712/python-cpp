@@ -63,6 +63,8 @@ class Interpreter
 		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, obj); }
 	}
 
+	std::optional<Value> get_object(const std::string &name);
+
 	template<typename PyObjectType, typename... Args>
 	PyObject *allocate_object(const std::string &name, Args &&... args)
 	{

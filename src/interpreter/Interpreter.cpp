@@ -125,3 +125,33 @@ PyObject *Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict
 	vm.reg(0) = result;
 	return result;
 }
+
+std::optional<Value> Interpreter::get_object(const std::string &name)
+{
+	Value obj;
+
+	const auto &name_value = String{ name };
+
+	ASSERT(execution_frame()->locals())
+	ASSERT(execution_frame()->globals())
+	ASSERT(execution_frame()->builtins())
+
+	const auto &locals = execution_frame()->locals()->map();
+	const auto &globals = execution_frame()->globals()->map();
+	const auto &builtins = execution_frame()->builtins()->symbol_table();
+
+	auto pystr_name = PyString::create(name);
+
+	if (auto it = locals.find(name_value); it != locals.end()) {
+		obj = it->second;
+	} else if (auto it = globals.find(name_value); it != globals.end()) {
+		obj = it->second;
+	} else if (auto it = builtins.find(pystr_name); it != builtins.end()) {
+		obj = it->second;
+	} else {
+		raise_exception("NameError: name '{:s}' is not defined", name);
+		obj = py_none();
+	}
+
+	return obj;
+}

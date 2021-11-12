@@ -171,6 +171,7 @@ class PyObject : public Cell
 
 	PyObject *get(std::string name, Interpreter &interpreter) const;
 	void put(std::string name, PyObject *);
+	const std::unordered_map<std::string, PyObject *> &attributes() const { return m_attributes; }
 
 	const Slots &slots() const { return m_slots; }
 
