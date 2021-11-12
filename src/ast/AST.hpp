@@ -37,6 +37,7 @@ namespace ast {
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Return)             \
+	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Tuple)              \
 	__AST_NODE_TYPE(While)
 
@@ -288,6 +289,7 @@ class Name final : public Variable
 	{}
 
 	const std::vector<std::string> &ids() const final { return m_id; }
+	void set_context(ContextType ctx) { m_ctx = ctx; }
 
 	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
 };
@@ -949,6 +951,108 @@ class Import : public ASTNode
 		spdlog::debug("{}  - name: {}", indent, dotted_name());
 	}
 };
+
+
+class Subscript : public ASTNode
+{
+  public:
+	struct Index
+	{
+		std::shared_ptr<ASTNode> value;
+
+		void print(const std::string &indent) const
+		{
+			spdlog::debug("{}Index", indent);
+			std::string new_indent = indent + std::string(6, ' ');
+			spdlog::debug("{}  - value:", indent);
+			value->print_node(new_indent);
+		}
+	};
+
+	struct Slice
+	{
+		std::shared_ptr<ASTNode> lower;
+		std::shared_ptr<ASTNode> upper;
+		std::shared_ptr<ASTNode> step{ nullptr };
+		void print(const std::string &indent) const
+		{
+			spdlog::debug("{}Slice", indent);
+			std::string new_indent = indent + std::string(6, ' ');
+
+			if (lower) {
+				spdlog::debug("{}  - lower:", indent);
+				lower->print_node(new_indent);
+			} else {
+				spdlog::debug("{}  - lower: null", indent);
+			}
+
+			if (upper) {
+				spdlog::debug("{}  - upper:", indent);
+				upper->print_node(new_indent);
+			} else {
+				spdlog::debug("{}  - upper: null", indent);
+			}
+
+			if (step) {
+				spdlog::debug("{}  - step:", indent);
+				step->print_node(new_indent);
+			} else {
+				spdlog::debug("{}  - step: null", indent);
+			}
+		}
+	};
+
+	struct ExtSlice
+	{
+		std::vector<std::variant<Index, Slice>> dims;
+		void print(const std::string &indent) const
+		{
+			spdlog::debug("{}ExtSlice", indent);
+			std::string new_indent = indent + std::string(6, ' ');
+			for (const auto &d : dims) {
+				std::visit([&new_indent](const auto &val) { val.print(new_indent); }, d);
+			}
+		}
+	};
+
+	using SliceType = std::variant<Index, Slice, ExtSlice>;
+
+  private:
+	std::shared_ptr<ASTNode> m_value;
+	SliceType m_slice;
+	ContextType m_ctx;
+
+  public:
+	Subscript() : ASTNode(ASTNodeType::Subscript) {}
+
+	Subscript(std::shared_ptr<ASTNode> value, SliceType slice, ContextType ctx)
+		: ASTNode(ASTNodeType::Subscript), m_value(std::move(value)), m_slice(std::move(slice)),
+		  m_ctx(ctx)
+	{}
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	const SliceType &slice() const { return m_slice; }
+	ContextType context() const { return m_ctx; }
+
+	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
+	void set_slice(SliceType slice) { m_slice = std::move(slice); }
+	void set_context(ContextType context) { m_ctx = context; }
+
+	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
+
+  private:
+	void print_this_node(const std::string &indent) const override
+	{
+		spdlog::debug("{}Subscript", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		spdlog::debug("{}  - value:", indent);
+		m_value->print_node(new_indent);
+		spdlog::debug("{}  - slice:", indent);
+		std::visit([&new_indent](const auto &val) { val.print(new_indent); }, m_slice);
+		spdlog::debug("{}  - ctx: {}", indent, m_ctx);
+	}
+};
+
 
 template<typename NodeType> std::shared_ptr<NodeType> as(std::shared_ptr<ASTNode> node);
 
