@@ -351,6 +351,7 @@ struct TPrimaryPattern : Pattern<TPrimaryPattern>
 	}
 };
 
+struct SlicesPattern;
 
 struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 {
@@ -369,7 +370,7 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 			SingleTokenPattern<Token::TokenType::NAME>,
 			NegativeLookAhead<TLookahead>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("t_primary '.' NAME !t_lookahead ");
+			spdlog::debug("t_primary '.' NAME !t_lookahead");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
 			const auto primary = p.pop_back();
@@ -377,6 +378,24 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 			primary->print_node("");
 			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
 			p.push_to_stack(attribute);
+			return true;
+		}
+
+		using pattern2 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::LSQB>,
+			SlicesPattern,
+			SingleTokenPattern<Token::TokenType::RSQB>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern2::match(p)) {
+			spdlog::debug("t_primary '[' slices ']' !t_lookahead");
+			auto subscript = p.pop_back();
+			auto name = p.pop_back();
+			ASSERT(as<Subscript>(subscript))
+			ASSERT(as<Name>(name))
+			as<Name>(name)->set_context(ContextType::LOAD);
+			as<Subscript>(subscript)->set_value(name);
+			as<Subscript>(subscript)->set_context(ContextType::STORE);
+			p.push_to_stack(subscript);
 			return true;
 		}
 
@@ -755,7 +774,6 @@ struct AtomPattern : Pattern<AtomPattern>
 	}
 };
 
-struct ExpressionPattern;
 
 struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 {
@@ -883,6 +901,87 @@ struct ArgumentsPattern : Pattern<ArgumentsPattern>
 	}
 };
 
+struct SlicePattern : Pattern<SlicePattern>
+{
+	// slice:
+	//     | [expression] ':' [expression] [':' [expression] ]
+	//     | named_expression
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("SlicePattern");
+		using pattern1 = PatternMatch<ZeroOrOnePattern<ExpressionPattern>,
+			SingleTokenPattern<Token::TokenType::COLON>,
+			ZeroOrOnePattern<ExpressionPattern>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COLON>,
+				ZeroOrOnePattern<ExpressionPattern>>>;
+		const auto initial_size = p.stack().size();
+		if (pattern1::match(p)) {
+			spdlog::debug("[expression] ':' [expression] [':' [expression] ]");
+			Subscript::SliceType slice;
+			if ((p.stack().size() - initial_size) > 1) {
+				if ((p.stack().size() - initial_size) == 3) {
+					auto step = p.pop_back();
+					auto upper = p.pop_back();
+					auto lower = p.pop_back();
+					slice = Subscript::Slice{ lower, upper, step };
+				} else if ((p.stack().size() - initial_size) == 2) {
+					auto upper = p.pop_back();
+					auto lower = p.pop_back();
+					slice = Subscript::Slice{ lower, upper };
+				} else {
+					PARSER_ERROR()
+				}
+			} else if ((p.stack().size() - initial_size) == 1) {
+				slice = Subscript::Index{ p.pop_back() };
+			} else {
+				PARSER_ERROR()
+			}
+			as<ast::Subscript>(p.stack().back())->set_slice(slice);
+			return true;
+		}
+
+		using pattern2 = PatternMatch<NamedExpressionPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("named_expression");
+			Subscript::SliceType slice = Subscript::Index{ p.pop_back() };
+			as<ast::Subscript>(p.stack().back())->set_slice(slice);
+			return true;
+		}
+		return false;
+	}
+};
+
+
+struct SlicesPattern : Pattern<SlicesPattern>
+{
+	// slices:
+	//     | slice !','
+	//     | ','.slice+ [',']
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("SlicesPattern");
+		p.push_to_stack(std::make_shared<Subscript>());
+
+		using pattern1 = PatternMatch<SlicePattern,
+			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("slice !','");
+			return true;
+		}
+
+		using pattern2 = PatternMatch<
+			ApplyInBetweenPattern<SlicePattern, SingleTokenPattern<Token::TokenType::DOT>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern2::match(p)) {
+			spdlog::debug("','.slice+ [',']");
+			return true;
+		}
+
+		p.pop_back();
+		return false;
+	}
+};
+
 struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 {
 	// primary' -> '.' NAME primary'
@@ -938,6 +1037,17 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			return true;
 		}
 
+		// '[' slices ']' primary'
+		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
+			SlicesPattern,
+			SingleTokenPattern<Token::TokenType::RSQB>>;
+		if (pattern4::match(p)) {
+			spdlog::debug("'[' slices ']' primary'");
+			ASSERT(as<Subscript>(p.stack().back()))
+			primary_scope.parent().push_back(p.pop_back());
+			return true;
+		}
+
 		// ϵ
 		using pattern5 = PatternMatch<LookAhead<SingleTokenPattern<Token::TokenType::NEWLINE,
 			Token::TokenType::DOUBLESTAR,
@@ -980,7 +1090,18 @@ struct PrimaryPattern : Pattern<PrimaryPattern>
 	{
 		//  primary' 		| atom primary'
 		using pattern2 = PatternMatch<AtomPattern, PrimaryPattern_>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			if (as<Subscript>(p.stack().back())) {
+				auto subscript = p.pop_back();
+				auto value = p.pop_back();
+				ASSERT(as<Subscript>(subscript))
+				ASSERT(as<Name>(value))
+				as<Subscript>(subscript)->set_value(as<Name>(value));
+				as<Subscript>(subscript)->set_context(ContextType::LOAD);
+				p.push_to_stack(subscript);
+			}
+			return true;
+		}
 
 		return false;
 	}

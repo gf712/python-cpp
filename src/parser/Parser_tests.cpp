@@ -415,6 +415,61 @@ void compare_import(const std::shared_ptr<ASTNode> &result,
 }
 
 
+void compare_subscript(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Subscript);
+
+	const auto result_value = as<Subscript>(result)->value();
+	const auto expected_value = as<Subscript>(expected)->value();
+	dispatch(result_value, expected_value);
+
+	const auto result_slice = as<Subscript>(result)->slice();
+	const auto expected_slice = as<Subscript>(expected)->slice();
+
+	ASSERT_EQ(result_slice.index(), expected_slice.index());
+	if (std::holds_alternative<Subscript::Slice>(expected_slice)) {
+		auto result_s = std::get<Subscript::Slice>(result_slice);
+		auto expected_s = std::get<Subscript::Slice>(expected_slice);
+
+		if (expected_s.lower) {
+			ASSERT_TRUE(result_s.lower);
+			dispatch(result_s.lower, expected_s.lower);
+		} else {
+			ASSERT_FALSE(result_s.lower);
+		}
+		if (expected_s.upper) {
+			ASSERT_TRUE(result_s.upper);
+			dispatch(result_s.upper, expected_s.upper);
+		} else {
+			ASSERT_FALSE(result_s.upper);
+		}
+		if (expected_s.step) {
+			ASSERT_TRUE(result_s.step);
+			dispatch(result_s.step, expected_s.step);
+		} else {
+			ASSERT_FALSE(result_s.step);
+		}
+	} else if (std::holds_alternative<Subscript::Index>(expected_slice)) {
+		auto result_i = std::get<Subscript::Index>(result_slice);
+		auto expected_i = std::get<Subscript::Index>(expected_slice);
+
+		if (expected_i.value) {
+			ASSERT_TRUE(result_i.value);
+			dispatch(result_i.value, expected_i.value);
+		} else {
+			ASSERT_FALSE(result_i.value);
+		}
+
+	} else {
+		TODO()
+	}
+
+	const auto result_ctx = as<Subscript>(result)->context();
+	const auto expected_ctx = as<Subscript>(expected)->context();
+	ASSERT_EQ(result_ctx, expected_ctx);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -496,6 +551,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Import: {
 		compare_import(result, expected);
+		break;
+	}
+	case ASTNodeType::Subscript: {
+		compare_subscript(result, expected);
 		break;
 	}
 	default: {
@@ -1053,6 +1112,101 @@ TEST(Parser, ImportDottedAs)
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(
 		std::make_shared<Import>(std::vector<std::string>{ "fibo", "nac", "ci" }, "f"));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SubscriptIndexExpression)
+{
+	constexpr std::string_view program = "a[0]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Subscript>(std::make_shared<Name>("a", ContextType::LOAD),
+			Subscript::Index{ std::make_shared<Constant>(int64_t{ 0 }) },
+			ContextType::LOAD));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, SubscriptIndexAssignment)
+{
+	constexpr std::string_view program = "a[0] = 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
+									 std::make_shared<Name>("a", ContextType::LOAD),
+									 Subscript::Index{ std::make_shared<Constant>(int64_t{ 0 }) },
+									 ContextType::STORE) },
+			std::make_shared<Constant>(int64_t{ 1 }),
+			""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, SubscriptSliceExpression)
+{
+	constexpr std::string_view program =
+		"a[0:10]\n"
+		"b[0:10:2]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Subscript>(std::make_shared<Name>("a", ContextType::LOAD),
+			Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }),
+				.upper = std::make_shared<Constant>(int64_t{ 10 }) },
+			ContextType::LOAD));
+	expected_ast->emplace(
+		std::make_shared<Subscript>(std::make_shared<Name>("b", ContextType::LOAD),
+			Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }),
+				.upper = std::make_shared<Constant>(int64_t{ 10 }),
+				.step = std::make_shared<Constant>(int64_t{ 2 }) },
+			ContextType::LOAD));
+
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SubscriptSliceAssignment)
+{
+	constexpr std::string_view program =
+		"a[0:10] = c\n"
+		"b[0:10:2] = d\n"
+		"b[0:g:2] = f[e:h]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Subscript>(std::make_shared<Name>("a", ContextType::LOAD),
+				Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }),
+					.upper = std::make_shared<Constant>(int64_t{ 10 }) },
+				ContextType::STORE) },
+		std::make_shared<Name>("c", ContextType::LOAD),
+		""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Subscript>(std::make_shared<Name>("b", ContextType::LOAD),
+				Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }),
+					.upper = std::make_shared<Constant>(int64_t{ 10 }),
+					.step = std::make_shared<Constant>(int64_t{ 2 }) },
+				ContextType::STORE) },
+		std::make_shared<Name>("d", ContextType::LOAD),
+		""));
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Subscript>(std::make_shared<Name>("b", ContextType::LOAD),
+				Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }),
+					.upper = std::make_shared<Name>("g", ContextType::LOAD),
+					.step = std::make_shared<Constant>(int64_t{ 2 }) },
+				ContextType::STORE) },
+		std::make_shared<Subscript>(std::make_shared<Name>("f", ContextType::LOAD),
+			Subscript::Slice{ .lower = std::make_shared<Name>("e", ContextType::LOAD),
+				.upper = std::make_shared<Name>("h", ContextType::LOAD) },
+			ContextType::LOAD),
+		""));
 
 	assert_generates_ast(program, expected_ast);
 }
