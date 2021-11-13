@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BytecodeGenerator.hpp"
+#include "codegen/BytecodeGenerator.hpp"
 #include "executable/Function.hpp"
 #include "executable/FunctionBlock.hpp"
 

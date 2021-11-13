@@ -1,5 +1,4 @@
 #include "Bytecode.hpp"
-#include "BytecodeGenerator.hpp"
 #include "instructions/Instructions.hpp"
 
 Bytecode::Bytecode(size_t registers_needed,

@@ -99,16 +99,8 @@ class ASTNode
 	void print_node(const std::string &indent) { print_this_node(indent); }
 	ASTNodeType node_type() const { return m_node_type; }
 	virtual ~ASTNode() = default;
-	virtual Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const = 0;
-	Register generate(size_t function_id, BytecodeGenerator &generator, ASTContext &ctx) const
-	{
-		ctx.push_node(this);
-		auto result_register = generate_impl(function_id, generator, ctx);
-		ctx.pop_node();
-		return result_register;
-	}
 
-	virtual void generate_(CodeGenerator *) const = 0;
+	virtual void codegen(CodeGenerator *) const = 0;
 };// namespace ast
 
 // FormatterValue, JoinedStr, List, Tuple, Set, Dict
@@ -118,20 +110,7 @@ class Constant : public ASTNode
 	Value m_value;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Constant", indent);
-		std::visit(overloaded{ [&indent](const String &value) {
-								  spdlog::debug("{}  - value: \"{}\"", indent, value.to_string());
-							  },
-					   [&indent](const auto &value) {
-						   spdlog::debug("{}  - value: {}", indent, value.to_string());
-					   },
-					   [&indent](PyObject *const value) {
-						   spdlog::debug("{}  - value: {}", indent, value->to_string());
-					   } },
-			m_value);
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	explicit Constant(Value value) : ASTNode(ASTNodeType::Constant), m_value(value) {}
@@ -152,10 +131,7 @@ class Constant : public ASTNode
 	const Value &value() const { return m_value; }
 	Value value() { return m_value; }
 
-	Register
-		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
-
-	virtual void generate_(CodeGenerator *) const override;
+	virtual void codegen(CodeGenerator *) const override;
 };
 
 
@@ -166,14 +142,7 @@ class List : public ASTNode
 	ContextType m_ctx;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}List", indent);
-		spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
-		spdlog::debug("{}  elements:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &el : m_elements) { el->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	List(std::vector<std::shared_ptr<ASTNode>> elements, ContextType ctx)
@@ -187,9 +156,7 @@ class List : public ASTNode
 	ContextType context() const { return m_ctx; }
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 class Tuple : public ASTNode
@@ -199,14 +166,7 @@ class Tuple : public ASTNode
 	ContextType m_ctx;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Tuple", indent);
-		spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
-		spdlog::debug("{}  elements:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &el : m_elements) { el->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	Tuple(std::vector<std::shared_ptr<ASTNode>> elements, ContextType ctx)
@@ -221,9 +181,7 @@ class Tuple : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 	std::vector<std::shared_ptr<ASTNode>> &elements() { return m_elements; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -234,15 +192,7 @@ class Dict : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_values;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Tuple", indent);
-		spdlog::debug("{}  keys:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &el : m_keys) { el->print_node(new_indent); }
-		spdlog::debug("{}  values:", indent);
-		for (const auto &el : m_values) { el->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	Dict(std::vector<std::shared_ptr<ASTNode>> keys, std::vector<std::shared_ptr<ASTNode>> values)
@@ -260,9 +210,7 @@ class Dict : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
 	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -286,12 +234,7 @@ class Name final : public Variable
 	std::vector<std::string> m_id;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Name", indent);
-		spdlog::debug("{}  - id: \"{}\"", indent, m_id[0]);
-		spdlog::debug("{}  - context_type: {}", indent, static_cast<int>(m_ctx));
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	Name(std::string id, ContextType ctx)
@@ -301,9 +244,7 @@ class Name final : public Variable
 	const std::vector<std::string> &ids() const final { return m_id; }
 	void set_context(ContextType ctx) { m_ctx = ctx; }
 
-	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -320,16 +261,7 @@ class Assign : public Statement
 	std::string m_type_comment;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Assign", indent);
-		spdlog::debug("{}  - targets:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &t : m_targets) { t->print_node(new_indent); }
-		spdlog::debug("{}  - value:", indent);
-		m_value->print_node(new_indent);
-		spdlog::debug("{}  - comment type: {}", indent, m_type_comment);
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	Assign(std::vector<std::shared_ptr<ASTNode>> targets,
@@ -343,10 +275,7 @@ class Assign : public Statement
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	void set_value(std::shared_ptr<ASTNode> v) { m_value = std::move(v); }
 
-	Register
-		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 #define BINARY_OPERATIONS  \
@@ -399,21 +328,10 @@ class BinaryExpr : public ASTNode
 
 	BinaryOpType op_type() const { return m_op_type; }
 
-	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}BinaryOp", indent);
-		spdlog::debug("{}  - op_type: {}", indent, stringify_binary_op(m_op_type));
-		spdlog::debug("{}  - lhs:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		m_lhs->print_node(new_indent);
-		spdlog::debug("{}  - rhs:", indent);
-		m_rhs->print_node(new_indent);
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -424,16 +342,7 @@ class AugAssign : public Statement
 	std::shared_ptr<ASTNode> m_value;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}AugAssign", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - target:", indent);
-		m_target->print_node(new_indent);
-		spdlog::debug("{}  - op: {}", indent, stringify_binary_op(m_op));
-		spdlog::debug("{}  - value:", indent);
-		m_value->print_node(new_indent);
-	}
+	void print_this_node(const std::string &indent) const override;
 
   public:
 	AugAssign(std::shared_ptr<ASTNode> target, BinaryOpType op, std::shared_ptr<ASTNode> value)
@@ -446,9 +355,7 @@ class AugAssign : public Statement
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 class Return : public ASTNode
@@ -461,17 +368,9 @@ class Return : public ASTNode
 
 	std::shared_ptr<ASTNode> value() const { return m_value; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
+	void print_this_node(const std::string &indent) const override;
 
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Return", indent);
-		spdlog::debug("{}  - value:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		m_value->print_node(new_indent);
-	}
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -487,18 +386,11 @@ class Argument final : public ASTNode
 		  m_annotation(std::move(annotation)), m_type_comment(std::move(type_comment))
 	{}
 
-	void print_this_node(const std::string &indent) const final
-	{
-		spdlog::debug("{}Argument", indent);
-		spdlog::debug("{}  - arg: {}", indent, m_arg);
-		spdlog::debug("{}  - annotation: {}", indent, m_annotation);
-		spdlog::debug("{}  - type_comment: {}", indent, m_type_comment);
-	}
+	void print_this_node(const std::string &indent) const final;
+
 	const std::string &name() const { return m_arg; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -520,15 +412,7 @@ class Arguments : public ASTNode
 	}
 
 
-	void print_this_node(const std::string &indent) const final
-	{
-		spdlog::debug("{}Arguments", indent);
-		spdlog::debug("{}  - args:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &arg : m_args) { arg->print_node(new_indent); }
-		spdlog::debug("{}  - kwargs:", indent);
-		for (const auto &arg : m_kwargs) { arg->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const final;
 
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
@@ -538,9 +422,7 @@ class Arguments : public ASTNode
 
 	const std::vector<std::shared_ptr<Argument>> &args() const { return m_args; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 class FunctionDefinition final : public ASTNode
@@ -552,21 +434,7 @@ class FunctionDefinition final : public ASTNode
 	const std::shared_ptr<ASTNode> m_returns;
 	std::string m_type_comment;
 
-	void print_this_node(const std::string &indent) const final
-	{
-		spdlog::debug("{}FunctionDefinition", indent);
-		spdlog::debug("{}  - function_name: {}", indent, m_function_name);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - args:", indent);
-		m_args->print_node(new_indent);
-		spdlog::debug("{}  - body:", indent);
-		for (const auto &statement : m_body) { statement->print_node(new_indent); }
-		spdlog::debug("{}  - decorator_list:", indent);
-		for (const auto &decorator : m_decorator_list) { decorator->print_node(new_indent); }
-		spdlog::debug("{}  - returns:", indent);
-		if (m_returns) m_returns->print_node(new_indent);
-		spdlog::debug("{}  - type_comment:{}", indent, m_type_comment);
-	}
+	void print_this_node(const std::string &indent) const final;
 
   public:
 	FunctionDefinition(std::string function_name,
@@ -588,9 +456,7 @@ class FunctionDefinition final : public ASTNode
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
 
-	Register generate_impl(size_t function_id, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -606,21 +472,12 @@ class Keyword : public ASTNode
 		m_value = std::move(value);
 	}
 
-	void print_this_node(const std::string &indent) const final
-	{
-		spdlog::debug("{}Keyword", indent);
-		spdlog::debug("{}  - arg: {}", indent, m_arg);
-		spdlog::debug("{}  - value:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		m_value->print_node(new_indent);
-	}
+	void print_this_node(const std::string &indent) const final;
 
 	const std::string &arg() const { return m_arg; }
 	std::shared_ptr<ASTNode> value() const { return m_value; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -631,22 +488,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
 	const std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 
-	void print_this_node(const std::string &indent) const final
-	{
-		spdlog::debug("{}ClassDefinition", indent);
-		spdlog::debug("{}  - function_name: {}", indent, m_class_name);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - args:", indent);
-		if (m_args) {
-			m_args->print_node(new_indent);
-		} else {
-			spdlog::debug("{}    (Empty):", indent);
-		}
-		spdlog::debug("{}  - body:", indent);
-		for (const auto &statement : m_body) { statement->print_node(new_indent); }
-		spdlog::debug("{}  - decorator_list:", indent);
-		for (const auto &decorator : m_decorator_list) { decorator->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const final;
 
   public:
 	ClassDefinition(std::string class_name,
@@ -663,9 +505,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 
@@ -675,17 +515,7 @@ class Call : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_args;
 	std::vector<std::shared_ptr<Keyword>> m_keywords;
 
-	void print_this_node(const std::string &indent) const final
-	{
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}Call", indent);
-		spdlog::debug("{}  - function:", indent);
-		m_function->print_node(new_indent);
-		spdlog::debug("{}  - args:", indent);
-		for (const auto &arg : m_args) { arg->print_node(new_indent); }
-		spdlog::debug("{}  - keywords:", indent);
-		for (const auto &keyword : m_keywords) { keyword->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const final;
 
   public:
 	Call(std::shared_ptr<ASTNode> function,
@@ -701,9 +531,7 @@ class Call : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &args() const { return m_args; }
 	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 };
 
 class Module : public ASTNode
@@ -716,24 +544,15 @@ class Module : public ASTNode
 
 	template<typename T> void emplace(T node) { m_body.emplace_back(std::move(node)); }
 
-	Register
-		generate_impl(size_t function_id, BytecodeGenerator &generator, ASTContext &) const final;
-
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 
 	const std::string &filename() const { return m_filename; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Module", indent);
-		spdlog::debug("{}  - body:", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		for (const auto &el : m_body) { el->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -751,26 +570,14 @@ class If : public ASTNode
 		  m_orelse(std::move(orelse))
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}If", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - test:", indent);
-		m_test->print_node(new_indent);
-		spdlog::debug("{}  - body:", indent);
-		for (const auto &el : m_body) { el->print_node(new_indent); }
-		spdlog::debug("{}  - orelse:", indent);
-		for (const auto &el : m_orelse) { el->print_node(new_indent); }
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 class For : public ASTNode
@@ -791,31 +598,16 @@ class For : public ASTNode
 		  m_body(std::move(body)), m_orelse(std::move(orelse)), m_type_comment(type_comment)
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::shared_ptr<ASTNode> &target() const { return m_target; }
 	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
 	const std::string &type_comment() const { return m_type_comment; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}For", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - target:", indent);
-		m_target->print_node(new_indent);
-		spdlog::debug("{}  - iter:", indent);
-		m_iter->print_node(new_indent);
-		spdlog::debug("{}  - body:", indent);
-		for (const auto &el : m_body) { el->print_node(new_indent); }
-		spdlog::debug("{}  - orelse:", indent);
-		for (const auto &el : m_orelse) { el->print_node(new_indent); }
-		spdlog::debug("{}  - type_comment:", m_type_comment);
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -833,25 +625,14 @@ class While : public ASTNode
 		  m_orelse(std::move(orelse))
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}While", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - target:", indent);
-		m_test->print_node(new_indent);
-		spdlog::debug("{}  - body:", indent);
-		for (const auto &el : m_body) { el->print_node(new_indent); }
-		spdlog::debug("{}  - orelse:", indent);
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -886,13 +667,11 @@ class Compare : public ASTNode
 		: ASTNode(ASTNodeType::Compare), m_lhs(std::move(lhs)), m_op(op), m_rhs(std::move(rhs))
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
 	OpType op() const { return m_op; }
 	const std::shared_ptr<ASTNode> &rhs() const { return m_rhs; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
 	std::string_view op_type_to_string(OpType type) const
@@ -907,16 +686,7 @@ class Compare : public ASTNode
 		ASSERT_NOT_REACHED()
 	}
 
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Compare", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - lhs:", indent);
-		m_lhs->print_node(new_indent);
-		spdlog::debug("{}  - op: {}", indent, op_type_to_string(m_op));
-		spdlog::debug("{}  - rhs:", indent);
-		m_rhs->print_node(new_indent);
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -932,24 +702,14 @@ class Attribute : public ASTNode
 		  m_ctx(ctx)
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	const std::string &attr() const { return m_attr; }
 	ContextType context() const { return m_ctx; }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Attribute", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - value:", indent);
-		m_value->print_node(new_indent);
-		spdlog::debug("{}  - attr: \"{}\"", indent, m_attr);
-		spdlog::debug("{}  - ctx: {}", indent, static_cast<int>(m_ctx));
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -968,8 +728,6 @@ class Import : public ASTNode
 		: ASTNode(ASTNodeType::Import), m_names(std::move(names)), m_asname(std::move(asname))
 	{}
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final;
-
 	const std::optional<std::string> &asname() const { return m_asname; }
 	const std::vector<std::string> &names() const { return m_names; }
 	std::string dotted_name() const
@@ -983,20 +741,10 @@ class Import : public ASTNode
 
 	void add_dotted_name(std::string name) { m_names.push_back(std::move(name)); }
 
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Import", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		if (m_asname.has_value()) {
-			spdlog::debug("{}  - asname: \"{}\"", indent, *m_asname);
-		} else {
-			spdlog::debug("{}  - asname: null", indent);
-		}
-		spdlog::debug("{}  - name: {}", indent, dotted_name());
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
@@ -1007,13 +755,7 @@ class Subscript : public ASTNode
 	{
 		std::shared_ptr<ASTNode> value;
 
-		void print(const std::string &indent) const
-		{
-			spdlog::debug("{}Index", indent);
-			std::string new_indent = indent + std::string(6, ' ');
-			spdlog::debug("{}  - value:", indent);
-			value->print_node(new_indent);
-		}
+		void print(const std::string &indent) const;
 	};
 
 	struct Slice
@@ -1021,45 +763,13 @@ class Subscript : public ASTNode
 		std::shared_ptr<ASTNode> lower;
 		std::shared_ptr<ASTNode> upper;
 		std::shared_ptr<ASTNode> step{ nullptr };
-		void print(const std::string &indent) const
-		{
-			spdlog::debug("{}Slice", indent);
-			std::string new_indent = indent + std::string(6, ' ');
-
-			if (lower) {
-				spdlog::debug("{}  - lower:", indent);
-				lower->print_node(new_indent);
-			} else {
-				spdlog::debug("{}  - lower: null", indent);
-			}
-
-			if (upper) {
-				spdlog::debug("{}  - upper:", indent);
-				upper->print_node(new_indent);
-			} else {
-				spdlog::debug("{}  - upper: null", indent);
-			}
-
-			if (step) {
-				spdlog::debug("{}  - step:", indent);
-				step->print_node(new_indent);
-			} else {
-				spdlog::debug("{}  - step: null", indent);
-			}
-		}
+		void print(const std::string &indent) const;
 	};
 
 	struct ExtSlice
 	{
 		std::vector<std::variant<Index, Slice>> dims;
-		void print(const std::string &indent) const
-		{
-			spdlog::debug("{}ExtSlice", indent);
-			std::string new_indent = indent + std::string(6, ' ');
-			for (const auto &d : dims) {
-				std::visit([&new_indent](const auto &val) { val.print(new_indent); }, d);
-			}
-		}
+		void print(const std::string &indent) const;
 	};
 
 	using SliceType = std::variant<Index, Slice, ExtSlice>;
@@ -1085,21 +795,10 @@ class Subscript : public ASTNode
 	void set_slice(SliceType slice) { m_slice = std::move(slice); }
 	void set_context(ContextType context) { m_ctx = context; }
 
-	Register generate_impl(size_t, BytecodeGenerator &, ASTContext &) const final { TODO() }
-
-	void generate_(CodeGenerator *) const override;
+	void codegen(CodeGenerator *) const override;
 
   private:
-	void print_this_node(const std::string &indent) const override
-	{
-		spdlog::debug("{}Subscript", indent);
-		std::string new_indent = indent + std::string(6, ' ');
-		spdlog::debug("{}  - value:", indent);
-		m_value->print_node(new_indent);
-		spdlog::debug("{}  - slice:", indent);
-		std::visit([&new_indent](const auto &val) { val.print(new_indent); }, m_slice);
-		spdlog::debug("{}  - ctx: {}", indent, m_ctx);
-	}
+	void print_this_node(const std::string &indent) const override;
 };
 
 
