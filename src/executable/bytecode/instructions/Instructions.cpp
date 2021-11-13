@@ -57,7 +57,7 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 };
 
 
-void JumpIfFalse::relocate(BytecodeGenerator &generator, size_t instruction_idx)
+void JumpIfFalse::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
 {
 	m_label = generator.label(m_label);
 	m_label.set_position(m_label.position() - instruction_idx - 1);
@@ -70,7 +70,7 @@ void Jump::execute(VirtualMachine &vm, Interpreter &) const
 };
 
 
-void Jump::relocate(BytecodeGenerator &generator, size_t instruction_idx)
+void Jump::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
 {
 	m_label = generator.label(m_label);
 	m_label.set_position(m_label.position() - instruction_idx - 1);
@@ -174,7 +174,7 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	}
 }
 
-void ForIter::relocate(BytecodeGenerator &generator, size_t instruction_idx)
+void ForIter::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
 {
 	m_exit_label = generator.label(m_exit_label);
 	m_exit_label.set_position(m_exit_label.position() - instruction_idx);

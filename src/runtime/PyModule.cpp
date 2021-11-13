@@ -66,7 +66,8 @@ PyModule *PyModule::create(PyString *name)
 	parser::Parser p{ lexer };
 	p.parse();
 
-	auto program = BytecodeGenerator::compile(p.module(), {}, compiler::OptimizationLevel::None);
+	auto program =
+		codegen::BytecodeGenerator::compile(p.module(), {}, compiler::OptimizationLevel::None);
 
 	ASSERT(vm.execute(program) == EXIT_SUCCESS);
 	auto *module_dict = vm.interpreter().execution_frame()->globals();

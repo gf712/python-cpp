@@ -7,6 +7,7 @@
 #include "parser/Parser.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
+#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 
 #include <sstream>
 
@@ -26,7 +27,7 @@ class Instruction : NonCopyable
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
 	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
-	virtual void relocate(BytecodeGenerator &, size_t) = 0;
+	virtual void relocate(codegen::BytecodeGenerator &, size_t) = 0;
 };
 
 
@@ -56,7 +57,7 @@ class LoadConst final : public Instruction
 		vm.reg(m_destination) = m_source;
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class Store final : public Instruction
@@ -73,7 +74,7 @@ class Store final : public Instruction
 	}
 	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -100,7 +101,7 @@ class Add : public Instruction
 		}
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -128,7 +129,7 @@ class Subtract : public Instruction
 		}
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class Multiply : public Instruction
@@ -154,7 +155,7 @@ class Multiply : public Instruction
 			vm.reg(m_destination) = *result;
 		}
 	}
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -181,7 +182,7 @@ class Exp : public Instruction
 		}
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class Modulo : public Instruction
@@ -207,7 +208,7 @@ class Modulo : public Instruction
 		}
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -235,7 +236,7 @@ class LeftShift : public Instruction
 		}
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -269,7 +270,7 @@ class LoadFast final : public Instruction
 		vm.reg(m_destination) = *maybe_value;
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class StoreFast final : public Instruction
@@ -294,7 +295,7 @@ class StoreFast final : public Instruction
 		interpreter.execution_frame()->parameter(m_parameter_index) = vm.reg(m_src);
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -318,7 +319,7 @@ class MakeFunction : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -340,7 +341,7 @@ class JumpIfFalse final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final;
+	void relocate(codegen::BytecodeGenerator &, size_t) final;
 };
 
 class Jump final : public Instruction
@@ -357,7 +358,7 @@ class Jump final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final;
+	void relocate(codegen::BytecodeGenerator &, size_t) final;
 };
 
 class Equal final : public Instruction
@@ -376,7 +377,7 @@ class Equal final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class LessThanEquals final : public Instruction
@@ -395,7 +396,7 @@ class LessThanEquals final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class LessThan final : public Instruction
@@ -414,7 +415,7 @@ class LessThan final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -430,7 +431,7 @@ class BuildList final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -446,7 +447,7 @@ class BuildTuple final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class BuildDict final : public Instruction
@@ -464,7 +465,7 @@ class BuildDict final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 
@@ -483,7 +484,7 @@ class GetIter final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
 class ForIter final : public Instruction
@@ -506,5 +507,5 @@ class ForIter final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final;
+	void relocate(codegen::BytecodeGenerator &, size_t) final;
 };

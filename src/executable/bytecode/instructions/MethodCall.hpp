@@ -22,5 +22,5 @@ class MethodCall final : public Instruction
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };

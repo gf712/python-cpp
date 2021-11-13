@@ -9,6 +9,9 @@ class Module;
 
 class Bytecode;
 class BytecodeGenerator;
+namespace codegen {
+class BytecodeGenerator;
+}
 class Function;
 class Interpreter;
 class InterpreterSession;

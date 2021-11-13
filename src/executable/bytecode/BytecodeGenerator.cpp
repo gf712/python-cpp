@@ -40,12 +40,14 @@ FunctionInfo BytecodeGenerator::allocate_function()
 void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 {
 	for (const auto &block : functions) {
-		size_t instruction_idx{ 0 };
-		for (const auto &ins : block.instructions) { ins->relocate(*this, instruction_idx++); }
+		(void)block;
+		// size_t instruction_idx{ 0 };
+		// for (const auto &ins : block.instructions) { ins->relocate(*this, instruction_idx++); }
 	}
 }
 
-std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename, std::vector<std::string> argv)
+std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
+	std::vector<std::string> argv)
 {
 	ASSERT(m_frame_register_count.size() == 1)
 	// make sure that at the end of compiling code we are back to __main__ frame

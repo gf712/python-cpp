@@ -12,5 +12,5 @@ class LoadBuildClass final : public Instruction
 	std::string to_string() const final { return fmt::format("LOAD_BUILD_CLASS r{}", m_dst); }
 
 	void execute(VirtualMachine &vm, Interpreter &intepreter) const final;
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
