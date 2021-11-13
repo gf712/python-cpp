@@ -2,7 +2,7 @@ include(FetchContent)
 
 
 FetchContent_Declare(linenoise_src
-    GIT_REPOSITORY    git@github.com:antirez/linenoise.git
+    GIT_REPOSITORY    https://github.com/antirez/linenoise.git
     GIT_TAG           master
 )
 

@@ -276,8 +276,9 @@ template<typename lhs, typename rhs> struct AndLiteral : Pattern<AndLiteral<lhs,
 	{
 		if (lhs::matches(p)) {
 			const auto token = p.lexer().peek_token(p.token_position());
-			std::string_view token_sv{ token->start().pointer_to_program,
-				token->end().pointer_to_program };
+			const size_t size = std::distance(token->start().pointer_to_program, 
+				token->end().pointer_to_program);
+			std::string_view token_sv{ token->start().pointer_to_program, size };
 			return rhs::matches(token_sv);
 		}
 		return false;
