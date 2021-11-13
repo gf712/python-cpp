@@ -23,8 +23,8 @@ size_t ValueHash::operator()(const Value &value) const
 					   }
 				   },
 			[](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
-			[](const Bytes &b) -> size_t { return bit_cast<size_t>(b.b.data()); },
-			[](const Ellipsis &) -> size_t { return bit_cast<size_t>(py_ellipsis()); },
+			[](const Bytes &b) -> size_t { return ::bit_cast<size_t>(b.b.data()); },
+			[](const Ellipsis &) -> size_t { return ::bit_cast<size_t>(py_ellipsis()); },
 			[](const NameConstant &c) -> size_t {
 				if (std::holds_alternative<bool>(c.value)) {
 					return std::get<bool>(c.value) ? 0 : 1;

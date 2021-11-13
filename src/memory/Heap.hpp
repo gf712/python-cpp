@@ -6,6 +6,7 @@
 
 #include <bitset>
 #include <memory>
+#include <optional>
 
 static constexpr size_t KB = 1024;
 static constexpr size_t MB = 1024 * KB;

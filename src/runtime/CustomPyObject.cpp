@@ -1,5 +1,6 @@
 #include "CustomPyObject.hpp"
 #include "PyDict.hpp"
+#include "PyFunction.hpp"
 #include "PyString.hpp"
 
 

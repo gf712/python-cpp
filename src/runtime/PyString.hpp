@@ -2,6 +2,7 @@
 
 #include "PyObject.hpp"
 
+#include <optional>
 
 class PyString : public PyObject
 {
