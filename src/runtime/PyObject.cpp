@@ -270,6 +270,7 @@ PyObject *PyObject::richcompare_impl(const PyObject *other,
 	ASSERT_NOT_REACHED()
 }
 
+PyObject *PyObject::truthy(Interpreter &) const { return py_true(); }
 
 PyObject *PyBytes::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {

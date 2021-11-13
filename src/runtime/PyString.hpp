@@ -21,6 +21,8 @@ class PyString : public PyObject
 	PyObject *repr_impl(Interpreter &interpreter) const override;
 	size_t hash_impl(Interpreter &interpreter) const override;
 	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *less_than_impl(const PyObject *obj, Interpreter &) const override;
+
 	PyObject *len_impl(Interpreter &interpreter) const override;
 
   private:

@@ -160,6 +160,8 @@ class PyObject : public Cell
 	virtual PyObject *
 		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const;
 
+	virtual PyObject *truthy(Interpreter &) const;
+
 	virtual PyObject *iter_impl(Interpreter &interpreter) const;
 	virtual PyObject *next_impl(Interpreter &interpreter);
 	virtual PyObject *len_impl(Interpreter &interpreter) const;
