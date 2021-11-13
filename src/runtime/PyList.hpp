@@ -23,6 +23,8 @@ class PyList : public PyObject
 
 	PyObject *append(PyObject *);
 
+	void sort();
+
   private:
 	PyList();
 	PyList(std::vector<Value> elements);

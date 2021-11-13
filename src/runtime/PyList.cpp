@@ -71,6 +71,24 @@ PyObject *PyList::iter_impl(Interpreter &) const
 	return heap.allocate<PyListIterator>(*this);
 }
 
+void PyList::sort()
+{
+	std::sort(m_elements.begin(), m_elements.end(), [](const Value &lhs, const Value &rhs) -> bool {
+		if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter())) {
+			const bool result = ::truthy(*cmp, VirtualMachine::the().interpreter());
+			spdlog::debug("{} < {}: {}",
+				PyObject::from(lhs)->to_string(),
+				PyObject::from(rhs)->to_string(),
+				result);
+			return result;
+		} else {
+			// VirtualMachine::the().interpreter().raise_exception("Failed to compare {} with {}",
+			// 	PyObject::from(lhs)->to_string(),
+			// 	PyObject::from(rhs)->to_string());
+			return false;
+		}
+	});
+}
 
 void PyList::visit_graph(Visitor &visitor)
 {

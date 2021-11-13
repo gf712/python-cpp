@@ -160,6 +160,8 @@ class PyObject : public Cell
 	virtual PyObject *
 		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const;
 
+	virtual PyObject *truthy(Interpreter &) const;
+
 	virtual PyObject *iter_impl(Interpreter &interpreter) const;
 	virtual PyObject *next_impl(Interpreter &interpreter);
 	virtual PyObject *len_impl(Interpreter &interpreter) const;
@@ -243,6 +245,8 @@ class PyNameConstant : public PyObject
 	const NameConstant &value() const { return m_value; }
 
 	void visit_graph(Visitor &) override {}
+
+	PyObject *truthy(Interpreter &) const override;
 
   private:
 	static PyNameConstant *create(const NameConstant &);

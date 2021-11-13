@@ -194,6 +194,14 @@ PyObject *PyNameConstant::repr_impl(Interpreter &) const
 	return PyString::from(String{ to_string() });
 }
 
+PyObject *PyNameConstant::truthy(Interpreter &) const
+{
+	if (std::holds_alternative<NoneType>(m_value.value)) {
+		return py_false();
+	} else {
+		return std::get<bool>(m_value.value) ? py_true() : py_false();
+	}
+}
 
 PyObject *PyObject::add_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
@@ -270,6 +278,7 @@ PyObject *PyObject::richcompare_impl(const PyObject *other,
 	ASSERT_NOT_REACHED()
 }
 
+PyObject *PyObject::truthy(Interpreter &) const { return py_true(); }
 
 PyObject *PyBytes::add_impl(const PyObject *obj, Interpreter &interpreter) const
 {

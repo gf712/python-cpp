@@ -320,7 +320,8 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 			}
 		}
 	}
-	// FIXME, this list should be ordered alphabetically
+
+	dir_list->sort();
 	return dir_list;
 }
 }// namespace

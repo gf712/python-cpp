@@ -206,3 +206,16 @@ struct NameConstant
 };
 
 using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, PyObject *>;
+
+std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+
+std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+
+bool truthy(const Value &lhs, Interpreter &interpreter);

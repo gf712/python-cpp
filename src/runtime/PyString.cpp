@@ -87,6 +87,19 @@ PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const
 	}
 }
 
+PyObject *PyString::less_than_impl(const PyObject *obj, Interpreter &) const
+{
+	if (this == obj) return py_false();
+	if (auto obj_string = as<PyString>(obj)) {
+		return m_value < obj_string->value() ? py_true() : py_false();
+	} else {
+		type_error("'<' not supported between instances of '{}' and '{}'",
+			object_name(type()),
+			object_name(obj->type()));
+		return nullptr;
+	}
+}
+
 
 PyObject *PyString::len_impl(Interpreter &) const
 {
