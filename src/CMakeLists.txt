@@ -1,10 +1,9 @@
 set(AST_SOURCE_FILES # cmake-format: sortable
-                     ast/AST.cpp ast/Module.cpp ast/optimizers/ConstantFolding.cpp)
+                     ast/AST.cpp ast/optimizers/ConstantFolding.cpp)
 
 set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
     executable/bytecode/Bytecode.cpp
-    executable/bytecode/BytecodeGenerator.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
@@ -59,7 +58,7 @@ set(UNITTEST_SOURCES
     # cmake-format: sortable
     ast/optimizers/Optimizers_tests.cpp
     executable/bytecode/Bytecode_tests.cpp
-    executable/bytecode/BytecodeGenerator_tests.cpp
+    executable/bytecode/codegen/BytecodeGenerator_tests.cpp
     lexer/Lexer_tests.cpp
     parser/Parser_tests.cpp)
 

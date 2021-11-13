@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ast/AST.hpp"
-#include "executable/bytecode/BytecodeGenerator.hpp"
 #include "lexer/Lexer.hpp"
 #include "utilities.hpp"
 

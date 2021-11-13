@@ -7,7 +7,7 @@
 
 
 namespace {
-std::unique_ptr<BytecodeGenerator> generate_bytecode(std::string_view program)
+std::unique_ptr<codegen::BytecodeGenerator> generate_bytecode(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_bytecode_generator_tests_.py");
 	parser::Parser p{ lexer };
@@ -16,14 +16,14 @@ std::unique_ptr<BytecodeGenerator> generate_bytecode(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	auto generator = std::make_unique<BytecodeGenerator>();
+	auto generator = std::make_unique<codegen::BytecodeGenerator>();
 
 	ast::ASTContext ctx;
-	module->generate_impl(0, *generator, ctx);
+	module->codegen(generator.get());
 
 	return generator;
 }
-}
+}// namespace
 
 TEST(BytecodeGenerator, EmitsMainProgram)
 {
@@ -42,7 +42,7 @@ TEST(BytecodeGenerator, EmitsProgramWithFunctionDefinition)
 	constexpr std::string_view program =
 		"def foo(arg):\n"
 		"   return arg + 42\n"
-        "def bar(arg):\n"
+		"def bar(arg):\n"
 		"   return arg\n";
 
 	auto bytecode_generator = generate_bytecode(program);

@@ -8,7 +8,6 @@ class Module;
 }// namespace ast
 
 class Bytecode;
-class BytecodeGenerator;
 namespace codegen {
 class BytecodeGenerator;
 }

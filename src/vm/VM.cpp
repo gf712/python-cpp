@@ -1,7 +1,6 @@
 #include "VM.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/BytecodeGenerator.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "interpreter/InterpreterSession.hpp"

@@ -1,6 +1,6 @@
 #include "Bytecode.hpp"
-#include "BytecodeGenerator.hpp"
 #include "executable/Program.hpp"
+#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
@@ -18,7 +18,7 @@ std::shared_ptr<Program> generate_bytecode_executable(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	return BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None);
+	return codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None);
 }
 }// namespace
 
