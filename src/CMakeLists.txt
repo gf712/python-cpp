@@ -5,6 +5,7 @@ set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
     executable/bytecode/Bytecode.cpp
     executable/bytecode/BytecodeGenerator.cpp
+    executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/ImportName.cpp

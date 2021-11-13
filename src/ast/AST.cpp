@@ -451,18 +451,18 @@ Register
 {
 	ASSERT(m_keys.size() == m_values.size())
 
-	std::vector<Register> m_key_registers;
-	std::vector<Register> m_value_registers;
+	std::vector<Register> key_registers;
+	std::vector<Register> value_registers;
 
 	for (const auto &key : m_keys) {
-		m_key_registers.push_back(key->generate(function_id, generator, ctx));
+		key_registers.push_back(key->generate(function_id, generator, ctx));
 	}
 	for (const auto &value : m_values) {
-		m_value_registers.push_back(value->generate(function_id, generator, ctx));
+		value_registers.push_back(value->generate(function_id, generator, ctx));
 	}
 
 	const auto result_reg = generator.allocate_register();
-	generator.emit<BuildDict>(function_id, result_reg, m_key_registers, m_value_registers);
+	generator.emit<BuildDict>(function_id, result_reg, key_registers, value_registers);
 
 	return result_reg;
 }
@@ -557,5 +557,12 @@ Register Import::generate_impl(size_t function_id, BytecodeGenerator &generator,
 	}
 	return {};
 }
+
+
+#define __AST_NODE_TYPE(NodeType) \
+	void NodeType::generate_(CodeGenerator *generator) const { generator->visit(this); }
+AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+
 
 }// namespace ast

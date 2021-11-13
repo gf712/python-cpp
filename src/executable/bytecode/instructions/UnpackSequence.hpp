@@ -19,5 +19,5 @@ class UnpackSequence final : public Instruction
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };

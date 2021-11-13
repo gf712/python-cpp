@@ -21,5 +21,5 @@ class InplaceAdd : public Instruction
 		if (auto result = add(lhs, rhs, interpreter)) { lhs = *result; }
 	}
 
-	void relocate(BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
