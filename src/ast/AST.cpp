@@ -320,4 +320,22 @@ void Subscript::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - ctx: {}", indent, m_ctx);
 }
 
+void Raise::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Raise", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	if (m_exception) {
+		spdlog::debug("{}  - exception:", indent);
+		m_exception->print_node(new_indent);
+	} else {
+		spdlog::debug("{}  - exception: null", indent);
+	}
+	if (m_cause) {
+		spdlog::debug("{}  - cause:", indent);
+		m_cause->print_node(new_indent);
+	} else {
+		spdlog::debug("{}  - cause: null", indent);
+	}
+}
+
 }// namespace ast

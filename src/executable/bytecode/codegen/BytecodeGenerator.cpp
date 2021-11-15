@@ -609,4 +609,7 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 }
 
 
+void BytecodeGenerator::visit(const Raise *) { TODO() }
+
+
 }// namespace codegen

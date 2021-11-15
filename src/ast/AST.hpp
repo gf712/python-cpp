@@ -36,6 +36,7 @@ namespace ast {
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
+	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
 	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Tuple)              \
@@ -794,6 +795,29 @@ class Subscript : public ASTNode
 	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
 	void set_slice(SliceType slice) { m_slice = std::move(slice); }
 	void set_context(ContextType context) { m_ctx = context; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+
+class Raise : public ASTNode
+{
+  public:
+	std::shared_ptr<ASTNode> m_exception;
+	std::shared_ptr<ASTNode> m_cause;
+
+  public:
+	Raise() : ASTNode(ASTNodeType::Raise), m_cause(std::make_shared<Constant>(NoneType{})) {}
+
+	Raise(std::shared_ptr<ASTNode> exception, std::shared_ptr<ASTNode> cause)
+		: ASTNode(ASTNodeType::Raise), m_exception(std::move(exception)), m_cause(std::move(cause))
+	{}
+
+	const std::shared_ptr<ASTNode> &exception() const { return m_exception; }
+	const std::shared_ptr<ASTNode> &cause() const { return m_cause; }
 
 	void codegen(CodeGenerator *) const override;
 

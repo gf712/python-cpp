@@ -470,6 +470,19 @@ void compare_subscript(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
+void compare_raise(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Raise);
+
+	const auto result_exception = as<Raise>(result)->exception();
+	const auto expected_exception = as<Raise>(expected)->exception();
+	dispatch(result_exception, expected_exception);
+
+	const auto result_cause = as<Raise>(result)->cause();
+	const auto expected_cause = as<Raise>(expected)->cause();
+	dispatch(result_exception, expected_exception);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -555,6 +568,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Subscript: {
 		compare_subscript(result, expected);
+		break;
+	}
+	case ASTNodeType::Raise: {
+		compare_raise(result, expected);
 		break;
 	}
 	default: {
@@ -1207,6 +1224,45 @@ TEST(Parser, SubscriptSliceAssignment)
 				.upper = std::make_shared<Name>("h", ContextType::LOAD) },
 			ContextType::LOAD),
 		""));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, Raise)
+{
+	constexpr std::string_view program = "raise\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Raise>());
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, RaiseValueError)
+{
+	constexpr std::string_view program = "raise ValueError(\"Wrong!\")\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Raise>(
+		std::make_shared<Call>(std::make_shared<Name>("ValueError", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Wrong!") },
+			std::vector<std::shared_ptr<Keyword>>{}),
+		nullptr));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, RaiseValueErrorCause)
+{
+	constexpr std::string_view program = "raise ValueError(\"Wrong!\") from exc\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Raise>(
+		std::make_shared<Call>(std::make_shared<Name>("ValueError", ContextType::LOAD),
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Wrong!") },
+			std::vector<std::shared_ptr<Keyword>>{}),
+		std::make_shared<Name>("exc", ContextType::LOAD)));
 
 	assert_generates_ast(program, expected_ast);
 }
