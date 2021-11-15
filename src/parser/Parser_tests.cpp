@@ -483,10 +483,65 @@ void compare_raise(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	dispatch(result_exception, expected_exception);
 }
 
+void compare_try(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Try);
+
+	const auto result_body = as<Try>(result)->body();
+	const auto expected_body = as<Try>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+
+	const auto result_handlers = as<Try>(result)->handlers();
+	const auto expected_handlers = as<Try>(expected)->handlers();
+	ASSERT_EQ(result_handlers.size(), expected_handlers.size());
+	for (size_t i = 0; i < result_handlers.size(); ++i) {
+		dispatch(result_handlers[i], expected_handlers[i]);
+	}
+
+	const auto result_orelse = as<Try>(result)->orelse();
+	const auto expected_orelse = as<Try>(expected)->orelse();
+	ASSERT_EQ(result_orelse.size(), expected_orelse.size());
+	for (size_t i = 0; i < result_orelse.size(); ++i) {
+		dispatch(result_orelse[i], expected_orelse[i]);
+	}
+
+	const auto result_cause = as<Try>(result)->cause();
+	const auto expected_cause = as<Try>(expected)->cause();
+	ASSERT_EQ(result_cause.size(), expected_cause.size());
+	for (size_t i = 0; i < result_cause.size(); ++i) {
+		dispatch(result_cause[i], expected_cause[i]);
+	}
+}
+
+void compare_except_handler(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::ExceptHandler);
+
+	const auto result_type = as<ExceptHandler>(result)->type();
+	const auto expected_type = as<ExceptHandler>(expected)->type();
+	dispatch(result_type, expected_type);
+
+	const auto result_name = as<ExceptHandler>(result)->name();
+	const auto expected_name = as<ExceptHandler>(expected)->name();
+	ASSERT_EQ(result_name.size(), expected_name.size());
+
+	const auto result_body = as<ExceptHandler>(result)->body();
+	const auto expected_body = as<ExceptHandler>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+}
+
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
 		ASSERT_FALSE(result);
+		return;
+	}
+	if (!result) {
+		ASSERT_FALSE(expected);
 		return;
 	}
 	switch (expected->node_type()) {
@@ -574,6 +629,14 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_raise(result, expected);
 		break;
 	}
+	case ASTNodeType::Try: {
+		compare_try(result, expected);
+		break;
+	}
+	case ASTNodeType::ExceptHandler: {
+		compare_except_handler(result, expected);
+		break;
+	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
 		TODO()
@@ -588,6 +651,8 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 	spdlog::set_level(spdlog::level::debug);
 	p.parse();
 	spdlog::set_level(spdlog::level::info);
+
+	ASSERT_EQ(p.module()->body().size(), expected_module->body().size());
 
 	size_t i = 0;
 	for (const auto &node : p.module()->body()) {
@@ -1263,6 +1328,177 @@ TEST(Parser, RaiseValueErrorCause)
 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Wrong!") },
 			std::vector<std::shared_ptr<Keyword>>{}),
 		std::make_shared<Name>("exc", ContextType::LOAD)));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryFinally)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"finally:\n"
+		"  bar()\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Try>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+								  std::make_shared<Name>("foo", ContextType::LOAD)) },
+			std::vector<std::shared_ptr<ExceptHandler>>{},
+			std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Call>(std::make_shared<Name>("bar", ContextType::LOAD)) }));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryExcept)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"except:\n"
+		"  print(\"Exception\")\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Try>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD)) },
+		std::vector{ std::make_shared<ExceptHandler>(nullptr,
+			"",
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+				std::make_shared<Name>("print", ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Exception") },
+				std::vector<std::shared_ptr<Keyword>>{}) }) },
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<ASTNode>>{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryExceptWithExceptionType)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"except ValueError:\n"
+		"  print(\"Exception\")\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Try>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD)) },
+		std::vector{ std::make_shared<ExceptHandler>(
+			std::make_shared<Name>("ValueError", ContextType::LOAD),
+			"",
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+				std::make_shared<Name>("print", ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("Exception") },
+				std::vector<std::shared_ptr<Keyword>>{}) }) },
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<ASTNode>>{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryExceptWithExceptionTypeAndName)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"except ValueError as e:\n"
+		"  print(e)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Try>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD)) },
+		std::vector{
+			std::make_shared<ExceptHandler>(std::make_shared<Name>("ValueError", ContextType::LOAD),
+				"e",
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Name>("e", ContextType::LOAD) },
+						std::vector<std::shared_ptr<Keyword>>{}) }) },
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<ASTNode>>{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryExceptMultipleExceptionHandlers)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"except ValueError as e:\n"
+		"  print(e)\n"
+		"except BaseException:\n"
+		"  print(\"BaseException\")\n"
+		"except:\n"
+		"  print(\"Exception\")\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Try>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD)) },
+		std::vector{
+			std::make_shared<ExceptHandler>(std::make_shared<Name>("ValueError", ContextType::LOAD),
+				"e",
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Name>("e", ContextType::LOAD) },
+						std::vector<std::shared_ptr<Keyword>>{}) }),
+			std::make_shared<ExceptHandler>(
+				std::make_shared<Name>("BaseException", ContextType::LOAD),
+				"",
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Constant>("BaseException") },
+						std::vector<std::shared_ptr<Keyword>>{}) }),
+			std::make_shared<ExceptHandler>(nullptr,
+				"",
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Constant>("Exception") },
+						std::vector<std::shared_ptr<Keyword>>{}) }) },
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<ASTNode>>{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, TryExceptFinally)
+{
+	constexpr std::string_view program =
+		"try:\n"
+		"  foo()\n"
+		"except ValueError as e:\n"
+		"  print(e)\n"
+		"finally:\n"
+		"  cleanup()\n"
+		"  exit()\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Try>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD)) },
+		std::vector{
+			std::make_shared<ExceptHandler>(std::make_shared<Name>("ValueError", ContextType::LOAD),
+				"e",
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD),
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Name>("e", ContextType::LOAD) },
+						std::vector<std::shared_ptr<Keyword>>{}) }) },
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("cleanup", ContextType::LOAD)),
+			std::make_shared<Call>(std::make_shared<Name>("exit", ContextType::LOAD)) }));
 
 	assert_generates_ast(program, expected_ast);
 }

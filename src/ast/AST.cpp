@@ -338,4 +338,33 @@ void Raise::print_this_node(const std::string &indent) const
 	}
 }
 
+void ExceptHandler::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}ExceptHandler", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	if (m_type) {
+		spdlog::debug("{}  - type:", indent);
+		m_type->print_node(new_indent);
+	} else {
+		spdlog::debug("{}  - type: null", indent);
+	}
+	spdlog::debug("{}  - name: {}", indent, m_name);
+	spdlog::debug("{}  - body:", indent);
+	for (const auto &node : m_body) { node->print_node(new_indent); }
+}
+
+void Try::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Try", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - body:", indent);
+	for (const auto &node : m_body) { node->print_node(new_indent); }
+	spdlog::debug("{}  - handlers:", indent);
+	for (const auto &node : m_handlers) { node->print_node(new_indent); }
+	spdlog::debug("{}  - orelse:", indent);
+	for (const auto &node : m_orelse) { node->print_node(new_indent); }
+	spdlog::debug("{}  - finalbody:", indent);
+	for (const auto &node : m_finalbody) { node->print_node(new_indent); }
+}
+
 }// namespace ast

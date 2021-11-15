@@ -510,7 +510,13 @@ void BytecodeGenerator::visit(const Module *node)
 	m_last_register = Register{ 0 };
 }
 
-void BytecodeGenerator::visit(const Subscript *){ TODO() }
+void BytecodeGenerator::visit(const Subscript *) { TODO() }
+
+void BytecodeGenerator::visit(const Raise *) { TODO() }
+
+void BytecodeGenerator::visit(const Try *) { TODO() }
+
+void BytecodeGenerator::visit(const ExceptHandler *){ TODO() }
 
 FunctionInfo::FunctionInfo(size_t function_id_, BytecodeGenerator *generator_)
 	: function_id(function_id_), generator(generator_)
@@ -607,9 +613,4 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 	auto executable = generator.generate_executable(module->filename(), argv);
 	return executable;
 }
-
-
-void BytecodeGenerator::visit(const Raise *) { TODO() }
-
-
 }// namespace codegen

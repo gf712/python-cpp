@@ -28,6 +28,7 @@ namespace ast {
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(Dict)               \
+	__AST_NODE_TYPE(ExceptHandler)      \
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(If)                 \
@@ -39,6 +40,7 @@ namespace ast {
 	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
 	__AST_NODE_TYPE(Subscript)          \
+	__AST_NODE_TYPE(Try)                \
 	__AST_NODE_TYPE(Tuple)              \
 	__AST_NODE_TYPE(While)
 
@@ -818,6 +820,61 @@ class Raise : public ASTNode
 
 	const std::shared_ptr<ASTNode> &exception() const { return m_exception; }
 	const std::shared_ptr<ASTNode> &cause() const { return m_cause; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+
+class ExceptHandler : public ASTNode
+{
+  public:
+	std::shared_ptr<ASTNode> m_type;
+	const std::string m_name;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+
+  public:
+	ExceptHandler(std::shared_ptr<ASTNode> type,
+		std::string name,
+		std::vector<std::shared_ptr<ASTNode>> body)
+		: ASTNode(ASTNodeType::ExceptHandler), m_type(std::move(type)), m_name(std::move(name)),
+		  m_body(std::move(body))
+	{}
+
+	const std::shared_ptr<ASTNode> &type() const { return m_type; }
+	const std::string &name() const { return m_name; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+
+class Try : public ASTNode
+{
+  public:
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ExceptHandler>> m_handlers;
+	std::vector<std::shared_ptr<ASTNode>> m_orelse;
+	std::vector<std::shared_ptr<ASTNode>> m_finalbody;
+
+  public:
+	Try(std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ExceptHandler>> handlers,
+		std::vector<std::shared_ptr<ASTNode>> orelse,
+		std::vector<std::shared_ptr<ASTNode>> finalbody)
+		: ASTNode(ASTNodeType::Try), m_body(std::move(body)), m_handlers(std::move(handlers)),
+		  m_orelse(std::move(orelse)), m_finalbody(std::move(finalbody))
+	{}
+
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::vector<std::shared_ptr<ExceptHandler>> &handlers() const { return m_handlers; }
+	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+	const std::vector<std::shared_ptr<ASTNode>> &cause() const { return m_finalbody; }
 
 	void codegen(CodeGenerator *) const override;
 

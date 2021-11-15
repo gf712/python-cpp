@@ -335,9 +335,19 @@ template<typename lhs, typename rhs> struct AndNotLiteral : Pattern<AndNotLitera
 	}
 };
 
-struct RaisePattern
+struct AsPattern
 {
-	static bool matches(std::string_view token_value) { return token_value == "raise"; }
+	static bool matches(std::string_view token_value) { return token_value == "as"; }
+};
+
+struct ExceptPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "except"; }
+};
+
+struct FinallyPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "finally"; }
 };
 
 struct FromPattern
@@ -350,9 +360,19 @@ struct ImportPattern
 	static bool matches(std::string_view token_value) { return token_value == "import"; }
 };
 
-struct AsPattern
+struct RaisePattern
 {
-	static bool matches(std::string_view token_value) { return token_value == "as"; }
+	static bool matches(std::string_view token_value) { return token_value == "raise"; }
+};
+
+struct TryPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "try"; }
+};
+
+struct WhilePattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "while"; }
 };
 
 
@@ -1148,7 +1168,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::GREATER,
 												 Token::TokenType::RSQB,
 												 Token::TokenType::RBRACE>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>>>>;
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>>>>;
 		if (pattern5::match(p)) {
 			spdlog::debug("ϵ");
 			return true;
@@ -2753,9 +2774,153 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 	}
 };
 
-struct WhilePattern
+struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 {
-	static bool matches(std::string_view token_value) { return token_value == "while"; }
+	// except_block:
+	//     | 'except' expression ['as' NAME ] ':' block
+	//     | 'except' ':' block
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("ExceptBlockPattern");
+		{
+			BlockScope scope{ p };
+			using pattern1 =
+				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptPattern>,
+					ExpressionPattern>;
+			if (pattern1::match(p)) {
+				spdlog::debug("'except' expression");
+				std::string name{};
+				using pattern1a =
+					PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>,
+						SingleTokenPattern<Token::TokenType::NAME>>;
+				if (pattern1a::match(p)) {
+					spdlog::debug("['as' NAME ]");
+					auto token = p.lexer().peek_token(p.token_position() - 1);
+					spdlog::debug("{}", token->to_string());
+					name = std::string{ token->start().pointer_to_program,
+						token->end().pointer_to_program };
+				}
+				using pattern1b =
+					PatternMatch<SingleTokenPattern<Token::TokenType::COLON>, BlockPattern>;
+				if (pattern1b::match(p)) {
+					spdlog::debug("':' block");
+					std::vector<std::shared_ptr<ASTNode>> body;
+					const auto type = p.pop_front();
+					while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+					scope.parent().push_front(std::make_shared<ExceptHandler>(type, name, body));
+					return true;
+				}
+			}
+		}
+		{
+			BlockScope scope{ p };
+			using pattern2 =
+				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptPattern>,
+					SingleTokenPattern<Token::TokenType::COLON>,
+					BlockPattern>;
+			if (pattern2::match(p)) {
+				spdlog::debug("'except' ':' block");
+				std::vector<std::shared_ptr<ASTNode>> body;
+				while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+				scope.parent().push_front(std::make_shared<ExceptHandler>(nullptr, "", body));
+				return true;
+			}
+		}
+		return false;
+	}
+};
+
+struct FinallyBlockPattern : Pattern<FinallyBlockPattern>
+{
+	// finally_block:
+	//     | 'finally' ':' block
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("FinallyBlockPattern");
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FinallyPattern>,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'finally' ':' block");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct TryStatementPattern : Pattern<TryStatementPattern>
+{
+	// try_stmt:
+	// 		| 'try' ':' block finally_block
+	// 		| 'try' ':' block except_block+ [else_block] [finally_block]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("TryStatementPattern");
+		BlockScope scope{ p };
+		// 'try' ':' block
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, TryPattern>,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'try' ':' block");
+
+			std::vector<std::shared_ptr<ASTNode>> body;
+			std::vector<std::shared_ptr<ExceptHandler>> handlers;
+			std::vector<std::shared_ptr<ASTNode>> orelse;
+			std::vector<std::shared_ptr<ASTNode>> finally;
+			bool match = false;
+			// finally_block
+			{
+				BlockScope finally_scope{ p };
+				using pattern1a = PatternMatch<FinallyBlockPattern>;
+				if (pattern1a::match(p)) {
+					spdlog::debug("finally_block");
+					while (!p.stack().empty()) { finally.push_back(p.pop_front()); }
+					match = true;
+				}
+			}
+			// except_block+
+			{
+				BlockScope except_block{ p };
+				using pattern1b = PatternMatch<OneOrMorePattern<ExceptBlockPattern>>;
+				if (pattern1b::match(p)) {
+					spdlog::debug("except_block");
+					while (!p.stack().empty()) {
+						auto node = p.pop_back();
+						ASSERT(as<ExceptHandler>(node))
+						handlers.push_back(as<ExceptHandler>(node));
+					}
+					match = true;
+
+					// [else_block]
+					{
+						BlockScope else_block{ p };
+						using pattern1c = PatternMatch<ElseBlockStatementPattern>;
+						if (pattern1c::match(p)) {
+							spdlog::debug("[else_block]");
+							while (!p.stack().empty()) { orelse.push_back(p.pop_front()); }
+						}
+					}
+					// [finally_block]
+					{
+						BlockScope finally_block{ p };
+						using pattern1d = PatternMatch<FinallyBlockPattern>;
+						if (pattern1d::match(p)) {
+							spdlog::debug("[finally_block]");
+							while (!p.stack().empty()) { finally.push_back(p.pop_front()); }
+						}
+					}
+				}
+			}
+			if (!match) { return false; }
+			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<Try>(body, handlers, orelse, finally));
+			return true;
+		}
+		return false;
+	}
 };
 
 
@@ -2833,6 +2998,14 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 		using pattern5 = PatternMatch<ForStatementPattern>;
 		if (pattern5::match(p)) {
 			spdlog::debug("for_stmt");
+			p.print_stack();
+			return true;
+		}
+
+		// try_stmt
+		using pattern6 = PatternMatch<TryStatementPattern>;
+		if (pattern6::match(p)) {
+			spdlog::debug("try_stmt");
 			p.print_stack();
 			return true;
 		}
