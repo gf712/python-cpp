@@ -78,9 +78,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 			end = std::get<String>(maybe_str).s;
 		}
 	}
-	auto reprfunc = [](const auto &arg) {
-		return arg->__repr__();
-	};
+	auto reprfunc = [](const auto &arg) { return arg->__repr__(); };
 
 	auto arg_it = args->begin();
 	auto arg_it_end = args->end();
@@ -309,6 +307,16 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	dir_list->sort();
 	return dir_list;
 }
+
+PyObject *repr(const PyTuple *args, const PyDict *, Interpreter &)
+{
+	if (args->size() != 1) {
+		type_error("repr() takes exactly one argument ({} given)", args->size());
+		return nullptr;
+	}
+	return PyObject::from(args->elements()[0])->__repr__();
+}
+
 }// namespace
 
 
@@ -376,6 +384,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->insert(PyString::create("range"),
 		heap.allocate<PyNativeFunction>("range", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return range(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->insert(PyString::create("repr"),
+		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return repr(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;
