@@ -78,21 +78,8 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 			end = std::get<String>(maybe_str).s;
 		}
 	}
-	auto reprfunc = [&interpreter](const auto &arg) {
-		auto reprfunc = arg->slots().repr;
-		if (std::holds_alternative<ReprSlotFunctionType>(reprfunc)) {
-			auto repr_native = std::get<ReprSlotFunctionType>(reprfunc);
-			spdlog::debug("Repr native function ptr: {}", static_cast<void *>(&repr_native));
-			return repr_native();
-		} else {
-			auto pyfunc = std::get<PyFunction *>(reprfunc);
-			spdlog::debug("Repr native function ptr: {}", static_cast<void *>(pyfunc));
-			return execute(interpreter,
-				pyfunc,
-				VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }),
-				nullptr,
-				nullptr);
-		}
+	auto reprfunc = [](const auto &arg) {
+		return arg->__repr__();
 	};
 
 	auto arg_it = args->begin();
@@ -304,9 +291,7 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		// If the object is a module object, the list contains the names of the module’s attributes.
 		if (std::holds_alternative<PyObject *>(arg) && as<PyModule>(std::get<PyObject *>(arg))) {
 			auto *pymodule = as<PyModule>(std::get<PyObject *>(arg));
-			for (const auto &[k, _] : pymodule->symbol_table()) {
-				dir_list->append(k); 
-			}
+			for (const auto &[k, _] : pymodule->symbol_table()) { dir_list->append(k); }
 		}
 		// If the object is a type or class object, the list contains the names of its attributes,
 		// and recursively of the attributes of its bases.

@@ -5,20 +5,20 @@
 
 class PyTupleIterator;
 
-class PyTuple : public PyObject
+class PyTuple : public PyBaseObject<PyTuple>
 {
 	friend class Heap;
 
 	std::vector<Value> m_elements;
 
   protected:
-	PyTuple() : PyObject(PyObjectType::PY_TUPLE) {}
+	PyTuple() : PyBaseObject(PyObjectType::PY_TUPLE) {}
 
 	PyTuple(std::vector<Value> &&elements)
-		: PyObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
+		: PyBaseObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
 	{}
 
-	PyTuple(const std::vector<PyObject *> &elements) : PyObject(PyObjectType::PY_TUPLE)
+	PyTuple(const std::vector<PyObject *> &elements) : PyBaseObject(PyObjectType::PY_TUPLE)
 	{
 		m_elements.reserve(elements.size());
 		for (auto *el : elements) { m_elements.push_back(el); }
@@ -35,7 +35,7 @@ class PyTuple : public PyObject
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	PyTupleIterator begin() const;
@@ -50,7 +50,7 @@ class PyTuple : public PyObject
 };
 
 
-class PyTupleIterator : public PyObject
+class PyTupleIterator : public PyBaseObject<PyTupleIterator>
 {
 	friend class Heap;
 	friend PyTuple;
@@ -66,7 +66,7 @@ class PyTupleIterator : public PyObject
 	using iterator_category = std::forward_iterator_tag;
 
 	PyTupleIterator(const PyTuple &pytuple)
-		: PyObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(pytuple)
+		: PyBaseObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(pytuple)
 	{}
 
 	PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
@@ -76,7 +76,7 @@ class PyTupleIterator : public PyObject
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *next_impl(Interpreter &interpreter) override;
 
 	bool operator==(const PyTupleIterator &) const;

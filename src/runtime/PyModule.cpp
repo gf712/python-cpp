@@ -33,7 +33,7 @@ std::optional<std::string> resolve_path(std::string module_name)
 
 
 PyModule::PyModule(PyString *module_name)
-	: PyObject(PyObjectType::PY_MODULE), m_module_name(std::move(module_name))
+	: PyBaseObject(PyObjectType::PY_MODULE), m_module_name(std::move(module_name))
 {
 	m_attributes.insert_or_assign("__name__", module_name);
 }

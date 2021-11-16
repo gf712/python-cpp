@@ -9,7 +9,7 @@ struct CustomPyObjectContext
 };
 
 // a user defined PyObject
-class CustomPyObject : public PyObject
+class CustomPyObject : public PyBaseObject<CustomPyObject>
 {
   public:
 	CustomPyObject(const CustomPyObjectContext &ctx, const PyTuple *);

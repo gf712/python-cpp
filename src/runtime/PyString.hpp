@@ -4,7 +4,7 @@
 
 #include <optional>
 
-class PyString : public PyObject
+class PyString : public PyBaseObject<PyString>
 {
 	friend class Heap;
 	std::string m_value;
@@ -18,8 +18,9 @@ class PyString : public PyObject
 
 	std::string to_string() const override { return fmt::format("{}", m_value); }
 
-	PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *add_impl(const PyObject *obj) const;
+
+	PyObject *repr_impl() const;
 	size_t hash_impl(Interpreter &interpreter) const override;
 	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *less_than_impl(const PyObject *obj, Interpreter &) const override;

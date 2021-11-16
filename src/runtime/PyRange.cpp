@@ -15,7 +15,7 @@ std::string PyRange::to_string() const
 	}
 }
 
-PyObject *PyRange::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
+PyObject *PyRange::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyRange::iter_impl(Interpreter &) const
 {
@@ -28,10 +28,7 @@ std::string PyRangeIterator::to_string() const
 	return fmt::format("<range_iterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyRangeIterator::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyRangeIterator::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyRangeIterator::next_impl(Interpreter &interpreter)
 {

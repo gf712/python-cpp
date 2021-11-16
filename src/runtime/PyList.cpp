@@ -8,7 +8,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
-PyList::PyList() : PyObject(PyObjectType::PY_LIST)
+PyList::PyList() : PyBaseObject(PyObjectType::PY_LIST)
 {
 	put("append",
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
@@ -63,7 +63,7 @@ std::string PyList::to_string() const
 	return os.str();
 }
 
-PyObject *PyList::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
+PyObject *PyList::repr_impl() const { return PyString::from(String{ to_string() }); }
 
 PyObject *PyList::iter_impl(Interpreter &) const
 {
@@ -110,10 +110,7 @@ void PyListIterator::visit_graph(Visitor &visitor)
 	const_cast<PyList &>(m_pylist).visit_graph(visitor);
 }
 
-PyObject *PyListIterator::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyListIterator::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyListIterator::next_impl(Interpreter &interpreter)
 {

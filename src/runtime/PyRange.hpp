@@ -2,7 +2,7 @@
 
 #include "PyObject.hpp"
 
-class PyRange : public PyObject
+class PyRange : public PyBaseObject<PyObject>
 {
 	friend class Heap;
 
@@ -16,12 +16,12 @@ class PyRange : public PyObject
 	PyRange(int64_t start, int64_t stop) : PyRange(start, stop, 1) {}
 
 	PyRange(int64_t start, int64_t stop, int64_t step)
-		: PyObject(PyObjectType::PY_RANGE), m_start(start), m_stop(stop), m_step(step)
+		: PyBaseObject(PyObjectType::PY_RANGE), m_start(start), m_stop(stop), m_step(step)
 	{}
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	int64_t start() const { return m_start; }
@@ -30,7 +30,7 @@ class PyRange : public PyObject
 };
 
 
-class PyRangeIterator : public PyObject
+class PyRangeIterator : public PyBaseObject<PyRangeIterator>
 {
 	friend class Heap;
 
@@ -39,12 +39,12 @@ class PyRangeIterator : public PyObject
 
   public:
 	PyRangeIterator(const PyRange &pyrange)
-		: PyObject(PyObjectType::PY_RANGE_ITERATOR), m_pyrange(pyrange),
+		: PyBaseObject(PyObjectType::PY_RANGE_ITERATOR), m_pyrange(pyrange),
 		  m_current_index(m_pyrange.start())
 	{}
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *next_impl(Interpreter &interpreter) override;
 };

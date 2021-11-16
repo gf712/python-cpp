@@ -1,14 +1,17 @@
 #include "PyNumber.hpp"
+#include "PyString.hpp"
 #include "TypeError.hpp"
 
 #include "interpreter/Interpreter.hpp"
 
-PyObject *PyNumber::add_impl(const PyObject *obj, Interpreter &interpreter) const
+PyObject *PyNumber::repr_impl() const { return PyString::create(to_string()); }
+
+PyObject *PyNumber::add_impl(const PyObject *obj) const
 {
 	if (auto *rhs = as<PyNumber>(obj)) {
 		return PyNumber::create(m_value + rhs->value());
 	} else {
-		interpreter.raise_exception(
+		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 			object_name(type()),
 			object_name(obj->type()));

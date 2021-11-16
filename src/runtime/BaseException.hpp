@@ -2,15 +2,15 @@
 
 #include "PyObject.hpp"
 
-class BaseException : public PyObject
+class BaseException : public PyBaseObject<BaseException>
 {
 	std::string m_exception_name;
 	std::string m_message;
 
   public:
 	BaseException(std::string exception_name, std::string &&name)
-		: PyObject(PyObjectType::PY_BASE_EXCEPTION), m_exception_name(std::move(exception_name)),
-		  m_message(std::move(name))
+		: PyBaseObject(PyObjectType::PY_BASE_EXCEPTION),
+		  m_exception_name(std::move(exception_name)), m_message(std::move(name))
 	{}
 
 	std::string what() const { return fmt::format("{}: {}", m_exception_name, m_message); }

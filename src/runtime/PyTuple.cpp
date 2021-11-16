@@ -1,8 +1,8 @@
 #include "PyTuple.hpp"
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
-#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "vm/VM.hpp"
 
 PyTuple *PyTuple::create()
 {
@@ -38,7 +38,7 @@ std::string PyTuple::to_string() const
 	return os.str();
 }
 
-PyObject *PyTuple::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
+PyObject *PyTuple::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyTuple::iter_impl(Interpreter &) const
 {
@@ -72,10 +72,7 @@ std::string PyTupleIterator::to_string() const
 	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyTupleIterator::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyTupleIterator::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyTupleIterator::next_impl(Interpreter &interpreter)
 {

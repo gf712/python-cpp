@@ -5,7 +5,7 @@
 class PyDictItems;
 class PyDictItemsIterator;
 
-class PyDict : public PyObject
+class PyDict : public PyBaseObject<PyDict>
 {
   public:
 	using MapType = std::unordered_map<Value, Value, ValueHash, ValueEqual>;
@@ -18,16 +18,16 @@ class PyDict : public PyObject
 	MapType m_map;
 
   public:
-	PyDict(MapType &&map) : PyObject(PyObjectType::PY_DICT), m_map(std::move(map)) {}
-	PyDict(const MapType &map) : PyObject(PyObjectType::PY_DICT), m_map(map) {}
-	PyDict() : PyObject(PyObjectType::PY_DICT) {}
+	PyDict(MapType &&map) : PyBaseObject(PyObjectType::PY_DICT), m_map(std::move(map)) {}
+	PyDict(const MapType &map) : PyBaseObject(PyObjectType::PY_DICT), m_map(map) {}
+	PyDict() : PyBaseObject(PyObjectType::PY_DICT) {}
 
 	PyDictItems *items() const;
 
 	size_t size() const { return m_map.size(); }
 
 	std::string to_string() const override;
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 
 	const MapType &map() const { return m_map; }
 
@@ -37,7 +37,7 @@ class PyDict : public PyObject
 	void visit_graph(Visitor &) override;
 };
 
-class PyDictItems : public PyObject
+class PyDictItems : public PyBaseObject<PyDictItems>
 {
 	friend class Heap;
 	friend PyDict;
@@ -46,7 +46,8 @@ class PyDictItems : public PyObject
 	const PyDict &m_pydict;
 
   public:
-	PyDictItems(const PyDict &pydict) : PyObject(PyObjectType::PY_DICT_ITEMS), m_pydict(pydict) {}
+	PyDictItems(const PyDict &pydict) : PyBaseObject(PyObjectType::PY_DICT_ITEMS), m_pydict(pydict)
+	{}
 
 	PyDictItemsIterator begin() const;
 	PyDictItemsIterator end() const;
@@ -56,7 +57,7 @@ class PyDictItems : public PyObject
 };
 
 
-class PyDictItemsIterator : public PyObject
+class PyDictItemsIterator : public PyBaseObject<PyDictItemsIterator>
 {
 	friend class Heap;
 	friend PyDictItems;
@@ -72,8 +73,8 @@ class PyDictItemsIterator : public PyObject
 	using iterator_category = std::forward_iterator_tag;
 
 	PyDictItemsIterator(const PyDictItems &pydict)
-		: PyObject(PyObjectType::PY_DICT_ITEMS_ITERATOR), m_pydictitems(pydict),
-		  m_current_iterator(m_pydictitems.m_pydict.map().begin())
+		: PyBaseObject(PyObjectType::PY_DICT_ITEMS_ITERATOR),
+		  m_pydictitems(pydict), m_current_iterator(m_pydictitems.m_pydict.map().begin())
 	{}
 
 	PyDictItemsIterator(const PyDictItems &pydict, size_t position) : PyDictItemsIterator(pydict)
@@ -83,13 +84,13 @@ class PyDictItemsIterator : public PyObject
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *next_impl(Interpreter &interpreter) override;
 
 	bool operator==(const PyDictItemsIterator &) const;
 	value_type operator*() const;
 	PyDictItemsIterator &operator++();
-	
+
 	void visit_graph(Visitor &) override;
 };
 

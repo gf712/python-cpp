@@ -9,7 +9,7 @@ PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t function_id,
 	std::vector<std::string> args,
 	PyModule *module)
-	: PyObject(PyObjectType::PY_CODE), m_function(function), m_function_id(function_id),
+	: PyBaseObject(PyObjectType::PY_CODE), m_function(function), m_function_id(function_id),
 	  m_register_count(function->registers_needed()), m_args(std::move(args)), m_module(module)
 {}
 
@@ -23,7 +23,8 @@ void PyCode::visit_graph(Visitor &visitor)
 }
 
 PyFunction::PyFunction(std::string name, PyCode *code, PyDict *globals)
-	: PyObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(code), m_globals(globals)
+	: PyBaseObject(PyObjectType::PY_FUNCTION), m_name(std::move(name)), m_code(code),
+	  m_globals(globals)
 {}
 
 

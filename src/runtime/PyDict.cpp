@@ -14,50 +14,41 @@ std::string PyDict::to_string() const
 
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
-		std::visit(
-			overloaded{ [&os](PyObject *key) {
-						   os << key->repr_impl(VirtualMachine::the().interpreter())->to_string();
-					   },
-				[&os](const auto &key) { os << key; } },
+		std::visit(overloaded{ [&os](PyObject *key) { os << key->__repr__()->to_string(); },
+					   [&os](const auto &key) { os << key; } },
 			it->first);
 		os << ": ";
-		std::visit(
-			overloaded{
-				[&os, this](PyObject *value) {
-					if (value == this) {
-						os << "{...}";
-					} else {
-						os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
-					}
-				},
-				[&os](const auto &value) { os << value; } },
+		std::visit(overloaded{ [&os, this](PyObject *value) {
+								  if (value == this) {
+									  os << "{...}";
+								  } else {
+									  os << value->__repr__()->to_string();
+								  }
+							  },
+					   [&os](const auto &value) { os << value; } },
 			it->second);
 		os << ", ";
 
 		std::advance(it, 1);
 	}
-	std::visit(overloaded{ [&os](PyObject *key) {
-							  os << key->repr_impl(VirtualMachine::the().interpreter())->to_string()
-								 << ": ";
-						  },
+	std::visit(overloaded{ [&os](PyObject *key) { os << key->__repr__()->to_string() << ": "; },
 				   [&os](const auto &key) { os << key << ": "; } },
 		it->first);
-	std::visit(
-		overloaded{ [&os, this](PyObject *value) {
-					   if (value == this) {
-						   os << "{...}";
-					   } else {
-						   os << value->repr_impl(VirtualMachine::the().interpreter())->to_string();
-					   }
-				   },
-			[&os](const auto &value) { os << value; } },
+	std::visit(overloaded{ [&os, this](PyObject *value) {
+							  if (value == this) {
+								  os << "{...}";
+							  } else {
+								  os << value->__repr__()->to_string();
+							  }
+						  },
+				   [&os](const auto &value) { os << value; } },
 		it->second);
 	os << "}";
 
 	return os.str();
 }
 
-PyObject *PyDict::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
+PyObject *PyDict::repr_impl() const { return PyString::from(String{ to_string() }); }
 
 PyDictItems *PyDict::items() const
 {
@@ -145,10 +136,7 @@ std::string PyDictItemsIterator::to_string() const
 	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyDictItemsIterator::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
+PyObject *PyDictItemsIterator::repr_impl() const { return PyString::create(to_string()); }
 
 PyObject *PyDictItemsIterator::next_impl(Interpreter &interpreter)
 {

@@ -119,7 +119,10 @@ std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interp
 			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
-				if (auto result = py_lhs->add_impl(py_rhs, interpreter)) { return result; }
+				if (auto result = py_lhs->__add__(py_rhs);
+					std::holds_alternative<PyObject *>(result)) {
+					return std::get<PyObject *>(result);
+				}
 				interpreter.raise_exception(
 					"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 					object_name(py_lhs->type()),
@@ -323,17 +326,18 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 bool truthy(const Value &value, Interpreter &interpreter)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
-	return std::visit(overloaded{ [](const NameConstant &c) {
-									 if (std::holds_alternative<NoneType>(c.value)) {
-										 return false;
-									 } else {
-										 return std::get<bool>(c.value);
-									 }
-								 },
-						  [](const Number &number) { return number == Number{ int64_t{ 0 } }; },
-						  [](const String &str) { return !str.s.empty(); },
-						  [](const Bytes &bytes) { return !bytes.b.empty(); },
-						  [](const Ellipsis &) { return true; },
-						  [&interpreter](PyObject *obj) { return obj->truthy(interpreter) == py_true(); } },
+	return std::visit(
+		overloaded{ [](const NameConstant &c) {
+					   if (std::holds_alternative<NoneType>(c.value)) {
+						   return false;
+					   } else {
+						   return std::get<bool>(c.value);
+					   }
+				   },
+			[](const Number &number) { return number == Number{ int64_t{ 0 } }; },
+			[](const String &str) { return !str.s.empty(); },
+			[](const Bytes &bytes) { return !bytes.b.empty(); },
+			[](const Ellipsis &) { return true; },
+			[&interpreter](PyObject *obj) { return obj->truthy(interpreter) == py_true(); } },
 		value);
 }

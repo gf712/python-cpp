@@ -46,32 +46,31 @@ int32_t codepoint(const char *str, size_t length)
 
 }// namespace utf8
 
-PyObject *PyString::add_impl(const PyObject *obj, Interpreter &interpreter) const
+PyObject *PyString::add_impl(const PyObject *obj) const
 {
 	if (auto rhs = as<PyString>(obj)) {
 		return PyString::create(m_value + rhs->value());
 	} else {
-
-		interpreter.raise_exception(
+		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
 			object_name(type()),
 			object_name(obj->type()));
-		return nullptr;
+		return py_none();
 	}
 }
 
 
-PyString::PyString(std::string s) : PyObject(PyObjectType::PY_STRING), m_value(std::move(s))
+PyString::PyString(std::string s) : PyBaseObject(PyObjectType::PY_STRING), m_value(std::move(s))
 {
-	m_slots.hash = [this]() { return this->hash_impl(VirtualMachine::the().interpreter()); };
-	m_slots.richcompare = [this](const PyObject *other, RichCompare op) {
+	m_slots->hash = [this]() { return this->hash_impl(VirtualMachine::the().interpreter()); };
+	m_slots->richcompare = [this](const PyObject *other, RichCompare op) {
 		return this->richcompare_impl(other, op, VirtualMachine::the().interpreter());
 	};
 }
 
 size_t PyString::hash_impl(Interpreter &) const { return std::hash<std::string>{}(m_value); }
 
-PyObject *PyString::repr_impl(Interpreter &) const { return PyString::from(String{ m_value }); }
+PyObject *PyString::repr_impl() const { return PyString::from(String{ m_value }); }
 
 
 PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const

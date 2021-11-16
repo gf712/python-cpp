@@ -107,15 +107,6 @@ template<> PyObject *PyObject::from(const Value &value)
 }
 
 
-PyObject::PyObject(PyObjectType type) : Cell(), m_type(type)
-{
-	m_slots =
-		Slots{ .repr = [this]() { return this->repr_impl(VirtualMachine::the().interpreter()); },
-			.iter = [this]() { return this->iter_impl(VirtualMachine::the().interpreter()); },
-			.hash = {},
-			.richcompare = {} };
-};
-
 void PyObject::visit_graph(Visitor &visitor)
 {
 	for (const auto &[name, obj] : m_attributes) {
@@ -141,10 +132,11 @@ PyObject *PyObject::get(std::string name, Interpreter &interpreter) const
 }
 
 
-PyObject *PyObject::repr_impl(Interpreter &) const
+PyObject *PyObject::repr_impl() const
 {
 	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
 }
+
 
 PyObject *PyObject::iter_impl(Interpreter &interpreter) const
 {
@@ -175,10 +167,6 @@ size_t PyObject::hash_impl(Interpreter &interpreter) const
 	return 0;
 }
 
-
-PyObject *PyNumber::repr_impl(Interpreter &) const { return PyString::from(String{ to_string() }); }
-
-
 std::string PyNameConstant::to_string() const
 {
 	if (std::holds_alternative<NoneType>(m_value.value)) {
@@ -189,23 +177,14 @@ std::string PyNameConstant::to_string() const
 	}
 }
 
-PyObject *PyNameConstant::repr_impl(Interpreter &) const
-{
-	return PyString::from(String{ to_string() });
-}
-
-
-PyObject *PyObject::add_impl(const PyObject *, Interpreter &) const { return nullptr; }
+PyObject *PyNameConstant::repr_impl() const { return PyString::from(String{ to_string() }); }
 
 
 PyObject *PyObject::subtract_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
-
 PyObject *PyObject::multiply_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
-
 PyObject *PyObject::exp_impl(const PyObject *, Interpreter &) const { return nullptr; }
-
 
 PyObject *PyObject::lshift_impl(const PyObject *, Interpreter &) const { return nullptr; }
 
@@ -272,31 +251,11 @@ PyObject *PyObject::richcompare_impl(const PyObject *other,
 
 PyObject *PyObject::truthy(Interpreter &) const { return py_true(); }
 
-PyObject *PyBytes::add_impl(const PyObject *obj, Interpreter &interpreter) const
-{
-	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-		object_name(type()),
-		object_name(obj->type()));
-	return nullptr;
-}
+PyObject *PyBytes::add_impl(const PyObject *) const { TODO() }
 
-PyObject *PyEllipsis::add_impl(const PyObject *obj, Interpreter &interpreter) const
-{
-	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-		object_name(type()),
-		object_name(obj->type()));
-	return nullptr;
-}
+PyObject *PyEllipsis::add_impl(const PyObject *) const { TODO() }
 
-
-PyObject *PyNameConstant::add_impl(const PyObject *obj, Interpreter &interpreter) const
-{
-	interpreter.raise_exception("TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-		object_name(type()),
-		object_name(obj->type()));
-	return nullptr;
-}
-
+PyObject *PyNameConstant::add_impl(const PyObject *) const { TODO() }
 
 PyString *PyString::create(const std::string &value)
 {

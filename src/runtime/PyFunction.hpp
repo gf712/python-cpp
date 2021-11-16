@@ -4,7 +4,7 @@
 #include "PyTuple.hpp"
 
 
-class PyCode : public PyObject
+class PyCode : public PyBaseObject<PyCode>
 {
 	const std::shared_ptr<Function> m_function;
 	const size_t m_function_id;
@@ -31,7 +31,7 @@ class PyCode : public PyObject
 };
 
 
-class PyFunction : public PyObject
+class PyFunction : public PyBaseObject<PyFunction>
 {
 	const std::string m_name;
 	PyCode *m_code;
@@ -51,7 +51,7 @@ class PyFunction : public PyObject
 };
 
 
-class PyNativeFunction : public PyObject
+class PyNativeFunction : public PyBaseObject<PyNativeFunction>
 {
 	std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
@@ -59,7 +59,7 @@ class PyNativeFunction : public PyObject
 
   public:
 	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
+		: PyBaseObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
 		  m_function(std::move(function))
 	{}
 
@@ -68,7 +68,7 @@ class PyNativeFunction : public PyObject
 	PyNativeFunction(std::string name,
 		std::function<PyObject *(PyTuple *, PyDict *)> function,
 		Args &&... args)
-		: PyObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
+		: PyBaseObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
 		  m_function(std::move(function)), m_captures{ std::forward<Args>(args)... }
 	{}
 

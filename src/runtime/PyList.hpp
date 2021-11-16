@@ -2,7 +2,7 @@
 
 #include "PyObject.hpp"
 
-class PyList : public PyObject
+class PyList : public PyBaseObject<PyList>
 {
 	friend class Heap;
 
@@ -14,7 +14,7 @@ class PyList : public PyObject
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *iter_impl(Interpreter &interpreter) const override;
 
 	const std::vector<Value> &elements() const { return m_elements; }
@@ -31,7 +31,7 @@ class PyList : public PyObject
 };
 
 
-class PyListIterator : public PyObject
+class PyListIterator : public PyBaseObject<PyListIterator>
 {
 	friend class Heap;
 
@@ -40,14 +40,14 @@ class PyListIterator : public PyObject
 
   public:
 	PyListIterator(const PyList &pylist)
-		: PyObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(pylist)
+		: PyBaseObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(pylist)
 	{}
 
 	std::string to_string() const override;
 
 	void visit_graph(Visitor &) override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *next_impl(Interpreter &interpreter) override;
 };
 

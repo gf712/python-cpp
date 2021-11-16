@@ -1,7 +1,7 @@
 #include "PyObject.hpp"
 
 
-class PyNumber final : public PyObject
+class PyNumber final : public PyBaseObject<PyNumber>
 {
 	friend class Heap;
 
@@ -15,12 +15,12 @@ class PyNumber final : public PyObject
 			[](const auto &value) { return fmt::format("{}", value); }, m_value.value);
 	}
 
-	PyObject *add_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *add_impl(const PyObject *obj) const;
 	PyObject *subtract_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *modulo_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *multiply_impl(const PyObject *obj, Interpreter &interpreter) const override;
 
-	PyObject *repr_impl(Interpreter &interpreter) const override;
+	PyObject *repr_impl() const;
 	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *less_than_impl(const PyObject *obj, Interpreter &interpreter) const override;
 	PyObject *less_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
@@ -30,7 +30,7 @@ class PyNumber final : public PyObject
 	const Number &value() const { return m_value; }
 
   private:
-	PyNumber(Number number) : PyObject(PyObjectType::PY_NUMBER), m_value(number) {}
+	PyNumber(Number number) : PyBaseObject(PyObjectType::PY_NUMBER), m_value(number) {}
 };
 
 
@@ -45,3 +45,5 @@ template<> inline const PyNumber *as(const PyObject *node)
 	if (node->type() == PyObjectType::PY_NUMBER) { return static_cast<const PyNumber *>(node); }
 	return nullptr;
 }
+
+static_assert(HasAdd<PyNumber>);
