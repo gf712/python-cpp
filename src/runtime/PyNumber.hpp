@@ -45,5 +45,3 @@ template<> inline const PyNumber *as(const PyObject *node)
 	if (node->type() == PyObjectType::PY_NUMBER) { return static_cast<const PyNumber *>(node); }
 	return nullptr;
 }
-
-static_assert(HasAdd<PyNumber>);
