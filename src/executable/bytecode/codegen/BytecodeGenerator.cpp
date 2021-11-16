@@ -518,6 +518,8 @@ void BytecodeGenerator::visit(const Try *) { TODO() }
 
 void BytecodeGenerator::visit(const ExceptHandler *){ TODO() }
 
+void BytecodeGenerator::visit(const Assert *){ TODO() }
+
 FunctionInfo::FunctionInfo(size_t function_id_, BytecodeGenerator *generator_)
 	: function_id(function_id_), generator(generator_)
 {

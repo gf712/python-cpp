@@ -533,6 +533,19 @@ void compare_except_handler(const std::shared_ptr<ASTNode> &result,
 	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
 }
 
+void compare_assert(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Assert);
+
+	const auto result_test = as<Assert>(result)->test();
+	const auto expected_test = as<Assert>(expected)->test();
+	dispatch(result_test, expected_test);
+
+	const auto result_msg = as<Assert>(result)->msg();
+	const auto expected_msg = as<Assert>(expected)->msg();
+	dispatch(result_msg, expected_msg);
+}
 
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
@@ -635,6 +648,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::ExceptHandler: {
 		compare_except_handler(result, expected);
+		break;
+	}
+	case ASTNodeType::Assert: {
+		compare_assert(result, expected);
 		break;
 	}
 	default: {
@@ -1499,6 +1516,27 @@ TEST(Parser, TryExceptFinally)
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Call>(std::make_shared<Name>("cleanup", ContextType::LOAD)),
 			std::make_shared<Call>(std::make_shared<Name>("exit", ContextType::LOAD)) }));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, Assert)
+{
+	constexpr std::string_view program = "assert False\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assert>(std::make_shared<Constant>(false), nullptr));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, AssertWithMessage)
+{
+	constexpr std::string_view program = "assert False, \"failed!\"\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assert>(
+		std::make_shared<Constant>(false), std::make_shared<Constant>("failed!")));
 
 	assert_generates_ast(program, expected_ast);
 }

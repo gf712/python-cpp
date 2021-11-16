@@ -340,6 +340,12 @@ struct AsPattern
 	static bool matches(std::string_view token_value) { return token_value == "as"; }
 };
 
+struct AssertPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "assert"; }
+};
+
+
 struct ExceptPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
@@ -2253,6 +2259,37 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 	}
 };
 
+struct AssertStatementPattern : Pattern<AssertStatementPattern>
+{
+	// assert_stmt: 'assert' expression [',' expression ]
+	static bool matches_impl(Parser &p)
+	{
+		spdlog::debug("AssertStatementPattern");
+		const auto initial_stack_size = p.stack().size();
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>,
+				ExpressionPattern,
+				ZeroOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, ExpressionPattern>>;
+		if (pattern1::match(p)) {
+			ASSERT((p.stack().size() - initial_stack_size) > 0)
+			ASSERT((p.stack().size() - initial_stack_size) <= 2)
+
+			std::shared_ptr<ASTNode> test{ nullptr };
+			std::shared_ptr<ASTNode> msg{ nullptr };
+
+			if ((p.stack().size() - initial_stack_size) == 1) {
+				test = p.pop_back();
+			} else {
+				msg = p.pop_back();
+				test = p.pop_back();
+			}
+			p.push_to_stack(std::make_shared<Assert>(test, msg));
+			return true;
+		}
+		return false;
+	}
+};
+
 struct SmallStatementPattern : Pattern<SmallStatementPattern>
 {
 	// small_stmt:
@@ -2294,6 +2331,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern5 = PatternMatch<RaiseStatementPattern>;
 		if (pattern5::match(p)) {
 			spdlog::debug("raise_stmt");
+			return true;
+		}
+		using pattern9 = PatternMatch<AssertStatementPattern>;
+		if (pattern9::match(p)) {
+			spdlog::debug("assert_stmt");
 			return true;
 		}
 		return false;

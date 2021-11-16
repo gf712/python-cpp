@@ -21,6 +21,7 @@ namespace ast {
 	__AST_NODE_TYPE(Arguments)          \
 	__AST_NODE_TYPE(Attribute)          \
 	__AST_NODE_TYPE(Assign)             \
+	__AST_NODE_TYPE(Assert)             \
 	__AST_NODE_TYPE(AugAssign)          \
 	__AST_NODE_TYPE(BinaryExpr)         \
 	__AST_NODE_TYPE(Call)               \
@@ -875,6 +876,29 @@ class Try : public ASTNode
 	const std::vector<std::shared_ptr<ExceptHandler>> &handlers() const { return m_handlers; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
 	const std::vector<std::shared_ptr<ASTNode>> &cause() const { return m_finalbody; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+
+class Assert : public ASTNode
+{
+  public:
+	std::shared_ptr<ASTNode> m_test{ nullptr };
+	std::shared_ptr<ASTNode> m_msg{ nullptr };
+
+  public:
+	Assert(std::shared_ptr<ASTNode> test, std::shared_ptr<ASTNode> msg)
+		: ASTNode(ASTNodeType::Assert), m_test(std::move(test)), m_msg(std::move(msg))
+	{
+		ASSERT(m_test)
+	}
+
+	const std::shared_ptr<ASTNode> &test() const { return m_test; }
+	const std::shared_ptr<ASTNode> &msg() const { return m_msg; }
 
 	void codegen(CodeGenerator *) const override;
 

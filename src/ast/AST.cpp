@@ -367,4 +367,18 @@ void Try::print_this_node(const std::string &indent) const
 	for (const auto &node : m_finalbody) { node->print_node(new_indent); }
 }
 
+void Assert::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Assert", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - test:", indent);
+	m_test->print_node(new_indent);
+	if (m_msg) {
+		spdlog::debug("{}  - message:", indent);
+		m_msg->print_node(new_indent);
+	} else {
+		spdlog::debug("{}  - message: null", indent);
+	}
+}
+
 }// namespace ast
