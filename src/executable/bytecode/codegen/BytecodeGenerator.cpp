@@ -5,11 +5,14 @@
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
+#include "executable/bytecode/instructions/JumpIfTrue.hpp"
+#include "executable/bytecode/instructions/LoadAssertionError.hpp"
 #include "executable/bytecode/instructions/LoadAttr.hpp"
 #include "executable/bytecode/instructions/LoadBuildClass.hpp"
 #include "executable/bytecode/instructions/LoadMethod.hpp"
 #include "executable/bytecode/instructions/LoadName.hpp"
 #include "executable/bytecode/instructions/MethodCall.hpp"
+#include "executable/bytecode/instructions/RaiseVarargs.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
@@ -516,9 +519,40 @@ void BytecodeGenerator::visit(const Raise *) { TODO() }
 
 void BytecodeGenerator::visit(const Try *) { TODO() }
 
-void BytecodeGenerator::visit(const ExceptHandler *){ TODO() }
+void BytecodeGenerator::visit(const ExceptHandler *) { TODO() }
 
-void BytecodeGenerator::visit(const Assert *){ TODO() }
+void BytecodeGenerator::visit(const Assert *node)
+{
+	static size_t assert_count = 0;
+	auto end_label = make_label(fmt::format("END_{}", assert_count++), m_function_id);
+
+	const auto test_result_register = generate(node->test().get(), m_function_id);
+
+	emit<JumpIfTrue>(m_function_id, test_result_register, end_label);
+
+	const auto assertion_function_register = allocate_register();
+	emit<LoadAssertionError>(m_function_id, assertion_function_register);
+
+	const auto msg_register = [this, &node]() -> std::optional<Register> {
+		if (node->msg()) {
+			const auto msg_register = generate(node->msg().get(), m_function_id);
+			// emit<FunctionCall>(
+			// 	m_function_id, assertion_function_register, std::vector{ msg_register });
+			return msg_register;
+		} else {
+			return {};
+		}
+	}();
+
+	if (msg_register.has_value()) {
+		emit<RaiseVarargs>(m_function_id, assertion_function_register, *msg_register);
+	} else {
+		emit<RaiseVarargs>(m_function_id, assertion_function_register);
+	}
+	bind(end_label);
+
+	m_last_register = Register{};
+}
 
 FunctionInfo::FunctionInfo(size_t function_id_, BytecodeGenerator *generator_)
 	: function_id(function_id_), generator(generator_)

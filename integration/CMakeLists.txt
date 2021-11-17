@@ -14,5 +14,6 @@ add_custom_target(
           && echo "-----------------------"
           && echo ""
           && $<TARGET_FILE:python> ${PROJECT_SOURCE_DIR}/integration/fibonacci/main.py
+          && ${PROJECT_SOURCE_DIR}/integration/run_python_tests.sh $<TARGET_FILE:python>
   DEPENDS integration-tests_ python)
 # cmake-format: on

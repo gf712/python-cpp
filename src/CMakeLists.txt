@@ -9,11 +9,14 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/JumpIfTrue.cpp
+    executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
     executable/bytecode/instructions/MethodCall.cpp
+    executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/StoreAttr.cpp
     executable/bytecode/instructions/StoreName.cpp
@@ -82,7 +85,12 @@ target_link_libraries(python-cpp PUBLIC spdlog_header_only)
 target_include_directories(python-cpp PUBLIC .)
 
 # -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
-target_compile_options(python-cpp PRIVATE -Wall -Wextra -Werror -fno-omit-frame-pointer)
+target_compile_options(
+  python-cpp
+  PRIVATE -Wall
+          -Wextra
+          -Werror
+          -fno-omit-frame-pointer)
 
 if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
