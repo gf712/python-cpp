@@ -3,6 +3,7 @@
 class PyDict;
 class PyFunction;
 class PyModule;
+class PyNumber;
 class PyObject;
 class PyString;
 class PyTuple;

@@ -1,9 +1,9 @@
 #include "runtime/forward.hpp"
 
 
-template<typename T> concept HasNew = requires(PyTuple *args, PyDict *kwargs)
+template<typename T> concept HasCreate = requires(T *self, PyTuple *args, PyDict *kwargs)
 {
-	T::create(args, kwargs);
+	T::create(self, args, kwargs);
 };
 
 template<typename T> concept HasInit = requires(T *self, PyTuple *args, PyDict *kwargs)

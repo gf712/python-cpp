@@ -7,24 +7,31 @@
 #include "runtime/TypeError.hpp"
 
 PyObject *execute(Interpreter &interpreter,
-	PyObject *function_object,
+	PyObject *callable_object,
 	PyTuple *args,
 	PyDict *kwargs,
 	PyDict *ns)
 {
 	std::string function_name;
 
-	if (auto pyfunc = as<PyFunction>(function_object)) {
+	if (auto it = callable_object->attributes().find("__call__");
+		it != callable_object->attributes().end()) {
+		callable_object = it->second;
+	}
+
+	if (auto pyfunc = as<PyFunction>(callable_object)) {
 		function_name = pyfunc->name();
-	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
+	} else if (auto native_func = as<PyNativeFunction>(callable_object)) {
 		function_name = native_func->name();
-	} else if (auto method = as<PyBoundMethod>(function_object)) {
+	} else if (auto method = as<PyBoundMethod>(callable_object)) {
 		function_name = method->method()->name();
+	} else if (auto method = as<PyMethodDescriptor>(callable_object)) {
+		function_name = method->name()->value();
 	} else {
 		TODO();
 	}
 
-	if (auto pymethod = as<PyBoundMethod>(function_object)) {
+	if (auto pymethod = as<PyBoundMethod>(callable_object)) {
 		// TODO: this is far from optimal, since we are creating a new vector
 		//       just to append self to the start of the args tuple
 		std::vector<Value> new_args_vector;
@@ -32,10 +39,10 @@ PyObject *execute(Interpreter &interpreter,
 		new_args_vector.push_back(pymethod->self());
 		for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
 		args = PyTuple::create(new_args_vector);
-		function_object = pymethod->method();
+		callable_object = pymethod->method();
 	}
 
-	if (auto pyfunc = as<PyFunction>(function_object)) {
+	if (auto pyfunc = as<PyFunction>(callable_object)) {
 
 		auto function_locals = VirtualMachine::the().heap().allocate<PyDict>();
 		auto *function_frame = ExecutionFrame::create(interpreter.execution_frame(),
@@ -77,8 +84,19 @@ PyObject *execute(Interpreter &interpreter,
 		// spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
 		// if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
 		return interpreter.call(pyfunc->code()->function(), function_frame);
-	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
+	} else if (auto native_func = as<PyNativeFunction>(callable_object)) {
 		return interpreter.call(native_func, args, kwargs);
+	} else if (auto method = as<PyMethodDescriptor>(callable_object)) {
+		std::vector<Value> new_args_vector;
+		new_args_vector.reserve(args->size() - 1);
+		PyObject *self = PyObject::from(args->elements()[0]);
+		for (size_t i = 1; i < args->size(); ++i) {
+			new_args_vector.push_back(args->elements()[i]);
+		}
+		args = PyTuple::create(new_args_vector);
+		auto *result = method->method_descriptor()(self, args, kwargs);
+		VirtualMachine::the().reg(0) = result;
+		return result;
 	} else {
 		TODO();
 	}
@@ -88,7 +106,7 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto func = vm.reg(m_function_name);
 	ASSERT(std::get_if<PyObject *>(&func));
-	auto function_object = std::get<PyObject *>(func);
+	auto callable_object = std::get<PyObject *>(func);
 
 	std::vector<Value> args;
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }
@@ -97,5 +115,5 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	spdlog::debug("args_tuple: {}", (void *)&args_tuple);
 	ASSERT(args_tuple);
 
-	::execute(interpreter, function_object, args_tuple, nullptr, nullptr);
+	::execute(interpreter, callable_object, args_tuple, nullptr, nullptr);
 }

@@ -257,12 +257,6 @@ PyObject *PyEllipsis::add_impl(const PyObject *) const { TODO() }
 
 PyObject *PyNameConstant::add_impl(const PyObject *) const { TODO() }
 
-PyString *PyString::create(const std::string &value)
-{
-	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyString>(value);
-}
-
 PyNumber *PyNumber::create(const Number &number)
 {
 	auto &heap = VirtualMachine::the().heap();

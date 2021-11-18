@@ -88,6 +88,7 @@ class PyType : public PyBaseObject<PyType>
 	struct SlotWrappers
 	{
 		PySlotWrapper *__repr__{ nullptr };
+		PyMethodDescriptor *__call__{ nullptr };
 	};
 	SlotWrappers m_slot_wrappers;
 
@@ -95,7 +96,6 @@ class PyType : public PyBaseObject<PyType>
 
 	// mappingproxy
 	PyDict *__dict__{ nullptr };
-#
 
 	PyType(PyString *type_name) : PyBaseObject(PyObjectType::PY_TYPE), m_name(type_name) {}
 
@@ -119,6 +119,19 @@ class PyType : public PyBaseObject<PyType>
 						return obj->__repr__();
 					});
 			type->__dict__->insert(PyString::create("__repr__"), type->m_slot_wrappers.__repr__);
+			type->m_attributes["__repr__"] = type->m_slot_wrappers.__repr__;
+		}
+		if constexpr (HasCreate<Type>) {
+			type->m_slot_wrappers.__call__ =
+				VirtualMachine::the().heap().allocate<PyMethodDescriptor>(PyString::create("__call__"),
+					type,
+					[](PyObject *obj, PyTuple *args, PyDict *kwargs) {
+						// TODO: this should raise an exception
+						ASSERT(as<Type>(obj))
+						return Type::create(as<Type>(obj), args, kwargs);
+					});
+			type->__dict__->insert(PyString::create("__call__"), type->m_slot_wrappers.__call__);
+			type->m_attributes["__call__"] = type->m_slot_wrappers.__call__;
 		}
 
 		type->m_attributes["__dict__"] = type->__dict__;
@@ -152,13 +165,17 @@ class PyType : public PyBaseObject<PyType>
 
 template<> inline PyBoundMethod *as(PyObject *node)
 {
-	if (node->type() == PyObjectType::PY_BOUND_METHOD) { return static_cast<PyBoundMethod *>(node); }
+	if (node->type() == PyObjectType::PY_BOUND_METHOD) {
+		return static_cast<PyBoundMethod *>(node);
+	}
 	return nullptr;
 }
 
 template<> inline const PyBoundMethod *as(const PyObject *node)
 {
-	if (node->type() == PyObjectType::PY_BOUND_METHOD) { return static_cast<const PyBoundMethod *>(node); }
+	if (node->type() == PyObjectType::PY_BOUND_METHOD) {
+		return static_cast<const PyBoundMethod *>(node);
+	}
 	return nullptr;
 }
 
