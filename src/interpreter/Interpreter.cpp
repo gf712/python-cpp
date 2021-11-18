@@ -76,6 +76,7 @@ void Interpreter::unwind()
 		// don't unwind beyond the main frame
 		if (!m_current_frame->parent()) {
 			// uncaught exception
+			ASSERT(m_current_frame->exception())
 			std::cout << static_cast<BaseException *>(m_current_frame->exception())->what() << '\n';
 			break;
 		}

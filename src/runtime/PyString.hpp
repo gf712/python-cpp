@@ -27,6 +27,10 @@ class PyString : public PyBaseObject<PyString>
 
 	PyObject *len_impl(Interpreter &interpreter) const override;
 
+	PyString *capitalize() const;
+
+	static void register_type(PyModule*);
+
   private:
 	PyString(std::string s);
 };

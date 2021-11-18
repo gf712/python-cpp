@@ -2,6 +2,7 @@
 #include "TypeError.hpp"
 
 #include "interpreter/Interpreter.hpp"
+#include "types/api.hpp"
 
 
 namespace utf8 {
@@ -70,7 +71,7 @@ PyString::PyString(std::string s) : PyBaseObject(PyObjectType::PY_STRING), m_val
 
 size_t PyString::hash_impl(Interpreter &) const { return std::hash<std::string>{}(m_value); }
 
-PyObject *PyString::repr_impl() const { return PyString::from(String{ m_value }); }
+PyObject *PyString::repr_impl() const { return PyString::create(m_value); }
 
 
 PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const
@@ -111,6 +112,13 @@ PyObject *PyString::len_impl(Interpreter &) const
 	return PyObject::from(Number{ static_cast<int64_t>(size) });
 }
 
+PyString *PyString::capitalize() const
+{
+	auto new_string = m_value;
+	new_string[0] = std::toupper(new_string[0]);
+	return PyString::create(new_string);
+}
+
 
 std::vector<int32_t> PyString::codepoints() const
 {
@@ -133,4 +141,10 @@ std::optional<int32_t> PyString::codepoint() const
 	} else {
 		return utf8::codepoint(m_value.c_str(), codepoint_length);
 	}
+}
+
+void PyString::register_type(PyModule *m)
+{
+	klass<PyString>(m, "str")
+		.def("capitalize", &PyString::capitalize);
 }

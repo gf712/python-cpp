@@ -2,6 +2,8 @@
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
 #include "PyString.hpp"
+#include "PyType.hpp"
+#include "vm/VM.hpp"
 
 
 CustomPyObject::CustomPyObject(const CustomPyObjectContext &ctx, const PyTuple *)
@@ -20,7 +22,11 @@ CustomPyObject::CustomPyObject(const CustomPyObjectContext &ctx, const PyTuple *
 		spdlog::debug("Adding attribute to class namespace: '{}' {}",
 			attr_name_str->to_string(),
 			(void *)attr_value_obj);
-		if (!update_slot_if_special(attr_name_str->to_string(), attr_value_obj)) {
+		if (auto method = as<PyFunction>(attr_value_obj)) {
+			// a function becomes a bound method, ie. first argument is always self
+			auto *bound_method = VirtualMachine::the().heap().allocate<PyBoundMethod>(this, method);
+			put(attr_name_str->to_string(), bound_method);
+		} else if (!update_slot_if_special(attr_name_str->to_string(), attr_value_obj)) {
 			put(attr_name_str->to_string(), attr_value_obj);
 		}
 	}

@@ -22,7 +22,9 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			auto maybe_method = (*this_obj)->get(m_method_name, interpreter);
 			ASSERT(maybe_method)
 			ASSERT(maybe_method->type() == PyObjectType::PY_FUNCTION
-				   || maybe_method->type() == PyObjectType::PY_NATIVE_FUNCTION)
+				   || maybe_method->type() == PyObjectType::PY_NATIVE_FUNCTION
+				   || maybe_method->type() == PyObjectType::PY_METHOD_DESCRIPTOR
+				   || maybe_method->type() == PyObjectType::PY_BOUND_METHOD)
 			vm.reg(m_destination) = std::move(maybe_method);
 		}
 	} else {

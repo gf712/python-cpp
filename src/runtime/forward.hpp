@@ -6,4 +6,5 @@ class PyModule;
 class PyObject;
 class PyString;
 class PyTuple;
+class PyType;
 class PyNativeFunction;

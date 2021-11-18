@@ -3,6 +3,7 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
+#include "runtime/PyType.hpp"
 #include "runtime/TypeError.hpp"
 
 PyObject *execute(Interpreter &interpreter,
@@ -17,8 +18,21 @@ PyObject *execute(Interpreter &interpreter,
 		function_name = pyfunc->name();
 	} else if (auto native_func = as<PyNativeFunction>(function_object)) {
 		function_name = native_func->name();
+	} else if (auto method = as<PyBoundMethod>(function_object)) {
+		function_name = method->method()->name();
 	} else {
 		TODO();
+	}
+
+	if (auto pymethod = as<PyBoundMethod>(function_object)) {
+		// TODO: this is far from optimal, since we are creating a new vector
+		//       just to append self to the start of the args tuple
+		std::vector<Value> new_args_vector;
+		new_args_vector.reserve(args->size() + 1);
+		new_args_vector.push_back(pymethod->self());
+		for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
+		args = PyTuple::create(new_args_vector);
+		function_object = pymethod->method();
 	}
 
 	if (auto pyfunc = as<PyFunction>(function_object)) {

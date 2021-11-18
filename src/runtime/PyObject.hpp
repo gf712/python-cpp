@@ -38,6 +38,10 @@ enum class PyObjectType {
 	PY_RANGE_ITERATOR,
 	PY_CUSTOM_TYPE,
 	PY_MODULE,
+	PY_TYPE,
+	PY_METHOD_DESCRIPTOR,
+	PY_SLOT_WRAPPER,
+	PY_BOUND_METHOD
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -103,6 +107,18 @@ inline std::string_view object_name(PyObjectType type)
 	case PyObjectType::PY_MODULE: {
 		return "module";
 	}
+	case PyObjectType::PY_TYPE: {
+		return "type";
+	}
+	case PyObjectType::PY_METHOD_DESCRIPTOR: {
+		return "method_descriptor";
+	}
+	case PyObjectType::PY_SLOT_WRAPPER: {
+		return "slot_wrapper";
+	}
+	case PyObjectType::PY_BOUND_METHOD: {
+		return "bound method";
+	}
 	}
 	ASSERT_NOT_REACHED()
 }
@@ -145,20 +161,18 @@ class Slots
 	template<typename Derived>
 	static Slots create(PyObject *object) requires std::is_base_of_v<PyObject, Derived>
 	{
-		Slots s;
-		s.put_add<Derived>(object);
-		s.put_repr<Derived>(object);
-		return s;
+		return Slots{
+			.add = put_add<Derived>(object),
+			.repr = put_repr<Derived>(object),
+		};
 	}
 
   private:
-	Slots() = default;
+	template<HasAdd T> static auto put_add(PyObject *) -> AddSlotFunctionType;
+	template<typename T> static auto put_add(PyObject *) -> std::monostate;
 
-	template<HasAdd T> void put_add(PyObject *obj);
-	template<typename T> void put_add(PyObject *);
-
-	template<HasRepr T> void put_repr(PyObject *obj);
-	template<typename T> void put_repr(PyObject *);
+	template<HasRepr T> static auto put_repr(PyObject *) -> ReprSlotFunctionType;
+	// template<typename T> static auto put_repr(PyObject *);
 };
 
 
@@ -246,23 +260,24 @@ class PyObject : public Cell
 	bool is_pyobject() const override { return true; }
 };
 
-template<HasAdd T> void Slots::put_add(PyObject *obj)
+
+template<HasAdd T> auto Slots::put_add(PyObject *obj) -> AddSlotFunctionType
 {
-	add = [obj](PyObject *other) { return static_cast<T *>(obj)->add_impl(other); };
+	return [obj](PyObject *other) { return static_cast<T *>(obj)->add_impl(other); };
 }
 
-template<typename T> void Slots::put_add(PyObject *) { add = std::monostate{}; }
+template<typename T> auto Slots::put_add(PyObject *) -> std::monostate { return std::monostate{}; }
 
-template<HasRepr T> void Slots::put_repr(PyObject *obj)
+template<HasRepr T> auto Slots::put_repr(PyObject *obj) -> ReprSlotFunctionType
 {
-	repr = [obj]() { return static_cast<T *>(obj)->repr_impl(); };
+	return [obj]() { return static_cast<T *>(obj)->repr_impl(); };
 }
 
-template<typename T> void Slots::put_repr(PyObject *)
-{
-	[]<bool flag = false>() { static_assert(flag, "PyObject must implement repr function"); }
-	();
-}
+// template<typename T> auto Slots::put_repr(PyObject *)
+// {
+// 	[]<bool flag = false>() { static_assert(flag, "PyObject must implement repr function"); }
+// 	();
+// }
 
 template<typename Derived> class PyBaseObject : public PyObject
 {

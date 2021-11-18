@@ -7,6 +7,7 @@
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyRange.hpp"
 #include "runtime/PyTuple.hpp"
+#include "runtime/PyType.hpp"
 #include "runtime/StopIterationException.hpp"
 #include "runtime/TypeError.hpp"
 
@@ -319,6 +320,7 @@ PyObject *repr(const PyTuple *args, const PyDict *, Interpreter &)
 
 }// namespace
 
+void initialize_types(PyModule *m) { PyString::register_type(m); }
 
 PyModule *builtins_module(Interpreter &interpreter)
 {
@@ -390,6 +392,8 @@ PyModule *builtins_module(Interpreter &interpreter)
 		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return repr(args, kwargs, interpreter);
 		}));
+
+	initialize_types(s_builtin_module);
 
 	return s_builtin_module;
 }

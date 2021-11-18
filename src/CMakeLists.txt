@@ -52,6 +52,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyRange.cpp
     runtime/PyString.cpp
     runtime/PyTuple.cpp
+    runtime/PyType.cpp
     runtime/Value.cpp)
 
 set(VM_SOURCE_FILES # cmake-format: sortable

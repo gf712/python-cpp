@@ -12,14 +12,12 @@ PyList::PyList() : PyBaseObject(PyObjectType::PY_LIST)
 {
 	put("append",
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"append", [](PyTuple *args, PyDict *) {
-				ASSERT(args->elements().size() == 2)
-				auto this_obj = args->elements()[0];
-				ASSERT(std::holds_alternative<PyObject *>(this_obj))
-				ASSERT(as<PyList>(std::get<PyObject *>(this_obj)))
-				return as<PyList>(std::get<PyObject *>(this_obj))
-					->append(PyObject::from(args->elements()[1]));
-			}));
+			"append",
+			[this](PyTuple *args, PyDict *) {
+				ASSERT(args->elements().size() == 1)
+				return this->append(PyObject::from(args->elements()[1]));
+			},
+			this));
 }
 
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
