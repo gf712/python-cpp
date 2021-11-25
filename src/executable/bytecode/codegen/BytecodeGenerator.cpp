@@ -189,12 +189,8 @@ void BytecodeGenerator::visit(const Call *node)
 	}
 
 	if (node->function()->node_type() == ASTNodeType::Attribute) {
-		auto attr_value = as<Attribute>(node->function())->value();
-		auto this_name = as<Name>(attr_value);
-		ASSERT(this_name);
-		ASSERT(this_name->ids().size() == 1);
-		emit<MethodCall>(
-			m_function_id, func_register, this_name->ids()[0], std::move(arg_registers));
+		auto attr_name = as<Attribute>(node->function())->attr();
+		emit<MethodCall>(m_function_id, func_register, attr_name, std::move(arg_registers));
 	} else {
 		if (keyword_registers.empty()) {
 			emit<FunctionCall>(m_function_id, func_register, std::move(arg_registers));

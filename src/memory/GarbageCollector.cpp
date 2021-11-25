@@ -22,12 +22,12 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	std::jmp_buf jump_buffer;
 	setjmp(jump_buffer);
 
-	// traverse the stack from the stack pointer to the top
+	// traverse the stack from the stack pointer to the stack origin/bottom
 	uintptr_t *rsp_;
 	asm volatile("movq %%rsp, %0" : "=r"(rsp_));
 
 	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
-	spdlog::trace("rps={}, stack_bottom={}", (void *)rsp, (void *)m_stack_bottom);
+	spdlog::trace("rsp={}, stack_bottom={}", (void *)rsp, (void *)m_stack_bottom);
 	for (; rsp < m_stack_bottom; rsp += sizeof(uintptr_t)) {
 		uint8_t *address =
 			bit_cast<uint8_t *>(*bit_cast<uintptr_t *>(rsp)) - sizeof(GarbageCollected);
@@ -59,25 +59,40 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 
 struct MarkGCVisitor : Cell::Visitor
 {
+	std::unordered_set<Cell *> m_visited;
 	void visit(Cell &cell)
 	{
+		// FIXME: due to the current awkward situation with static memory
+		// 		  it can happen that
+		if (m_visited.contains(&cell)) return;
+		m_visited.insert(&cell);
+
+		auto &heap = VirtualMachine::the().heap();
 		uint8_t *cell_start = bit_cast<uint8_t *>(&cell);
-		auto *obj_header = bit_cast<GarbageCollected *>(cell_start - sizeof(GarbageCollected));
 
-		if (obj_header->black()) {
-			if (cell.is_pyobject()) {
-				spdlog::trace("Already visited {}@{}, skipping",
-					object_name(static_cast<PyObject *>(&cell)->type()),
-					(void *)&cell);
+		const bool static_memory =
+			bit_cast<uintptr_t>(cell_start) >= bit_cast<uintptr_t>(heap.static_memory())
+			&& bit_cast<uintptr_t>(cell_start)
+				   < bit_cast<uintptr_t>(heap.static_memory() + heap.static_memory_size());
+
+		if (!static_memory) {
+			auto *obj_header = bit_cast<GarbageCollected *>(cell_start - sizeof(GarbageCollected));
+
+			if (obj_header->black()) {
+				if (cell.is_pyobject()) {
+					spdlog::trace("Already visited {}@{}, skipping",
+						object_name(static_cast<PyObject *>(&cell)->type()),
+						(void *)&cell);
+				}
+				return;
 			}
-			return;
-		}
-		if (cell.is_pyobject()) {
-			auto *obj = static_cast<PyObject *>(&cell);
-			spdlog::trace("Visiting {}@{}", object_name(obj->type()), (void *)&obj);
+			if (cell.is_pyobject()) {
+				auto *obj = static_cast<PyObject *>(&cell);
+				spdlog::trace("Visiting {}@{}", object_name(obj->type()), (void *)&obj);
+			}
+			obj_header->mark(GarbageCollected::Color::BLACK);
 		}
 
-		obj_header->mark(GarbageCollected::Color::BLACK);
 		cell.visit_graph(*this);
 	}
 };
@@ -87,7 +102,10 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { std::reference_wrapper{ heap.slab().block_512() },
+	std::array blocks = { 
+		// std::reference_wrapper{ heap.slab().block_128() },
+		// std::reference_wrapper{ heap.slab().block_256() },
+		std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() } };
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
@@ -116,7 +134,10 @@ void MarkSweepGC::sweep(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { std::reference_wrapper{ heap.slab().block_512() },
+	std::array blocks = { 
+		// std::reference_wrapper{ heap.slab().block_128() },
+		// std::reference_wrapper{ heap.slab().block_256() },
+		std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() } };
 	// sweep all the dead objects
 	for (const auto &block : blocks) {

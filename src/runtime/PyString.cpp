@@ -1,10 +1,17 @@
 #include "PyString.hpp"
+#include "PyBool.hpp"
+#include "PyDict.hpp"
+#include "PyInteger.hpp"
 #include "PyList.hpp"
-#include "PyNumber.hpp"
+#include "PyNone.hpp"
 #include "TypeError.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
 
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
+
+#include <mutex>
 
 #include <numeric>
 
@@ -56,16 +63,31 @@ PyString *PyString::create(const std::string &value)
 	return heap.allocate<PyString>(value);
 }
 
-// PyString *PyString::create(PyString *self, PyTuple *args, PyDict *kwargs)
-// {
-// 	// FIXME with proper error handling
-// 	ASSERT(!args)
-// 	ASSERT(!kwargs)
+PyObject *PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a String
+	// FIXME: handle bytes_or_buffer argument
+	// FIXME: handle encoding argument
+	// FIXME: handle errors argument
+	ASSERT(!kwargs || kwargs->map().size() == 0)
+	ASSERT(args && args->size() == 1)
+	ASSERT(type == str())
 
-// 	return self;
-// }
+	const auto &string = args->elements()[0];
+	ASSERT(std::holds_alternative<String>(string))
 
-PyObject *PyString::add_impl(const PyObject *obj) const
+	return PyString::create(std::get<String>(string).s);
+}
+
+PyString::PyString(std::string s)
+	: PyBaseObject(PyObjectType::PY_STRING, BuiltinTypes::the().str()), m_value(std::move(s))
+{}
+
+size_t PyString::__hash__() const { return std::hash<std::string>{}(m_value); }
+
+PyObject *PyString::__repr__() const { return PyString::create(m_value); }
+
+PyObject *PyString::__add__(const PyObject *obj) const
 {
 	if (auto rhs = as<PyString>(obj)) {
 		return PyString::create(m_value + rhs->value());
@@ -78,21 +100,7 @@ PyObject *PyString::add_impl(const PyObject *obj) const
 	}
 }
 
-
-PyString::PyString(std::string s) : PyBaseObject(PyObjectType::PY_STRING), m_value(std::move(s))
-{
-	m_slots->hash = [this]() { return this->hash_impl(VirtualMachine::the().interpreter()); };
-	m_slots->richcompare = [this](const PyObject *other, RichCompare op) {
-		return this->richcompare_impl(other, op, VirtualMachine::the().interpreter());
-	};
-}
-
-size_t PyString::hash_impl(Interpreter &) const { return std::hash<std::string>{}(m_value); }
-
-PyObject *PyString::repr_impl() const { return PyString::create(m_value); }
-
-
-PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const
+PyObject *PyString::__eq__(const PyObject *obj) const
 {
 	if (this == obj) return py_true();
 	if (auto obj_string = as<PyString>(obj)) {
@@ -105,7 +113,7 @@ PyObject *PyString::equal_impl(const PyObject *obj, Interpreter &) const
 	}
 }
 
-PyObject *PyString::less_than_impl(const PyObject *obj, Interpreter &) const
+PyObject *PyString::__lt__(const PyObject *obj) const
 {
 	if (this == obj) return py_true();
 	if (auto obj_string = as<PyString>(obj)) {
@@ -118,8 +126,7 @@ PyObject *PyString::less_than_impl(const PyObject *obj, Interpreter &) const
 	}
 }
 
-
-PyObject *PyString::len_impl(Interpreter &) const
+PyObject *PyString::__len__() const
 {
 	size_t size{ 0 };
 	for (auto it = m_value.begin(); it != m_value.end();) {
@@ -243,23 +250,23 @@ size_t PyString::get_position_from_slice(int64_t pos) const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyNumber *PyString::find(PyTuple *args, PyDict *kwargs) const
+PyInteger *PyString::find(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
 	PyString *pattern = as<PyString>(PyObject::from(args->elements()[0]));
-	PyNumber *start = nullptr;
-	PyNumber *end = nullptr;
+	PyInteger *start = nullptr;
+	PyInteger *end = nullptr;
 	size_t result{ std::string::npos };
 
 	if (args->size() >= 2) {
-		start = as<PyNumber>(PyObject::from(args->elements()[1]));
+		start = as<PyInteger>(PyObject::from(args->elements()[1]));
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
-		end = as<PyNumber>(PyObject::from(args->elements()[2]));
+		end = as<PyInteger>(PyObject::from(args->elements()[2]));
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -282,30 +289,30 @@ PyNumber *PyString::find(PyTuple *args, PyDict *kwargs) const
 		result = m_value.find(pattern->value().c_str(), start_, subtring_size);
 	}
 	if (result == std::string::npos) {
-		return PyNumber::create(Number{ int64_t{ -1 } });
+		return PyInteger::create(int64_t{ -1 });
 	} else {
-		return PyNumber::create(Number{ static_cast<int64_t>(result) });
+		return PyInteger::create(static_cast<int64_t>(result));
 	}
 }
 
 // FIXME: assumes string only has ASCII characters
-PyNumber *PyString::count(PyTuple *args, PyDict *kwargs) const
+PyInteger *PyString::count(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
 	PyString *pattern = as<PyString>(PyObject::from(args->elements()[0]));
-	PyNumber *start = nullptr;
-	PyNumber *end = nullptr;
+	PyInteger *start = nullptr;
+	PyInteger *end = nullptr;
 	size_t result{ 0 };
 
 	if (args->size() >= 2) {
-		start = as<PyNumber>(PyObject::from(args->elements()[1]));
+		start = as<PyInteger>(PyObject::from(args->elements()[1]));
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
-		end = as<PyNumber>(PyObject::from(args->elements()[2]));
+		end = as<PyInteger>(PyObject::from(args->elements()[2]));
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -352,7 +359,7 @@ PyNumber *PyString::count(PyTuple *args, PyDict *kwargs) const
 		}
 	}
 
-	return PyNumber::create(Number{ static_cast<int64_t>(result) });
+	return PyInteger::create(static_cast<int64_t>(result));
 }
 
 // FIXME: assumes string only has ASCII characters
@@ -362,17 +369,17 @@ PyObject *PyString::endswith(PyTuple *args, PyDict *kwargs) const
 	ASSERT(!kwargs)
 
 	PyString *suffix = as<PyString>(PyObject::from(args->elements()[0]));
-	PyNumber *start = nullptr;
-	PyNumber *end = nullptr;
+	PyInteger *start = nullptr;
+	PyInteger *end = nullptr;
 	bool result{ false };
 
 	if (args->size() >= 2) {
-		start = as<PyNumber>(PyObject::from(args->elements()[1]));
+		start = as<PyInteger>(PyObject::from(args->elements()[1]));
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
-		end = as<PyNumber>(PyObject::from(args->elements()[2]));
+		end = as<PyInteger>(PyObject::from(args->elements()[2]));
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -491,21 +498,36 @@ std::optional<int32_t> PyString::codepoint() const
 	}
 }
 
-void PyString::register_type(PyModule *m)
+PyType *PyString::type_() const { return str(); }
+
+namespace {
+
+std::once_flag str_flag;
+
+std::unique_ptr<TypePrototype> register_string()
 {
-	klass<PyString>(m, "str")
-		.def("isalnum", &PyString::isalnum)
-		.def("isalpha", &PyString::isalpha)
-		.def("isascii", &PyString::isascii)
-		.def("isdigit", &PyString::isdigit)
-		.def("islower", &PyString::islower)
-		.def("isupper", &PyString::isupper)
-		.def("capitalize", &PyString::capitalize)
-		.def("casefold", &PyString::casefold)
-		.def("count", &PyString::count)
-		.def("endswith", &PyString::endswith)
-		.def("find", &PyString::find)
-		.def("join", &PyString::join)
-		.def("lower", &PyString::lower)
-		.def("upper", &PyString::upper);
+	return std::move(klass<PyString>("str")
+						 .def("isalnum", &PyString::isalnum)
+						 .def("isalpha", &PyString::isalpha)
+						 .def("isascii", &PyString::isascii)
+						 .def("isdigit", &PyString::isdigit)
+						 .def("islower", &PyString::islower)
+						 .def("isupper", &PyString::isupper)
+						 .def("capitalize", &PyString::capitalize)
+						 .def("casefold", &PyString::casefold)
+						 .def("count", &PyString::count)
+						 .def("endswith", &PyString::endswith)
+						 .def("find", &PyString::find)
+						 .def("join", &PyString::join)
+						 .def("lower", &PyString::lower)
+						 .def("upper", &PyString::upper)
+						 .type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyString::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(str_flag, []() { type = ::register_string(); });
+	return std::move(type);
 }

@@ -1,17 +1,20 @@
 #include "PyModule.hpp"
 #include "PyDict.hpp"
 #include "PyList.hpp"
-#include "modules/Modules.hpp"
-
+#include "PyString.hpp"
 #include "executable/Program.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "modules/Modules.hpp"
 #include "parser/Parser.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
 #include <filesystem>
 
 namespace fs = std::filesystem;
 
+namespace {
 std::optional<std::string> resolve_path(std::string module_name)
 {
 	auto *sysmodule = sys_module(VirtualMachine::the().interpreter());
@@ -30,12 +33,19 @@ std::optional<std::string> resolve_path(std::string module_name)
 
 	return {};
 }
+}// namespace
 
 
 PyModule::PyModule(PyString *module_name)
-	: PyBaseObject(PyObjectType::PY_MODULE), m_module_name(std::move(module_name))
+	: PyBaseObject(PyObjectType::PY_MODULE, BuiltinTypes::the().module()),
+	  m_module_name(std::move(module_name))
 {
 	m_attributes.insert_or_assign("__name__", module_name);
+}
+
+PyObject *PyModule::__repr__() const
+{
+	return PyString::create(fmt::format("<module '{}'>", m_module_name->to_string()));
 }
 
 void PyModule::visit_graph(Visitor &visitor)
@@ -43,11 +53,14 @@ void PyModule::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	visitor.visit(*m_module_name);
 	for (auto &[k, v] : m_symbol_table) {
-		k->visit_graph(visitor);
-		if (std::holds_alternative<PyObject *>(v)) {
-			std::get<PyObject *>(v)->visit_graph(visitor);
-		}
+		visitor.visit(*k);
+		if (std::holds_alternative<PyObject *>(v)) { visitor.visit(*std::get<PyObject *>(v)); }
 	}
+}
+
+std::string PyModule::to_string() const
+{
+	return fmt::format("<module '{}'>", m_module_name->to_string());
 }
 
 PyModule *PyModule::create(PyString *name)
@@ -95,4 +108,29 @@ PyModule *PyModule::create(PyString *name)
 	// clean up the interpreter now that we have obtained all the global data we needed
 	vm.shutdown_interpreter(vm.interpreter());
 	return module;
+}
+
+void PyModule::insert(PyString *key, const Value &value)
+{
+	m_symbol_table.insert_or_assign(key, value);
+	m_attributes.insert_or_assign(key->value(), PyObject::from(value));
+}
+
+PyType *PyModule::type_() const { return module(); }
+
+namespace {
+
+std::once_flag module_flag;
+
+std::unique_ptr<TypePrototype> register_module()
+{
+	return std::move(klass<PyModule>("module").type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyModule::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(module_flag, []() { type = ::register_module(); });
+	return std::move(type);
 }

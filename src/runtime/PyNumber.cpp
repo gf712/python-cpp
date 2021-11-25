@@ -1,14 +1,26 @@
 #include "PyNumber.hpp"
+#include "PyFloat.hpp"
+#include "PyInteger.hpp"
 #include "PyString.hpp"
 #include "TypeError.hpp"
 
 #include "interpreter/Interpreter.hpp"
 
-PyObject *PyNumber::repr_impl() const { return PyString::create(to_string()); }
+PyObject *PyNumber::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyNumber::add_impl(const PyObject *obj) const
+const PyNumber *PyNumber::as_number(const PyObject *obj)
 {
-	if (auto *rhs = as<PyNumber>(obj)) {
+	if (auto *num = as<PyFloat>(obj)) {
+		return num;
+	} else if (auto *num = as<PyInteger>(obj)) {
+		return num;
+	}
+	return nullptr;
+}
+
+PyObject *PyNumber::__add__(const PyObject *obj) const
+{
+	if (auto *rhs = as_number(obj)) {
 		return PyNumber::create(m_value + rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
@@ -19,13 +31,12 @@ PyObject *PyNumber::add_impl(const PyObject *obj) const
 	}
 }
 
-
-PyObject *PyNumber::subtract_impl(const PyObject *obj, Interpreter &interpreter) const
+PyObject *PyNumber::__sub__(const PyObject *obj) const
 {
-	if (auto rhs = as<PyNumber>(obj)) {
+	if (auto rhs = as_number(obj)) {
 		return PyNumber::create(m_value - rhs->value());
 	} else {
-		interpreter.raise_exception(
+		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
 			object_name(type()),
 			object_name(obj->type()));
@@ -33,13 +44,12 @@ PyObject *PyNumber::subtract_impl(const PyObject *obj, Interpreter &interpreter)
 	}
 }
 
-
-PyObject *PyNumber::modulo_impl(const PyObject *obj, Interpreter &interpreter) const
+PyObject *PyNumber::__mod__(const PyObject *obj) const
 {
-	if (auto rhs = as<PyNumber>(obj)) {
+	if (auto rhs = as_number(obj)) {
 		return PyNumber::create(m_value % rhs->value());
 	} else {
-		interpreter.raise_exception(
+		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
 			object_name(type()),
 			object_name(obj->type()));
@@ -47,12 +57,12 @@ PyObject *PyNumber::modulo_impl(const PyObject *obj, Interpreter &interpreter) c
 	}
 }
 
-PyObject *PyNumber::multiply_impl(const PyObject *obj, Interpreter &interpreter) const
+PyObject *PyNumber::__mul__(const PyObject *obj) const
 {
-	if (auto rhs = as<PyNumber>(obj)) {
+	if (auto rhs = as_number(obj)) {
 		return PyNumber::create(m_value * rhs->value());
 	} else {
-		interpreter.raise_exception(
+		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
 			object_name(type()),
 			object_name(obj->type()));
@@ -60,64 +70,77 @@ PyObject *PyNumber::multiply_impl(const PyObject *obj, Interpreter &interpreter)
 	}
 }
 
-
-PyObject *PyNumber::equal_impl(const PyObject *obj, Interpreter &) const
+PyObject *PyNumber::__eq__(const PyObject *obj) const
 {
-	if (auto *pynum = as<PyNumber>(obj)) {
+	if (auto *pynum = as_number(obj)) {
 		const bool comparisson = m_value == pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
-	type_error("'==' not supported between instances of '{}' and '{}'",
-		object_name(this->type()),
-		object_name(obj->type()));
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'==' not supported between instances of '{}' and '{}'",
+			object_name(this->type()),
+			object_name(obj->type())));
 	return nullptr;
 }
 
 
-PyObject *PyNumber::less_than_impl(const PyObject *other, Interpreter &) const
+PyObject *PyNumber::__lt__(const PyObject *other) const
 {
-	if (auto *pynum = as<PyNumber>(other)) {
+	if (auto *pynum = as_number(other)) {
 		const bool comparisson = m_value < pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
-	type_error("'<' not supported between instances of '{}' and '{}'",
-		object_name(this->type()),
-		object_name(other->type()));
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'<' not supported between instances of '{}' and '{}'",
+			object_name(this->type()),
+			object_name(other->type())));
 	return nullptr;
 }
 
-PyObject *PyNumber::less_than_equal_impl(const PyObject *other, Interpreter &) const
+PyObject *PyNumber::__le__(const PyObject *other) const
 {
-	if (auto *pynum = as<PyNumber>(other)) {
+	if (auto *pynum = as_number(other)) {
 		const bool comparisson = m_value <= pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
-	type_error("'<=' not supported between instances of '{}' and '{}'",
-		object_name(this->type()),
-		object_name(other->type()));
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'<=' not supported between instances of '{}' and '{}'",
+			object_name(this->type()),
+			object_name(other->type())));
 	return nullptr;
 }
 
-PyObject *PyNumber::greater_than_impl(const PyObject *other, Interpreter &) const
+PyObject *PyNumber::__gt__(const PyObject *other) const
 {
-	if (auto *pynum = as<PyNumber>(other)) {
+	if (auto *pynum = as_number(other)) {
 		const bool comparisson = m_value > pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
-	type_error("'>' not supported between instances of '{}' and '{}'",
-		object_name(this->type()),
-		object_name(other->type()));
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'>' not supported between instances of '{}' and '{}'",
+			object_name(this->type()),
+			object_name(other->type())));
 	return nullptr;
 }
 
-PyObject *PyNumber::greater_than_equal_impl(const PyObject *other, Interpreter &) const
+PyObject *PyNumber::__ge__(const PyObject *other) const
 {
-	if (auto *pynum = as<PyNumber>(other)) {
+	if (auto *pynum = as_number(other)) {
 		const bool comparisson = m_value >= pynum->value();
 		return PyObject::from(NameConstant{ comparisson });
 	}
-	type_error("'>=' not supported between instances of '{}' and '{}'",
-		object_name(this->type()),
-		object_name(other->type()));
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'>=' not supported between instances of '{}' and '{}'",
+			object_name(this->type()),
+			object_name(other->type())));
 	return nullptr;
+}
+
+PyNumber *PyNumber::create(const Number &number)
+{
+	if (std::holds_alternative<double>(number.value)) {
+		return PyFloat::create(std::get<double>(number.value));
+	} else {
+		return PyInteger::create(std::get<int64_t>(number.value));
+	}
 }

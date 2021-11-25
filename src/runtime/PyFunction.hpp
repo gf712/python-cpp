@@ -4,7 +4,7 @@
 #include "PyTuple.hpp"
 
 
-class PyCode : public PyBaseObject<PyCode>
+class PyCode : public PyBaseObject
 {
 	const std::shared_ptr<Function> m_function;
 	const size_t m_function_id;
@@ -28,10 +28,13 @@ class PyCode : public PyBaseObject<PyCode>
 	const std::shared_ptr<Function> &function() const { return m_function; }
 
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 
-class PyFunction : public PyBaseObject<PyFunction>
+class PyFunction : public PyBaseObject
 {
 	const std::string m_name;
 	PyCode *m_code;
@@ -48,29 +51,30 @@ class PyFunction : public PyBaseObject<PyFunction>
 	PyDict *globals() const { return m_globals; }
 
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 
-class PyNativeFunction : public PyBaseObject<PyNativeFunction>
+class PyNativeFunction : public PyBaseObject
 {
 	std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
 	std::vector<PyObject *> m_captures;
 
   public:
-	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function)
-		: PyBaseObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
-		  m_function(std::move(function))
-	{}
+	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function);
 
 	// TODO: fix tracking of lambda captures
 	template<typename... Args>
 	PyNativeFunction(std::string name,
 		std::function<PyObject *(PyTuple *, PyDict *)> function,
 		Args &&... args)
-		: PyBaseObject(PyObjectType::PY_NATIVE_FUNCTION), m_name(std::move(name)),
-		  m_function(std::move(function)), m_captures{ std::forward<Args>(args)... }
-	{}
+		: PyNativeFunction(name, function)
+	{
+		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
+	}
 
 	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
 
@@ -82,7 +86,11 @@ class PyNativeFunction : public PyBaseObject<PyNativeFunction>
 	const std::string &name() const { return m_name; }
 
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
+
 
 template<> inline PyFunction *as(PyObject *node)
 {
@@ -104,7 +112,6 @@ template<> inline PyNativeFunction *as(PyObject *node)
 	}
 	return nullptr;
 }
-
 
 template<> inline const PyNativeFunction *as(const PyObject *node)
 {

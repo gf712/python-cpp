@@ -5,38 +5,28 @@
 
 class PyTupleIterator;
 
-class PyTuple : public PyBaseObject<PyTuple>
+class PyTuple : public PyBaseObject
 {
 	friend class Heap;
 
 	std::vector<Value> m_elements;
 
   protected:
-	PyTuple() : PyBaseObject(PyObjectType::PY_TUPLE) {}
-
-	PyTuple(std::vector<Value> &&elements)
-		: PyBaseObject(PyObjectType::PY_TUPLE), m_elements(std::move(elements))
-	{}
-
-	PyTuple(const std::vector<PyObject *> &elements) : PyBaseObject(PyObjectType::PY_TUPLE)
-	{
-		m_elements.reserve(elements.size());
-		for (auto *el : elements) { m_elements.push_back(el); }
-	}
+	PyTuple();
+	PyTuple(std::vector<Value> &&elements);
+	PyTuple(const std::vector<PyObject *> &elements);
 
 	void visit_graph(Visitor &) override;
 
   public:
 	static PyTuple *create();
-
 	static PyTuple *create(std::vector<Value> elements);
-
 	static PyTuple *create(const std::vector<PyObject *> &elements);
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *iter_impl(Interpreter &interpreter) const override;
+	PyObject *__repr__() const;
+	PyObject *__iter__() const;
 
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;
@@ -47,16 +37,22 @@ class PyTuple : public PyBaseObject<PyTuple>
 	const std::vector<Value> &elements() const { return m_elements; }
 	size_t size() const { return m_elements.size(); }
 	PyObject *operator[](size_t idx) const;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 
-class PyTupleIterator : public PyBaseObject<PyTupleIterator>
+class PyTupleIterator : public PyBaseObject
 {
 	friend class Heap;
 	friend PyTuple;
 
 	const PyTuple &m_pytuple;
 	size_t m_current_index{ 0 };
+
+	PyTupleIterator(const PyTuple &pytuple);
+	PyTupleIterator(const PyTuple &pytuple, size_t position);
 
   public:
 	using difference_type = std::vector<Value>::difference_type;
@@ -65,24 +61,18 @@ class PyTupleIterator : public PyBaseObject<PyTupleIterator>
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
 
-	PyTupleIterator(const PyTuple &pytuple)
-		: PyBaseObject(PyObjectType::PY_TUPLE_ITERATOR), m_pytuple(pytuple)
-	{}
-
-	PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
-	{
-		m_current_index = position;
-	}
-
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *next_impl(Interpreter &interpreter) override;
+	PyObject *__repr__() const;
+	PyObject *__next__();
 
 	bool operator==(const PyTupleIterator &) const;
 	PyObject *operator*() const;
 	PyTupleIterator &operator++();
 	PyTupleIterator &operator--();
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 

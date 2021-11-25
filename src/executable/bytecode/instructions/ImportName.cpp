@@ -1,6 +1,7 @@
 #include "ImportName.hpp"
 
 #include "runtime/PyModule.hpp"
+#include "runtime/PyString.hpp"
 
 
 void ImportName::execute(VirtualMachine &vm, Interpreter &) const

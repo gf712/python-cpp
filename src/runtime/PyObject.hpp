@@ -19,12 +19,14 @@
 
 enum class PyObjectType {
 	PY_STRING,
-	PY_NUMBER,
 	PY_FUNCTION,
 	PY_NATIVE_FUNCTION,
 	PY_BYTES,
 	PY_ELLIPSIS,
-	PY_CONSTANT_NAME,
+	PY_BOOL,
+	PY_FLOAT,
+	PY_INTEGER,
+	PY_NONE,
 	PY_CODE,
 	PY_LIST,
 	PY_LIST_ITERATOR,
@@ -39,9 +41,10 @@ enum class PyObjectType {
 	PY_CUSTOM_TYPE,
 	PY_MODULE,
 	PY_TYPE,
-	PY_METHOD_DESCRIPTOR,
+	PY_METHOD_WRAPPER,
 	PY_SLOT_WRAPPER,
-	PY_BOUND_METHOD
+	PY_BOUND_METHOD,
+	PY_BUILTIN_METHOD
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -50,8 +53,17 @@ inline std::string_view object_name(PyObjectType type)
 	case PyObjectType::PY_STRING: {
 		return "str";
 	}
-	case PyObjectType::PY_NUMBER: {
-		return "number";
+	case PyObjectType::PY_BOOL: {
+		return "bool";
+	}
+	case PyObjectType::PY_NONE: {
+		return "NoneType";
+	}
+	case PyObjectType::PY_FLOAT: {
+		return "float";
+	}
+	case PyObjectType::PY_INTEGER: {
+		return "int";
 	}
 	case PyObjectType::PY_FUNCTION: {
 		return "function";
@@ -61,9 +73,6 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_ELLIPSIS: {
 		return "ellipsis";
-	}
-	case PyObjectType::PY_CONSTANT_NAME: {
-		return "constant_name";
 	}
 	case PyObjectType::PY_NATIVE_FUNCTION: {
 		return "external_function";
@@ -110,14 +119,17 @@ inline std::string_view object_name(PyObjectType type)
 	case PyObjectType::PY_TYPE: {
 		return "type";
 	}
-	case PyObjectType::PY_METHOD_DESCRIPTOR: {
-		return "method_descriptor";
+	case PyObjectType::PY_METHOD_WRAPPER: {
+		return "method_wrapper";
 	}
 	case PyObjectType::PY_SLOT_WRAPPER: {
 		return "slot_wrapper";
 	}
 	case PyObjectType::PY_BOUND_METHOD: {
 		return "bound method";
+	}
+	case PyObjectType::PY_BUILTIN_METHOD: {
+		return "built-in method";
 	}
 	}
 	ASSERT_NOT_REACHED()
@@ -132,49 +144,70 @@ enum class RichCompare {
 	Py_GE = 5,// >=
 };
 
-
-using NewSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
-using InitSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
-
-
-using ReprSlotFunctionType = std::function<PyObject *()>;
-using IterSlotFunctionType = std::function<PyObject *()>;
-using AddSlotFunctionType = std::function<PyObject *(PyObject *)>;
-using HashSlotFunctionType = std::function<size_t()>;
-using RichCompareSlotFunctionType = std::function<PyObject *(const PyObject *, RichCompare)>;
-
 class PyObject;
 
-class Slots
-// : NonCopyable
-// , NonMoveable
+struct MethodDefinition
 {
-  public:
-	std::variant<std::monostate, AddSlotFunctionType, PyFunction *> add;
-	std::variant<std::monostate, NewSlotFunctionType, PyFunction *> new_;
-	std::variant<ReprSlotFunctionType, PyFunction *> repr;
-	std::variant<IterSlotFunctionType, PyFunction *> iter;
-	std::variant<std::monostate, HashSlotFunctionType, PyFunction *> hash;
-	std::variant<std::monostate, RichCompareSlotFunctionType, PyFunction *> richcompare;
-
-  public:
-	template<typename Derived>
-	static Slots create(PyObject *object) requires std::is_base_of_v<PyObject, Derived>
-	{
-		return Slots{
-			.add = put_add<Derived>(object),
-			.repr = put_repr<Derived>(object),
-		};
-	}
-
-  private:
-	template<HasAdd T> static auto put_add(PyObject *) -> AddSlotFunctionType;
-	template<typename T> static auto put_add(PyObject *) -> std::monostate;
-
-	template<HasRepr T> static auto put_repr(PyObject *) -> ReprSlotFunctionType;
-	// template<typename T> static auto put_repr(PyObject *);
+	std::string name;
+	std::function<PyObject *(PyObject * /* self */, PyTuple * /* args */, PyDict * /* kwargs */)>
+		method;
 };
 
+using CallSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
+using NewSlotFunctionType = std::function<PyObject*(const PyType *, PyTuple *, PyDict *)>;
+using InitSlotFunctionType = std::function<int32_t(PyObject *, PyTuple *, PyDict *)>;
+using LenSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using BoolSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using ReprSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using IterSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using NextSlotFunctionType = std::function<PyObject *(PyObject *)>;
+
+using AddSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+using SubtractSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+using MultiplySlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+using ExpSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+using LeftShiftSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+using ModuloSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+
+using HashSlotFunctionType = std::function<size_t(const PyObject *)>;
+using CompareSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+
+struct TypePrototype
+{
+	std::string __name__;
+	std::optional<NewSlotFunctionType> __new__;
+	std::optional<InitSlotFunctionType> __init__;
+
+	std::optional<AddSlotFunctionType> __add__;
+	std::optional<SubtractSlotFunctionType> __sub__;
+	std::optional<MultiplySlotFunctionType> __mul__;
+	std::optional<ExpSlotFunctionType> __exp__;
+	std::optional<LeftShiftSlotFunctionType> __lshift__;
+	std::optional<ModuloSlotFunctionType> __mod__;
+
+	std::optional<CallSlotFunctionType> __call__;
+	// std::variant<std::monostate, NewSlotFunctionType, PyFunction *> __new__;
+	std::optional<LenSlotFunctionType> __len__;
+	std::optional<BoolSlotFunctionType> __bool__;
+	std::optional<ReprSlotFunctionType> __repr__;
+	std::optional<IterSlotFunctionType> __iter__;
+	std::optional<NextSlotFunctionType> __next__;
+	std::optional<HashSlotFunctionType> __hash__;
+
+	std::optional<CompareSlotFunctionType> __eq__;
+	std::optional<CompareSlotFunctionType> __gt__;
+	std::optional<CompareSlotFunctionType> __ge__;
+	std::optional<CompareSlotFunctionType> __le__;
+	std::optional<CompareSlotFunctionType> __lt__;
+	std::optional<CompareSlotFunctionType> __ne__;
+	// std::variant<std::monostate, RichCompareSlotFunctionType, PyFunction *> __richcompare__;
+	std::vector<MethodDefinition> __methods__;
+	PyDict *__dict__{ nullptr };
+
+	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
+
+	void add_method(MethodDefinition &&method) { __methods__.push_back(std::move(method)); }
+};
 
 class PyObject : public Cell
 {
@@ -184,39 +217,20 @@ class PyObject : public Cell
 	};
 
   protected:
-	std::optional<Slots> m_slots;
+	const TypePrototype &m_type_prototype;
 	std::unordered_map<std::string, PyObject *> m_attributes;
 
   public:
 	using PyResult = std::variant<PyObject *, NotImplemented_>;
 
 	PyObject() = delete;
-	PyObject(PyObjectType type) : Cell(), m_type(type) {}
+	PyObject(PyObjectType type, const TypePrototype &type_);
 
 	virtual ~PyObject() = default;
+
+	virtual PyType *type_() const = 0;
 	PyObjectType type() const { return m_type; }
 	std::string_view type_string() const { return object_name(m_type); }
-
-	virtual PyObject *subtract_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *multiply_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *exp_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *lshift_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *modulo_impl(const PyObject *obj, Interpreter &interpreter) const;
-
-	virtual PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *less_than_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *less_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *greater_than_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *greater_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const;
-	virtual PyObject *
-		richcompare_impl(const PyObject *, RichCompare, Interpreter &interpreter) const;
-
-	virtual PyObject *truthy(Interpreter &) const;
-
-	virtual PyObject *iter_impl(Interpreter &interpreter) const;
-	virtual PyObject *next_impl(Interpreter &interpreter);
-	virtual PyObject *len_impl(Interpreter &interpreter) const;
-	virtual size_t hash_impl(Interpreter &interpreter) const;
 
 	template<typename T> static PyObject *from(const T &value);
 
@@ -224,139 +238,161 @@ class PyObject : public Cell
 	void put(std::string name, PyObject *);
 	const std::unordered_map<std::string, PyObject *> &attributes() const { return m_attributes; }
 
-	PyObject *repr_impl() const;
-
-	const Slots &slots() const
-	{
-		ASSERT(m_slots)
-		return *m_slots;
-	}
-
 	void visit_graph(Visitor &) override;
 
-	PyResult __add__(PyObject *other) const
-	{
-		ASSERT(m_slots)
-		if (std::holds_alternative<std::monostate>(m_slots->add)) {
-			return NotImplemented_{};
-		} else if (std::holds_alternative<AddSlotFunctionType>(m_slots->add)) {
-			return std::get<AddSlotFunctionType>(m_slots->add)(other);
-		} else {
-			TODO()
-		}
-	}
+	PyObject *add(const PyObject *other) const;
+	PyObject *subtract(const PyObject *other) const;
+	PyObject *multiply(const PyObject *other) const;
+	PyObject *exp(const PyObject *other) const;
+	PyObject *lshift(const PyObject *other) const;
+	PyObject *modulo(const PyObject *other) const;
 
-	PyObject *__repr__() const
-	{
-		ASSERT(m_slots)
+	PyObject *repr() const;
 
-		if (std::holds_alternative<ReprSlotFunctionType>(m_slots->repr)) {
-			return std::get<ReprSlotFunctionType>(m_slots->repr)();
-		} else {
-			TODO()
-		}
-	}
+	size_t hash() const;
+
+	PyObject *richcompare(const PyObject *other, RichCompare) const;
+	PyResult eq(const PyObject *other) const;
+	PyResult ge(const PyObject *other) const;
+	PyResult gt(const PyObject *other) const;
+	PyResult le(const PyObject *other) const;
+	PyResult lt(const PyObject *other) const;
+	PyResult ne(const PyObject *other) const;
+
+	PyObject *bool_() const;
+	PyObject *len() const;
+	PyObject *iter() const;
+	PyObject *next();
+	virtual PyObject *new_(PyTuple *args, PyDict *kwargs) const;
+	std::optional<int32_t> init(PyTuple *args, PyDict *kwargs);
+
+	PyObject *__eq__(const PyObject *other) const;
+	PyObject *__repr__() const;
+	size_t __hash__() const;
+	PyObject *__bool__() const;
 
 	bool is_pyobject() const override { return true; }
 };
 
-
-template<HasAdd T> auto Slots::put_add(PyObject *obj) -> AddSlotFunctionType
+template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
 {
-	return [obj](PyObject *other) { return static_cast<T *>(obj)->add_impl(other); };
-}
-
-template<typename T> auto Slots::put_add(PyObject *) -> std::monostate { return std::monostate{}; }
-
-template<HasRepr T> auto Slots::put_repr(PyObject *obj) -> ReprSlotFunctionType
-{
-	return [obj]() { return static_cast<T *>(obj)->repr_impl(); };
-}
-
-// template<typename T> auto Slots::put_repr(PyObject *)
-// {
-// 	[]<bool flag = false>() { static_assert(flag, "PyObject must implement repr function"); }
-// 	();
-// }
-
-template<typename Derived> class PyBaseObject : public PyObject
-{
-  public:
-	PyBaseObject(PyObjectType type) : PyObject(type) { m_slots = Slots::create<Derived>(this); }
-};
-
-
-class PyBytes : public PyBaseObject<PyBytes>
-{
-	friend class Heap;
-
-	Bytes m_value;
-
-  public:
-	static PyBytes *create(const Bytes &number);
-	~PyBytes() = default;
-	std::string to_string() const override
-	{
-		std::ostringstream os;
-		os << m_value;
-		return fmt::format("PyBytes {}", os.str());
+	auto type_prototype = std::make_unique<TypePrototype>();
+	type_prototype->__name__ = std::string(name);
+	if constexpr (HasRepr<Type>) {
+		type_prototype->__repr__ = [](const PyObject *self) {
+			return static_cast<const Type *>(self)->__repr__();
+		};
 	}
+	if constexpr (HasCall<Type>) {
+		type_prototype->__call__ = [](const PyObject *self, PyTuple *args, PyDict *kwargs) {
+			return static_cast<const Type *>(self)->__call__(args, kwargs);
+		};
+	}
+	if constexpr (HasNew<Type>) {
+		type_prototype->__new__ = [](const PyType *type, PyTuple *args, PyDict *kwargs) {
+			return Type::__new__(type, args, kwargs);
+		};
+	}
+	if constexpr (HasInit<Type>) {
+		type_prototype->__init__ =
+			[](PyObject *self, PyTuple *args, PyDict *kwargs) -> std::optional<int32_t> {
+			return static_cast<Type *>(self)->__init__(args, kwargs);
+		};
+	}
+	if constexpr (HasHash<Type>) {
+		type_prototype->__hash__ = [](const PyObject *self) -> size_t {
+			return static_cast<const Type *>(self)->__hash__();
+		};
+	}
+	if constexpr (HasLt<Type>) {
+		type_prototype->__lt__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__lt__(other);
+		};
+	}
+	if constexpr (HasLe<Type>) {
+		type_prototype->__le__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__le__(other);
+		};
+	}
+	if constexpr (HasEq<Type>) {
+		type_prototype->__eq__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__eq__(other);
+		};
+	}
+	if constexpr (HasNe<Type>) {
+		type_prototype->__ne__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__ne__(other);
+		};
+	}
+	if constexpr (HasGt<Type>) {
+		type_prototype->__gt__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__gt__(other);
+		};
+	}
+	if constexpr (HasGe<Type>) {
+		type_prototype->__ge__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__ge__(other);
+		};
+	}
+	if constexpr (HasIter<Type>) {
+		type_prototype->__iter__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__iter__();
+		};
+	}
+	if constexpr (HasNext<Type>) {
+		type_prototype->__next__ = [](PyObject *self) -> PyObject * {
+			return static_cast<Type *>(self)->__next__();
+		};
+	}
+	if constexpr (HasLength<Type>) {
+		type_prototype->__len__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__len__();
+		};
+	}
+	if constexpr (HasAdd<Type>) {
+		type_prototype->__add__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__add__(other);
+		};
+	}
+	if constexpr (HasSub<Type>) {
+		type_prototype->__sub__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__sub__(other);
+		};
+	}
+	if constexpr (HasMul<Type>) {
+		type_prototype->__mul__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__mul__(other);
+		};
+	}
+	if constexpr (HasExp<Type>) {
+		type_prototype->__exp__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__exp__(other);
+		};
+	}
+	if constexpr (HasLshift<Type>) {
+		type_prototype->__lshift__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__lshift__(other);
+		};
+	}
+	if constexpr (HasModulo<Type>) {
+		type_prototype->__mod__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+			return static_cast<const Type *>(self)->__mod__(other);
+		};
+	}
+	if constexpr (HasBool<Type>) {
+		type_prototype->__bool__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__bool__();
+		};
+	}
+	return type_prototype;
+}
 
-	PyObject *add_impl(const PyObject *obj) const;
 
-	const Bytes &value() const { return m_value; }
-
-  private:
-	PyBytes(const Bytes &number) : PyBaseObject(PyObjectType::PY_BYTES), m_value(number) {}
-};
-
-
-class PyEllipsis : public PyBaseObject<PyEllipsis>
+class PyBaseObject : public PyObject
 {
-	friend class Heap;
-	friend PyObject *py_ellipsis();
-
-	static constexpr Ellipsis m_value{};
-
   public:
-	std::string to_string() const override { return fmt::format("PyEllipsis"); }
-
-	PyObject *add_impl(const PyObject *obj) const;
-
-	const Ellipsis &value() const { return m_value; }
-
-  private:
-	static PyEllipsis *create();
-	PyEllipsis() : PyBaseObject(PyObjectType::PY_ELLIPSIS) {}
+	PyBaseObject(PyObjectType type, const TypePrototype &type_) : PyObject(type, type_) {}
 };
-
-
-class PyNameConstant : public PyBaseObject<PyNameConstant>
-{
-	friend class Heap;
-	friend class Env;
-
-	NameConstant m_value;
-
-  public:
-	std::string to_string() const override;
-
-	PyObject *add_impl(const PyObject *obj) const;
-
-	PyObject *repr_impl() const;
-
-	const NameConstant &value() const { return m_value; }
-
-	void visit_graph(Visitor &) override {}
-
-  private:
-	static PyNameConstant *create(const NameConstant &);
-
-	PyNameConstant(const NameConstant &name)
-		: PyBaseObject(PyObjectType::PY_CONSTANT_NAME), m_value(name)
-	{}
-};
-
 
 struct ValueHash
 {
@@ -368,42 +404,5 @@ struct ValueEqual
 	bool operator()(const Value &lhs, const Value &rhs) const;
 };
 
-
 template<typename T> T *as(PyObject *node);
 template<typename T> const T *as(const PyObject *node);
-
-
-template<> inline PyNameConstant *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
-		return static_cast<PyNameConstant *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PyNameConstant *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_CONSTANT_NAME) {
-		return static_cast<const PyNameConstant *>(node);
-	}
-	return nullptr;
-}
-
-
-template<> inline PyBytes *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<PyBytes *>(node); }
-	return nullptr;
-}
-
-
-template<> inline const PyBytes *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<const PyBytes *>(node); }
-	return nullptr;
-}
-
-PyObject *py_none();
-PyObject *py_true();
-PyObject *py_false();
-PyObject *py_ellipsis();

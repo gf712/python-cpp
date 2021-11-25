@@ -1,5 +1,6 @@
 #include "UnpackSequence.hpp"
 
+#include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
@@ -7,7 +8,7 @@
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
 
-void UnpackSequence::execute(VirtualMachine &vm, Interpreter &interpreter) const
+void UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &source = vm.reg(m_source);
 
@@ -35,8 +36,8 @@ void UnpackSequence::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				for (const auto &el : pylist->elements()) { vm.reg(m_destination[idx++]) = el; }
 			}
 		} else {
-			const auto *source_size = (*obj)->len_impl(interpreter);
-			if (auto *pynum = as<PyNumber>(source_size)) {
+			const auto *source_size = (*obj)->len();
+			if (auto *pynum = as<PyInteger>(source_size)) {
 				if (pynum->value() != Number{ static_cast<int64_t>(m_destination.size()) }) {
 					value_error("too many values to unpack (expected {})", m_destination.size());
 					return;

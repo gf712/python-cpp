@@ -1,6 +1,7 @@
 #include "LoadBuildClass.hpp"
 
 #include "runtime/PyModule.hpp"
+#include "runtime/PyString.hpp"
 
 
 void LoadBuildClass::execute(VirtualMachine &vm, Interpreter &intepreter) const

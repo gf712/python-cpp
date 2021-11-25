@@ -3,6 +3,7 @@
 #include "runtime/BaseException.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
@@ -23,7 +24,7 @@ static PyString *s_sys__ = nullptr;
 
 Interpreter::Interpreter() {}
 
-void Interpreter::internal_setup(PyString *name,
+void Interpreter::internal_setup(const std::string &name,
 	std::string entry_script,
 	std::vector<std::string> argv,
 	size_t local_registers)
@@ -33,15 +34,19 @@ void Interpreter::internal_setup(PyString *name,
 
 	auto &heap = VirtualMachine::the().heap();
 
-	if (!s_sys__) { s_sys__ = heap.allocate_static<PyString>("sys").get(); }
+	// initialize the standard types by initializing the builtins module
+	auto *builtins = builtins_module(*this);
 
-	auto *main_module = heap.allocate<PyModule>(name);
+	// before we construct the first PyObject we need to initialize the standard types
+	auto name_ = PyString::create(name);
+	auto *main_module = heap.allocate<PyModule>(name_);
 	m_module = main_module;
 	m_available_modules.push_back(main_module);
-	m_available_modules.push_back(builtins_module(*this));
+	m_available_modules.push_back(builtins);
 	m_available_modules.push_back(sys_module(*this));
 
-	PyDict::MapType global_map = { { String{ "__name__" }, name },
+	if (!s_sys__) { s_sys__ = heap.allocate<PyString>("sys"); }
+	PyDict::MapType global_map = { { String{ "__name__" }, name_ },
 		{ String{ "__doc__" }, py_none() },
 		{ String{ "__package__" }, py_none() } };
 
@@ -55,7 +60,7 @@ void Interpreter::internal_setup(PyString *name,
 
 void Interpreter::setup(std::shared_ptr<Program> program)
 {
-	PyString *name = PyString::create(fs::path(program->filename()).stem());
+	const auto name = fs::path(program->filename()).stem();
 	internal_setup(name, program->filename(), program->argv(), program->main_stack_size());
 	m_program = std::move(program);
 }
@@ -64,8 +69,8 @@ void Interpreter::setup_main_interpreter(std::shared_ptr<Program> program)
 {
 	auto &heap = VirtualMachine::the().heap();
 
-	if (!s_main__) { s_main__ = heap.allocate_static<PyString>("__main__").get(); }
-	internal_setup(s_main__, program->filename(), program->argv(), program->main_stack_size());
+	internal_setup("__main__", program->filename(), program->argv(), program->main_stack_size());
+	if (!s_main__) { s_main__ = heap.allocate<PyString>("__main__"); }
 	m_program = std::move(program);
 }
 
@@ -141,17 +146,18 @@ std::optional<Value> Interpreter::get_object(const std::string &name)
 	const auto &globals = execution_frame()->globals()->map();
 	const auto &builtins = execution_frame()->builtins()->symbol_table();
 
-	auto pystr_name = PyString::create(name);
-
 	if (auto it = locals.find(name_value); it != locals.end()) {
 		obj = it->second;
 	} else if (auto it = globals.find(name_value); it != globals.end()) {
 		obj = it->second;
-	} else if (auto it = builtins.find(pystr_name); it != builtins.end()) {
-		obj = it->second;
 	} else {
-		raise_exception("NameError: name '{:s}' is not defined", name);
-		obj = py_none();
+		auto pystr_name = PyString::create(name);
+		if (auto it = builtins.find(pystr_name); it != builtins.end()) {
+			obj = it->second;
+		} else {
+			raise_exception("NameError: name '{:s}' is not defined", name);
+			obj = py_none();
+		}
 	}
 
 	return obj;

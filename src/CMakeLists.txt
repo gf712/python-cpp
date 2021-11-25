@@ -43,16 +43,28 @@ set(RUNTIME_SOURCE_FILES
     runtime/CustomPyObject.cpp
     runtime/modules/BuiltinsModule.cpp
     runtime/modules/SysModule.cpp
+    runtime/types/builtin.cpp
+    runtime/BaseException.cpp
+    runtime/PyBoundMethod.cpp
+    runtime/PyBool.cpp
+    runtime/PyBuiltInMethod.cpp
+    runtime/PyBytes.cpp
     runtime/PyDict.cpp
+    runtime/PyEllipsis.cpp
+    runtime/PyFloat.cpp
     runtime/PyFunction.cpp
+    runtime/PyInteger.cpp
     runtime/PyList.cpp
+    runtime/PyMethodWrapper.cpp
     runtime/PyModule.cpp
+    runtime/PyNone.cpp
     runtime/PyNumber.cpp
     runtime/PyObject.cpp
     runtime/PyRange.cpp
     runtime/PyString.cpp
     runtime/PyTuple.cpp
     runtime/PyType.cpp
+    runtime/PySlotWrapper.cpp
     runtime/Value.cpp)
 
 set(VM_SOURCE_FILES # cmake-format: sortable

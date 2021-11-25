@@ -96,7 +96,7 @@ class Interpreter
 	PyObject *call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs);
 
   private:
-	void internal_setup(PyString *name,
+	void internal_setup(const std::string& name,
 		std::string entry_script,
 		std::vector<std::string> argv,
 		size_t local_registers);

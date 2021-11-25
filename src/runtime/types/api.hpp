@@ -1,15 +1,22 @@
+#pragma once
+
+#include "builtin.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
 template<typename T> struct klass
 {
-	PyType *m_type;
+	std::unique_ptr<TypePrototype> type;
 
 	klass(PyModule *module, std::string_view name)
 	{
-		auto *name_ = PyString::create(std::string(name));
-		m_type = PyType::create<T>(name_);
-		module->insert(name_, m_type);
+		(void)module;
+		(void)name;
+		TODO()
+		// module->insert(name_, type);
 	}
+
+	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
 
 	template<typename FuncType>
 	klass &def(std::string_view name, FuncType &&F) requires requires(PyObject *self)
@@ -17,17 +24,15 @@ template<typename T> struct klass
 		(static_cast<T *>(self)->*F)();
 	}
 	{
-		m_type->add_method(VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
-			PyString::create(std::string(name)),
-			m_type,
-			[F](PyObject *self, PyTuple *args, PyDict *kwargs) {
+		type->add_method(MethodDefinition{
+			std::string(name), [F](PyObject *self, PyTuple *args, PyDict *kwargs) {
 				// TODO: this should raise an exception
 				//       TypeError: {}() takes no arguments ({} given)
 				//       TypeError: {}() takes no keyword arguments
 				ASSERT(!args || args->size() == 0)
 				ASSERT(!kwargs)
 				return (static_cast<T *>(self)->*F)();
-			}));
+			} });
 		return *this;
 	}
 
@@ -38,12 +43,10 @@ template<typename T> struct klass
 		(static_cast<T *>(self)->*F)(args, kwargs);
 	}
 	{
-		m_type->add_method(VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
-			PyString::create(std::string(name)),
-			m_type,
-			[F](PyObject *self, PyTuple *args, PyDict *kwargs) {
+		type->add_method(MethodDefinition{
+			std::string(name), [F](PyObject *self, PyTuple *args, PyDict *kwargs) {
 				return (static_cast<T *>(self)->*F)(args, kwargs);
-			}));
+			} });
 		return *this;
 	}
 };

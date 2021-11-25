@@ -1,5 +1,6 @@
 #include "runtime/PyList.hpp"
 #include "runtime/PyModule.hpp"
+#include "runtime/PyString.hpp"
 
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
@@ -15,7 +16,8 @@ PyList *create_sys_paths(Interpreter &interpreter)
 
 	auto *path_list = heap.allocate<PyList>();
 	const auto &entry_script = interpreter.entry_script();
-	path_list->append(PyString::create(std::filesystem::path(entry_script).parent_path()));
+	path_list->elements().push_back(
+		PyString::create(std::filesystem::path(entry_script).parent_path()));
 
 	return path_list;
 }
@@ -24,7 +26,9 @@ PyList *create_sys_argv(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *argv_list = heap.allocate<PyList>();
-	for (const auto &arg : interpreter.argv()) { argv_list->append(PyString::create(arg)); }
+	for (const auto &arg : interpreter.argv()) {
+		argv_list->elements().push_back(PyString::create(arg));
+	}
 
 	return argv_list;
 }

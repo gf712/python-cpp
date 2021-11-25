@@ -5,7 +5,7 @@
 class PyDictItems;
 class PyDictItemsIterator;
 
-class PyDict : public PyBaseObject<PyDict>
+class PyDict : public PyBaseObject
 {
   public:
 	using MapType = std::unordered_map<Value, Value, ValueHash, ValueEqual>;
@@ -18,16 +18,16 @@ class PyDict : public PyBaseObject<PyDict>
 	MapType m_map;
 
   public:
-	PyDict(MapType &&map) : PyBaseObject(PyObjectType::PY_DICT), m_map(std::move(map)) {}
-	PyDict(const MapType &map) : PyBaseObject(PyObjectType::PY_DICT), m_map(map) {}
-	PyDict() : PyBaseObject(PyObjectType::PY_DICT) {}
+	PyDict(MapType &&map);
+	PyDict(const MapType &map);
+	PyDict();
 
 	PyDictItems *items() const;
 
 	size_t size() const { return m_map.size(); }
 
 	std::string to_string() const override;
-	PyObject *repr_impl() const;
+	PyObject *__repr__() const;
 
 	const MapType &map() const { return m_map; }
 
@@ -35,9 +35,12 @@ class PyDict : public PyBaseObject<PyDict>
 	Value operator[](Value key) const;
 
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
-class PyDictItems : public PyBaseObject<PyDictItems>
+class PyDictItems : public PyBaseObject
 {
 	friend class Heap;
 	friend PyDict;
@@ -46,18 +49,20 @@ class PyDictItems : public PyBaseObject<PyDictItems>
 	const PyDict &m_pydict;
 
   public:
-	PyDictItems(const PyDict &pydict) : PyBaseObject(PyObjectType::PY_DICT_ITEMS), m_pydict(pydict)
-	{}
+	PyDictItems(const PyDict &pydict);
 
 	PyDictItemsIterator begin() const;
 	PyDictItemsIterator end() const;
 
 	std::string to_string() const override;
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 
-class PyDictItemsIterator : public PyBaseObject<PyDictItemsIterator>
+class PyDictItemsIterator : public PyBaseObject
 {
 	friend class Heap;
 	friend PyDictItems;
@@ -72,26 +77,23 @@ class PyDictItemsIterator : public PyBaseObject<PyDictItemsIterator>
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
 
-	PyDictItemsIterator(const PyDictItems &pydict)
-		: PyBaseObject(PyObjectType::PY_DICT_ITEMS_ITERATOR),
-		  m_pydictitems(pydict), m_current_iterator(m_pydictitems.m_pydict.map().begin())
-	{}
+	PyDictItemsIterator(const PyDictItems &pydict);
 
-	PyDictItemsIterator(const PyDictItems &pydict, size_t position) : PyDictItemsIterator(pydict)
-	{
-		std::advance(m_current_iterator, position);
-	}
+	PyDictItemsIterator(const PyDictItems &pydict, size_t position);
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *next_impl(Interpreter &interpreter) override;
+	PyObject *__repr__() const;
+	PyObject *__next__();
 
 	bool operator==(const PyDictItemsIterator &) const;
 	value_type operator*() const;
 	PyDictItemsIterator &operator++();
 
 	void visit_graph(Visitor &) override;
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 

@@ -8,7 +8,6 @@ gtest_add_tests(TARGET integration-tests_)
 add_custom_target(
   integration-tests
   COMMAND $<TARGET_FILE:integration-tests_>
-          && echo
           && echo "-----------------------"
           && echo "Running python scripts:"
           && echo "-----------------------"

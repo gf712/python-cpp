@@ -3,7 +3,7 @@
 #include "PyObject.hpp"
 #include "PyString.hpp"
 
-class PyModule : public PyBaseObject<PyModule>
+class PyModule : public PyBaseObject
 {
   public:
 	using MapType = std::unordered_map<PyString *, Value, ValueHash, ValueEqual>;
@@ -23,25 +23,18 @@ class PyModule : public PyBaseObject<PyModule>
 
 	void visit_graph(Visitor &visitor) override;
 
-	PyObject *repr_impl() const
-	{
-		return PyString::create(fmt::format("<module '{}'>", m_module_name->to_string()));
-	}
+	PyObject *__repr__() const;
 
-	std::string to_string() const override
-	{
-		return fmt::format("<module '{}'>", m_module_name->to_string());
-	}
+	std::string to_string() const override;
 
 	const MapType &symbol_table() const { return m_symbol_table; }
 
 	PyString *name() const { return m_module_name; }
 
-	void insert(PyString *key, const Value &value)
-	{
-		m_symbol_table.insert_or_assign(key, value);
-		m_attributes.insert_or_assign(key->value(), PyObject::from(value));
-	}
+	void insert(PyString *key, const Value &value);
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 

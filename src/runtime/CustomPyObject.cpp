@@ -1,13 +1,16 @@
 #include "CustomPyObject.hpp"
+#include "PyBoundMethod.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
 
 CustomPyObject::CustomPyObject(const CustomPyObjectContext &ctx, const PyTuple *)
-	: PyBaseObject(PyObjectType::PY_CUSTOM_TYPE)
+	: PyBaseObject(PyObjectType::PY_CUSTOM_TYPE, BuiltinTypes::the().custom_object())
 {
 	// m_slots["__qualname__"] = [ctx](std::shared_ptr<PyTuple>, std::shared_ptr<PyDict>) {
 	// 	return PyString::from(String{ ctx.name });
@@ -40,11 +43,30 @@ bool CustomPyObject::update_slot_if_special(const std::string &name, PyObject *v
 	if (name == "__repr__") {
 		auto pyfunc = as<PyFunction>(value);
 		ASSERT(pyfunc)
-		m_slots->repr = std::move(pyfunc);
+		m_attributes["__repr__"] = pyfunc;
 	} else {
 		spdlog::debug("{} is not a special name, skipping", name);
 		return false;
 	}
 
 	return true;
+}
+
+PyType *CustomPyObject::type_() const { return custom_object(); }
+
+namespace {
+
+std::once_flag object_flag;
+
+std::unique_ptr<TypePrototype> register_object()
+{
+	return std::move(klass<CustomPyObject>("object").type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> CustomPyObject::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(object_flag, []() { type = ::register_object(); });
+	return std::move(type);
 }

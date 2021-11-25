@@ -2,7 +2,19 @@
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
 #include "vm/VM.hpp"
+
+PyTuple::PyTuple() : PyBaseObject(PyObjectType::PY_TUPLE, BuiltinTypes::the().tuple()) {}
+
+PyTuple::PyTuple(std::vector<Value> &&elements) : PyTuple() { m_elements = std::move(elements); }
+
+PyTuple::PyTuple(const std::vector<PyObject *> &elements) : PyTuple()
+{
+	m_elements.reserve(elements.size());
+	for (auto *el : elements) { m_elements.push_back(el); }
+}
 
 PyTuple *PyTuple::create()
 {
@@ -38,14 +50,13 @@ std::string PyTuple::to_string() const
 	return os.str();
 }
 
-PyObject *PyTuple::repr_impl() const { return PyString::create(to_string()); }
+PyObject *PyTuple::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyTuple::iter_impl(Interpreter &) const
+PyObject *PyTuple::__iter__() const
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyTupleIterator>(*PyTuple::create());
+	return heap.allocate<PyTupleIterator>(*this);
 }
-
 
 PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
 
@@ -66,20 +77,46 @@ void PyTuple::visit_graph(Visitor &visitor)
 	}
 }
 
+PyType *PyTuple::type_() const { return tuple(); }
+
+namespace {
+
+std::once_flag tuple_flag;
+
+std::unique_ptr<TypePrototype> register_tuple() { return std::move(klass<PyTuple>("tuple").type); }
+}// namespace
+
+std::unique_ptr<TypePrototype> PyTuple::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(tuple_flag, []() { type = ::register_tuple(); });
+	return std::move(type);
+}
+
+
+PyTupleIterator::PyTupleIterator(const PyTuple &pytuple)
+	: PyBaseObject(PyObjectType::PY_TUPLE_ITERATOR, BuiltinTypes::the().tuple_iterator()),
+	  m_pytuple(pytuple)
+{}
+
+PyTupleIterator::PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
+{
+	m_current_index = position;
+}
 
 std::string PyTupleIterator::to_string() const
 {
 	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyTupleIterator::repr_impl() const { return PyString::create(to_string()); }
+PyObject *PyTupleIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyTupleIterator::next_impl(Interpreter &interpreter)
+PyObject *PyTupleIterator::__next__()
 {
 	if (m_current_index < m_pytuple.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pytuple.elements()[m_current_index++]);
-	interpreter.raise_exception(stop_iteration(""));
+	VirtualMachine::the().interpreter().raise_exception(stop_iteration(""));
 	return nullptr;
 }
 
@@ -104,4 +141,23 @@ PyObject *PyTupleIterator::operator*() const
 {
 	return std::visit([](const auto &element) { return PyObject::from(element); },
 		m_pytuple.elements()[m_current_index]);
+}
+
+PyType *PyTupleIterator::type_() const { return tuple_iterator(); }
+
+namespace {
+
+std::once_flag tuple_iterator_flag;
+
+std::unique_ptr<TypePrototype> register_tuple_iterator()
+{
+	return std::move(klass<PyTupleIterator>("tuple_iterator").type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyTupleIterator::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(tuple_iterator_flag, []() { type = ::register_tuple_iterator(); });
+	return std::move(type);
 }
