@@ -2,7 +2,7 @@
 
 #include "PyObject.hpp"
 
-class PyRange : public PyBaseObject<PyObject>
+class PyRange : public PyBaseObject
 {
 	friend class Heap;
 
@@ -11,26 +11,27 @@ class PyRange : public PyBaseObject<PyObject>
 	int64_t m_step;
 
   public:
-	PyRange(int64_t stop) : PyRange(0, stop, 1) {}
-
-	PyRange(int64_t start, int64_t stop) : PyRange(start, stop, 1) {}
-
-	PyRange(int64_t start, int64_t stop, int64_t step)
-		: PyBaseObject(PyObjectType::PY_RANGE), m_start(start), m_stop(stop), m_step(step)
-	{}
-
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *iter_impl(Interpreter &interpreter) const override;
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyObject *__repr__() const;
+	PyObject *__iter__() const;
 
 	int64_t start() const { return m_start; }
 	int64_t stop() const { return m_stop; }
 	int64_t step() const { return m_step; }
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
+
+  private:
+	PyRange(int64_t stop);
+	PyRange(int64_t start, int64_t stop);
+	PyRange(int64_t start, int64_t stop, int64_t step);
 };
 
 
-class PyRangeIterator : public PyBaseObject<PyRangeIterator>
+class PyRangeIterator : public PyBaseObject
 {
 	friend class Heap;
 
@@ -38,13 +39,13 @@ class PyRangeIterator : public PyBaseObject<PyRangeIterator>
 	int64_t m_current_index;
 
   public:
-	PyRangeIterator(const PyRange &pyrange)
-		: PyBaseObject(PyObjectType::PY_RANGE_ITERATOR), m_pyrange(pyrange),
-		  m_current_index(m_pyrange.start())
-	{}
+	PyRangeIterator(const PyRange &);
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *next_impl(Interpreter &interpreter) override;
+	PyObject *__repr__() const;
+	PyObject *__next__();
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };

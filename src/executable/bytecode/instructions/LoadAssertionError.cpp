@@ -1,6 +1,7 @@
 #include "LoadAssertionError.hpp"
 #include "runtime/AssertionError.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 

@@ -5,7 +5,7 @@
 
 #include <optional>
 
-class PyString : public PyBaseObject<PyString>
+class PyString : public PyBaseObject
 {
 	friend class Heap;
 	std::string m_value;
@@ -26,16 +26,16 @@ class PyString : public PyBaseObject<PyString>
 	std::vector<int32_t> codepoints() const;
 	std::optional<int32_t> codepoint() const;
 
-	std::string to_string() const override { return fmt::format("{}", m_value); }
+	std::string to_string() const override { return m_value; }
 
-	PyObject *add_impl(const PyObject *obj) const;
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyObject *__repr__() const;
+	size_t __hash__() const;
+	PyObject *__eq__(const PyObject *obj) const;
+	PyObject *__lt__(const PyObject *obj) const;
 
-	PyObject *repr_impl() const;
-	size_t hash_impl(Interpreter &interpreter) const override;
-	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *less_than_impl(const PyObject *obj, Interpreter &) const override;
-
-	PyObject *len_impl(Interpreter &interpreter) const override;
+	PyObject *__len__() const;
+	PyObject *__add__(const PyObject *obj) const;
 
 	PyObject *isalpha() const;
 	PyObject *isalnum() const;
@@ -46,14 +46,15 @@ class PyString : public PyBaseObject<PyString>
 
 	PyString *capitalize() const;
 	PyString *casefold() const;
-	PyNumber *find(PyTuple *args, PyDict *kwargs) const;
-	PyNumber *count(PyTuple *args, PyDict *kwargs) const;
+	PyInteger *find(PyTuple *args, PyDict *kwargs) const;
+	PyInteger *count(PyTuple *args, PyDict *kwargs) const;
 	PyObject *endswith(PyTuple *args, PyDict *kwargs) const;
 	PyString *join(PyTuple *args, PyDict *kwargs) const;
 	PyString *lower() const;
 	PyString *upper() const;
 
-	static void register_type(PyModule *);
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 
   private:
 	PyString(std::string s);

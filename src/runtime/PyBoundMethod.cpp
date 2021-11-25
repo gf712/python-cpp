@@ -1,0 +1,44 @@
+#include "PyBoundMethod.hpp"
+#include "PyFunction.hpp"
+#include "PyString.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
+
+PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
+	: PyBaseObject(PyObjectType::PY_BOUND_METHOD, BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
+{}
+
+void PyBoundMethod::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	visitor.visit(*m_self);
+	visitor.visit(*m_method);
+}
+
+std::string PyBoundMethod::to_string() const
+{
+	return fmt::format("<bound method '{}' of '{}'>",
+		m_method->name(),
+		m_self->attributes().at("__qualname__")->to_string());
+}
+
+PyObject *PyBoundMethod::__repr__() const { return PyString::create(to_string()); }
+
+PyType *PyBoundMethod::type_() const { return bound_method(); }
+
+namespace {
+
+std::once_flag bound_method_flag;
+
+std::unique_ptr<TypePrototype> register_bound_method()
+{
+	return std::move(klass<PyBoundMethod>("bound_method").type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyBoundMethod::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(bound_method_flag, []() { type = ::register_bound_method(); });
+	return std::move(type);
+}

@@ -2,6 +2,7 @@
 
 #include "executable/bytecode/Bytecode.hpp"
 
+#include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyList.hpp"
@@ -25,31 +26,20 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
-	const bool test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> bool {
-								  if (auto bool_obj = as<PyNameConstant>(obj)) {
-									  const auto value = bool_obj->value();
-									  if (auto *bool_type = std::get_if<bool>(&value.value)) {
-										  return *bool_type;
-									  } else {
-										  return false;
-									  }
-								  }
-								  TODO()
-								  return false;
-							  },
-					   [](const auto &) -> bool {
-						   TODO()
-						   return false;
-					   },
-					   [](const NameConstant &value) -> bool {
-						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return *bool_type;
-						   } else {
-							   return false;
-						   }
-					   } },
-			result);
+	const bool test_result = std::visit(
+		overloaded{ [](PyObject *const &obj) -> bool { return obj->bool_() == py_true(); },
+			[](const auto &) -> bool {
+				TODO()
+				return false;
+			},
+			[](const NameConstant &value) -> bool {
+				if (auto *bool_type = std::get_if<bool>(&value.value)) {
+					return *bool_type;
+				} else {
+					return false;
+				}
+			} },
+		result);
 	if (!test_result) {
 		const auto ip = vm.instruction_pointer() + m_label.position();
 		vm.set_instruction_pointer(ip);
@@ -138,16 +128,14 @@ void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 	vm.reg(m_dst) = heap.allocate<PyDict>(map);
 };
 
-void GetIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
+void GetIter::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto iterable_value = vm.reg(m_src);
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterable_value)) {
-		vm.reg(m_dst) = (*iterable_object)->iter_impl(interpreter);
+		vm.reg(m_dst) = (*iterable_object)->iter();
 	} else {
 		vm.reg(m_dst) = std::visit(
-			[&interpreter](
-				const auto &value) { return PyObject::from(value)->iter_impl(interpreter); },
-			iterable_value);
+			[](const auto &value) { return PyObject::from(value)->iter(); }, iterable_value);
 	}
 }
 
@@ -156,14 +144,16 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	auto iterator = vm.reg(m_src);
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
-		const auto &next_value = (*iterable_object)->next_impl(interpreter);
+		const auto &next_value = (*iterable_object)->next();
 		if (auto last_exception = interpreter.execution_frame()->exception()) {
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
 				// exit loop in error state and handle unwinding to interpreter
 			} else {
 				interpreter.execution_frame()->set_exception(nullptr);
 				interpreter.set_status(Interpreter::Status::OK);
-				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label.position());
+				// FIXME: subtract one since the vm will advance the ip by one.
+				//        is this always true?
+				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label.position() - 1);
 			}
 			return;
 		}

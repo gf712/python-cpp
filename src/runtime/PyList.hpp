@@ -2,7 +2,7 @@
 
 #include "PyObject.hpp"
 
-class PyList : public PyBaseObject<PyList>
+class PyList : public PyBaseObject
 {
 	friend class Heap;
 
@@ -14,16 +14,20 @@ class PyList : public PyBaseObject<PyList>
 
 	std::string to_string() const override;
 
-	PyObject *repr_impl() const;
-	PyObject *iter_impl(Interpreter &interpreter) const override;
+	PyObject *__repr__() const;
+	PyObject *__iter__() const;
 
 	const std::vector<Value> &elements() const { return m_elements; }
+	std::vector<Value> &elements() { return m_elements; }
 
 	void visit_graph(Visitor &) override;
 
-	PyObject *append(PyObject *);
+	PyObject *append(PyTuple *args, PyDict *kwargs);
 
 	void sort();
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 
   private:
 	PyList();
@@ -31,7 +35,7 @@ class PyList : public PyBaseObject<PyList>
 };
 
 
-class PyListIterator : public PyBaseObject<PyListIterator>
+class PyListIterator : public PyBaseObject
 {
 	friend class Heap;
 
@@ -39,16 +43,17 @@ class PyListIterator : public PyBaseObject<PyListIterator>
 	size_t m_current_index{ 0 };
 
   public:
-	PyListIterator(const PyList &pylist)
-		: PyBaseObject(PyObjectType::PY_LIST_ITERATOR), m_pylist(pylist)
-	{}
+	PyListIterator(const PyList &pylist);
 
 	std::string to_string() const override;
 
 	void visit_graph(Visitor &) override;
 
-	PyObject *repr_impl() const;
-	PyObject *next_impl(Interpreter &interpreter) override;
+	PyObject *__repr__() const;
+	PyObject *__next__();
+
+	static std::unique_ptr<TypePrototype> register_type();
+	PyType *type_() const override;
 };
 
 template<> inline PyList *as(PyObject *node)

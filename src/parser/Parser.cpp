@@ -2541,18 +2541,28 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
-
-		// | function_def block
-		using pattern1 = PatternMatch<FunctionDefinitionPattern, BlockPattern>;
+		const auto stack_size = p.stack().size();
+		// function_def block
+		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("function_def_raw: function_def block");
+			spdlog::debug("function_def_raw: function_def");
 			auto name = p.pop_front();
-			auto args = p.pop_front();
-			args->print_node("");
+			auto args = [&]() -> std::shared_ptr<ast::ASTNode> {
+				if ((p.stack().size() - stack_size) > 0) {
+					return p.pop_front();
+				} else {
+					return std::make_shared<Arguments>();
+				}
+			}();
+			if (args) { args->print_node(""); }
 			name->print_node("");
-
 			std::vector<std::shared_ptr<ASTNode>> body;
-			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+			{
+				BlockScope inner_scope{ p };
+				using pattern1a = PatternMatch<ZeroOrOnePattern<BlockPattern>>;
+				if (pattern1a::match(p)) { spdlog::debug("block"); }
+				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
+			}
 
 			ASSERT(as<Constant>(name));
 			ASSERT(as<Arguments>(args));

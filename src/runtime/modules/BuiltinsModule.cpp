@@ -2,14 +2,18 @@
 #include "runtime/CustomPyObject.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyModule.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyRange.hpp"
+#include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/StopIterationException.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/types/builtin.hpp"
 
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
@@ -23,17 +27,6 @@
 static PyModule *s_builtin_module = nullptr;
 
 namespace {
-std::optional<int64_t> to_integer(const PyObject *obj, Interpreter &interpreter)
-{
-	if (auto pynumber = as<PyNumber>(obj)) {
-		if (auto int_value = std::get_if<int64_t>(&pynumber->value().value)) { return *int_value; }
-		interpreter.raise_exception(
-			"TypeError: '{}' object cannot be interpreted as an integer", object_name(obj->type()));
-	}
-	return {};
-}
-
-
 PyFunction *make_function(const std::string &function_name,
 	int64_t function_id,
 	const std::vector<std::string> &argnames,
@@ -79,7 +72,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 			end = std::get<String>(maybe_str).s;
 		}
 	}
-	auto reprfunc = [](const auto &arg) { return arg->__repr__(); };
+	auto reprfunc = [](const auto &arg) { return arg->repr(); };
 
 	auto arg_it = args->begin();
 	auto arg_it_end = args->end();
@@ -110,24 +103,11 @@ PyObject *iter(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 {
 	ASSERT(args->size() == 1)
 	const auto &arg = args->operator[](0);
-	auto iterfunc = arg->slots().iter;
 	if (kwargs) {
 		interpreter.raise_exception("TypeError: iter() takes no keyword arguments");
 		return py_none();
 	}
-	if (std::holds_alternative<IterSlotFunctionType>(iterfunc)) {
-		auto iter_native = std::get<IterSlotFunctionType>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
-		return iter_native();
-	} else {
-		auto pyfunc = std::get<PyFunction *>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc));
-		return execute(interpreter,
-			pyfunc,
-			VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }),
-			nullptr,
-			nullptr);
-	}
+	return arg->iter();
 }
 
 
@@ -138,35 +118,8 @@ PyObject *next(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 		interpreter.raise_exception("TypeError: next() takes no keyword arguments");
 		return py_none();
 	}
-	PyObject *next_result{ nullptr };
 	const auto &arg = args->operator[](0);
-	auto iterfunc = arg->slots().iter;
-	if (std::holds_alternative<ReprSlotFunctionType>(iterfunc)) {
-		auto iter_native = std::get<ReprSlotFunctionType>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(&iter_native));
-		next_result = iter_native();
-	} else {
-		auto pyfunc = std::get<PyFunction *>(iterfunc);
-		spdlog::debug("Iter native function ptr: {}", static_cast<void *>(pyfunc));
-		next_result = execute(interpreter,
-			pyfunc,
-			VirtualMachine::the().heap().allocate<PyTuple>(std::vector<Value>{ arg }),
-			nullptr,
-			nullptr);
-	}
-
-	if (!next_result) { interpreter.raise_exception(stop_iteration("")); }
-	return next_result;
-}
-
-
-PyObject *range(const PyTuple *args, const PyDict *, Interpreter &interpreter)
-{
-	ASSERT(args->size() == 1)
-	const auto &arg = args->operator[](0);
-	auto &heap = VirtualMachine::the().heap();
-	if (auto pynumber = to_integer(arg, interpreter)) { return heap.allocate<PyRange>(*pynumber); }
-	return py_none();
+	return arg->next();
 }
 
 
@@ -181,9 +134,8 @@ PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpre
 	ASSERT(as<PyString>(class_name))
 	auto class_name_as_string = as<PyString>(class_name)->value();
 
-	ASSERT(as<PyNumber>(function_location))
-	auto pynumber = as<PyNumber>(function_location)->value();
-	ASSERT(std::get_if<int64_t>(&pynumber.value))
+	ASSERT(as<PyInteger>(function_location))
+	auto pynumber = as<PyInteger>(function_location)->value();
 	auto function_id = std::get<int64_t>(pynumber.value);
 
 	// FIXME: what should be the global dictionary for this?
@@ -241,7 +193,7 @@ PyObject *id(const PyTuple *args, const PyDict *, Interpreter &)
 PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
-	if (auto pynumber = as<PyNumber>(args->operator[](0))) {
+	if (auto pynumber = PyNumber::as_number(args->operator[](0))) {
 		if (std::holds_alternative<int64_t>(pynumber->value().value)) {
 			return PyString::create(
 				fmt::format("{0:#x}", std::get<int64_t>(pynumber->value().value)));
@@ -263,11 +215,11 @@ PyObject *ord(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	ASSERT(args->size() == 1)
 	if (auto pystr = as<PyString>(args->operator[](0))) {
 		if (auto codepoint = pystr->codepoint()) {
-			return PyNumber::create(Number{ static_cast<int64_t>(*codepoint) });
+			return PyInteger::create(static_cast<int64_t>(*codepoint));
 		} else {
-			auto size = pystr->len_impl(interpreter);
+			auto size = pystr->len();
 			type_error("ord() expected a character, but string of length {} found",
-				as<PyNumber>(size)->value().to_string());
+				as<PyInteger>(size)->value().to_string());
 		}
 	} else {
 		interpreter.raise_exception("TypeError: ord() expected string of length 1, but {} found",
@@ -282,7 +234,7 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	auto dir_list = PyList::create();
 	if (args->size() == 0) {
 		for (const auto &[k, _] : interpreter.execution_frame()->locals()->map()) {
-			dir_list->append(PyObject::from(k));
+			dir_list->elements().push_back(PyObject::from(k));
 		}
 	} else {
 		const auto &arg = args->elements()[0];
@@ -290,7 +242,9 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		// If the object is a module object, the list contains the names of the module’s attributes.
 		if (std::holds_alternative<PyObject *>(arg) && as<PyModule>(std::get<PyObject *>(arg))) {
 			auto *pymodule = as<PyModule>(std::get<PyObject *>(arg));
-			for (const auto &[k, _] : pymodule->symbol_table()) { dir_list->append(k); }
+			for (const auto &[k, _] : pymodule->symbol_table()) {
+				dir_list->elements().push_back(k);
+			}
 		}
 		// If the object is a type or class object, the list contains the names of its attributes,
 		// and recursively of the attributes of its bases.
@@ -300,7 +254,7 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		else {
 			auto object = PyObject::from(arg);
 			for (const auto &[k, _] : object->attributes()) {
-				dir_list->append(PyString::create(k));
+				dir_list->elements().push_back(PyString::create(k));
 			}
 		}
 	}
@@ -320,17 +274,70 @@ PyObject *repr(const PyTuple *args, const PyDict *, Interpreter &)
 
 }// namespace
 
-void initialize_types(PyModule *m) { PyString::register_type(m); }
+auto initialize_types()
+{
+	type();
+	bool_();
+	bytes();
+	ellipsis();
+	str();
+	float_();
+	integer();
+	none();
+	exception();
+	module();
+	custom_object();
+	dict();
+	dict_items();
+	dict_items_iterator();
+	list();
+	list_iterator();
+	tuple();
+	tuple_iterator();
+	range();
+	range_iterator();
+	function();
+	native_function();
+	code();
+	builtin_method();
+	slot_wrapper();
+	bound_method();
+	method_wrapper();
+
+	return std::array{
+		type(),
+		bool_(),
+		bytes(),
+		ellipsis(),
+		str(),
+		float_(),
+		integer(),
+		none(),
+		exception(),
+		custom_object(),
+		dict(),
+		list(),
+		tuple(),
+		range(),
+	};
+}
 
 PyModule *builtins_module(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
 
+	// FIXME: second check (check address is valid) is only needed for unittests since each test
+	// 		  clears the heap but is still the same executable (so it still uses the same static
+	// 		  address)
 	if (s_builtin_module && heap.slab().has_address(bit_cast<uint8_t *>(s_builtin_module))) {
 		return s_builtin_module;
 	}
 
+	auto types = initialize_types();
+
 	s_builtin_module = heap.allocate<PyModule>(PyString::create("__builtins__"));
+
+	for (auto *type : types) { s_builtin_module->insert(PyString::create(type->name()), type); }
 
 	s_builtin_module->insert(PyString::create("__build_class__"),
 		heap.allocate<PyNativeFunction>(
@@ -383,17 +390,10 @@ PyModule *builtins_module(Interpreter &interpreter)
 			return print(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("range"),
-		heap.allocate<PyNativeFunction>("range", [&interpreter](PyTuple *args, PyDict *kwargs) {
-			return range(args, kwargs, interpreter);
-		}));
-
 	s_builtin_module->insert(PyString::create("repr"),
 		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return repr(args, kwargs, interpreter);
 		}));
-
-	initialize_types(s_builtin_module);
 
 	return s_builtin_module;
 }

@@ -70,7 +70,7 @@ class Block
 		uint8_t *allocate()
 		{
 			if (auto chunk_idx = m_chunk_view.mark_next_free_chunk()) {
-				spdlog::debug("Allocating memory at index {}, address {}",
+				spdlog::trace("Allocating memory at index {}, address {}",
 					*chunk_idx,
 					(void *)(m_memory + *chunk_idx * m_object_size));
 				return m_memory + *chunk_idx * m_object_size;
@@ -165,12 +165,14 @@ class Slab
 		block1024 = std::make_unique<Block>(1024, 1000);
 	}
 
+	std::unique_ptr<Block> &block_128() { return block128; }
+	std::unique_ptr<Block> &block_256() { return block256; }
 	std::unique_ptr<Block> &block_512() { return block512; }
-	std::unique_ptr<Block> &block_1024() { return block512; }
+	std::unique_ptr<Block> &block_1024() { return block1024; }
 
 	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
 	{
-		spdlog::debug("Allocating Cell object memory for object of size {}", sizeof(T));
+		spdlog::trace("Allocating Cell object memory for object of size {}", sizeof(T));
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 16) { return block16->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 32) { return block32->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 64) { return block64->allocate(); }
@@ -245,7 +247,7 @@ class Heap
 	, NonMoveable
 {
 	uint8_t *m_static_memory;
-	size_t m_static_memory_size{ 4 * KB };
+	size_t m_static_memory_size{ 16 * KB };
 	size_t m_static_offset{ 8 };
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;
@@ -298,6 +300,9 @@ class Heap
 		m_static_offset += sizeof(T);
 		return std::shared_ptr<T>(ptr, [](T *) { return; });
 	}
+
+	const uint8_t *static_memory() const { return m_static_memory; }
+	size_t static_memory_size() const { return m_static_memory_size; }
 
 	Slab &slab() { return m_slab; }
 

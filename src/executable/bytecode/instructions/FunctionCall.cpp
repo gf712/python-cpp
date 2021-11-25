@@ -1,10 +1,19 @@
 #include "FunctionCall.hpp"
+#include "runtime/PyBoundMethod.hpp"
+#include "runtime/PyBuiltInMethod.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyMethodWrapper.hpp"
+#include "runtime/PySlotWrapper.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/TypeError.hpp"
+
+
+namespace {
+bool is_callable(PyObject *obj) { return obj->attributes().contains("__call__"); }
+}// namespace
 
 PyObject *execute(Interpreter &interpreter,
 	PyObject *callable_object,
@@ -14,8 +23,17 @@ PyObject *execute(Interpreter &interpreter,
 {
 	std::string function_name;
 
-	if (auto it = callable_object->attributes().find("__call__");
+	if (auto it = callable_object->type_()->attributes().find("__call__");
 		it != callable_object->attributes().end()) {
+		// TODO: this is far from optimal, since we are creating a new vector
+		//       just to append self to the start of the args tuple
+		//       this is needed because SlotWrapper unpacking below expects self
+		//		 to be the first arg
+		std::vector<Value> new_args_vector;
+		new_args_vector.reserve(args->size() + 1);
+		new_args_vector.push_back(callable_object);
+		for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
+		args = PyTuple::create(new_args_vector);
 		callable_object = it->second;
 	}
 
@@ -25,8 +43,18 @@ PyObject *execute(Interpreter &interpreter,
 		function_name = native_func->name();
 	} else if (auto method = as<PyBoundMethod>(callable_object)) {
 		function_name = method->method()->name();
-	} else if (auto method = as<PyMethodDescriptor>(callable_object)) {
+	} else if (auto method = as<PyMethodWrapper>(callable_object)) {
 		function_name = method->name()->value();
+	} else if (auto slot = as<PySlotWrapper>(callable_object)) {
+		function_name = slot->name()->value();
+	} else if (auto builtin_method = as<PyBuiltInMethod>(callable_object)) {
+		function_name = builtin_method->name();
+	} else if (is_callable(callable_object)) {
+		ASSERT(callable_object->attributes().contains("__name__"))
+		auto obj_name = callable_object->attributes().at("__name__");
+		ASSERT(as<PyString>(obj_name))
+		function_name = fmt::format("{}.__call__", as<PyString>(obj_name)->value());
+		callable_object = callable_object->attributes().at("__call__");
 	} else {
 		TODO();
 	}
@@ -86,7 +114,7 @@ PyObject *execute(Interpreter &interpreter,
 		return interpreter.call(pyfunc->code()->function(), function_frame);
 	} else if (auto native_func = as<PyNativeFunction>(callable_object)) {
 		return interpreter.call(native_func, args, kwargs);
-	} else if (auto method = as<PyMethodDescriptor>(callable_object)) {
+	} else if (auto method = as<PyMethodWrapper>(callable_object)) {
 		std::vector<Value> new_args_vector;
 		new_args_vector.reserve(args->size() - 1);
 		PyObject *self = PyObject::from(args->elements()[0]);
@@ -95,6 +123,21 @@ PyObject *execute(Interpreter &interpreter,
 		}
 		args = PyTuple::create(new_args_vector);
 		auto *result = method->method_descriptor()(self, args, kwargs);
+		VirtualMachine::the().reg(0) = result;
+		return result;
+	} else if (auto slot = as<PySlotWrapper>(callable_object)) {
+		std::vector<Value> new_args_vector;
+		new_args_vector.reserve(args->size() - 1);
+		PyObject *self = PyObject::from(args->elements()[0]);
+		for (size_t i = 1; i < args->size(); ++i) {
+			new_args_vector.push_back(args->elements()[i]);
+		}
+		args = PyTuple::create(new_args_vector);
+		auto *result = slot->slot()(self, args, kwargs);
+		VirtualMachine::the().reg(0) = result;
+		return result;
+	} else if (auto builtin_method = as<PyBuiltInMethod>(callable_object)) {
+		auto *result = builtin_method->builtin_method()(args, kwargs);
 		VirtualMachine::the().reg(0) = result;
 		return result;
 	} else {

@@ -1,9 +1,12 @@
+#pragma once
+
 #include "PyObject.hpp"
 
-
-class PyNumber final : public PyBaseObject<PyNumber>
+class PyNumber : public PyBaseObject
 {
 	friend class Heap;
+	friend class PyInteger;
+	friend class PyFloat;
 
 	Number m_value;
 
@@ -15,33 +18,24 @@ class PyNumber final : public PyBaseObject<PyNumber>
 			[](const auto &value) { return fmt::format("{}", value); }, m_value.value);
 	}
 
-	PyObject *add_impl(const PyObject *obj) const;
-	PyObject *subtract_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *modulo_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *multiply_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *__add__(const PyObject *obj) const;
+	PyObject *__sub__(const PyObject *obj) const;
+	PyObject *__mod__(const PyObject *obj) const;
+	PyObject *__mul__(const PyObject *obj) const;
 
-	PyObject *repr_impl() const;
-	PyObject *equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *less_than_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *less_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *greater_than_impl(const PyObject *obj, Interpreter &interpreter) const override;
-	PyObject *greater_than_equal_impl(const PyObject *obj, Interpreter &interpreter) const override;
+	PyObject *__repr__() const;
+	PyObject *__eq__(const PyObject *obj) const;
+	PyObject *__lt__(const PyObject *obj) const;
+	PyObject *__le__(const PyObject *obj) const;
+	PyObject *__gt__(const PyObject *obj) const;
+	PyObject *__ge__(const PyObject *obj) const;
 
 	const Number &value() const { return m_value; }
 
+	static const PyNumber *as_number(const PyObject *obj);
+
   private:
-	PyNumber(Number number) : PyBaseObject(PyObjectType::PY_NUMBER), m_value(number) {}
+	PyNumber(Number number, PyObjectType type, const TypePrototype &type_)
+		: PyBaseObject(type, type_), m_value(number)
+	{}
 };
-
-
-template<> inline PyNumber *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NUMBER) { return static_cast<PyNumber *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyNumber *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NUMBER) { return static_cast<const PyNumber *>(node); }
-	return nullptr;
-}

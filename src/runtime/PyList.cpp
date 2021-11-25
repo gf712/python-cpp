@@ -1,24 +1,18 @@
 #include "PyList.hpp"
+#include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
+#include "PyNone.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "StopIterationException.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "types/api.hpp"
+#include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyList::PyList() : PyBaseObject(PyObjectType::PY_LIST)
-{
-	put("append",
-		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"append",
-			[this](PyTuple *args, PyDict *) {
-				ASSERT(args->elements().size() == 1)
-				return this->append(PyObject::from(args->elements()[1]));
-			},
-			this));
-}
+PyList::PyList() : PyBaseObject(PyObjectType::PY_LIST, BuiltinTypes::the().list()) {}
 
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
 
@@ -29,9 +23,11 @@ PyList *PyList::create(std::vector<Value> elements)
 
 PyList *PyList::create() { return VirtualMachine::the().heap().allocate<PyList>(); }
 
-PyObject *PyList::append(PyObject *obj)
+PyObject *PyList::append(PyTuple *args, PyDict *kwargs)
 {
-	m_elements.push_back(obj);
+	ASSERT(args && args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().size())
+	m_elements.push_back(PyObject::from(args->elements()[0]));
 	return py_none();
 }
 
@@ -61,9 +57,9 @@ std::string PyList::to_string() const
 	return os.str();
 }
 
-PyObject *PyList::repr_impl() const { return PyString::from(String{ to_string() }); }
+PyObject *PyList::__repr__() const { return PyString::from(String{ to_string() }); }
 
-PyObject *PyList::iter_impl(Interpreter &) const
+PyObject *PyList::__iter__() const
 {
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyListIterator>(*this);
@@ -93,6 +89,38 @@ void PyList::visit_graph(Visitor &visitor)
 	}
 }
 
+PyType *PyList::type_() const { return list(); }
+
+namespace {
+
+std::once_flag list_flag;
+
+std::unique_ptr<TypePrototype> register_list()
+{
+	return std::move(klass<PyList>("list")
+						 .def("append", &PyList::append)
+						 //  .def(
+						 // 	 "sort",
+						 // 	 +[](PyObject *self) {
+						 // 		 self->sort();
+						 // 		 return py_none();
+						 // 	 })
+						 .type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyList::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(list_flag, []() { type = ::register_list(); });
+	return std::move(type);
+}
+
+
+PyListIterator::PyListIterator(const PyList &pylist)
+	: PyBaseObject(PyObjectType::PY_LIST_ITERATOR, BuiltinTypes::the().list_iterator()),
+	  m_pylist(pylist)
+{}
 
 std::string PyListIterator::to_string() const
 {
@@ -108,13 +136,32 @@ void PyListIterator::visit_graph(Visitor &visitor)
 	const_cast<PyList &>(m_pylist).visit_graph(visitor);
 }
 
-PyObject *PyListIterator::repr_impl() const { return PyString::create(to_string()); }
+PyObject *PyListIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyListIterator::next_impl(Interpreter &interpreter)
+PyObject *PyListIterator::__next__()
 {
 	if (m_current_index < m_pylist.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pylist.elements()[m_current_index++]);
-	interpreter.raise_exception(stop_iteration(""));
+	VirtualMachine::the().interpreter().raise_exception(stop_iteration(""));
 	return nullptr;
+}
+
+PyType *PyListIterator::type_() const { return list_iterator(); }
+
+namespace {
+
+std::once_flag list_iterator_flag;
+
+std::unique_ptr<TypePrototype> register_list_iterator()
+{
+	return std::move(klass<PyListIterator>("list_iterator").type);
+}
+}// namespace
+
+std::unique_ptr<TypePrototype> PyListIterator::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
+	return std::move(type);
 }

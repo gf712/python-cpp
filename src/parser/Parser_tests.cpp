@@ -1106,6 +1106,17 @@ TEST(Parser, CallMethod)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, LiteralMethodCall)
+{
+	constexpr std::string_view program = "\"foo123\".isalnum()\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Attribute>(
+		std::make_shared<Constant>("foo123"), "isalnum", ContextType::LOAD)));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, FunctionCallWithKwarg)
 {
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=',')\n";

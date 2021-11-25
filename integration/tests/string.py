@@ -3,9 +3,11 @@ def concat(a, b):
 
 assert concat("foo", "bar") == "foobar", "String concatentation failed"
 
-# print(str.__dict__)
+assert type("string") == str, "A literal string should be of type str"
 
 assert str.isalnum("foo123"), "'foo123' should be just alphanumeric characters"
+assert "foo123".isalnum(), "'foo123' should be just alphanumeric characters"
+
 # TODO: when keyword 'not' is added fix line below
 assert str.isalnum("foo123_")==False, "'foo123_' should not be just alphanumeric characters"
 
