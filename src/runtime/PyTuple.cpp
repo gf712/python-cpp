@@ -1,4 +1,5 @@
 #include "PyTuple.hpp"
+#include "PyInteger.hpp"
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -57,6 +58,8 @@ PyObject *PyTuple::__iter__() const
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyTupleIterator>(*this);
 }
+
+PyObject *PyTuple::__len__() const { return PyInteger::create(m_elements.size()); }
 
 PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
 

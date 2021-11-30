@@ -2,6 +2,7 @@
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
+#include "PyInteger.hpp"
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
@@ -64,6 +65,8 @@ PyObject *PyList::__iter__() const
 	auto &heap = VirtualMachine::the().heap();
 	return heap.allocate<PyListIterator>(*this);
 }
+
+PyObject *PyList::__len__() const { return PyInteger::create(m_elements.size()); }
 
 void PyList::sort()
 {

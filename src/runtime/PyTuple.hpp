@@ -27,6 +27,7 @@ class PyTuple : public PyBaseObject
 
 	PyObject *__repr__() const;
 	PyObject *__iter__() const;
+	PyObject *__len__() const;
 
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;

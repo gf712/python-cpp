@@ -183,6 +183,21 @@ PyObject *locals(const PyTuple *, const PyDict *, Interpreter &interpreter)
 }
 
 
+PyObject *len(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (args->size() != 1) {
+		interpreter.raise_exception(
+			type_error("len() takes exactly one argument ({} given)", args->size()));
+		return nullptr;
+	}
+	if (kwargs && !kwargs->map().empty()) {
+		interpreter.raise_exception(type_error("len() takes no keyword arguments"));
+		return nullptr;
+	}
+	return PyObject::from(args->elements()[0])->len();
+}
+
+
 PyObject *id(const PyTuple *args, const PyDict *, Interpreter &)
 {
 	ASSERT(args->size() == 1)
@@ -373,6 +388,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->insert(PyString::create("locals"),
 		heap.allocate<PyNativeFunction>("locals", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return locals(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->insert(PyString::create("len"),
+		heap.allocate<PyNativeFunction>("len", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return len(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->insert(PyString::create("next"),

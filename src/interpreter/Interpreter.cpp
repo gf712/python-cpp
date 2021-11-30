@@ -126,6 +126,8 @@ PyObject *Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict
 	auto &vm = VirtualMachine::the();
 	auto result = native_func->operator()(args, kwargs);
 
+	if (!result) { return nullptr; }
+
 	spdlog::debug("Native function return value: {}", result->to_string());
 
 	vm.reg(0) = result;
