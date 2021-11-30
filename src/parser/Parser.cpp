@@ -816,7 +816,8 @@ struct AtomPattern : Pattern<AtomPattern>
 		// NAME
 		// using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>>>;
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("NAME");
 
@@ -1286,9 +1287,37 @@ struct FactorPattern : Pattern<FactorPattern>
 	//     | power
 	static bool matches_impl(Parser &p)
 	{
+		spdlog::debug("factor");
+		// '+' factor
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, FactorPattern>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'+' factor");
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::ADD, p.pop_back()));
+			return true;
+		}
+
+		// '-' factor
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, FactorPattern>;
+		if (pattern2::match(p)) {
+			spdlog::debug("'-' factor");
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::SUB, p.pop_back()));
+			return true;
+		}
+
+		// '~' factor
+		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::TILDE>, FactorPattern>;
+		if (pattern3::match(p)) {
+			spdlog::debug("'~' factor");
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::INVERT, p.pop_back()));
+			return true;
+		}
+
 		// power
 		using pattern4 = PatternMatch<PowerPattern>;
-		if (pattern4::match(p)) { return true; }
+		if (pattern4::match(p)) {
+			spdlog::debug("power");
+			return true;
+		}
 
 		return false;
 	}

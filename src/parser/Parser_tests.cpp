@@ -547,6 +547,21 @@ void compare_assert(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_msg, expected_msg);
 }
 
+void compare_unary_op(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::UnaryExpr);
+
+	const auto result_operand = as<UnaryExpr>(result)->operand();
+	const auto expected_operand = as<UnaryExpr>(expected)->operand();
+	dispatch(result_operand, expected_operand);
+
+	const auto result_optype = as<UnaryExpr>(result)->op_type();
+	const auto expected_optype = as<UnaryExpr>(expected)->op_type();
+
+	ASSERT_EQ(result_optype, expected_optype);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -652,6 +667,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Assert: {
 		compare_assert(result, expected);
+		break;
+	}
+	case ASTNodeType::UnaryExpr: {
+		compare_unary_op(result, expected);
 		break;
 	}
 	default: {
@@ -1549,5 +1568,33 @@ TEST(Parser, AssertWithMessage)
 	expected_ast->emplace(std::make_shared<Assert>(
 		std::make_shared<Constant>(false), std::make_shared<Constant>("failed!")));
 
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, NegativeNumber)
+{
+	constexpr std::string_view program = "a = -1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<UnaryExpr>(UnaryOpType::SUB, std::make_shared<Constant>(int64_t{ 1 })),
+		""));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, UnaryExprMix)
+{
+	constexpr std::string_view program = "a = -+-+1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<UnaryExpr>(UnaryOpType::SUB,
+			std::make_shared<UnaryExpr>(UnaryOpType::ADD,
+				std::make_shared<UnaryExpr>(UnaryOpType::SUB,
+					std::make_shared<UnaryExpr>(
+						UnaryOpType::ADD, std::make_shared<Constant>(int64_t{ 1 }))))),
+		""));
 	assert_generates_ast(program, expected_ast);
 }

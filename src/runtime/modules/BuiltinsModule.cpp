@@ -287,6 +287,20 @@ PyObject *repr(const PyTuple *args, const PyDict *, Interpreter &)
 	return PyObject::from(args->elements()[0])->__repr__();
 }
 
+PyObject *abs(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (args->size() != 1) {
+		interpreter.raise_exception(
+			type_error("abs() takes exactly one argument ({} given)", args->size()));
+		return nullptr;
+	}
+	if (kwargs && !kwargs->map().empty()) {
+		interpreter.raise_exception(type_error("abs() takes no keyword arguments"));
+		return nullptr;
+	}
+	return PyObject::from(args->elements()[0])->abs();
+}
+
 }// namespace
 
 auto initialize_types()
@@ -359,6 +373,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 			"__build_class__", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return build_class(args, kwargs, interpreter);
 			}));
+
+	s_builtin_module->insert(PyString::create("abs"),
+		heap.allocate<PyNativeFunction>("abs", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return abs(args, kwargs, interpreter);
+		}));
 
 	s_builtin_module->insert(PyString::create("dir"),
 		heap.allocate<PyNativeFunction>("dir", [&interpreter](PyTuple *args, PyDict *kwargs) {

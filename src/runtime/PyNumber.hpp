@@ -23,6 +23,11 @@ class PyNumber : public PyBaseObject
 	PyObject *__mod__(const PyObject *obj) const;
 	PyObject *__mul__(const PyObject *obj) const;
 
+	PyObject *__abs__() const;
+	PyObject *__neg__() const;
+	PyObject *__pos__() const;
+	PyObject *__invert__() const;
+
 	PyObject *__repr__() const;
 	PyObject *__eq__(const PyObject *obj) const;
 	PyObject *__lt__(const PyObject *obj) const;

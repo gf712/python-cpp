@@ -154,13 +154,18 @@ struct MethodDefinition
 };
 
 using CallSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
-using NewSlotFunctionType = std::function<PyObject*(const PyType *, PyTuple *, PyDict *)>;
+using NewSlotFunctionType = std::function<PyObject *(const PyType *, PyTuple *, PyDict *)>;
 using InitSlotFunctionType = std::function<int32_t(PyObject *, PyTuple *, PyDict *)>;
 using LenSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using ReprSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using IterSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using NextSlotFunctionType = std::function<PyObject *(PyObject *)>;
+
+using AbsSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using NegSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using PosSlotFunctionType = std::function<PyObject *(const PyObject *)>;
+using InvertSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 
 using AddSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 using SubtractSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
@@ -184,6 +189,11 @@ struct TypePrototype
 	std::optional<ExpSlotFunctionType> __exp__;
 	std::optional<LeftShiftSlotFunctionType> __lshift__;
 	std::optional<ModuloSlotFunctionType> __mod__;
+
+	std::optional<AbsSlotFunctionType> __abs__;
+	std::optional<AbsSlotFunctionType> __neg__;
+	std::optional<AbsSlotFunctionType> __pos__;
+	std::optional<AbsSlotFunctionType> __invert__;
 
 	std::optional<CallSlotFunctionType> __call__;
 	// std::variant<std::monostate, NewSlotFunctionType, PyFunction *> __new__;
@@ -246,6 +256,11 @@ class PyObject : public Cell
 	PyObject *exp(const PyObject *other) const;
 	PyObject *lshift(const PyObject *other) const;
 	PyObject *modulo(const PyObject *other) const;
+
+	PyObject *neg() const;
+	PyObject *pos() const;
+	PyObject *abs() const;
+	PyObject *invert() const;
 
 	PyObject *repr() const;
 
@@ -377,6 +392,26 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 	if constexpr (HasModulo<Type>) {
 		type_prototype->__mod__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__mod__(other);
+		};
+	}
+	if constexpr (HasAbs<Type>) {
+		type_prototype->__abs__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__abs__();
+		};
+	}
+	if constexpr (HasNeg<Type>) {
+		type_prototype->__neg__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__neg__();
+		};
+	}
+	if constexpr (HasPos<Type>) {
+		type_prototype->__pos__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__pos__();
+		};
+	}
+	if constexpr (HasInvert<Type>) {
+		type_prototype->__invert__ = [](const PyObject *self) -> PyObject * {
+			return static_cast<const Type *>(self)->__invert__();
 		};
 	}
 	if constexpr (HasBool<Type>) {

@@ -381,4 +381,12 @@ void Assert::print_this_node(const std::string &indent) const
 	}
 }
 
+void UnaryExpr::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}UnaryExpr", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - op_type: {}", indent, stringify_unary_op(m_op_type));
+	m_operand->print_node(new_indent);
+}
+
 }// namespace ast

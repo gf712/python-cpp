@@ -16,6 +16,7 @@
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
+#include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 
 #include "ast/optimizers/ConstantFolding.hpp"
@@ -516,6 +517,28 @@ void BytecodeGenerator::visit(const Raise *) { TODO() }
 void BytecodeGenerator::visit(const Try *) { TODO() }
 
 void BytecodeGenerator::visit(const ExceptHandler *) { TODO() }
+
+void BytecodeGenerator::visit(const UnaryExpr *node)
+{
+	const auto source_register = generate(node->operand().get(), m_function_id);
+	const auto dst_register = allocate_register();
+	switch (node->op_type()) {
+	case UnaryOpType::ADD: {
+		emit<UnaryPositive>(m_function_id, dst_register, source_register);
+	} break;
+	case UnaryOpType::SUB: {
+		emit<UnaryNegative>(m_function_id, dst_register, source_register);
+	} break;
+	case UnaryOpType::INVERT: {
+		emit<UnaryInvert>(m_function_id, dst_register, source_register);
+	} break;
+	case UnaryOpType::NOT: {
+		emit<UnaryNot>(m_function_id, dst_register, source_register);
+	} break;
+	}
+
+	m_last_register = dst_register;
+}
 
 void BytecodeGenerator::visit(const Assert *node)
 {

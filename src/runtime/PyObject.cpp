@@ -60,7 +60,11 @@ bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) cons
 }
 
 
-template<> PyObject *PyObject::from(PyObject *const &value) { return value; }
+template<> PyObject *PyObject::from(PyObject *const &value)
+{
+	ASSERT(value)
+	return value;
+}
 
 template<> PyObject *PyObject::from(const Number &value) { return PyNumber::create(value); }
 
@@ -340,6 +344,41 @@ PyObject *PyObject::modulo(const PyObject *other) const
 	return nullptr;
 }
 
+PyObject *PyObject::abs() const
+{
+	if (m_type_prototype.__abs__.has_value()) { return m_type_prototype.__abs__->operator()(this); }
+	VirtualMachine::the().interpreter().raise_exception(
+		"TypeError: bad operand type for abs(): '{}'", m_type_prototype.__name__);
+	return nullptr;
+}
+
+PyObject *PyObject::neg() const
+{
+	if (m_type_prototype.__neg__.has_value()) { return m_type_prototype.__neg__->operator()(this); }
+	VirtualMachine::the().interpreter().raise_exception(
+		"bad operand type for unary -: '{}'", m_type_prototype.__name__);
+	return nullptr;
+}
+
+PyObject *PyObject::pos() const
+{
+	if (m_type_prototype.__pos__.has_value()) { return m_type_prototype.__pos__->operator()(this); }
+	VirtualMachine::the().interpreter().raise_exception(
+		"bad operand type for unary +: '{}'", m_type_prototype.__name__);
+	return nullptr;
+}
+
+PyObject *PyObject::invert() const
+{
+	if (m_type_prototype.__invert__.has_value()) {
+		return m_type_prototype.__invert__->operator()(this);
+	}
+	VirtualMachine::the().interpreter().raise_exception(
+		"bad operand type for unary ~: '{}'", m_type_prototype.__name__);
+	return nullptr;
+}
+
+
 PyObject *PyObject::bool_() const
 {
 	ASSERT(m_type_prototype.__bool__.has_value())
@@ -387,7 +426,8 @@ PyObject *PyObject::new_(PyTuple *args, PyDict *kwargs) const
 	return nullptr;
 }
 
-std::optional<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs) {
+std::optional<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
+{
 	if (m_type_prototype.__init__.has_value()) {
 		return m_type_prototype.__init__->operator()(this, args, kwargs);
 	}

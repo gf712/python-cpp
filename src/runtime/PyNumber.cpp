@@ -18,6 +18,34 @@ const PyNumber *PyNumber::as_number(const PyObject *obj)
 	return nullptr;
 }
 
+PyObject *PyNumber::__abs__() const
+{
+	return PyNumber::create(
+		std::visit([](const auto &val) { return Number{ std::abs(val) }; }, m_value.value));
+}
+
+PyObject *PyNumber::__neg__() const
+{
+	return PyNumber::create(
+		std::visit([](const auto &val) { return Number{ -val }; }, m_value.value));
+}
+
+PyObject *PyNumber::__pos__() const
+{
+	return PyNumber::create(
+		std::visit([](const auto &val) { return Number{ val }; }, m_value.value));
+}
+
+PyObject *PyNumber::__invert__() const
+{
+	if (std::get<double>(m_value.value)) {
+		VirtualMachine::the().interpreter().raise_exception(
+			type_error("bad operand type for unary ~: 'float'"));
+		return nullptr;
+	}
+	return PyNumber::create(Number{ ~std::get<int64_t>(m_value.value) });
+}
+
 PyObject *PyNumber::__add__(const PyObject *obj) const
 {
 	if (auto *rhs = as_number(obj)) {

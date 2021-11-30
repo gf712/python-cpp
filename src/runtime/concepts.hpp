@@ -79,19 +79,31 @@ template<typename T> concept HasSub = requires(const T *obj, const PyObject *oth
 {
 	obj->__sub__(other);
 };
+
 template<typename T> concept HasMul = requires(const T *obj, const PyObject *other)
 {
 	obj->__mul__(other);
 };
+
 template<typename T> concept HasExp = requires(const T *obj, const PyObject *other)
 {
 	obj->__exp__(other);
 };
+
 template<typename T> concept HasLshift = requires(const T *obj, const PyObject *other)
 {
 	obj->__lshift__(other);
 };
+
 template<typename T> concept HasModulo = requires(const T *obj, const PyObject *other)
 {
 	obj->__mod__(other);
 };
+
+template<typename T> concept HasAbs = requires(const T *obj) { obj->__abs__(); };
+
+template<typename T> concept HasNeg = requires(const T *obj) { obj->__neg__(); };
+
+template<typename T> concept HasPos = requires(const T *obj) { obj->__pos__(); };
+
+template<typename T> concept HasInvert = requires(const T *obj) { obj->__invert__(); };

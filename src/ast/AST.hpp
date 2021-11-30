@@ -43,6 +43,7 @@ namespace ast {
 	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Try)                \
 	__AST_NODE_TYPE(Tuple)              \
+	__AST_NODE_TYPE(UnaryExpr)            \
 	__AST_NODE_TYPE(While)
 
 
@@ -280,6 +281,53 @@ class Assign : public Statement
 	void set_value(std::shared_ptr<ASTNode> v) { m_value = std::move(v); }
 
 	void codegen(CodeGenerator *) const override;
+};
+
+#define UNARY_OPERATIONS \
+	__UNARY_OP(ADD)      \
+	__UNARY_OP(SUB)      \
+	__UNARY_OP(NOT)      \
+	__UNARY_OP(INVERT)
+
+enum class UnaryOpType {
+#define __UNARY_OP(x) x,
+	UNARY_OPERATIONS
+#undef __UNARY_OP
+};
+
+inline std::string_view stringify_unary_op(UnaryOpType op)
+{
+	switch (op) {
+#define __UNARY_OP(x)    \
+	case UnaryOpType::x: \
+		return #x;
+		UNARY_OPERATIONS
+#undef __UNARY_OP
+	}
+	ASSERT_NOT_REACHED()
+}
+
+class UnaryExpr : public ASTNode
+{
+  public:
+  private:
+	const UnaryOpType m_op_type;
+	std::shared_ptr<ASTNode> m_operand;
+
+  public:
+	UnaryExpr(UnaryOpType op_type, std::shared_ptr<ASTNode> operand)
+		: ASTNode(ASTNodeType::UnaryExpr), m_op_type(op_type), m_operand(std::move(operand))
+	{}
+
+	const std::shared_ptr<ASTNode> &operand() const { return m_operand; }
+	std::shared_ptr<ASTNode> &operand() { return m_operand; }
+
+	UnaryOpType op_type() const { return m_op_type; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
 };
 
 #define BINARY_OPERATIONS  \

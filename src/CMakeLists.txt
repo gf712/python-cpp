@@ -20,6 +20,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/StoreAttr.cpp
     executable/bytecode/instructions/StoreName.cpp
+    executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp)
 
 set(EXECUTABLE_SOURCE_FILES # cmake-format: sortable
