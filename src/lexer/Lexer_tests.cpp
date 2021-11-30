@@ -33,9 +33,7 @@ void assert_generates_tokens_without_comment_tokens(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
 {
 	const auto tokens = generate_tokens(program, true, true);
-	for (const auto& t: tokens) {
-		std::cout << t.to_string() << '\n';
-	}
+	for (const auto &t : tokens) { std::cout << t.to_string() << '\n'; }
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
@@ -522,4 +520,13 @@ TEST(Lexer, IgnoreCommentsAndNL)
 		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, Ellipsis)
+{
+	constexpr std::string_view program = "...\n";
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::ELLIPSIS, Token::TokenType::NEWLINE, Token::TokenType::ENDMARKER
+	};
+	assert_generates_tokens(program, expected_tokens);
 }

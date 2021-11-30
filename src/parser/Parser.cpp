@@ -345,7 +345,6 @@ struct AssertPattern
 	static bool matches(std::string_view token_value) { return token_value == "assert"; }
 };
 
-
 struct ExceptPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
@@ -356,6 +355,11 @@ struct FinallyPattern
 	static bool matches(std::string_view token_value) { return token_value == "finally"; }
 };
 
+struct ForPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "for"; }
+};
+
 struct FromPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "from"; }
@@ -364,6 +368,11 @@ struct FromPattern
 struct ImportPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "import"; }
+};
+
+struct InPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "in"; }
 };
 
 struct RaisePattern
@@ -380,7 +389,6 @@ struct WhilePattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "while"; }
 };
-
 
 struct StarAtomPattern : Pattern<StarAtomPattern>
 {
@@ -871,6 +879,12 @@ struct AtomPattern : Pattern<AtomPattern>
 			PatternMatch<OrPattern<DictPattern, SetPattern, DictCompPattern, SetCompPattern>>;
 		if (pattern10::match(p)) {
 			spdlog::debug("(dict | set | dictcomp | setcomp)");
+			return true;
+		}
+
+		using pattern11 = PatternMatch<SingleTokenPattern<Token::TokenType::ELLIPSIS>>;
+		if (pattern11::match(p)) {
+			p.push_to_stack(std::make_shared<Constant>(Ellipsis{}));
 			return true;
 		}
 
@@ -2774,16 +2788,6 @@ struct ClassDefinitionPattern : Pattern<ClassDefinitionPattern>
 		}
 		return false;
 	}
-};
-
-struct ForPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "for"; }
-};
-
-struct InPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "in"; }
 };
 
 struct ForStatementPattern : Pattern<ForStatementPattern>

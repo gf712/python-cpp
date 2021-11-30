@@ -479,6 +479,8 @@ class Lexer
 			return Token::TokenType::DOUBLESTAREQUAL;
 		if (peek(0) == '/' && peek(1) == '/' && peek(2) == '=')
 			return Token::TokenType::DOUBLESLASHEQUAL;
+		if (peek(0) == '.' && peek(1) == '.' && peek(2) == '.') 
+			return Token::TokenType::ELLIPSIS;
 		return {};
 	}
 
