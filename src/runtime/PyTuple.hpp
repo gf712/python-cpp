@@ -22,6 +22,10 @@ class PyTuple : public PyBaseObject
 	static PyTuple *create();
 	static PyTuple *create(std::vector<Value> elements);
 	static PyTuple *create(const std::vector<PyObject *> &elements);
+	template<typename... Args> static PyTuple *create(Args &&... args)
+	{
+		return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... });
+	}
 
 	std::string to_string() const override;
 

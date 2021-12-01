@@ -22,6 +22,8 @@ class PyDict : public PyBaseObject
 	PyDict(const MapType &map);
 	PyDict();
 
+	static PyDict* create();
+
 	PyDictItems *items() const;
 
 	size_t size() const { return m_map.size(); }

@@ -37,12 +37,12 @@ class PyMethodWrapper : public PyBaseObject
 	std::string to_string() const override;
 
 	PyObject *__repr__() const;
+	PyObject *__call__(PyTuple *args, PyDict *kwargs);
 
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type_() const override;
-
 };
 
 template<> inline PyMethodWrapper *as(PyObject *node)

@@ -23,5 +23,3 @@ class FunctionCall final : public Instruction
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
-
-PyObject *execute(Interpreter &, PyObject *func_object, PyTuple *args, PyDict *kwargs, PyDict *ns);

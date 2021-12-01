@@ -1,4 +1,5 @@
 #include "PyType.hpp"
+#include "CustomPyObject.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
 #include "PyMethodWrapper.hpp"

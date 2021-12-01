@@ -46,9 +46,15 @@ class PyFunction : public PyBaseObject
 	const PyCode *code() const { return m_code; }
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
+
+	PyObject *call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
+
+	PyObject *__call__(PyTuple *args, PyDict *kwargs);
 	const std::string &name() const { return m_name; }
 
 	PyDict *globals() const { return m_globals; }
+
+	PyObject *__repr__() const;
 
 	void visit_graph(Visitor &) override;
 
@@ -84,6 +90,7 @@ class PyNativeFunction : public PyBaseObject
 	}
 
 	const std::string &name() const { return m_name; }
+	PyObject *__call__(PyTuple *args, PyDict *kwargs);
 
 	void visit_graph(Visitor &) override;
 

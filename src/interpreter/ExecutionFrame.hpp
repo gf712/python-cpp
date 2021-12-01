@@ -21,17 +21,16 @@ class ExecutionFrame : public Cell
 	PyModule *m_builtins;
 	PyDict *m_globals;
 	PyDict *m_locals;
-	PyDict *m_ns;
+	// PyDict *m_ns;
 	ExecutionFrame *m_parent{ nullptr };
 	PyObject *m_exception{ nullptr };
 	PyObject *m_exception_to_catch{ nullptr };
 
   public:
-	static ExecutionFrame *create(ExecutionFrame *parent,
-		size_t register_count,
-		PyDict *globals,
-		PyDict *locals,
-		PyDict *ns);
+	static ExecutionFrame *
+		create(ExecutionFrame *parent, size_t register_count, PyDict *globals, PyDict *locals
+			// PyDict *ns
+		);
 
 	const std::optional<Value> &parameter(size_t parameter_idx) const
 	{

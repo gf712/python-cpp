@@ -5,7 +5,7 @@
 #include "runtime/PyTuple.hpp"
 
 
-void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &interpreter) const
+void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto func = vm.reg(m_function_name);
 	ASSERT(std::get_if<PyObject *>(&func));
@@ -25,8 +25,9 @@ void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &interpre
 		map.insert_or_assign(String{ m_keywords[i] }, vm.reg(m_kwargs[i]));
 	}
 
-	auto args_dict = vm.heap().allocate<PyDict>(map);
-	ASSERT(args_dict);
+	// FIXME: process kwargs
+	auto kwargs_dict = vm.heap().allocate<PyDict>(map);
+	ASSERT(kwargs_dict);
 
-	::execute(interpreter, function_object, args_tuple, args_dict, nullptr);
+	vm.reg(0) = function_object->call(args_tuple, kwargs_dict);
 }

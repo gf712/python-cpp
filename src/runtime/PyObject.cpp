@@ -2,8 +2,10 @@
 
 #include "AttributeError.hpp"
 #include "PyBool.hpp"
+#include "PyBoundMethod.hpp"
 #include "PyBuiltInMethod.hpp"
 #include "PyBytes.hpp"
+#include "PyDict.hpp"
 #include "PyEllipsis.hpp"
 #include "PyFunction.hpp"
 #include "PyNone.hpp"
@@ -251,7 +253,13 @@ PyObject::PyResult PyObject::ne(const PyObject *other) const
 
 PyObject *PyObject::repr() const
 {
-	if (m_type_prototype.__repr__.has_value()) {
+	if (auto it = m_attributes.find("__repr__"); it != m_attributes.end()) {
+		if (auto result = it->second->call(PyTuple::create(), PyDict::create())) {
+			return result;
+		} else {
+			TODO()
+		}
+	} else if (m_type_prototype.__repr__.has_value()) {
 		return m_type_prototype.__repr__->operator()(this);
 	}
 	TODO()
@@ -267,6 +275,17 @@ size_t PyObject::hash() const
 		return bit_cast<size_t>(this);
 	}
 }
+
+PyObject *PyObject::call(PyTuple *args, PyDict *kwargs)
+{
+	if (m_type_prototype.__call__.has_value()) {
+		return m_type_prototype.__call__->operator()(this, args, kwargs);
+	}
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'{}' object is not callable", m_type_prototype.__name__));
+	return nullptr;
+}
+
 
 PyObject *PyObject::add(const PyObject *other) const
 {

@@ -278,6 +278,8 @@ class PyObject : public Cell
 	PyObject *len() const;
 	PyObject *iter() const;
 	PyObject *next();
+
+	PyObject *call(PyTuple *args, PyDict *kwargs);
 	virtual PyObject *new_(PyTuple *args, PyDict *kwargs) const;
 	std::optional<int32_t> init(PyTuple *args, PyDict *kwargs);
 
@@ -299,8 +301,8 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		};
 	}
 	if constexpr (HasCall<Type>) {
-		type_prototype->__call__ = [](const PyObject *self, PyTuple *args, PyDict *kwargs) {
-			return static_cast<const Type *>(self)->__call__(args, kwargs);
+		type_prototype->__call__ = [](PyObject *self, PyTuple *args, PyDict *kwargs) {
+			return static_cast<Type *>(self)->__call__(args, kwargs);
 		};
 	}
 	if constexpr (HasNew<Type>) {

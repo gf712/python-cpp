@@ -10,15 +10,15 @@ ExecutionFrame::ExecutionFrame() {}
 ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	size_t register_count,
 	PyDict *globals,
-	PyDict *locals,
-	PyDict *ns)
+	PyDict *locals
+	/* PyDict *ns */)
 {
 	auto *new_frame = Heap::the().allocate<ExecutionFrame>();
 	new_frame->m_parent = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
-	new_frame->m_ns = ns;
+	// new_frame->m_ns = ns;
 
 	if (new_frame->m_parent) {
 		new_frame->m_builtins = new_frame->m_parent->m_builtins;
@@ -26,6 +26,7 @@ ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
 		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
 			   == PyObjectType::PY_MODULE)
+		// TODO: could this just return the builtin singleton?
 		new_frame->m_builtins =
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
 	}
@@ -64,9 +65,9 @@ PyModule *ExecutionFrame::builtins() const { return m_builtins; }
 
 ExecutionFrame *ExecutionFrame::exit()
 {
-	if (m_ns) {
-		for (const auto &[k, v] : m_locals->map()) { m_ns->insert(k, v); }
-	}
+	// if (m_ns) {
+	// 	for (const auto &[k, v] : m_locals->map()) { m_ns->insert(k, v); }
+	// }
 	return m_parent;
 }
 
@@ -75,7 +76,7 @@ std::string ExecutionFrame::to_string() const
 	const auto locals = m_locals ? m_locals->to_string() : "";
 	const auto globals = m_globals ? m_globals->to_string() : "";
 	const auto builtins = m_builtins ? m_builtins->to_string() : "";
-	const auto ns = m_ns ? m_ns->to_string() : "";
+	// const auto ns = m_ns ? m_ns->to_string() : "";
 	const void *parent = m_parent ? &m_parent : nullptr;
 
 	return fmt::format(
@@ -84,7 +85,7 @@ std::string ExecutionFrame::to_string() const
 		locals,
 		globals,
 		builtins,
-		ns,
+		0,// ns,
 		parent);
 }
 
@@ -94,7 +95,7 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 	if (m_locals) m_locals->visit_graph(visitor);
 	if (m_globals) m_globals->visit_graph(visitor);
 	if (m_builtins) m_builtins->visit_graph(visitor);
-	if (m_ns) m_ns->visit_graph(visitor);
+	// if (m_ns) m_ns->visit_graph(visitor);
 	for (const auto &val : m_parameters) {
 		if (val.has_value() && std::holds_alternative<PyObject *>(*val)) {
 			std::get<PyObject *>(*val)->visit_graph(visitor);

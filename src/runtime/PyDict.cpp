@@ -17,6 +17,8 @@ PyDict::PyDict(const MapType &map)
 {}
 PyDict::PyDict() : PyBaseObject(PyObjectType::PY_DICT, BuiltinTypes::the().dict()) {}
 
+PyDict *PyDict::create() { return VirtualMachine::the().heap().allocate<PyDict>(); }
+
 std::string PyDict::to_string() const
 {
 	if (m_map.empty()) { return "{}"; }
@@ -26,7 +28,7 @@ std::string PyDict::to_string() const
 
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
-		std::visit(overloaded{ [&os](PyObject *key) { os << key->__repr__()->to_string(); },
+		std::visit(overloaded{ [&os](PyObject *key) { os << key->repr()->to_string(); },
 					   [&os](const auto &key) { os << key; } },
 			it->first);
 		os << ": ";
@@ -34,7 +36,7 @@ std::string PyDict::to_string() const
 								  if (value == this) {
 									  os << "{...}";
 								  } else {
-									  os << value->__repr__()->to_string();
+									  os << value->repr()->to_string();
 								  }
 							  },
 					   [&os](const auto &value) { os << value; } },
@@ -43,14 +45,14 @@ std::string PyDict::to_string() const
 
 		std::advance(it, 1);
 	}
-	std::visit(overloaded{ [&os](PyObject *key) { os << key->__repr__()->to_string() << ": "; },
+	std::visit(overloaded{ [&os](PyObject *key) { os << key->repr()->to_string() << ": "; },
 				   [&os](const auto &key) { os << key << ": "; } },
 		it->first);
 	std::visit(overloaded{ [&os, this](PyObject *value) {
 							  if (value == this) {
 								  os << "{...}";
 							  } else {
-								  os << value->__repr__()->to_string();
+								  os << value->repr()->to_string();
 							  }
 						  },
 				   [&os](const auto &value) { os << value; } },
@@ -160,8 +162,8 @@ std::unique_ptr<TypePrototype> PyDictItems::register_type()
 }
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict)
-	: PyBaseObject(PyObjectType::PY_DICT_ITEMS_ITERATOR, BuiltinTypes::the().dict_items_iterator()), m_pydictitems(pydict),
-	  m_current_iterator(m_pydictitems.m_pydict.map().begin())
+	: PyBaseObject(PyObjectType::PY_DICT_ITEMS_ITERATOR, BuiltinTypes::the().dict_items_iterator()),
+	  m_pydictitems(pydict), m_current_iterator(m_pydictitems.m_pydict.map().begin())
 {}
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict, size_t position)

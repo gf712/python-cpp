@@ -30,6 +30,19 @@ std::string PyMethodWrapper::to_string() const
 
 PyObject *PyMethodWrapper::__repr__() const { return PyString::create(to_string()); }
 
+PyObject *PyMethodWrapper::__call__(PyTuple *args, PyDict *kwargs)
+{
+	// split args tuple -> (args[0], args[1:])
+	// since args[0] is self (hopefully)
+	std::vector<Value> new_args_vector;
+	new_args_vector.reserve(args->size() - 1);
+	PyObject *self = PyObject::from(args->elements()[0]);
+	for (size_t i = 1; i < args->size(); ++i) { new_args_vector.push_back(args->elements()[i]); }
+	args = PyTuple::create(new_args_vector);
+	return m_method_descriptor(self, args, kwargs);
+}
+
+
 PyType *PyMethodWrapper::type_() const { return method_wrapper(); }
 
 namespace {

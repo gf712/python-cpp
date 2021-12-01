@@ -24,6 +24,17 @@ std::string PyBoundMethod::to_string() const
 
 PyObject *PyBoundMethod::__repr__() const { return PyString::create(to_string()); }
 
+PyObject *PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
+{
+	// first create new args tuple -> (self, *args)
+	std::vector<Value> new_args_vector;
+	new_args_vector.reserve(args->size() + 1);
+	new_args_vector.push_back(m_self);
+	for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
+	args = PyTuple::create(new_args_vector);
+	return m_method->call(args, kwargs);
+}
+
 PyType *PyBoundMethod::type_() const { return bound_method(); }
 
 namespace {

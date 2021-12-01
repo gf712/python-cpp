@@ -123,7 +123,7 @@ PyObject *next(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 }
 
 
-PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+PyType *build_class(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 2)
 	auto *class_name = args->operator[](0);
@@ -148,27 +148,28 @@ PyObject *build_class(const PyTuple *args, const PyDict *, Interpreter &interpre
 
 	auto &vm = VirtualMachine::the();
 
-	// TODO: fix tracking of lambda captures
-	return vm.heap().allocate<PyNativeFunction>(
-		class_name_as_string,
-		[class_name, &interpreter, pyfunc, class_name_as_string](
-			const PyTuple *call_args, PyDict *call_kwargs) {
-			spdlog::debug("Calling __build_class__");
+	// // TODO: fix tracking of lambda captures
+	// return vm.heap().allocate<PyNativeFunction>(
+	// 	class_name_as_string,
+	// 	[class_name, &interpreter, pyfunc, class_name_as_string](
+	// 		const PyTuple *call_args, PyDict *call_kwargs) {
+	// 		spdlog::debug("Calling __build_class__");
 
-			std::vector args_vector{ class_name };
-			for (const auto &arg : *call_args) { args_vector.push_back(arg); }
+	// 		std::vector args_vector{ class_name };
+	// 		for (const auto &arg : *call_args) { args_vector.push_back(arg); }
 
-			auto &vm = VirtualMachine::the();
-			auto class_args = vm.heap().allocate<PyTuple>(args_vector);
+	// 		auto &vm = VirtualMachine::the();
+	// 		auto class_args = vm.heap().allocate<PyTuple>(args_vector);
 
-			auto *ns = vm.heap().allocate<PyDict>();
-			execute(interpreter, pyfunc, class_args, call_kwargs, ns);
+	// 		auto *ns = vm.heap().allocate<PyDict>();
+	// 		execute(interpreter, pyfunc, class_args, call_kwargs, ns);
 
-			CustomPyObjectContext ctx{ class_name_as_string, ns };
-			return vm.heap().allocate<CustomPyObject>(ctx, PyTuple::create());
-		},
-		class_name,
-		pyfunc);
+	// 		CustomPyObjectContext ctx{ class_name_as_string, ns };
+	// 		return vm.heap().allocate<CustomPyObject>(ctx, PyTuple::create());
+	// 	},
+	// 	class_name,
+	// 	pyfunc);
+	return nullptr;
 }
 
 PyObject *globals(const PyTuple *, const PyDict *, Interpreter &interpreter)

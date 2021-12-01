@@ -40,12 +40,31 @@ std::string PyTuple::to_string() const
 	std::ostringstream os;
 
 	os << "(";
-	auto it = m_elements.begin();
-	while (std::next(it) != m_elements.end()) {
-		std::visit([&os](const auto &value) { os << value << ", "; }, *it);
-		std::advance(it, 1);
+	if (!m_elements.empty()) {
+		auto it = m_elements.begin();
+		while (std::next(it) != m_elements.end()) {
+			std::visit(overloaded{ [&os](const auto &value) { os << value; },
+						   [&os, this](PyObject *value) {
+							   if (value == this) {
+								   os << "{...}";
+							   } else {
+								   os << value->repr()->to_string();
+							   }
+						   } },
+				*it);
+			std::advance(it, 1);
+			os << ", ";
+		}
+		std::visit(overloaded{ [&os](const auto &value) { os << value; },
+					   [&os, this](PyObject *value) {
+						   if (value == this) {
+							   os << "{...}";
+						   } else {
+							   os << value->repr()->to_string();
+						   }
+					   } },
+			*it);
 	}
-	std::visit([&os](const auto &value) { os << value; }, *it);
 	os << ")";
 
 	return os.str();

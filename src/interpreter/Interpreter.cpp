@@ -54,7 +54,7 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame = ExecutionFrame::create(nullptr, local_registers, globals, locals, nullptr);
+	m_current_frame = ExecutionFrame::create(nullptr, local_registers, globals, locals); //, nullptr);
 	m_global_frame = m_current_frame;
 }
 
