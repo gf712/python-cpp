@@ -9,12 +9,12 @@ class PyType : public PyBaseObject
 	friend class Heap;
 
   private:
-	TypePrototype &m_underlying_type;
+	TypePrototype m_underlying_type;
 
-	PyType(TypePrototype &type_prototype);
+	PyType(TypePrototype type_prototype);
 
   public:
-	static PyType *initialize(TypePrototype &type_prototype);
+	static PyType *initialize(TypePrototype type_prototype);
 
 	const std::string &name() const { return m_underlying_type.__name__; }
 
@@ -22,6 +22,8 @@ class PyType : public PyBaseObject
 	PyObject *__repr__() const;
 
 	PyObject *new_(PyTuple *args, PyDict *kwargs) const override;
+
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	std::string to_string() const override;
 

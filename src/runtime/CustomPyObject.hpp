@@ -2,23 +2,16 @@
 
 #include "PyObject.hpp"
 
-struct CustomPyObjectContext
-{
-	const std::string name;
-	const PyDict *attributes;
-};
-
-// a user defined PyObject
 class CustomPyObject : public PyBaseObject
 {
+	const PyType *m_type_obj;
   public:
-	CustomPyObject(const CustomPyObjectContext &ctx, const PyTuple *);
+	CustomPyObject(const PyType* type);
 
-	std::string to_string() const override { return fmt::format("CustomPyObject"); }
+	std::string to_string() const override { return fmt::format("object"); }
+
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type_() const override;
-
-  private:
-	bool update_slot_if_special(const std::string &name, PyObject *value);
 };

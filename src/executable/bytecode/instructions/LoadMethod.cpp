@@ -1,6 +1,9 @@
 #include "LoadMethod.hpp"
+#include "runtime/AttributeError.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyType.hpp"
+
 
 void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
@@ -22,12 +25,13 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		}
 	} else {
 		auto maybe_method = this_obj->get(m_method_name, interpreter);
+		if (!maybe_method) {
+			interpreter.raise_exception(attribute_error(
+				"object '{}' has no attribute '{}'", this_obj->name(), m_method_name));
+			return;
+		}
 		ASSERT(maybe_method)
-		ASSERT(maybe_method->type() == PyObjectType::PY_FUNCTION
-			   || maybe_method->type() == PyObjectType::PY_NATIVE_FUNCTION
-			   || maybe_method->type() == PyObjectType::PY_METHOD_WRAPPER
-			   || maybe_method->type() == PyObjectType::PY_BUILTIN_METHOD
-			   || maybe_method->type() == PyObjectType::PY_BOUND_METHOD)
+		ASSERT(maybe_method->is_callable())
 		vm.reg(m_destination) = std::move(maybe_method);
 	}
 }

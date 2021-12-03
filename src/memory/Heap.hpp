@@ -163,6 +163,7 @@ class Slab
 		block256 = std::make_unique<Block>(256, 1000);
 		block512 = std::make_unique<Block>(512, 1000);
 		block1024 = std::make_unique<Block>(1024, 1000);
+		block2048 = std::make_unique<Block>(2048, 1000);
 	}
 
 	std::unique_ptr<Block> &block_128() { return block128; }
@@ -179,12 +180,13 @@ class Slab
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 128) { return block128->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 256) { return block256->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 512) { return block512->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) {
-			return block1024->allocate();
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) { return block1024->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
+			return block2048->allocate();
 		} else {
 			[]<bool flag = false>()
 			{
-				static_assert(flag, "only object sizes <= 1024 bytes are currently supported");
+				static_assert(flag, "only object sizes <= 2048 bytes are currently supported");
 			}
 			();
 		}
@@ -230,6 +232,7 @@ class Slab
 		block256->reset();
 		block512->reset();
 		block1024->reset();
+		block2048->reset();
 	}
 
   private:
@@ -240,6 +243,7 @@ class Slab
 	std::unique_ptr<Block> block256{ nullptr };
 	std::unique_ptr<Block> block512{ nullptr };
 	std::unique_ptr<Block> block1024{ nullptr };
+	std::unique_ptr<Block> block2048{ nullptr };
 };
 
 class Heap
@@ -247,7 +251,7 @@ class Heap
 	, NonMoveable
 {
 	uint8_t *m_static_memory;
-	size_t m_static_memory_size{ 16 * KB };
+	size_t m_static_memory_size{ 1 * MB };
 	size_t m_static_offset{ 8 };
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;

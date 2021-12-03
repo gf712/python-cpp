@@ -289,6 +289,8 @@ class PyObject : public Cell
 	PyObject *__bool__() const;
 
 	bool is_pyobject() const override { return true; }
+	bool is_callable() const;
+	const std::string& name() const;
 };
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)

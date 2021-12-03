@@ -102,6 +102,32 @@ PyObject::PyObject(PyObjectType type, const TypePrototype &type_)
 			this);
 		put(m.name, builtin_method);
 	}
+
+	if (m_type_prototype.__dict__) {
+		for (auto [attr_name, attr] : m_type_prototype.__dict__->map()) {
+
+			if (std::get<PyObject *>(attr)) {
+				auto *attr_obj = std::get<PyObject *>(attr);
+				if (attr_obj->m_type_prototype.__call__.has_value()) {
+					// attribute is a callable so it becomes a method
+					if (as<PyFunction>(attr_obj)) {
+						attr = PyBoundMethod::create(this, as<PyFunction>(attr_obj));
+					} else {
+						TODO()
+					}
+				}
+			}
+			if (std::holds_alternative<String>(attr_name)) {
+				put(std::get<String>(attr_name).s, PyObject::from(attr));
+			} else if (std::holds_alternative<PyObject *>(attr_name)) {
+				auto *obj = std::get<PyObject *>(attr_name);
+				ASSERT(as<PyString>(obj))
+				put(as<PyString>(obj)->value(), PyObject::from(attr));
+			} else {
+				TODO()
+			}
+		}
+	}
 }
 
 void PyObject::visit_graph(Visitor &visitor)
@@ -447,7 +473,15 @@ PyObject *PyObject::new_(PyTuple *args, PyDict *kwargs) const
 
 std::optional<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 {
-	if (m_type_prototype.__init__.has_value()) {
+	if (auto it = m_attributes.find("__init__"); it != m_attributes.end()) {
+		PyObject *obj = it->second;
+		if (obj->call(args, kwargs)) {
+			return 0;
+		} else {
+			// maybe?
+			return 1;
+		}
+	} else if (m_type_prototype.__init__.has_value()) {
 		return m_type_prototype.__init__->operator()(this, args, kwargs);
 	}
 	return {};
@@ -461,3 +495,7 @@ PyObject *PyObject::__eq__(const PyObject *other) const
 PyObject *PyObject::__bool__() const { return py_true(); }
 
 size_t PyObject::__hash__() const { return bit_cast<size_t>(this) >> 4; }
+
+bool PyObject::is_callable() const { return m_type_prototype.__call__.has_value(); }
+
+const std::string &PyObject::name() const { return m_type_prototype.__name__; }

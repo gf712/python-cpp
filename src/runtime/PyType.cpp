@@ -19,7 +19,7 @@ std::unique_ptr<TypePrototype> register_type() { return std::move(klass<PyType>(
 }// namespace
 
 
-PyType::PyType(TypePrototype &type_prototype)
+PyType::PyType(TypePrototype type_prototype)
 	: PyBaseObject(PyObjectType::PY_TYPE, BuiltinTypes::the().type()),
 	  m_underlying_type(type_prototype)
 {}
@@ -35,7 +35,7 @@ PyType *PyType::type_() const
 	}
 }
 
-PyType *PyType::initialize(TypePrototype &type_prototype)
+PyType *PyType::initialize(TypePrototype type_prototype)
 {
 	auto *type = VirtualMachine::the().heap().allocate_static<PyType>(type_prototype).get();
 	type->initialize();
@@ -51,7 +51,9 @@ std::unique_ptr<TypePrototype> PyType::register_type()
 
 void PyType::initialize()
 {
-	m_underlying_type.__dict__ = VirtualMachine::the().heap().allocate<PyDict>();
+	// FIXME: this is only allocated in static memory so that the lifetime of __dict__
+	//        matches the one of m_underlying_type
+	m_underlying_type.__dict__ = VirtualMachine::the().heap().allocate_static<PyDict>().get();
 	m_attributes["__dict__"] = m_underlying_type.__dict__;
 	if (m_underlying_type.__add__.has_value()) {
 		auto *name = PyString::create("__add__");
@@ -82,22 +84,60 @@ void PyType::initialize()
 
 PyObject *PyType::new_(PyTuple *args, PyDict *kwargs) const
 {
-	if (m_underlying_type.__new__.has_value()) {
+	if (auto it = m_underlying_type.__dict__->map().find(String{ "__new__" });
+		it != m_underlying_type.__dict__->map().end()) {
+		ASSERT(std::holds_alternative<PyObject *>(it->second))
+		auto *obj = std::get<PyObject *>(it->second);
+		return obj->call(args, kwargs);
+	} else if (m_underlying_type.__new__.has_value()) {
 		return m_underlying_type.__new__->operator()(this, args, kwargs);
 	}
 	return nullptr;
 }
 
 
+PyObject *PyType::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(!kwargs || kwargs->map().empty())
+
+	auto *name = as<PyString>(PyObject::from(args->elements()[0]));
+	ASSERT(name)
+	auto *bases = as<PyTuple>(PyObject::from(args->elements()[1]));
+	ASSERT(bases)
+	auto *ns = as<PyDict>(PyObject::from(args->elements()[2]));
+	ASSERT(ns)
+
+	if (bases->size() > 0) { TODO() }
+
+	auto klass_ = klass<CustomPyObject>(name->value());
+	auto *type = VirtualMachine::the().heap().allocate<PyType>(*klass_.type);
+	type->initialize();
+
+	for (const auto &[key, v] : ns->map()) {
+		auto *attr_method_name = [](const auto &k) {
+			if (std::holds_alternative<String>(k)) {
+				return PyString::create(std::get<String>(k).s);
+			} else if (std::holds_alternative<PyObject *>(k)) {
+				auto *obj = std::get<PyObject *>(k);
+				ASSERT(as<PyString>(obj))
+				return as<PyString>(obj);
+			} else {
+				TODO()
+			}
+		}(key);
+
+		type->m_underlying_type.__dict__->insert(attr_method_name, v);
+	}
+
+	return type;
+}
+
 PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	if (this == ::type()) {
-		if (args->size() == 1) {
-			return PyObject::from(args->elements()[0])->type_();
-		} else if (args->size() == 3) {
-			TODO()
-		} else {
+		if (args->size() == 1) { return PyObject::from(args->elements()[0])->type_(); }
+		if (args->size() != 3) {
 			VirtualMachine::the().interpreter().raise_exception(
 				type_error("type() takes 1 or 3 arguments, got {}", args->size()));
 			return nullptr;

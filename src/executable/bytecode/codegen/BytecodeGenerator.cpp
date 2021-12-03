@@ -395,7 +395,7 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 
 	emit<FunctionCall>(m_function_id,
 		builtin_build_class_register,
-		std::vector{ class_name_register, class_location_register });
+		std::vector{ class_location_register, class_name_register });
 
 	emit<StoreName>(m_function_id, node->name(), Register{ 0 });
 

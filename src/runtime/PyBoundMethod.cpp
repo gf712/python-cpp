@@ -3,10 +3,17 @@
 #include "PyString.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include "vm/VM.hpp"
 
 PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
-	: PyBaseObject(PyObjectType::PY_BOUND_METHOD, BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
+	: PyBaseObject(PyObjectType::PY_BOUND_METHOD, BuiltinTypes::the().bound_method()), m_self(self),
+	  m_method(method)
 {}
+
+PyBoundMethod *PyBoundMethod::create(PyObject *self, PyFunction *method)
+{
+	return VirtualMachine::the().heap().allocate<PyBoundMethod>(self, method);
+}
 
 void PyBoundMethod::visit_graph(Visitor &visitor)
 {

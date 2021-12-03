@@ -123,53 +123,83 @@ PyObject *next(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 }
 
 
-PyType *build_class(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
+	if (args->size() < 2) {
+		interpreter.raise_exception(
+			type_error("__build_class__: not enough arguments, got {}", args->size()));
+		return nullptr;
+	}
 	ASSERT(args->size() == 2)
-	auto *class_name = args->operator[](0);
-	auto *function_location = args->operator[](1);
+	// FIXME: should accept metaclass keyword
+	ASSERT(!kwargs || kwargs->map().empty())
+	auto *maybe_function_location = args->operator[](0);
+	auto *class_name = args->operator[](1);
 	spdlog::debug(
-		"__build_class__({}, {})", class_name->to_string(), function_location->to_string());
+		"__build_class__({}, {})", class_name->to_string(), maybe_function_location->to_string());
 
-	ASSERT(as<PyString>(class_name))
+	if (!as<PyString>(class_name)) {
+		interpreter.raise_exception(type_error("__build_class__: name is not a string"));
+		return nullptr;
+	}
 	auto class_name_as_string = as<PyString>(class_name)->value();
 
-	ASSERT(as<PyInteger>(function_location))
-	auto pynumber = as<PyInteger>(function_location)->value();
-	auto function_id = std::get<int64_t>(pynumber.value);
+	PyFunction *callable = [&]() -> PyFunction * {
+		if (auto *pynumber = as<PyInteger>(maybe_function_location)) {
+			auto function_id = std::get<int64_t>(pynumber->value().value);
+			// FIXME: what should be the global dictionary for this?
+			// FIXME: what should be the module for this?
+			return make_function(class_name_as_string,
+				function_id,
+				std::vector<std::string>{},
+				nullptr,
+				interpreter.execution_frame()->globals());
+		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {
+			return pyfunc;
+		} else {
+			interpreter.raise_exception(type_error("__build_class__: func must be callable"));
+			return nullptr;
+		}
+	}();
 
-	// FIXME: what should be the global dictionary for this?
-	// FIXME: what should be the module for this?
-	auto *pyfunc = make_function(class_name_as_string,
-		function_id,
-		std::vector<std::string>{},
-		nullptr,
-		interpreter.execution_frame()->globals());
+	if (!callable) { return nullptr; }
 
-	auto &vm = VirtualMachine::the();
+	auto *ns = PyDict::create();
+	auto *bases = PyTuple::create();
 
-	// // TODO: fix tracking of lambda captures
-	// return vm.heap().allocate<PyNativeFunction>(
-	// 	class_name_as_string,
-	// 	[class_name, &interpreter, pyfunc, class_name_as_string](
-	// 		const PyTuple *call_args, PyDict *call_kwargs) {
-	// 		spdlog::debug("Calling __build_class__");
+	// this calls a function that defines a call
+	// For example:
+	// class A:
+	// 	def foo(self):
+	//		pass
+	//
+	// becomes something like this (in bytecode):
+	//   1           0 LOAD_NAME                0 (__name__)
+	//               2 STORE_NAME               1 (__module__)
+	//               4 LOAD_CONST               0 ('A')
+	//               6 STORE_NAME               2 (__qualname__)
 
-	// 		std::vector args_vector{ class_name };
-	// 		for (const auto &arg : *call_args) { args_vector.push_back(arg); }
+	//   2           8 LOAD_CONST               1 (<code object foo at 0x5557f27c0390, file
+	//   "example.py", line 2>)
+	//              10 LOAD_CONST               2 ('A.foo')
+	//              12 MAKE_FUNCTION            0
+	//              14 STORE_NAME               3 (foo)
+	//              16 LOAD_CONST               3 (None)
+	//              18 RETURN_VALUE
+	// and calling these instructions creates the class' methods and attributes (i.e. foo)
+	// call with frame keeps a reference to locals in a ns
+	// so we have a reference to all class attributes and methods
+	// i.e. {__module__: __name__, __qualname__: 'A', foo: <function A.foo>}
+	callable->call_with_frame(ns, PyTuple::create(), PyDict::create());
 
-	// 		auto &vm = VirtualMachine::the();
-	// 		auto class_args = vm.heap().allocate<PyTuple>(args_vector);
+	auto *call_args = PyTuple::create(class_name, bases, ns);
 
-	// 		auto *ns = vm.heap().allocate<PyDict>();
-	// 		execute(interpreter, pyfunc, class_args, call_kwargs, ns);
+	// FIXME: determine what the actual metaclass is
+	auto *metaclass = type();
 
-	// 		CustomPyObjectContext ctx{ class_name_as_string, ns };
-	// 		return vm.heap().allocate<CustomPyObject>(ctx, PyTuple::create());
-	// 	},
-	// 	class_name,
-	// 	pyfunc);
-	return nullptr;
+	PyObject *cls = metaclass->__call__(call_args, nullptr);
+	ASSERT(as<PyType>(cls))
+	return cls;
 }
 
 PyObject *globals(const PyTuple *, const PyDict *, Interpreter &interpreter)

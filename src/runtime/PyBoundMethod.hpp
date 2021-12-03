@@ -4,11 +4,13 @@
 
 class PyBoundMethod : public PyBaseObject
 {
+	friend class Heap;
 	PyObject *m_self;
 	PyFunction *m_method;
 
-  public:
 	PyBoundMethod(PyObject *self, PyFunction *method);
+  public:
+	static PyBoundMethod *create(PyObject *self, PyFunction *method);
 
 	PyObject *self() { return m_self; }
 	PyFunction *method() { return m_method; }

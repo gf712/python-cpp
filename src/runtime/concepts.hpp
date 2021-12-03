@@ -7,7 +7,7 @@ template<typename T> concept HasCreate = requires(T *self, PyTuple *args, PyDict
 	T::create(self, args, kwargs);
 };
 
-template<typename T> concept HasCall = requires(const T *self, PyTuple *args, PyDict *kwargs)
+template<typename T> concept HasCall = requires(T *self, PyTuple *args, PyDict *kwargs)
 {
 	self->__call__(args, kwargs);
 };

@@ -27,6 +27,11 @@ std::string PyBuiltInMethod::to_string() const
 
 PyObject *PyBuiltInMethod::__repr__() const { return PyString::create(to_string()); }
 
+PyObject *PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
+{
+	return m_builtin_method(args, kwargs);
+}
+
 PyBuiltInMethod *PyBuiltInMethod::create(std::string name,
 	std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
 	PyObject *self)
