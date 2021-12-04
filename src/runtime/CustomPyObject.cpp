@@ -13,23 +13,21 @@
 
 CustomPyObject::CustomPyObject(const PyType *type)
 	: PyBaseObject(PyObjectType::PY_CUSTOM_TYPE, type->underlying_type()), m_type_obj(type)
-{
-}
+{}
 
 PyObject *CustomPyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	if (args && !args->elements().empty()) {
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("object() takes no arguments"));
-		return nullptr;
-	}
-	if (kwargs && !kwargs->map().empty()) {
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("object() takes no arguments"));
-		return nullptr;
+	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
+		if (&*type->underlying_type().__init__ == &*custom_object()->underlying_type().__init__) {
+			VirtualMachine::the().interpreter().raise_exception(
+				type_error("object() takes no arguments"));
+			return nullptr;
+		}
 	}
 	return VirtualMachine::the().heap().allocate<CustomPyObject>(type);
 }
+
+std::optional<int32_t> CustomPyObject::__init__(PyTuple *, PyDict *) { return 0; }
 
 PyType *CustomPyObject::type_() const
 {

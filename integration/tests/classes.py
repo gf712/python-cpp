@@ -7,9 +7,8 @@ class A:
         return "foo"
 
 class B:
-    a = 1
-    def __init__(self):
-        self.a = -1
+    def __init__(self, value):
+        self.a = value
 
     def __repr__(self):
         return "foob"
@@ -20,7 +19,7 @@ class B:
 a = A()
 assert a.__repr__() == "foo"
 assert a.a == 2
-b = B()
+b = B(-1)
 assert b.__repr__() == "foob"
 assert b.foo(a).a == a.a
 assert b.a == -1

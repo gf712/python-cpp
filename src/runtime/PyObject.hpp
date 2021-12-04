@@ -155,7 +155,7 @@ struct MethodDefinition
 
 using CallSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
 using NewSlotFunctionType = std::function<PyObject *(const PyType *, PyTuple *, PyDict *)>;
-using InitSlotFunctionType = std::function<int32_t(PyObject *, PyTuple *, PyDict *)>;
+using InitSlotFunctionType = std::function<std::optional<int32_t>(PyObject *, PyTuple *, PyDict *)>;
 using LenSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using ReprSlotFunctionType = std::function<PyObject *(const PyObject *)>;
@@ -290,7 +290,7 @@ class PyObject : public Cell
 
 	bool is_pyobject() const override { return true; }
 	bool is_callable() const;
-	const std::string& name() const;
+	const std::string &name() const;
 };
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
