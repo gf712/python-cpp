@@ -23,6 +23,12 @@ FetchContent_Declare(
 	GIT_TAG release-1.11.0)
 FetchContent_MakeAvailable(gtest)
 
+FetchContent_Declare(
+	cxxopts
+	GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+	GIT_TAG v3.0.0)
+FetchContent_MakeAvailable(cxxopts)
+
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::GMock ALIAS gmock)
 add_library(GTest::Main ALIAS gtest_main)

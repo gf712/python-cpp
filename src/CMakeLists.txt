@@ -113,4 +113,4 @@ endif()
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)
 
 add_executable(python repl/repl.cpp)
-target_link_libraries(python PRIVATE linenoise python-cpp)
+target_link_libraries(python PRIVATE linenoise cxxopts python-cpp)
