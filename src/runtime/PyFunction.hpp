@@ -50,7 +50,7 @@ class PyFunction : public PyBaseObject
 	PyObject *call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
 
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
-	const std::string &name() const { return m_name; }
+	const std::string &function_name() const { return m_name; }
 
 	PyDict *globals() const { return m_globals; }
 

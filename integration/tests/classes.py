@@ -27,3 +27,12 @@ b = B(-1)
 assert b.__repr__() == "foob"
 assert b.foo(a).a == a.a
 assert b.a == -1
+
+def foo():
+    return 1
+
+class C:
+    a = staticmethod(foo)
+
+c = C()
+assert c.a() == foo()

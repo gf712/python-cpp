@@ -118,7 +118,8 @@ PyObject::PyObject(PyObjectType type, const TypePrototype &type_)
 						attr = VirtualMachine::the().heap().allocate<PyNativeFunction>(
 							name->value(),
 							[attr_obj](PyTuple *args, PyDict *kwargs) {
-								return as<PyStaticMethod>(attr_obj)->__call__(args, kwargs);
+								return as<PyStaticMethod>(attr_obj)->call_static_method(
+									args, kwargs);
 							},
 							attr_obj);
 					} else if (as<PySlotWrapper>(attr_obj)) {

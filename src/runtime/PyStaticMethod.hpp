@@ -4,28 +4,35 @@
 
 class PyStaticMethod : public PyBaseObject
 {
+	using TypeBoundFunctionType = std::function<PyObject *(PyType *, PyTuple *, PyDict *)>;
+	using FreeFunctionType = std::function<PyObject *(PyTuple *, PyDict *)>;
+
 	PyString *m_name;
-	PyType *m_underlying_type;
-	std::function<PyObject *(PyType *, PyTuple *, PyDict *)> m_static_method;
+	PyType *m_underlying_type{ nullptr };
+	std::variant<TypeBoundFunctionType, FreeFunctionType> m_static_method;
 
 	friend class Heap;
 
 	PyStaticMethod(PyString *name,
 		PyType *underlying_type,
-		std::function<PyObject *(PyType *, PyTuple *, PyDict *)> function);
+		std::variant<TypeBoundFunctionType, FreeFunctionType> function);
 
   public:
-	static PyStaticMethod *create(PyString *name,
-		PyType *underlying_type,
-		std::function<PyObject *(PyType *, PyTuple *, PyDict *)> function);
+	static PyStaticMethod *
+		create(PyString *name, PyType *underlying_type, TypeBoundFunctionType function);
+
+	static PyStaticMethod *create(PyString *name, FreeFunctionType function);
 
 	PyString *static_method_name() { return m_name; }
-	const std::function<PyObject *(PyType *, PyTuple *, PyDict *)> &static_method() { return m_static_method; }
+	const std::variant<TypeBoundFunctionType, FreeFunctionType> &static_method()
+	{
+		return m_static_method;
+	}
 
 	std::string to_string() const override;
 
 	PyObject *__repr__() const;
-	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyObject *call_static_method(PyTuple *args, PyDict *kwargs);
 
 	void visit_graph(Visitor &visitor) override;
 

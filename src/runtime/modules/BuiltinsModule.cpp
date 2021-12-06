@@ -8,6 +8,7 @@
 #include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyRange.hpp"
+#include "runtime/PyStaticMethod.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
@@ -332,6 +333,24 @@ PyObject *abs(const PyTuple *args, const PyDict *kwargs, Interpreter &interprete
 	return PyObject::from(args->elements()[0])->abs();
 }
 
+PyObject *staticmethod(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (args->size() != 1) {
+		interpreter.raise_exception(
+			type_error("staticmethod() takes exactly one argument ({} given)", args->size()));
+		return nullptr;
+	}
+	if (kwargs && !kwargs->map().empty()) {
+		interpreter.raise_exception(type_error("staticmethod() takes no keyword arguments"));
+		return nullptr;
+	}
+
+	auto *function = as<PyFunction>(PyObject::from(args->elements()[0]));
+
+	return PyStaticMethod::create(PyString::create(function->function_name()),
+		[function](PyTuple *args, PyDict *kwargs) { return function->__call__(args, kwargs); });
+}
+
 }// namespace
 
 auto initialize_types()
@@ -464,6 +483,12 @@ PyModule *builtins_module(Interpreter &interpreter)
 		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return repr(args, kwargs, interpreter);
 		}));
+
+	s_builtin_module->insert(PyString::create("staticmethod"),
+		heap.allocate<PyNativeFunction>(
+			"staticmethod", [&interpreter](PyTuple *args, PyDict *kwargs) {
+				return staticmethod(args, kwargs, interpreter);
+			}));
 
 	return s_builtin_module;
 }
