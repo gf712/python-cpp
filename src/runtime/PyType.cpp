@@ -4,6 +4,7 @@
 #include "PyFunction.hpp"
 #include "PyMethodWrapper.hpp"
 #include "PySlotWrapper.hpp"
+#include "PyStaticMethod.hpp"
 #include "PyString.hpp"
 #include "TypeError.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -12,6 +13,40 @@
 #include "vm/VM.hpp"
 
 namespace {
+
+TypePrototype clone(std::string name, const TypePrototype &prototype)
+{
+	TypePrototype type_prototype;
+	type_prototype.__name__ = std::move(name);
+#define COPY_SLOT(NAME) type_prototype. NAME = prototype. NAME;
+	COPY_SLOT(__repr__)
+	COPY_SLOT(__call__)
+	COPY_SLOT(__new__)
+	COPY_SLOT(__init__)
+	COPY_SLOT(__hash__)
+	COPY_SLOT(__lt__)
+	COPY_SLOT(__le__)
+	COPY_SLOT(__eq__)
+	COPY_SLOT(__ne__)
+	COPY_SLOT(__gt__)
+	COPY_SLOT(__ge__)
+	COPY_SLOT(__iter__)
+	COPY_SLOT(__next__)
+	COPY_SLOT(__len__)
+	COPY_SLOT(__add__)
+	COPY_SLOT(__sub__)
+	COPY_SLOT(__mul__)
+	COPY_SLOT(__exp__)
+	COPY_SLOT(__lshift__)
+	COPY_SLOT(__mod__)
+	COPY_SLOT(__abs__)
+	COPY_SLOT(__neg__)
+	COPY_SLOT(__pos__)
+	COPY_SLOT(__invert__)
+	COPY_SLOT(__bool__)
+#undef COPY_SLOT
+	return type_prototype;
+}
 
 std::once_flag type_flag;
 
@@ -74,6 +109,15 @@ void PyType::initialize()
 		m_attributes["__call__"] = call_fn;
 		m_underlying_type.__dict__->insert(name, call_fn);
 	}
+	if (m_underlying_type.__new__.has_value()) {
+		auto *name = PyString::create("__new__");
+		auto *call_fn =
+			PyStaticMethod::create(name, this, [this](PyType *type, PyTuple *args, PyDict *kwargs) {
+				return (*m_underlying_type.__new__)(type, args, kwargs);
+			});
+		m_attributes["__new__"] = call_fn;
+		m_underlying_type.__dict__->insert(name, call_fn);
+	}
 	for (auto method : m_underlying_type.__methods__) {
 		auto *name = PyString::create(method.name);
 		auto *method_fn = PyMethodWrapper::create(name, this, method.method);
@@ -88,6 +132,13 @@ PyObject *PyType::new_(PyTuple *args, PyDict *kwargs) const
 		it != m_underlying_type.__dict__->map().end()) {
 		ASSERT(std::holds_alternative<PyObject *>(it->second))
 		auto *obj = std::get<PyObject *>(it->second);
+		// prepend class type to args tuple -> obj->call((cls, *args), kwargs)
+		std::vector<Value> args_with_type;
+		args_with_type.reserve(args->size() + 1);
+		// FIXME: remove this const_cast. Either args are const or PyType::new_ should not be const
+		args_with_type.push_back(const_cast<PyType *>(this));
+		for (const auto &el : args->elements()) { args_with_type.push_back(el); }
+		args = PyTuple::create(args_with_type);
 		return obj->call(args, kwargs);
 	} else if (m_underlying_type.__new__.has_value()) {
 		return m_underlying_type.__new__->operator()(this, args, kwargs);
@@ -96,8 +147,10 @@ PyObject *PyType::new_(PyTuple *args, PyDict *kwargs) const
 }
 
 
-PyObject *PyType::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
+PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 {
+	(void)type_;
+	ASSERT(args && args->size() == 3)
 	ASSERT(!kwargs || kwargs->map().empty())
 
 	auto *name = as<PyString>(PyObject::from(args->elements()[0]));
@@ -109,8 +162,8 @@ PyObject *PyType::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 
 	if (bases->size() > 0) { TODO() }
 
-	auto klass_ = klass<CustomPyObject>(name->value());
-	auto *type = VirtualMachine::the().heap().allocate<PyType>(*klass_.type);
+	auto *type =
+		VirtualMachine::the().heap().allocate<PyType>(clone(name->value(), custom_object()->underlying_type()));
 	type->initialize();
 
 	for (const auto &[key, v] : ns->map()) {

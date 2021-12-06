@@ -1,5 +1,9 @@
 class A:
     a = 1
+    def __new__(cls):
+        assert A == cls
+        return object.__new__(cls)
+
     def __init__(self):
         self.a = 2
 

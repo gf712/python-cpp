@@ -66,6 +66,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyTuple.cpp
     runtime/PyType.cpp
     runtime/PySlotWrapper.cpp
+    runtime/PyStaticMethod.cpp
     runtime/Value.cpp)
 
 set(VM_SOURCE_FILES # cmake-format: sortable

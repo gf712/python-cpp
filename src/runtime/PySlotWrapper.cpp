@@ -23,7 +23,7 @@ PyObject *PySlotWrapper::__repr__() const { return PyString::create(to_string())
 PyObject *PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 {
 	// split args tuple -> (args[0], args[1:])
-	// since args[0] is self (hopefully)
+	// since args[0] is self (right?)
 	std::vector<Value> new_args_vector;
 	new_args_vector.reserve(args->size() - 1);
 	PyObject *self = PyObject::from(args->elements()[0]);
@@ -43,7 +43,6 @@ PySlotWrapper::PySlotWrapper(PyString *name,
 	: PyBaseObject(PyObjectType::PY_SLOT_WRAPPER, BuiltinTypes::the().slot_wrapper()),
 	  m_name(std::move(name)), m_underlying_type(underlying_type), m_slot(std::move(function))
 {}
-
 
 PySlotWrapper *PySlotWrapper::create(PyString *name,
 	PyType *underlying_type,

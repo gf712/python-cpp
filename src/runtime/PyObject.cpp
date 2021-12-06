@@ -10,6 +10,8 @@
 #include "PyFunction.hpp"
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
+#include "PySlotWrapper.hpp"
+#include "PyStaticMethod.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "PyType.hpp"
@@ -105,13 +107,28 @@ PyObject::PyObject(PyObjectType type, const TypePrototype &type_)
 
 	if (m_type_prototype.__dict__) {
 		for (auto [attr_name, attr] : m_type_prototype.__dict__->map()) {
-
 			if (std::get<PyObject *>(attr)) {
 				auto *attr_obj = std::get<PyObject *>(attr);
 				if (attr_obj->m_type_prototype.__call__.has_value()) {
 					// attribute is a callable so it becomes a method
 					if (as<PyFunction>(attr_obj)) {
 						attr = PyBoundMethod::create(this, as<PyFunction>(attr_obj));
+					} else if (as<PyStaticMethod>(attr_obj)) {
+						const auto &name = as<PyStaticMethod>(attr_obj)->static_method_name();
+						attr = VirtualMachine::the().heap().allocate<PyNativeFunction>(
+							name->value(),
+							[attr_obj](PyTuple *args, PyDict *kwargs) {
+								return as<PyStaticMethod>(attr_obj)->__call__(args, kwargs);
+							},
+							attr_obj);
+					} else if (as<PySlotWrapper>(attr_obj)) {
+						const auto &name = as<PySlotWrapper>(attr_obj)->slot_name();
+						attr = VirtualMachine::the().heap().allocate<PyNativeFunction>(
+							name->value(),
+							[attr_obj](PyTuple *args, PyDict *kwargs) {
+								return as<PySlotWrapper>(attr_obj)->__call__(args, kwargs);
+							},
+							attr_obj);
 					} else {
 						TODO()
 					}

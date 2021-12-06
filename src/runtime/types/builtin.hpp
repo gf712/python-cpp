@@ -38,6 +38,7 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_slot_wrapper;
 	std::unique_ptr<TypePrototype> m_bound_method;
 	std::unique_ptr<TypePrototype> m_method_wrapper;
+	std::unique_ptr<TypePrototype> m_static_method;
 
 	BuiltinTypes();
 
@@ -81,6 +82,7 @@ class BuiltinTypes
 	TypePrototype &slot_wrapper() const { return *m_slot_wrapper; }
 	TypePrototype &bound_method() const { return *m_bound_method; }
 	TypePrototype &method_wrapper() const { return *m_method_wrapper; }
+	TypePrototype &static_method() const { return *m_static_method; }
 };
 
 PyType *type();
@@ -110,5 +112,5 @@ PyType *builtin_method();
 PyType *slot_wrapper();
 PyType *bound_method();
 PyType *method_wrapper();
-
+PyType *static_method();
 PyType *str();

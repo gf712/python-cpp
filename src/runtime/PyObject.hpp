@@ -44,7 +44,8 @@ enum class PyObjectType {
 	PY_METHOD_WRAPPER,
 	PY_SLOT_WRAPPER,
 	PY_BOUND_METHOD,
-	PY_BUILTIN_METHOD
+	PY_BUILTIN_METHOD,
+	PY_STATIC_METHOD
 };
 
 inline std::string_view object_name(PyObjectType type)
@@ -130,6 +131,9 @@ inline std::string_view object_name(PyObjectType type)
 	}
 	case PyObjectType::PY_BUILTIN_METHOD: {
 		return "built-in method";
+	}
+	case PyObjectType::PY_STATIC_METHOD: {
+		return "staticmethod";
 	}
 	}
 	ASSERT_NOT_REACHED()
@@ -298,128 +302,128 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
 	if constexpr (HasRepr<Type>) {
-		type_prototype->__repr__ = [](const PyObject *self) {
+		type_prototype->__repr__ = +[](const PyObject *self) {
 			return static_cast<const Type *>(self)->__repr__();
 		};
 	}
 	if constexpr (HasCall<Type>) {
-		type_prototype->__call__ = [](PyObject *self, PyTuple *args, PyDict *kwargs) {
+		type_prototype->__call__ = +[](PyObject *self, PyTuple *args, PyDict *kwargs) {
 			return static_cast<Type *>(self)->__call__(args, kwargs);
 		};
 	}
 	if constexpr (HasNew<Type>) {
-		type_prototype->__new__ = [](const PyType *type, PyTuple *args, PyDict *kwargs) {
+		type_prototype->__new__ = +[](const PyType *type, PyTuple *args, PyDict *kwargs) {
 			return Type::__new__(type, args, kwargs);
 		};
 	}
 	if constexpr (HasInit<Type>) {
 		type_prototype->__init__ =
-			[](PyObject *self, PyTuple *args, PyDict *kwargs) -> std::optional<int32_t> {
+			+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> std::optional<int32_t> {
 			return static_cast<Type *>(self)->__init__(args, kwargs);
 		};
 	}
 	if constexpr (HasHash<Type>) {
-		type_prototype->__hash__ = [](const PyObject *self) -> size_t {
+		type_prototype->__hash__ = +[](const PyObject *self) -> size_t {
 			return static_cast<const Type *>(self)->__hash__();
 		};
 	}
 	if constexpr (HasLt<Type>) {
-		type_prototype->__lt__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__lt__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__lt__(other);
 		};
 	}
 	if constexpr (HasLe<Type>) {
-		type_prototype->__le__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__le__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__le__(other);
 		};
 	}
 	if constexpr (HasEq<Type>) {
-		type_prototype->__eq__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__eq__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__eq__(other);
 		};
 	}
 	if constexpr (HasNe<Type>) {
-		type_prototype->__ne__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__ne__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__ne__(other);
 		};
 	}
 	if constexpr (HasGt<Type>) {
-		type_prototype->__gt__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__gt__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__gt__(other);
 		};
 	}
 	if constexpr (HasGe<Type>) {
-		type_prototype->__ge__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__ge__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__ge__(other);
 		};
 	}
 	if constexpr (HasIter<Type>) {
-		type_prototype->__iter__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__iter__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__iter__();
 		};
 	}
 	if constexpr (HasNext<Type>) {
-		type_prototype->__next__ = [](PyObject *self) -> PyObject * {
+		type_prototype->__next__ = +[](PyObject *self) -> PyObject * {
 			return static_cast<Type *>(self)->__next__();
 		};
 	}
 	if constexpr (HasLength<Type>) {
-		type_prototype->__len__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__len__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__len__();
 		};
 	}
 	if constexpr (HasAdd<Type>) {
-		type_prototype->__add__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__add__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__add__(other);
 		};
 	}
 	if constexpr (HasSub<Type>) {
-		type_prototype->__sub__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__sub__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__sub__(other);
 		};
 	}
 	if constexpr (HasMul<Type>) {
-		type_prototype->__mul__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__mul__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__mul__(other);
 		};
 	}
 	if constexpr (HasExp<Type>) {
-		type_prototype->__exp__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__exp__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__exp__(other);
 		};
 	}
 	if constexpr (HasLshift<Type>) {
-		type_prototype->__lshift__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__lshift__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__lshift__(other);
 		};
 	}
 	if constexpr (HasModulo<Type>) {
-		type_prototype->__mod__ = [](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__mod__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__mod__(other);
 		};
 	}
 	if constexpr (HasAbs<Type>) {
-		type_prototype->__abs__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__abs__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__abs__();
 		};
 	}
 	if constexpr (HasNeg<Type>) {
-		type_prototype->__neg__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__neg__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__neg__();
 		};
 	}
 	if constexpr (HasPos<Type>) {
-		type_prototype->__pos__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__pos__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__pos__();
 		};
 	}
 	if constexpr (HasInvert<Type>) {
-		type_prototype->__invert__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__invert__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__invert__();
 		};
 	}
 	if constexpr (HasBool<Type>) {
-		type_prototype->__bool__ = [](const PyObject *self) -> PyObject * {
+		type_prototype->__bool__ = +[](const PyObject *self) -> PyObject * {
 			return static_cast<const Type *>(self)->__bool__();
 		};
 	}

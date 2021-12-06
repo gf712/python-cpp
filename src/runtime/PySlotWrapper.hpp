@@ -19,7 +19,7 @@ class PySlotWrapper : public PyBaseObject
 		PyType *underlying_type,
 		std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function);
 
-	PyString *name() { return m_name; }
+	PyString *slot_name() { return m_name; }
 	const std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> &slot() { return m_slot; }
 
 	std::string to_string() const override;

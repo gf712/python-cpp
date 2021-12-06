@@ -13,6 +13,7 @@ class CustomPyObject : public PyBaseObject
 
 	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	std::optional<int32_t> __init__(PyTuple *args, PyDict *kwargs);
+	PyObject *__repr__() const;
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type_() const override;
