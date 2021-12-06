@@ -357,8 +357,13 @@ void BytecodeGenerator::visit(const Tuple *node)
 
 void BytecodeGenerator::visit(const ClassDefinition *node)
 {
-	if (node->args()) {
-		spdlog::error("ClassDefinition cannot handle arguments");
+	if (!node->bases().empty()) {
+		spdlog::error("ClassDefinition cannot currently handle arguments");
+		TODO();
+	}
+
+	if (!node->keywords().empty()) {
+		spdlog::error("ClassDefinition cannot currently handle keywords");
 		TODO();
 	}
 

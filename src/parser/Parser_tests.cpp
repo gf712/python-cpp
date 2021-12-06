@@ -146,9 +146,19 @@ void compare_class_definition(const std::shared_ptr<ASTNode> &result,
 	const auto expected_name = as<ClassDefinition>(expected)->name();
 	EXPECT_EQ(result_name, expected_name);
 
-	// const auto result_args = as<FunctionDefinition>(result)->args();
-	// const auto expected_args = as<FunctionDefinition>(expected)->args();
-	// dispatch(result_args, expected_args);
+	const auto result_bases = as<ClassDefinition>(result)->bases();
+	const auto expected_bases = as<ClassDefinition>(expected)->bases();
+	ASSERT_EQ(result_bases.size(), expected_bases.size());
+	for (size_t i = 0; i < result_bases.size(); ++i) {
+		dispatch(result_bases[i], expected_bases[i]);
+	}
+
+	const auto result_keywords = as<ClassDefinition>(result)->keywords();
+	const auto expected_keywords = as<ClassDefinition>(expected)->keywords();
+	ASSERT_EQ(result_keywords.size(), expected_keywords.size());
+	for (size_t i = 0; i < result_keywords.size(); ++i) {
+		dispatch(result_keywords[i], expected_keywords[i]);
+	}
 
 	const auto result_body = as<ClassDefinition>(result)->body();
 	const auto expected_body = as<ClassDefinition>(expected)->body();
@@ -1067,13 +1077,16 @@ TEST(Parser, ForLoopWithElseBlock)
 TEST(Parser, ClassDefinition)
 {
 	constexpr std::string_view program =
-		"class A:\n"
+		"class A(Base, metaclass=MyMetaClass):\n"
 		"	def __init__(self, value):\n"
 		"		self.value = value\n";
 
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<ClassDefinition>("A",// class name
-		nullptr,// arguments
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("Base", ContextType::LOAD) },// bases
+		std::vector{ std::make_shared<Keyword>(
+			"metaclass", std::make_shared<Name>("MyMetaClass", ContextType::LOAD)) },// keywords
 		std::vector<std::shared_ptr<ast::ASTNode>>{
 			std::make_shared<FunctionDefinition>("__init__",// function_name
 				std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{

@@ -43,7 +43,7 @@ namespace ast {
 	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Try)                \
 	__AST_NODE_TYPE(Tuple)              \
-	__AST_NODE_TYPE(UnaryExpr)            \
+	__AST_NODE_TYPE(UnaryExpr)          \
 	__AST_NODE_TYPE(While)
 
 
@@ -536,7 +536,8 @@ class Keyword : public ASTNode
 class ClassDefinition final : public ASTNode
 {
 	const std::string m_class_name;
-	const std::shared_ptr<Arguments> m_args;
+	const std::vector<std::shared_ptr<ASTNode>> m_bases;
+	const std::vector<std::shared_ptr<Keyword>> m_keywords;
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
 	const std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 
@@ -544,16 +545,18 @@ class ClassDefinition final : public ASTNode
 
   public:
 	ClassDefinition(std::string class_name,
-		std::shared_ptr<Arguments> args,
+		std::vector<std::shared_ptr<ASTNode>> bases,
+		std::vector<std::shared_ptr<Keyword>> keywords,
 		std::vector<std::shared_ptr<ASTNode>> body,
 		std::vector<std::shared_ptr<ASTNode>> decorator_list)
 		: ASTNode(ASTNodeType::ClassDefinition), m_class_name(std::move(class_name)),
-		  m_args(std::move(args)), m_body(std::move(body)),
+		  m_bases(std::move(bases)), m_keywords(std::move(keywords)), m_body(std::move(body)),
 		  m_decorator_list(std::move(decorator_list))
 	{}
 
 	const std::string &name() const { return m_class_name; }
-	const std::shared_ptr<Arguments> &args() const { return m_args; }
+	const std::vector<std::shared_ptr<ASTNode>> &bases() const { return m_bases; }
+	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 

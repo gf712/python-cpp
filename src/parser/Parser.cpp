@@ -1132,6 +1132,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			return false;
 		}
 
+		// '(' [arguments] ')' primary'
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrOnePattern<ArgumentsPattern>,
 			SingleTokenPattern<Token::TokenType::RPAREN>,
@@ -2766,19 +2767,37 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 	{
 		spdlog::debug("ClassDefinitionRawPattern");
 		BlockScope scope{ p };
-
+		ASSERT(p.stack().empty())
 		// 'class' NAME ['(' [arguments] ')' ] ':'
+
+		if (!p.lexer().peek_token(p.token_position() + 1)) { return false; }
+
+		auto maybe_name_token = p.lexer().peek_token(p.token_position() + 1);
+		std::string class_name{ maybe_name_token->start().pointer_to_program,
+			maybe_name_token->end().pointer_to_program };
 		using pattern0 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ClassPattern>,
 				SingleTokenPattern<Token::TokenType::NAME>,
+				ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::LPAREN>,
+					ZeroOrMorePattern<ArgumentsPattern>,
+					SingleTokenPattern<Token::TokenType::RPAREN>>,
 				SingleTokenPattern<Token::TokenType::COLON>>;
 		if (pattern0::match(p)) {
 			spdlog::debug("'class' NAME ['(' [arguments] ')' ] ':'");
 			// FIXME: assumes no inheritance
-			auto token = p.lexer().peek_token(p.token_position() - 2);
-			spdlog::debug("{}", token->to_string());
-			std::string class_name{ token->start().pointer_to_program,
-				token->end().pointer_to_program };
+			spdlog::debug("class name: {}", class_name);
+
+			std::vector<std::shared_ptr<ASTNode>> bases;
+			std::vector<std::shared_ptr<Keyword>> keywords;
+
+			while (!p.stack().empty()) {
+				const auto &node = p.pop_front();
+				if (auto keyword_node = as<Keyword>(node)) {
+					keywords.push_back(keyword_node);
+				} else {
+					bases.push_back(node);
+				}
+			}
 
 			std::vector<std::shared_ptr<ASTNode>> body;
 			{
@@ -2791,11 +2810,10 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 				}
 				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
 			}
-			std::shared_ptr<Arguments> arguments;
 			std::vector<std::shared_ptr<ASTNode>> decorator_list;
 			// while (!p.stack().empty()) { arguments.push_back(p.pop_front()); }
-			scope.parent().push_back(
-				std::make_shared<ClassDefinition>(class_name, arguments, body, decorator_list));
+			scope.parent().push_back(std::make_shared<ClassDefinition>(
+				class_name, bases, keywords, body, decorator_list));
 			return true;
 		}
 		return false;

@@ -162,12 +162,10 @@ void ClassDefinition::print_this_node(const std::string &indent) const
 	spdlog::debug("{}ClassDefinition", indent);
 	spdlog::debug("{}  - function_name: {}", indent, m_class_name);
 	std::string new_indent = indent + std::string(6, ' ');
-	spdlog::debug("{}  - args:", indent);
-	if (m_args) {
-		m_args->print_node(new_indent);
-	} else {
-		spdlog::debug("{}    (Empty):", indent);
-	}
+	spdlog::debug("{}  - bases:", indent);
+	for (const auto &base : m_bases) { base->print_node(new_indent); }
+	spdlog::debug("{}  - keywords:", indent);
+	for (const auto &keyword : m_keywords) { keyword->print_node(new_indent); }
 	spdlog::debug("{}  - body:", indent);
 	for (const auto &statement : m_body) { statement->print_node(new_indent); }
 	spdlog::debug("{}  - decorator_list:", indent);
