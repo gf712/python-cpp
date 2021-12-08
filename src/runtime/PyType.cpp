@@ -314,8 +314,13 @@ PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 		return nullptr;
 	}
 
-	// FIXME: this should be checking if it is subtype rather than the same type
+	// If __new__() does not return an instance of cls, then the new instance’s __init__() method
+	// will not be invoked.
 	if (obj->type_() == this) {
+		// If __new__() is invoked during object construction and it returns an instance of cls,
+		// then the new instance’s __init__() method will be invoked like __init__(self[, ...]),
+		// where self is the new instance and the remaining arguments are the same as were passed to
+		// the object constructor.
 		if (const auto res = obj->init(args, kwargs); res.has_value()) {
 			if (*res < 0) {
 				// error
@@ -343,3 +348,18 @@ PyTuple *PyType::mro_internal()
 }
 
 PyList *PyType::mro() { return PyList::create(mro_internal()->elements()); }
+
+bool PyType::issubclass(const PyType *other)
+{
+	if (this == other) { return true; }
+
+	// every type is a subclass of object
+	if (other == custom_object()) { return true; }
+
+	auto *this_mro = mro_internal();
+	for (const auto &el : this_mro->elements()) {
+		if (std::get<PyObject *>(el) == other) { return true; }
+	}
+
+	return false;
+}

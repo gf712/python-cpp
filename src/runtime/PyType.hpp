@@ -39,6 +39,8 @@ class PyType : public PyBaseObject
 
 	PyList *mro();
 
+	bool issubclass(const PyType*);
+
   private:
 	PyTuple *mro_internal();
 };
