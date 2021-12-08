@@ -79,7 +79,8 @@ set(UNITTEST_SOURCES
     executable/bytecode/codegen/BytecodeGenerator_tests.cpp
     lexer/Lexer_tests.cpp
     parser/Parser_tests.cpp
-    runtime/PyNumber_tests.cpp)
+    runtime/PyNumber_tests.cpp
+    runtime/PyType_tests.cpp)
 
 add_library(
   python-cpp

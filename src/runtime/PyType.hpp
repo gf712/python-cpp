@@ -36,6 +36,11 @@ class PyType : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 
 	PyType *type_() const override;
+
+	PyList *mro();
+
+  private:
+	PyTuple *mro_internal();
 };
 
 

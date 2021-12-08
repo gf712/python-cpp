@@ -2,6 +2,7 @@
 #include "CustomPyObject.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
+#include "PyList.hpp"
 #include "PyMethodWrapper.hpp"
 #include "PySlotWrapper.hpp"
 #include "PyStaticMethod.hpp"
@@ -18,7 +19,7 @@ TypePrototype clone(std::string name, const TypePrototype &prototype)
 {
 	TypePrototype type_prototype;
 	type_prototype.__name__ = std::move(name);
-#define COPY_SLOT(NAME) type_prototype. NAME = prototype. NAME;
+#define COPY_SLOT(NAME) type_prototype.NAME = prototype.NAME;
 	COPY_SLOT(__repr__)
 	COPY_SLOT(__call__)
 	COPY_SLOT(__new__)
@@ -50,7 +51,78 @@ TypePrototype clone(std::string name, const TypePrototype &prototype)
 
 std::once_flag type_flag;
 
-std::unique_ptr<TypePrototype> register_type() { return std::move(klass<PyType>("type").type); }
+std::unique_ptr<TypePrototype> register_type()
+{
+	return std::move(klass<PyType>("type").def("mro", &PyType::mro).type);
+}
+
+std::vector<PyObject *> merge(const std::vector<std::vector<PyObject *>> &mros)
+{
+	if (std::all_of(mros.begin(), mros.end(), [](const auto &vec) { return vec.empty(); })) {
+		return {};
+	}
+	for (const auto &el : mros) {
+		auto *candidate = el[0];
+		auto candidate_not_in_mro_tail = [&candidate](const std::vector<PyObject *> &m) {
+			if (m.size() > 1) {
+				auto it = std::find_if(m.begin() + 1, m.end(), [&candidate](const PyObject *c) {
+					return c == candidate;
+				});
+				return it == m.end();
+			} else {
+				return true;
+			}
+		};
+		if (std::all_of(mros.begin(), mros.end(), candidate_not_in_mro_tail)) {
+			std::vector<PyObject *> result;
+			result.push_back(candidate);
+			std::vector<std::vector<PyObject *>> rest;
+			for (const auto &m : mros) {
+				auto *head = m[0];
+				if (head == candidate) {
+					rest.push_back(std::vector<PyObject *>{ m.begin() + 1, m.end() });
+				} else {
+					rest.push_back(m);
+				}
+			}
+			auto tmp = merge(rest);
+			result.insert(result.end(), tmp.begin(), tmp.end());
+			return result;
+		}
+	}
+
+	// error
+	TODO()
+}
+
+std::vector<PyObject *> mro_(PyType *type)
+{
+	if (type == custom_object()) { return { type }; }
+
+	std::vector<PyObject *> mro_types;
+	mro_types.push_back(type);
+
+	std::vector<std::vector<PyObject *>> bases_mro;
+
+	for (const auto &base : type->underlying_type().__bases__->elements()) {
+		if (auto *precomputed_mro =
+				as<PyType>(std::get<PyObject *>(base))->underlying_type().__mro__) {
+			std::vector<PyObject *> base_mro;
+			base_mro.reserve(precomputed_mro->size());
+			for (const auto &el : precomputed_mro->elements()) {
+				base_mro.push_back(std::get<PyObject *>(el));
+			}
+			bases_mro.push_back(base_mro);
+		} else {
+			bases_mro.push_back(mro_(as<PyType>(std::get<PyObject *>(base))));
+		}
+	}
+
+	auto result = merge(bases_mro);
+	mro_types.insert(mro_types.end(), result.begin(), result.end());
+
+	return mro_types;
+}
 }// namespace
 
 
@@ -88,6 +160,7 @@ void PyType::initialize()
 {
 	// FIXME: this is only allocated in static memory so that the lifetime of __dict__
 	//        matches the one of m_underlying_type
+	m_underlying_type.__class__ = this;
 	m_underlying_type.__dict__ = VirtualMachine::the().heap().allocate_static<PyDict>().get();
 	m_attributes["__dict__"] = m_underlying_type.__dict__;
 	if (m_underlying_type.__add__.has_value()) {
@@ -124,6 +197,24 @@ void PyType::initialize()
 		m_underlying_type.__dict__->insert(name, method_fn);
 		m_attributes[method.name] = method_fn;
 	}
+
+	if (!m_underlying_type.__bases__) {
+		// not ideal, but avoids recursively calling custom_object()
+		if (m_underlying_type.__name__ == "object") {
+			m_underlying_type.__bases__ = PyTuple::create();
+		} else {
+			m_underlying_type.__bases__ = PyTuple::create(custom_object());
+		}
+	}
+	m_attributes["__bases__"] = m_underlying_type.__bases__;
+	m_underlying_type.__dict__->insert(PyString::create("__bases__"), m_underlying_type.__bases__);
+	// not ideal, but avoids recursively calling custom_object()
+	if (m_underlying_type.__name__ == "object") {
+		m_underlying_type.__mro__ = PyTuple::create(this);
+	} else {
+		m_underlying_type.__mro__ = mro_internal();
+	}
+	m_attributes["__mro__"] = m_underlying_type.__mro__;
 }
 
 PyObject *PyType::new_(PyTuple *args, PyDict *kwargs) const
@@ -160,10 +251,28 @@ PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 	auto *ns = as<PyDict>(PyObject::from(args->elements()[2]));
 	ASSERT(ns)
 
-	if (bases->size() > 0) { TODO() }
+	if (!bases->elements().empty()) {
+		std::unordered_set<PyObject *> bases_set;
+		for (const auto &b : bases->elements()) {
+			ASSERT(std::holds_alternative<PyObject *>(b))
+			if (bases_set.contains(std::get<PyObject *>(b))) {
+				auto *duplicate_type = as<PyType>(std::get<PyObject *>(b));
+				VirtualMachine::the().interpreter().raise_exception(type_error(
+					"duplicate base class {}", duplicate_type->underlying_type().__name__));
+				return nullptr;
+			}
+			bases_set.insert(std::get<PyObject *>(b));
+		}
+	}
 
-	auto *type =
-		VirtualMachine::the().heap().allocate<PyType>(clone(name->value(), custom_object()->underlying_type()));
+	auto *type = VirtualMachine::the().heap().allocate<PyType>(
+		clone(name->value(), custom_object()->underlying_type()));
+
+	if (bases->elements().empty()) {
+		// all objects inherit from object by default
+		bases = PyTuple::create(custom_object());
+	}
+	type->m_underlying_type.__bases__ = bases;
 	type->initialize();
 
 	for (const auto &[key, v] : ns->map()) {
@@ -181,6 +290,7 @@ PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 
 		type->m_underlying_type.__dict__->insert(attr_method_name, v);
 	}
+	// if (bases->size() > 0) { TODO() }
 
 	return type;
 }
@@ -222,3 +332,14 @@ std::string PyType::to_string() const
 }
 
 PyObject *PyType::__repr__() const { return PyString::create(to_string()); }
+
+PyTuple *PyType::mro_internal()
+{
+	if (!m_underlying_type.__mro__) {
+		const auto &result = mro_(this);
+		m_underlying_type.__mro__ = PyTuple::create(result);
+	}
+	return m_underlying_type.__mro__;
+}
+
+PyList *PyType::mro() { return PyList::create(mro_internal()->elements()); }

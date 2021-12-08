@@ -139,8 +139,9 @@ void VirtualMachine::show_current_instruction(size_t index, size_t window) const
 void VirtualMachine::dump() const
 {
 	size_t i = 0;
-	std::cout << "Register state: " << (void *)(registers().data()) << " \n";
-	for (const auto &register_ : registers()) {
+	ASSERT(registers().has_value())
+	std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
+	for (const auto &register_ : registers()->get()) {
 		std::visit(overloaded{ [&i](const auto &register_value) {
 								  std::ostringstream os;
 								  os << register_value;

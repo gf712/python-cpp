@@ -72,7 +72,8 @@ void Equal::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	const auto &rhs = vm.reg(m_rhs);
 
 	if (auto result = equals(lhs, rhs, interpreter)) {
-		ASSERT(vm.registers().size() > m_dst)
+		ASSERT(vm.registers().has_value())
+		ASSERT(vm.registers()->get().size() > m_dst)
 		vm.reg(m_dst) = *result;
 	}
 };
@@ -83,7 +84,8 @@ void LessThanEquals::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	const auto &rhs = vm.reg(m_rhs);
 
 	if (auto result = less_than_equals(lhs, rhs, interpreter)) {
-		ASSERT(vm.registers().size() > m_dst)
+		ASSERT(vm.registers().has_value())
+		ASSERT(vm.registers()->get().size() > m_dst)
 		vm.reg(m_dst) = *result;
 	}
 };
@@ -94,7 +96,8 @@ void LessThan::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	const auto &rhs = vm.reg(m_rhs);
 
 	if (auto result = less_than(lhs, rhs, interpreter)) {
-		ASSERT(vm.registers().size() > m_dst)
+		ASSERT(vm.registers().has_value())
+		ASSERT(vm.registers()->get().size() > m_dst)
 		vm.reg(m_dst) = *result;
 	}
 };

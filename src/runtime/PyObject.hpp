@@ -186,6 +186,7 @@ struct TypePrototype
 	std::string __name__;
 	std::optional<NewSlotFunctionType> __new__;
 	std::optional<InitSlotFunctionType> __init__;
+	PyType *__class__{ nullptr };
 
 	std::optional<AddSlotFunctionType> __add__;
 	std::optional<SubtractSlotFunctionType> __sub__;
@@ -217,6 +218,9 @@ struct TypePrototype
 	// std::variant<std::monostate, RichCompareSlotFunctionType, PyFunction *> __richcompare__;
 	std::vector<MethodDefinition> __methods__;
 	PyDict *__dict__{ nullptr };
+
+	PyTuple *__mro__{ nullptr };
+	PyTuple *__bases__{ nullptr };
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
@@ -302,9 +306,8 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
 	if constexpr (HasRepr<Type>) {
-		type_prototype->__repr__ = +[](const PyObject *self) {
-			return static_cast<const Type *>(self)->__repr__();
-		};
+		type_prototype->__repr__ =
+			+[](const PyObject *self) { return static_cast<const Type *>(self)->__repr__(); };
 	}
 	if constexpr (HasCall<Type>) {
 		type_prototype->__call__ = +[](PyObject *self, PyTuple *args, PyDict *kwargs) {
@@ -363,9 +366,8 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		};
 	}
 	if constexpr (HasNext<Type>) {
-		type_prototype->__next__ = +[](PyObject *self) -> PyObject * {
-			return static_cast<Type *>(self)->__next__();
-		};
+		type_prototype->__next__ =
+			+[](PyObject *self) -> PyObject * { return static_cast<Type *>(self)->__next__(); };
 	}
 	if constexpr (HasLength<Type>) {
 		type_prototype->__len__ = +[](const PyObject *self) -> PyObject * {
@@ -393,7 +395,8 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		};
 	}
 	if constexpr (HasLshift<Type>) {
-		type_prototype->__lshift__ = +[](const PyObject *self, const PyObject *other) -> PyObject * {
+		type_prototype->__lshift__ =
+			+[](const PyObject *self, const PyObject *other) -> PyObject * {
 			return static_cast<const Type *>(self)->__lshift__(other);
 		};
 	}

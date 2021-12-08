@@ -357,16 +357,6 @@ void BytecodeGenerator::visit(const Tuple *node)
 
 void BytecodeGenerator::visit(const ClassDefinition *node)
 {
-	if (!node->bases().empty()) {
-		spdlog::error("ClassDefinition cannot currently handle arguments");
-		TODO();
-	}
-
-	if (!node->keywords().empty()) {
-		spdlog::error("ClassDefinition cannot currently handle keywords");
-		TODO();
-	}
-
 	size_t class_id;
 	{
 		auto this_class_info = allocate_function();
@@ -389,18 +379,40 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 		emit<ReturnValue>(class_id, return_none_register);
 	}
 
+	std::vector<Register> arg_registers;
+	arg_registers.reserve(2 + node->bases().size());
+	std::vector<Register> kwarg_registers;
+	std::vector<std::string> keyword_names;
+
 	const auto builtin_build_class_register = allocate_register();
-	const auto class_name_register = allocate_register();
 	const auto class_location_register = allocate_register();
+	const auto class_name_register = allocate_register();
+
+	arg_registers.push_back(class_location_register);
+	arg_registers.push_back(class_name_register);
+
+	for (const auto &base : node->bases()) {
+		arg_registers.push_back(generate(base.get(), m_function_id));
+	}
+	for (const auto &keyword : node->keywords()) {
+		kwarg_registers.push_back(generate(keyword.get(), m_function_id));
+		keyword_names.push_back(keyword->arg());
+	}
 
 	emit<LoadBuildClass>(m_function_id, builtin_build_class_register);
 	emit<LoadConst>(m_function_id, class_name_register, String{ node->name() });
 	emit<LoadConst>(
 		m_function_id, class_location_register, Number{ static_cast<int64_t>(class_id) });
 
-	emit<FunctionCall>(m_function_id,
-		builtin_build_class_register,
-		std::vector{ class_location_register, class_name_register });
+	if (kwarg_registers.empty()) {
+		emit<FunctionCall>(m_function_id, builtin_build_class_register, std::move(arg_registers));
+	} else {
+		emit<FunctionCallWithKeywords>(m_function_id,
+			std::move(builtin_build_class_register),
+			std::move(arg_registers),
+			std::move(kwarg_registers),
+			std::move(keyword_names));
+	}
 
 	emit<StoreName>(m_function_id, node->name(), Register{ 0 });
 

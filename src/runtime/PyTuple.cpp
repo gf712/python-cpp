@@ -65,6 +65,7 @@ std::string PyTuple::to_string() const
 					   } },
 			*it);
 	}
+	if (m_elements.size() == 1) { os << ','; }
 	os << ")";
 
 	return os.str();

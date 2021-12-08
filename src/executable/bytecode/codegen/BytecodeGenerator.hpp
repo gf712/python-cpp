@@ -6,6 +6,7 @@
 #include "forward.hpp"
 #include "utilities.hpp"
 
+#include "executable/FunctionBlock.hpp"
 #include "executable/Label.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 

@@ -43,9 +43,12 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 		}
 	}
 
-	for (const auto &reg : VirtualMachine::the().registers()) {
-		if (std::holds_alternative<PyObject *>(reg)) {
-			if (auto *obj = std::get<PyObject *>(reg)) roots.insert(obj);
+	const auto &registers = VirtualMachine::the().registers();
+	if (registers.has_value()) {
+		for (const auto &reg : registers->get()) {
+			if (std::holds_alternative<PyObject *>(reg)) {
+				if (auto *obj = std::get<PyObject *>(reg)) roots.insert(obj);
+			}
 		}
 	}
 
@@ -102,11 +105,11 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { 
-		// std::reference_wrapper{ heap.slab().block_128() },
+	std::array blocks = { // std::reference_wrapper{ heap.slab().block_128() },
 		// std::reference_wrapper{ heap.slab().block_256() },
 		std::reference_wrapper{ heap.slab().block_512() },
-		std::reference_wrapper{ heap.slab().block_1024() } };
+		std::reference_wrapper{ heap.slab().block_1024() }
+	};
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
 			chunk.for_each_cell([](uint8_t *memory) {
@@ -134,11 +137,11 @@ void MarkSweepGC::sweep(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { 
-		// std::reference_wrapper{ heap.slab().block_128() },
+	std::array blocks = { // std::reference_wrapper{ heap.slab().block_128() },
 		// std::reference_wrapper{ heap.slab().block_256() },
 		std::reference_wrapper{ heap.slab().block_512() },
-		std::reference_wrapper{ heap.slab().block_1024() } };
+		std::reference_wrapper{ heap.slab().block_1024() }
+	};
 	// sweep all the dead objects
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {

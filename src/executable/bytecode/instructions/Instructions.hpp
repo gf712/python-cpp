@@ -2,12 +2,12 @@
 
 #include "ast/AST.hpp"
 #include "executable/Label.hpp"
+#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "forward.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 
 #include <sstream>
 
@@ -43,7 +43,8 @@ class LoadConst final : public Instruction
 	}
 	void execute(VirtualMachine &vm, Interpreter &) const final
 	{
-		ASSERT(vm.registers().size() > m_destination)
+		ASSERT(vm.registers().has_value())
+		ASSERT(vm.registers()->get().size() > m_destination)
 		vm.reg(m_destination) = m_source;
 	}
 
@@ -86,7 +87,8 @@ class Add : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = add(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}
@@ -114,7 +116,8 @@ class Subtract : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = subtract(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}
@@ -141,7 +144,8 @@ class Multiply : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = multiply(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}
@@ -167,7 +171,8 @@ class Exp : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = exp(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}
@@ -193,7 +198,8 @@ class Modulo : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = modulo(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}
@@ -221,7 +227,8 @@ class LeftShift : public Instruction
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
 		if (auto result = lshift(lhs, rhs, interpreter)) {
-			ASSERT(vm.registers().size() > m_destination)
+			ASSERT(vm.registers().has_value())
+			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
 		}
 	}

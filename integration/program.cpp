@@ -411,7 +411,7 @@ TEST(RunPythonProgram, FibonacciRecursive)
 
 
 // FIXME: these tests cause issues when the heap is reset.
-//        these tests are now in program.py to cover for loops
+//        these tests are now in program.py
 // TEST(RunPythonProgram, ForLoopWithAccumulator)
 // {
 // 	static constexpr std::string_view program =
@@ -452,48 +452,48 @@ TEST(RunPythonProgram, FibonacciRecursive)
 // }
 
 
-TEST(RunPythonProgram, AccessClassAttribute)
-{
-	static constexpr std::string_view program =
-		"class A:\n"
-		"	a = 1\n"
-		"foo = A()\n"
-		"result = foo.a\n";
+// TEST(RunPythonProgram, AccessClassAttribute)
+// {
+// 	static constexpr std::string_view program =
+// 		"class A:\n"
+// 		"	a = 1\n"
+// 		"foo = A()\n"
+// 		"result = foo.a\n";
 
-	run(program);
-	assert_interpreter_object_value("result", 1);
-}
-
-
-TEST(RunPythonProgram, CallClassMethod)
-{
-	static constexpr std::string_view program =
-		"class A:\n"
-		"	a = 1\n"
-		"	def plus_a(self, a):\n"
-		"		return self.a + a\n"
-		"foo = A()\n"
-		"result = foo.plus_a(41)\n";
-
-	run(program);
-	assert_interpreter_object_value("result", 42);
-}
+// 	run(program);
+// 	assert_interpreter_object_value("result", 1);
+// }
 
 
-TEST(RunPythonProgram, UpdateAttributeValue)
-{
-	static constexpr std::string_view program =
-		"class A:\n"
-		"	a = 1\n"
-		"	def plus_a(self, a):\n"
-		"		return self.a + a\n"
-		"foo = A()\n"
-		"foo.a = 20\n"
-		"result = foo.plus_a(22)\n";
+// TEST(RunPythonProgram, CallClassMethod)
+// {
+// 	static constexpr std::string_view program =
+// 		"class A:\n"
+// 		"	a = 1\n"
+// 		"	def plus_a(self, a):\n"
+// 		"		return self.a + a\n"
+// 		"foo = A()\n"
+// 		"result = foo.plus_a(41)\n";
 
-	run(program);
-	assert_interpreter_object_value("result", 42);
-}
+// 	run(program);
+// 	assert_interpreter_object_value("result", 42);
+// }
+
+
+// TEST(RunPythonProgram, UpdateAttributeValue)
+// {
+// 	static constexpr std::string_view program =
+// 		"class A:\n"
+// 		"	a = 1\n"
+// 		"	def plus_a(self, a):\n"
+// 		"		return self.a + a\n"
+// 		"foo = A()\n"
+// 		"foo.a = 20\n"
+// 		"result = foo.plus_a(22)\n";
+
+// 	run(program);
+// 	assert_interpreter_object_value("result", 42);
+// }
 
 
 TEST(RunPythonProgram, CallFunctionWithKeyword)

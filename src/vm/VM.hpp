@@ -47,25 +47,29 @@ class VirtualMachine
 
 	Value &reg(size_t idx)
 	{
-		ASSERT(idx < registers().size())
-		return registers()[idx];
+		auto r = registers();
+		ASSERT(r.has_value())
+		ASSERT(idx < r->get().size())
+		return r->get()[idx];
 	}
 
 	const Value &reg(size_t idx) const
 	{
-		ASSERT(idx < registers().size())
-		return registers()[idx];
+		auto r = registers();
+		ASSERT(r.has_value())
+		ASSERT(idx < r->get().size())
+		return r->get()[idx];
 	}
 
-	Registers &registers()
+	std::optional<std::reference_wrapper<Registers>> registers()
 	{
-		ASSERT(!m_stack.empty())
-		return m_stack.top().registers;
+		if (!m_stack.empty()) { return m_stack.top().registers; }
+		return {};
 	}
-	const Registers &registers() const
+	std::optional<std::reference_wrapper<const Registers>> registers() const
 	{
-		ASSERT(!m_stack.empty())
-		return m_stack.top().registers;
+		if (!m_stack.empty()) { return m_stack.top().registers; }
+		return {};
 	}
 
 	Heap &heap() { return m_heap; }

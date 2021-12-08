@@ -131,7 +131,6 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 			type_error("__build_class__: not enough arguments, got {}", args->size()));
 		return nullptr;
 	}
-	ASSERT(args->size() == 2)
 	// FIXME: should accept metaclass keyword
 	ASSERT(!kwargs || kwargs->map().empty())
 	auto *maybe_function_location = args->operator[](0);
@@ -165,8 +164,18 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 
 	if (!callable) { return nullptr; }
 
+	std::vector<Value> bases_vector;
+	if (args->size() > 2) {
+		bases_vector.reserve(args->size() - 2);
+		auto it = args->elements().begin() + 2;
+		while (it != args->elements().end()) {
+			bases_vector.push_back(*it);
+			it++;
+		}
+	}
+
 	auto *ns = PyDict::create();
-	auto *bases = PyTuple::create();
+	auto *bases = PyTuple::create(bases_vector);
 
 	// this calls a function that defines a call
 	// For example:
@@ -179,7 +188,7 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	//               2 STORE_NAME               1 (__module__)
 	//               4 LOAD_CONST               0 ('A')
 	//               6 STORE_NAME               2 (__qualname__)
-
+	//
 	//   2           8 LOAD_CONST               1 (<code object foo at 0x5557f27c0390, file
 	//   "example.py", line 2>)
 	//              10 LOAD_CONST               2 ('A.foo')
@@ -199,7 +208,7 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	auto *metaclass = type();
 
 	PyObject *cls = metaclass->__call__(call_args, nullptr);
-	ASSERT(as<PyType>(cls))
+	if (cls) { ASSERT(as<PyType>(cls)) }
 	return cls;
 }
 

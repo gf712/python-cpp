@@ -1,6 +1,7 @@
 #pragma once
 
 #include "builtin.hpp"
+#include "runtime/PyDict.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
@@ -30,7 +31,7 @@ template<typename T> struct klass
 				//       TypeError: {}() takes no arguments ({} given)
 				//       TypeError: {}() takes no keyword arguments
 				ASSERT(!args || args->size() == 0)
-				ASSERT(!kwargs)
+				ASSERT(!kwargs || kwargs->map().empty())
 				return (static_cast<T *>(self)->*F)();
 			} });
 		return *this;

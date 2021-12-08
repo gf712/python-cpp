@@ -4,6 +4,7 @@ class PyDict;
 class PyFloat;
 class PyFunction;
 class PyInteger;
+class PyList;
 class PyModule;
 class PyNumber;
 class PyObject;
