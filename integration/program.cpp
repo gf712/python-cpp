@@ -9,6 +9,7 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
+#include "runtime/types/builtin.hpp"
 #include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
@@ -54,12 +55,12 @@ template<typename T, typename U> struct is_unordered_map<std::unordered_map<T, U
 template<typename T> void check_value(const PyObject *obj, T expected_value)
 {
 	if constexpr (std::is_integral_v<T>) {
-		ASSERT_EQ(obj->type(), PyObjectType::PY_INTEGER);
+		ASSERT_EQ(obj->type(), integer());
 		auto pynum = as<PyInteger>(obj);
 		ASSERT_TRUE(pynum);
 		ASSERT_EQ(std::get<int64_t>(pynum->value().value), expected_value);
 	} else if constexpr (std::is_same_v<T, const char *> || std::is_same_v<T, std::string>) {
-		ASSERT_EQ(obj->type(), PyObjectType::PY_STRING);
+		ASSERT_EQ(obj->type(), str());
 		auto pystring = as<PyString>(obj);
 		ASSERT_TRUE(pystring);
 		ASSERT_EQ(pystring->value(), expected_value);
@@ -80,7 +81,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 	auto obj = std::get<PyObject *>(value);
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
-		ASSERT_EQ(obj->type(), PyObjectType::PY_LIST);
+		ASSERT_EQ(obj->type(), list());
 		auto pylist = as<PyList>(obj);
 		ASSERT_TRUE(pylist);
 		size_t i = 0;
@@ -94,7 +95,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 			i++;
 		}
 	} else if constexpr (is_unordered_map<T>{}) {
-		ASSERT_EQ(obj->type(), PyObjectType::PY_DICT);
+		ASSERT_EQ(obj->type(), dict());
 		auto pydict = as<PyDict>(obj);
 		ASSERT_TRUE(pydict);
 		// FIXME: this prolongs the lifetime of items should be just be:

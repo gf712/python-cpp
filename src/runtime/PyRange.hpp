@@ -22,7 +22,7 @@ class PyRange : public PyBaseObject
 	int64_t step() const { return m_step; }
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 
   private:
 	PyRange(int64_t stop);
@@ -47,5 +47,5 @@ class PyRangeIterator : public PyBaseObject
 	PyObject *__next__();
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };

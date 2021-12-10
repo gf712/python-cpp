@@ -19,20 +19,8 @@ class PyBytes : public PyBaseObject
 	const Bytes &value() const { return m_value; }
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 
   private:
 	PyBytes(const Bytes &number);
 };
-
-template<> inline PyBytes *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<PyBytes *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyBytes *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BYTES) { return static_cast<const PyBytes *>(node); }
-	return nullptr;
-}

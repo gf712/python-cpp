@@ -46,9 +46,8 @@ PyObject *PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
 PyStaticMethod::PyStaticMethod(PyString *name,
 	PyType *underlying_type,
 	std::variant<TypeBoundFunctionType, FreeFunctionType> function)
-	: PyBaseObject(PyObjectType::PY_STATIC_METHOD, BuiltinTypes::the().slot_wrapper()),
-	  m_name(std::move(name)), m_underlying_type(underlying_type),
-	  m_static_method(std::move(function))
+	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
+	  m_underlying_type(underlying_type), m_static_method(std::move(function))
 {}
 
 PyStaticMethod *
@@ -62,7 +61,7 @@ PyStaticMethod *PyStaticMethod::create(PyString *name, FreeFunctionType function
 	return VirtualMachine::the().heap().allocate<PyStaticMethod>(name, nullptr, function);
 }
 
-PyType *PyStaticMethod::type_() const { return ::static_method(); }
+PyType *PyStaticMethod::type() const { return ::static_method(); }
 
 namespace {
 
@@ -79,4 +78,16 @@ std::unique_ptr<TypePrototype> PyStaticMethod::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(static_method_flag, []() { type = ::register_static_method(); });
 	return std::move(type);
+}
+
+template<> PyStaticMethod *as(PyObject *obj)
+{
+	if (obj->type() == static_method()) { return static_cast<PyStaticMethod *>(obj); }
+	return nullptr;
+}
+
+template<> const PyStaticMethod *as(const PyObject *obj)
+{
+	if (obj->type() == static_method()) { return static_cast<const PyStaticMethod *>(obj); }
+	return nullptr;
 }

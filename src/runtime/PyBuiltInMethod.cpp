@@ -7,8 +7,8 @@
 PyBuiltInMethod::PyBuiltInMethod(std::string name,
 	std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
 	PyObject *self)
-	: PyBaseObject(PyObjectType::PY_BUILTIN_METHOD, BuiltinTypes::the().builtin_method()),
-	  m_name(std::move(name)), m_builtin_method(std::move(builtin_method)), m_self(self)
+	: PyBaseObject(BuiltinTypes::the().builtin_method()), m_name(std::move(name)),
+	  m_builtin_method(std::move(builtin_method)), m_self(self)
 {}
 
 void PyBuiltInMethod::visit_graph(Visitor &visitor)
@@ -21,7 +21,7 @@ std::string PyBuiltInMethod::to_string() const
 {
 	return fmt::format("<built-in method '{}' of '{}' object at {}>",
 		m_name,
-		object_name(m_self->type()),
+		m_self->type()->name(),
 		static_cast<void *>(m_self));
 }
 
@@ -39,7 +39,7 @@ PyBuiltInMethod *PyBuiltInMethod::create(std::string name,
 	return VirtualMachine::the().heap().allocate<PyBuiltInMethod>(name, builtin_method, self);
 }
 
-PyType *PyBuiltInMethod::type_() const { return ::builtin_method(); }
+PyType *PyBuiltInMethod::type() const { return ::builtin_method(); }
 
 namespace {
 
@@ -56,4 +56,16 @@ std::unique_ptr<TypePrototype> PyBuiltInMethod::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(builtin_method_flag, []() { type = ::register_builtin_method(); });
 	return std::move(type);
+}
+
+template<> PyBuiltInMethod *as(PyObject *node)
+{
+	if (node->type() == builtin_method()) { return static_cast<PyBuiltInMethod *>(node); }
+	return nullptr;
+}
+
+template<> const PyBuiltInMethod *as(const PyObject *node)
+{
+	if (node->type() == builtin_method()) { return static_cast<const PyBuiltInMethod *>(node); }
+	return nullptr;
 }

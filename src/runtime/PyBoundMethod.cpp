@@ -6,8 +6,7 @@
 #include "vm/VM.hpp"
 
 PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
-	: PyBaseObject(PyObjectType::PY_BOUND_METHOD, BuiltinTypes::the().bound_method()), m_self(self),
-	  m_method(method)
+	: PyBaseObject(BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
 {}
 
 PyBoundMethod *PyBoundMethod::create(PyObject *self, PyFunction *method)
@@ -42,7 +41,7 @@ PyObject *PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
 	return m_method->call(args, kwargs);
 }
 
-PyType *PyBoundMethod::type_() const { return bound_method(); }
+PyType *PyBoundMethod::type() const { return bound_method(); }
 
 namespace {
 
@@ -59,4 +58,16 @@ std::unique_ptr<TypePrototype> PyBoundMethod::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(bound_method_flag, []() { type = ::register_bound_method(); });
 	return std::move(type);
+}
+
+template<> PyBoundMethod *as(PyObject *node)
+{
+	if (node->type() == bound_method()) { return static_cast<PyBoundMethod *>(node); }
+	return nullptr;
+}
+
+template<> const PyBoundMethod *as(const PyObject *node)
+{
+	if (node->type() == bound_method()) { return static_cast<const PyBoundMethod *>(node); }
+	return nullptr;
 }

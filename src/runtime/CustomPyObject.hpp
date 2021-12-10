@@ -16,5 +16,5 @@ class CustomPyObject : public PyBaseObject
 	PyObject *__repr__() const;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };

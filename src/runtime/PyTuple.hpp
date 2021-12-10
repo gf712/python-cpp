@@ -44,7 +44,7 @@ class PyTuple : public PyBaseObject
 	PyObject *operator[](size_t idx) const;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
 
 
@@ -77,19 +77,5 @@ class PyTupleIterator : public PyBaseObject
 	PyTupleIterator &operator--();
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-
-template<> inline PyTuple *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_TUPLE) { return static_cast<PyTuple *>(node); }
-	return nullptr;
-}
-
-
-template<> inline const PyTuple *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_TUPLE) { return static_cast<const PyTuple *>(node); }
-	return nullptr;
-}

@@ -14,9 +14,8 @@ PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t function_id,
 	std::vector<std::string> args,
 	PyModule *module)
-	: PyBaseObject(PyObjectType::PY_CODE, BuiltinTypes::the().code()), m_function(function),
-	  m_function_id(function_id), m_register_count(function->registers_needed()),
-	  m_args(std::move(args)), m_module(module)
+	: PyBaseObject(BuiltinTypes::the().code()), m_function(function), m_function_id(function_id),
+	  m_register_count(function->registers_needed()), m_args(std::move(args)), m_module(module)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
@@ -28,7 +27,7 @@ void PyCode::visit_graph(Visitor &visitor)
 	if (m_module) m_module->visit_graph(visitor);
 }
 
-PyType *PyCode::type_() const { return code(); }
+PyType *PyCode::type() const { return code(); }
 
 namespace {
 
@@ -45,8 +44,8 @@ std::unique_ptr<TypePrototype> PyCode::register_type()
 }
 
 PyFunction::PyFunction(std::string name, PyCode *code, PyDict *globals)
-	: PyBaseObject(PyObjectType::PY_FUNCTION, BuiltinTypes::the().function()),
-	  m_name(std::move(name)), m_code(code), m_globals(globals)
+	: PyBaseObject(BuiltinTypes::the().function()), m_name(std::move(name)), m_code(code),
+	  m_globals(globals)
 {}
 
 void PyFunction::visit_graph(Visitor &visitor)
@@ -56,7 +55,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_globals) visitor.visit(*m_globals);
 }
 
-PyType *PyFunction::type_() const { return function(); }
+PyType *PyFunction::type() const { return function(); }
 
 PyObject *PyFunction::__repr__() const
 {
@@ -129,8 +128,8 @@ std::unique_ptr<TypePrototype> PyFunction::register_type()
 
 PyNativeFunction::PyNativeFunction(std::string name,
 	std::function<PyObject *(PyTuple *, PyDict *)> function)
-	: PyBaseObject(PyObjectType::PY_NATIVE_FUNCTION, BuiltinTypes::the().native_function()),
-	  m_name(std::move(name)), m_function(std::move(function))
+	: PyBaseObject(BuiltinTypes::the().native_function()), m_name(std::move(name)),
+	  m_function(std::move(function))
 {}
 
 PyObject *PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
@@ -144,7 +143,7 @@ void PyNativeFunction::visit_graph(Visitor &visitor)
 	for (auto *obj : m_captures) { obj->visit_graph(visitor); }
 }
 
-PyType *PyNativeFunction::type_() const { return native_function(); }
+PyType *PyNativeFunction::type() const { return native_function(); }
 
 namespace {
 
@@ -161,4 +160,28 @@ std::unique_ptr<TypePrototype> PyNativeFunction::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(native_function_flag, []() { type = ::register_native_function(); });
 	return std::move(type);
+}
+
+template<> PyFunction *as(PyObject *node)
+{
+	if (node->type() == function()) { return static_cast<PyFunction *>(node); }
+	return nullptr;
+}
+
+template<> const PyFunction *as(const PyObject *node)
+{
+	if (node->type() == function()) { return static_cast<const PyFunction *>(node); }
+	return nullptr;
+}
+
+template<> PyNativeFunction *as(PyObject *node)
+{
+	if (node->type() == native_function()) { return static_cast<PyNativeFunction *>(node); }
+	return nullptr;
+}
+
+template<> const PyNativeFunction *as(const PyObject *node)
+{
+	if (node->type() == native_function()) { return static_cast<const PyNativeFunction *>(node); }
+	return nullptr;
 }

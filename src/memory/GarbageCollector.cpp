@@ -5,6 +5,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyType.hpp"
 #include "vm/VM.hpp"
 
 #include <csetjmp>
@@ -37,7 +38,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 			auto *cell = bit_cast<Cell *>(address + sizeof(GarbageCollected));
 			if (cell->is_pyobject()) {
 				auto *obj = static_cast<PyObject *>(cell);
-				spdlog::trace("adding root {}@{}", object_name(obj->type()), (void *)obj);
+				spdlog::trace("adding root {}@{}", obj->type()->name(), (void *)obj);
 			}
 			roots.insert(cell);
 		}
@@ -84,14 +85,14 @@ struct MarkGCVisitor : Cell::Visitor
 			if (obj_header->black()) {
 				if (cell.is_pyobject()) {
 					spdlog::trace("Already visited {}@{}, skipping",
-						object_name(static_cast<PyObject *>(&cell)->type()),
+						static_cast<PyObject *>(&cell)->type_prototype().__name__,
 						(void *)&cell);
 				}
 				return;
 			}
 			if (cell.is_pyobject()) {
 				auto *obj = static_cast<PyObject *>(&cell);
-				spdlog::trace("Visiting {}@{}", object_name(obj->type()), (void *)&obj);
+				spdlog::trace("Visiting {}@{}", obj->type_prototype().__name__, (void *)&obj);
 			}
 			obj_header->mark(GarbageCollected::Color::BLACK);
 		}
@@ -151,7 +152,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 					auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
 					if (cell->is_pyobject()) {
 						auto *obj = static_cast<PyObject *>(cell);
-						spdlog::trace("Deallocating {}@{}", object_name(obj->type()), (void *)obj);
+						spdlog::trace("Deallocating {}@{}", obj->type()->name(), (void *)obj);
 					}
 					cell->~Cell();
 					chunk.deallocate(memory);

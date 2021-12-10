@@ -30,21 +30,5 @@ class PySlotWrapper : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PySlotWrapper *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_SLOT_WRAPPER) {
-		return static_cast<PySlotWrapper *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PySlotWrapper *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_SLOT_WRAPPER) {
-		return static_cast<const PySlotWrapper *>(node);
-	}
-	return nullptr;
-}

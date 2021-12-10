@@ -4,8 +4,7 @@
 #include "vm/VM.hpp"
 
 
-PyBytes::PyBytes(const Bytes &number)
-	: PyBaseObject(PyObjectType::PY_BYTES, BuiltinTypes::the().bytes()), m_value(number)
+PyBytes::PyBytes(const Bytes &number) : PyBaseObject(BuiltinTypes::the().bytes()), m_value(number)
 {}
 
 PyBytes *PyBytes::create(const Bytes &value)
@@ -23,7 +22,7 @@ std::string PyBytes::to_string() const
 
 PyObject *PyBytes::__add__(const PyObject *) const { TODO() }
 
-PyType *PyBytes::type_() const
+PyType *PyBytes::type() const
 {
 	return bytes();
 }
@@ -40,4 +39,16 @@ std::unique_ptr<TypePrototype> PyBytes::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(bytes_flag, []() { type = ::register_bytes(); });
 	return std::move(type);
+}
+
+template<> PyBytes *as(PyObject *obj)
+{
+	if (obj->type() == bytes()) { return static_cast<PyBytes *>(obj); }
+	return nullptr;
+}
+
+template<> const PyBytes *as(const PyObject *obj)
+{
+	if (obj->type() == bytes()) { return static_cast<const PyBytes *>(obj); }
+	return nullptr;
 }

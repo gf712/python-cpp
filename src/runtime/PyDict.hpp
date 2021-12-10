@@ -39,7 +39,7 @@ class PyDict : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
 
 class PyDictItems : public PyBaseObject
@@ -60,7 +60,7 @@ class PyDictItems : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
 
 
@@ -95,18 +95,5 @@ class PyDictItemsIterator : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-
-template<> inline PyDict *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_DICT) { return static_cast<PyDict *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyDict *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_DICT) { return static_cast<const PyDict *>(node); }
-	return nullptr;
-}

@@ -4,9 +4,7 @@
 #include "vm/VM.hpp"
 
 
-PyFloat::PyFloat(double value)
-	: PyNumber(Number{ value }, PyObjectType::PY_FLOAT, BuiltinTypes::the().float_())
-{}
+PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
 
 PyFloat *PyFloat::create(double value)
 {
@@ -14,7 +12,7 @@ PyFloat *PyFloat::create(double value)
 	return heap.allocate<PyFloat>(value);
 }
 
-PyType *PyFloat::type_() const { return float_(); }
+PyType *PyFloat::type() const { return float_(); }
 
 namespace {
 
@@ -28,4 +26,16 @@ std::unique_ptr<TypePrototype> PyFloat::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(float_flag, []() { type = ::register_float(); });
 	return std::move(type);
+}
+
+template<> PyFloat *as(PyObject *obj)
+{
+	if (obj->type() == float_()) { return static_cast<PyFloat *>(obj); }
+	return nullptr;
+}
+
+template<> const PyFloat *as(const PyObject *obj)
+{
+	if (obj->type() == float_()) { return static_cast<const PyFloat *>(obj); }
+	return nullptr;
 }

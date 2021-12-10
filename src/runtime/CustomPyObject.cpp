@@ -21,7 +21,7 @@ template<typename T, typename... U> size_t get_address(std::function<T(U...)> f)
 }// namespace
 
 CustomPyObject::CustomPyObject(const PyType *type)
-	: PyBaseObject(PyObjectType::PY_CUSTOM_TYPE, type->underlying_type()), m_type_obj(type)
+	: PyBaseObject(type->underlying_type()), m_type_obj(type)
 {}
 
 PyObject *CustomPyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -107,7 +107,7 @@ PyObject *CustomPyObject::__repr__() const
 }
 
 
-PyType *CustomPyObject::type_() const
+PyType *CustomPyObject::type() const
 {
 	// FIXME: should type_ return const PyType* instead?
 	return const_cast<PyType *>(m_type_obj);

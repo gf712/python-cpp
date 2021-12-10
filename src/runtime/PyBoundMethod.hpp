@@ -23,21 +23,5 @@ class PyBoundMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PyBoundMethod *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BOUND_METHOD) {
-		return static_cast<PyBoundMethod *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PyBoundMethod *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BOUND_METHOD) {
-		return static_cast<const PyBoundMethod *>(node);
-	}
-	return nullptr;
-}

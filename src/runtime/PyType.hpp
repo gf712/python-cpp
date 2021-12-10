@@ -35,7 +35,7 @@ class PyType : public PyBaseObject
 
 	static std::unique_ptr<TypePrototype> register_type();
 
-	PyType *type_() const override;
+	PyType *type() const override;
 
 	PyList *mro();
 
@@ -44,16 +44,3 @@ class PyType : public PyBaseObject
   private:
 	PyTuple *mro_internal();
 };
-
-
-template<> inline PyType *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_TYPE) { return static_cast<PyType *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyType *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_TYPE) { return static_cast<const PyType *>(node); }
-	return nullptr;
-}

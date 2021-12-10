@@ -34,19 +34,5 @@ class PyModule : public PyBaseObject
 	void insert(PyString *key, const Value &value);
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-
-template<> inline PyModule *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_MODULE) { return static_cast<PyModule *>(node); }
-	return nullptr;
-}
-
-
-template<> inline const PyModule *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_MODULE) { return static_cast<const PyModule *>(node); }
-	return nullptr;
-}

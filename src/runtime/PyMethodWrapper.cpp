@@ -8,9 +8,9 @@ PyMethodWrapper::PyMethodWrapper(PyString *name,
 	PyType *underlying_type,
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function,
 	std::vector<PyObject *> &&captures)
-	: PyBaseObject(PyObjectType::PY_METHOD_WRAPPER, BuiltinTypes::the().method_wrapper()),
-	  m_name(std::move(name)), m_underlying_type(underlying_type),
-	  m_method_descriptor(std::move(function)), m_captures(std::move(captures))
+	: PyBaseObject(BuiltinTypes::the().method_wrapper()), m_name(std::move(name)),
+	  m_underlying_type(underlying_type), m_method_descriptor(std::move(function)),
+	  m_captures(std::move(captures))
 {}
 
 
@@ -43,7 +43,7 @@ PyObject *PyMethodWrapper::__call__(PyTuple *args, PyDict *kwargs)
 }
 
 
-PyType *PyMethodWrapper::type_() const { return method_wrapper(); }
+PyType *PyMethodWrapper::type() const { return method_wrapper(); }
 
 namespace {
 
@@ -60,4 +60,16 @@ std::unique_ptr<TypePrototype> PyMethodWrapper::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(method_wrapper_flag, []() { type = ::register_method_wrapper(); });
 	return std::move(type);
+}
+
+template<> PyMethodWrapper *as(PyObject *obj)
+{
+	if (obj->type() == method_wrapper()) { return static_cast<PyMethodWrapper *>(obj); }
+	return nullptr;
+}
+
+template<> const PyMethodWrapper *as(const PyObject *obj)
+{
+	if (obj->type() == method_wrapper()) { return static_cast<const PyMethodWrapper *>(obj); }
+	return nullptr;
 }

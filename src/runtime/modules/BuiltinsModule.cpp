@@ -56,7 +56,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 				auto obj =
 					std::visit([](const auto &value) { return PyObject::from(value); }, maybe_str);
 				interpreter.raise_exception(
-					"TypeError: sep must be None or a string, not {}", object_name(obj->type()));
+					"TypeError: sep must be None or a string, not {}", obj->type()->name());
 				return nullptr;
 			}
 			separator = std::get<String>(maybe_str).s;
@@ -67,7 +67,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 				auto obj =
 					std::visit([](const auto &value) { return PyObject::from(value); }, maybe_str);
 				interpreter.raise_exception(
-					"TypeError: end must be None or a string, not {}", object_name(obj->type()));
+					"TypeError: end must be None or a string, not {}", obj->type()->name());
 				return nullptr;
 			}
 			end = std::get<String>(maybe_str).s;
@@ -257,11 +257,11 @@ PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 			// FIXME: when float is separated from integer fix this
 			interpreter.raise_exception(
 				"TypeError: 'float' object cannot be interpreted as an integer",
-				object_name(args->operator[](0)->type()));
+				args->operator[](0)->type()->name());
 		}
 	} else {
 		interpreter.raise_exception("TypeError: '{}' object cannot be interpreted as an integer",
-			object_name(args->operator[](0)->type()));
+			args->operator[](0)->type()->name());
 	}
 	return nullptr;
 }
@@ -279,7 +279,7 @@ PyObject *ord(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		}
 	} else {
 		interpreter.raise_exception("TypeError: ord() expected string of length 1, but {} found",
-			object_name(args->operator[](0)->type()));
+			args->operator[](0)->type()->name());
 	}
 	return nullptr;
 }

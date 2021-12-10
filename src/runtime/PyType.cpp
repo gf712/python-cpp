@@ -13,6 +13,18 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+template<> PyType *as(PyObject *obj)
+{
+	if (obj->type() == type()) { return static_cast<PyType *>(obj); }
+	return nullptr;
+}
+
+template<> const PyType *as(const PyObject *obj)
+{
+	if (obj->type() == type()) { return static_cast<const PyType *>(obj); }
+	return nullptr;
+}
+
 namespace {
 
 TypePrototype clone(std::string name, const TypePrototype &prototype)
@@ -106,7 +118,7 @@ std::vector<PyObject *> mro_(PyType *type)
 
 	for (const auto &base : type->underlying_type().__bases__->elements()) {
 		if (auto *precomputed_mro =
-				as<PyType>(std::get<PyObject *>(base))->underlying_type().__mro__) {
+				static_cast<PyType *>(std::get<PyObject *>(base))->underlying_type().__mro__) {
 			std::vector<PyObject *> base_mro;
 			base_mro.reserve(precomputed_mro->size());
 			for (const auto &el : precomputed_mro->elements()) {
@@ -127,11 +139,10 @@ std::vector<PyObject *> mro_(PyType *type)
 
 
 PyType::PyType(TypePrototype type_prototype)
-	: PyBaseObject(PyObjectType::PY_TYPE, BuiltinTypes::the().type()),
-	  m_underlying_type(type_prototype)
+	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(type_prototype)
 {}
 
-PyType *PyType::type_() const
+PyType *PyType::type() const
 {
 	// FIXME: probably not the best way to do this
 	//		  this avoids infinite recursion where PyType representing "type" has type "type"
@@ -299,7 +310,7 @@ PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	if (this == ::type()) {
-		if (args->size() == 1) { return PyObject::from(args->elements()[0])->type_(); }
+		if (args->size() == 1) { return PyObject::from(args->elements()[0])->type(); }
 		if (args->size() != 3) {
 			VirtualMachine::the().interpreter().raise_exception(
 				type_error("type() takes 1 or 3 arguments, got {}", args->size()));
@@ -316,7 +327,7 @@ PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 
 	// If __new__() does not return an instance of cls, then the new instance’s __init__() method
 	// will not be invoked.
-	if (obj->type_() == this) {
+	if (obj->type() == this) {
 		// If __new__() is invoked during object construction and it returns an instance of cls,
 		// then the new instance’s __init__() method will be invoked like __init__(self[, ...]),
 		// where self is the new instance and the remaining arguments are the same as were passed to

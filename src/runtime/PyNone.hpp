@@ -20,7 +20,7 @@ class PyNone : public PyBaseObject
 	void visit_graph(Visitor &) override {}
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 
   private:
 	static PyNone *create();

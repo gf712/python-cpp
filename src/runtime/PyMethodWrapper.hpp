@@ -42,21 +42,5 @@ class PyMethodWrapper : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PyMethodWrapper *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_METHOD_WRAPPER) {
-		return static_cast<PyMethodWrapper *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PyMethodWrapper *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_METHOD_WRAPPER) {
-		return static_cast<const PyMethodWrapper *>(node);
-	}
-	return nullptr;
-}

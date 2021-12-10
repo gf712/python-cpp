@@ -41,8 +41,7 @@ PyRange::PyRange(int64_t stop) : PyRange(0, stop, 1) {}
 PyRange::PyRange(int64_t start, int64_t stop) : PyRange(start, stop, 1) {}
 
 PyRange::PyRange(int64_t start, int64_t stop, int64_t step)
-	: PyBaseObject(PyObjectType::PY_RANGE, BuiltinTypes::the().range()), m_start(start),
-	  m_stop(stop), m_step(step)
+	: PyBaseObject(BuiltinTypes::the().range()), m_start(start), m_stop(stop), m_step(step)
 {}
 
 std::string PyRange::to_string() const
@@ -62,7 +61,7 @@ PyObject *PyRange::__iter__() const
 	return heap.allocate<PyRangeIterator>(*this);
 }
 
-PyType *PyRange::type_() const { return range(); }
+PyType *PyRange::type() const { return range(); }
 
 namespace {
 
@@ -80,8 +79,8 @@ std::unique_ptr<TypePrototype> PyRange::register_type()
 
 
 PyRangeIterator::PyRangeIterator(const PyRange &pyrange)
-	: PyBaseObject(PyObjectType::PY_RANGE_ITERATOR, BuiltinTypes::the().range_iterator()),
-	  m_pyrange(pyrange), m_current_index(m_pyrange.start())
+	: PyBaseObject(BuiltinTypes::the().range_iterator()), m_pyrange(pyrange),
+	  m_current_index(m_pyrange.start())
 {}
 
 std::string PyRangeIterator::to_string() const
@@ -102,7 +101,7 @@ PyObject *PyRangeIterator::__next__()
 	return nullptr;
 }
 
-PyType *PyRangeIterator::type_() const { return range_iterator(); }
+PyType *PyRangeIterator::type() const { return range_iterator(); }
 
 namespace {
 

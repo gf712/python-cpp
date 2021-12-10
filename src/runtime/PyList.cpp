@@ -13,7 +13,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyList::PyList() : PyBaseObject(PyObjectType::PY_LIST, BuiltinTypes::the().list()) {}
+PyList::PyList() : PyBaseObject(BuiltinTypes::the().list()) {}
 
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
 
@@ -92,7 +92,7 @@ void PyList::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyList::type_() const { return list(); }
+PyType *PyList::type() const { return list(); }
 
 namespace {
 
@@ -121,7 +121,7 @@ std::unique_ptr<TypePrototype> PyList::register_type()
 
 
 PyListIterator::PyListIterator(const PyList &pylist)
-	: PyBaseObject(PyObjectType::PY_LIST_ITERATOR, BuiltinTypes::the().list_iterator()),
+	: PyBaseObject(BuiltinTypes::the().list_iterator()),
 	  m_pylist(pylist)
 {}
 
@@ -150,7 +150,7 @@ PyObject *PyListIterator::__next__()
 	return nullptr;
 }
 
-PyType *PyListIterator::type_() const { return list_iterator(); }
+PyType *PyListIterator::type() const { return list_iterator(); }
 
 namespace {
 
@@ -167,4 +167,16 @@ std::unique_ptr<TypePrototype> PyListIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
 	return std::move(type);
+}
+
+template<> PyList *as(PyObject *obj)
+{
+	if (obj->type() == list()) { return static_cast<PyList *>(obj); }
+	return nullptr;
+}
+
+template<> const PyList *as(const PyObject *obj)
+{
+	if (obj->type() == list()) { return static_cast<const PyList *>(obj); }
+	return nullptr;
 }

@@ -33,21 +33,5 @@ class PyBuiltInMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PyBuiltInMethod *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BUILTIN_METHOD) {
-		return static_cast<PyBuiltInMethod *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PyBuiltInMethod *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_BUILTIN_METHOD) {
-		return static_cast<const PyBuiltInMethod *>(node);
-	}
-	return nullptr;
-}

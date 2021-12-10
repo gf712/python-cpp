@@ -5,7 +5,7 @@
 #include "vm/VM.hpp"
 
 
-PyNone::PyNone() : PyBaseObject(PyObjectType::PY_NONE, BuiltinTypes::the().none()) {}
+PyNone::PyNone() : PyBaseObject(BuiltinTypes::the().none()) {}
 
 std::string PyNone::to_string() const { return "None"; }
 
@@ -19,7 +19,7 @@ PyNone *PyNone::create()
 	return heap.allocate_static<PyNone>().get();
 }
 
-PyType *PyNone::type_() const { return none(); }
+PyType *PyNone::type() const { return none(); }
 
 namespace {
 

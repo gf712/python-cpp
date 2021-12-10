@@ -16,129 +16,6 @@
 
 #include <spdlog/fmt/fmt.h>
 
-
-enum class PyObjectType {
-	PY_STRING,
-	PY_FUNCTION,
-	PY_NATIVE_FUNCTION,
-	PY_BYTES,
-	PY_ELLIPSIS,
-	PY_BOOL,
-	PY_FLOAT,
-	PY_INTEGER,
-	PY_NONE,
-	PY_CODE,
-	PY_LIST,
-	PY_LIST_ITERATOR,
-	PY_TUPLE,
-	PY_TUPLE_ITERATOR,
-	PY_DICT,
-	PY_DICT_ITEMS,
-	PY_DICT_ITEMS_ITERATOR,
-	PY_BASE_EXCEPTION,
-	PY_RANGE,
-	PY_RANGE_ITERATOR,
-	PY_CUSTOM_TYPE,
-	PY_MODULE,
-	PY_TYPE,
-	PY_METHOD_WRAPPER,
-	PY_SLOT_WRAPPER,
-	PY_BOUND_METHOD,
-	PY_BUILTIN_METHOD,
-	PY_STATIC_METHOD
-};
-
-inline std::string_view object_name(PyObjectType type)
-{
-	switch (type) {
-	case PyObjectType::PY_STRING: {
-		return "str";
-	}
-	case PyObjectType::PY_BOOL: {
-		return "bool";
-	}
-	case PyObjectType::PY_NONE: {
-		return "NoneType";
-	}
-	case PyObjectType::PY_FLOAT: {
-		return "float";
-	}
-	case PyObjectType::PY_INTEGER: {
-		return "int";
-	}
-	case PyObjectType::PY_FUNCTION: {
-		return "function";
-	}
-	case PyObjectType::PY_BYTES: {
-		return "bytes";
-	}
-	case PyObjectType::PY_ELLIPSIS: {
-		return "ellipsis";
-	}
-	case PyObjectType::PY_NATIVE_FUNCTION: {
-		return "external_function";
-	}
-	case PyObjectType::PY_CODE: {
-		return "code";
-	}
-	case PyObjectType::PY_LIST: {
-		return "list";
-	}
-	case PyObjectType::PY_LIST_ITERATOR: {
-		return "list_iterator";
-	}
-	case PyObjectType::PY_TUPLE: {
-		return "tuple";
-	}
-	case PyObjectType::PY_TUPLE_ITERATOR: {
-		return "tuple_iterator";
-	}
-	case PyObjectType::PY_DICT: {
-		return "dict";
-	}
-	case PyObjectType::PY_DICT_ITEMS: {
-		return "dict_items";
-	}
-	case PyObjectType::PY_DICT_ITEMS_ITERATOR: {
-		return "dict_itemiterator";
-	}
-	case PyObjectType::PY_BASE_EXCEPTION: {
-		return "BaseException";
-	}
-	case PyObjectType::PY_RANGE: {
-		return "range";
-	}
-	case PyObjectType::PY_RANGE_ITERATOR: {
-		return "range_iterator";
-	}
-	case PyObjectType::PY_CUSTOM_TYPE: {
-		return "object";
-	}
-	case PyObjectType::PY_MODULE: {
-		return "module";
-	}
-	case PyObjectType::PY_TYPE: {
-		return "type";
-	}
-	case PyObjectType::PY_METHOD_WRAPPER: {
-		return "method_wrapper";
-	}
-	case PyObjectType::PY_SLOT_WRAPPER: {
-		return "slot_wrapper";
-	}
-	case PyObjectType::PY_BOUND_METHOD: {
-		return "bound method";
-	}
-	case PyObjectType::PY_BUILTIN_METHOD: {
-		return "built-in method";
-	}
-	case PyObjectType::PY_STATIC_METHOD: {
-		return "staticmethod";
-	}
-	}
-	ASSERT_NOT_REACHED()
-}
-
 enum class RichCompare {
 	Py_LT = 0,// <
 	Py_LE = 1,// <=
@@ -229,10 +106,11 @@ struct TypePrototype
 
 class PyObject : public Cell
 {
-	const PyObjectType m_type;
 	struct NotImplemented_
 	{
 	};
+
+	friend class Heap;
 
   protected:
 	const TypePrototype &m_type_prototype;
@@ -242,13 +120,11 @@ class PyObject : public Cell
 	using PyResult = std::variant<PyObject *, NotImplemented_>;
 
 	PyObject() = delete;
-	PyObject(PyObjectType type, const TypePrototype &type_);
+	PyObject(const TypePrototype &type);
 
 	virtual ~PyObject() = default;
 
-	virtual PyType *type_() const = 0;
-	PyObjectType type() const { return m_type; }
-	std::string_view type_string() const { return object_name(m_type); }
+	virtual PyType *type() const = 0;
 
 	template<typename T> static PyObject *from(const T &value);
 
@@ -299,6 +175,7 @@ class PyObject : public Cell
 	bool is_pyobject() const override { return true; }
 	bool is_callable() const;
 	const std::string &name() const;
+	const TypePrototype &type_prototype() const { return m_type_prototype; }
 };
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
@@ -437,7 +314,7 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 class PyBaseObject : public PyObject
 {
   public:
-	PyBaseObject(PyObjectType type, const TypePrototype &type_) : PyObject(type, type_) {}
+	PyBaseObject(const TypePrototype &type) : PyObject(type) {}
 };
 
 struct ValueHash

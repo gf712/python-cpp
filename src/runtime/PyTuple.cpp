@@ -7,7 +7,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyTuple::PyTuple() : PyBaseObject(PyObjectType::PY_TUPLE, BuiltinTypes::the().tuple()) {}
+PyTuple::PyTuple() : PyBaseObject(BuiltinTypes::the().tuple()) {}
 
 PyTuple::PyTuple(std::vector<Value> &&elements) : PyTuple() { m_elements = std::move(elements); }
 
@@ -100,7 +100,7 @@ void PyTuple::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyTuple::type_() const { return tuple(); }
+PyType *PyTuple::type() const { return tuple(); }
 
 namespace {
 
@@ -118,8 +118,7 @@ std::unique_ptr<TypePrototype> PyTuple::register_type()
 
 
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple)
-	: PyBaseObject(PyObjectType::PY_TUPLE_ITERATOR, BuiltinTypes::the().tuple_iterator()),
-	  m_pytuple(pytuple)
+	: PyBaseObject(BuiltinTypes::the().tuple_iterator()), m_pytuple(pytuple)
 {}
 
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
@@ -166,7 +165,7 @@ PyObject *PyTupleIterator::operator*() const
 		m_pytuple.elements()[m_current_index]);
 }
 
-PyType *PyTupleIterator::type_() const { return tuple_iterator(); }
+PyType *PyTupleIterator::type() const { return tuple_iterator(); }
 
 namespace {
 
@@ -183,4 +182,17 @@ std::unique_ptr<TypePrototype> PyTupleIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(tuple_iterator_flag, []() { type = ::register_tuple_iterator(); });
 	return std::move(type);
+}
+
+template<> PyTuple *as(PyObject *obj)
+{
+	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
+	return nullptr;
+}
+
+
+template<> const PyTuple *as(const PyObject *obj)
+{
+	if (obj->type() == tuple()) { return static_cast<const PyTuple *>(obj); }
+	return nullptr;
 }

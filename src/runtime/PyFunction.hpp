@@ -30,7 +30,7 @@ class PyCode : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
 
 
@@ -59,7 +59,7 @@ class PyFunction : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
 
 
@@ -95,35 +95,5 @@ class PyNativeFunction : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-
-template<> inline PyFunction *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<PyFunction *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyFunction *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_FUNCTION) { return static_cast<const PyFunction *>(node); }
-	return nullptr;
-}
-
-
-template<> inline PyNativeFunction *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
-		return static_cast<PyNativeFunction *>(node);
-	}
-	return nullptr;
-}
-
-template<> inline const PyNativeFunction *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_NATIVE_FUNCTION) {
-		return static_cast<const PyNativeFunction *>(node);
-	}
-	return nullptr;
-}

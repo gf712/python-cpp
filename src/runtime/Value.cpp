@@ -7,6 +7,7 @@
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
 #include "PyString.hpp"
+#include "PyType.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
@@ -261,8 +262,8 @@ std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interp
 				} else {
 					interpreter.raise_exception(
 						"TypeError: unsupported operand type(s) for <=: \'{}\' and \'{}\'",
-						object_name(py_lhs->type()),
-						object_name(py_rhs->type()));
+						py_lhs->type()->name(),
+						py_rhs->type()->name());
 					return {};
 				}
 			} },
@@ -291,8 +292,8 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 				} else {
 					interpreter.raise_exception(
 						"TypeError: unsupported operand type(s) for <: \'{}\' and \'{}\'",
-						object_name(py_lhs->type()),
-						object_name(py_rhs->type()));
+						py_lhs->type()->name(),
+						py_rhs->type()->name());
 					return {};
 				}
 			} },

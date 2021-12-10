@@ -93,8 +93,7 @@ template<> PyObject *PyObject::from(const Value &value)
 	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
 }
 
-PyObject::PyObject(PyObjectType type, const TypePrototype &type_)
-	: Cell(), m_type(type), m_type_prototype(type_)
+PyObject::PyObject(const TypePrototype &type) : Cell(), m_type_prototype(type)
 {
 	for (auto m : m_type_prototype.__methods__) {
 		auto *builtin_method = VirtualMachine::the().heap().allocate<PyBuiltInMethod>(
@@ -167,8 +166,8 @@ void PyObject::put(std::string name, PyObject *value)
 PyObject *PyObject::get(std::string name, Interpreter &interpreter) const
 {
 	if (auto it = m_attributes.find(name); it != m_attributes.end()) { return it->second; }
-	interpreter.raise_exception(attribute_error(
-		fmt::format("'{}' object has no attribute '{}'", object_name(m_type), name)));
+	interpreter.raise_exception(
+		attribute_error(fmt::format("'{}' object has no attribute '{}'", type()->name(), name)));
 	return nullptr;
 }
 
@@ -454,7 +453,7 @@ PyObject *PyObject::len() const
 	if (m_type_prototype.__len__.has_value()) { return m_type_prototype.__len__->operator()(this); }
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: object of type '{}' has no len()", object_name(type())));
+		fmt::format("TypeError: object of type '{}' has no len()", type()->name()));
 	return nullptr;
 }
 
@@ -465,7 +464,7 @@ PyObject *PyObject::iter() const
 	}
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: '{}' object is not iterable", object_name(type())));
+		fmt::format("TypeError: '{}' object is not iterable", type()->name()));
 	return nullptr;
 }
 
@@ -476,7 +475,7 @@ PyObject *PyObject::next()
 	}
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: '{}' object is not an iterator", object_name(type())));
+		fmt::format("TypeError: '{}' object is not an iterator", type()->name()));
 	return nullptr;
 }
 
@@ -484,7 +483,7 @@ PyObject *PyObject::next()
 PyObject *PyObject::new_(PyTuple *args, PyDict *kwargs) const
 {
 	if (m_type_prototype.__new__.has_value()) {
-		return m_type_prototype.__new__->operator()(type_(), args, kwargs);
+		return m_type_prototype.__new__->operator()(type(), args, kwargs);
 	}
 	return nullptr;
 }

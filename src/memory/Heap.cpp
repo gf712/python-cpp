@@ -1,5 +1,6 @@
 #include "Heap.hpp"
 #include "GarbageCollector.hpp"
+#include "runtime/PyType.hpp"
 
 bool Block::Chunk::has_address(uint8_t *memory) const
 {
@@ -133,4 +134,9 @@ uint8_t *Heap::allocate_gc(uint8_t *ptr) const
 {
 	new (ptr) GarbageCollected();
 	return ptr + sizeof(GarbageCollected);
+}
+
+void Heap::log_allocation(PyObject *obj) const
+{
+	spdlog::debug("Allocated {} on the heap @{}", obj->m_type_prototype.__name__, (void *)obj);
 }

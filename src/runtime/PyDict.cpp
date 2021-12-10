@@ -10,12 +10,12 @@
 #include "vm/VM.hpp"
 
 PyDict::PyDict(MapType &&map)
-	: PyBaseObject(PyObjectType::PY_DICT, BuiltinTypes::the().dict()), m_map(std::move(map))
+	: PyBaseObject(BuiltinTypes::the().dict()), m_map(std::move(map))
 {}
 PyDict::PyDict(const MapType &map)
-	: PyBaseObject(PyObjectType::PY_DICT, BuiltinTypes::the().dict()), m_map(map)
+	: PyBaseObject(BuiltinTypes::the().dict()), m_map(map)
 {}
-PyDict::PyDict() : PyBaseObject(PyObjectType::PY_DICT, BuiltinTypes::the().dict()) {}
+PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
 
 PyDict *PyDict::create() { return VirtualMachine::the().heap().allocate<PyDict>(); }
 
@@ -95,7 +95,7 @@ void PyDict::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyDict::type_() const { return dict(); }
+PyType *PyDict::type() const { return dict(); }
 
 namespace {
 
@@ -112,7 +112,7 @@ std::unique_ptr<TypePrototype> PyDict::register_type()
 }
 
 PyDictItems::PyDictItems(const PyDict &pydict)
-	: PyBaseObject(PyObjectType::PY_DICT_ITEMS, BuiltinTypes::the().dict_items()), m_pydict(pydict)
+	: PyBaseObject(BuiltinTypes::the().dict_items()), m_pydict(pydict)
 {}
 
 std::string PyDictItems::to_string() const
@@ -142,7 +142,7 @@ void PyDictItems::visit_graph(Visitor &visitor)
 	visitor.visit(*const_cast<PyDict *>(&m_pydict));
 }
 
-PyType *PyDictItems::type_() const { return dict_items(); }
+PyType *PyDictItems::type() const { return dict_items(); }
 
 namespace {
 
@@ -162,7 +162,7 @@ std::unique_ptr<TypePrototype> PyDictItems::register_type()
 }
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict)
-	: PyBaseObject(PyObjectType::PY_DICT_ITEMS_ITERATOR, BuiltinTypes::the().dict_items_iterator()),
+	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()),
 	  m_pydictitems(pydict), m_current_iterator(m_pydictitems.m_pydict.map().begin())
 {}
 
@@ -227,7 +227,7 @@ PyTuple *PyDictItemsIterator::operator*() const
 	return VirtualMachine::the().heap().allocate<PyTuple>(std::vector{ key, value });
 }
 
-PyType *PyDictItemsIterator::type_() const { return dict_items_iterator(); }
+PyType *PyDictItemsIterator::type() const { return dict_items_iterator(); }
 
 namespace {
 
@@ -244,4 +244,16 @@ std::unique_ptr<TypePrototype> PyDictItemsIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(dict_items_iterator_flag, []() { type = ::register_dict_items_iterator(); });
 	return std::move(type);
+}
+
+template<> PyDict *as(PyObject *obj)
+{
+	if (obj->type() == dict()) { return static_cast<PyDict *>(obj); }
+	return nullptr;
+}
+
+template<> const PyDict *as(const PyObject *obj)
+{
+	if (obj->type() == dict()) { return static_cast<const PyDict *>(obj); }
+	return nullptr;
 }

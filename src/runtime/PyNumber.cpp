@@ -2,6 +2,7 @@
 #include "PyFloat.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
+#include "PyType.hpp"
 #include "TypeError.hpp"
 
 #include "interpreter/Interpreter.hpp"
@@ -53,8 +54,8 @@ PyObject *PyNumber::__add__(const PyObject *obj) const
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -66,8 +67,8 @@ PyObject *PyNumber::__sub__(const PyObject *obj) const
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -79,8 +80,8 @@ PyObject *PyNumber::__mod__(const PyObject *obj) const
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -92,8 +93,8 @@ PyObject *PyNumber::__mul__(const PyObject *obj) const
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -106,8 +107,8 @@ PyObject *PyNumber::__eq__(const PyObject *obj) const
 	}
 	VirtualMachine::the().interpreter().raise_exception(
 		type_error("'==' not supported between instances of '{}' and '{}'",
-			object_name(this->type()),
-			object_name(obj->type())));
+			type()->name(),
+			obj->type()->name()));
 	return nullptr;
 }
 
@@ -120,8 +121,8 @@ PyObject *PyNumber::__lt__(const PyObject *other) const
 	}
 	VirtualMachine::the().interpreter().raise_exception(
 		type_error("'<' not supported between instances of '{}' and '{}'",
-			object_name(this->type()),
-			object_name(other->type())));
+			type()->name(),
+			other->type()->name()));
 	return nullptr;
 }
 
@@ -133,8 +134,8 @@ PyObject *PyNumber::__le__(const PyObject *other) const
 	}
 	VirtualMachine::the().interpreter().raise_exception(
 		type_error("'<=' not supported between instances of '{}' and '{}'",
-			object_name(this->type()),
-			object_name(other->type())));
+			type()->name(),
+			other->type()->name()));
 	return nullptr;
 }
 
@@ -146,8 +147,8 @@ PyObject *PyNumber::__gt__(const PyObject *other) const
 	}
 	VirtualMachine::the().interpreter().raise_exception(
 		type_error("'>' not supported between instances of '{}' and '{}'",
-			object_name(this->type()),
-			object_name(other->type())));
+			type()->name(),
+			other->type()->name()));
 	return nullptr;
 }
 
@@ -159,8 +160,8 @@ PyObject *PyNumber::__ge__(const PyObject *other) const
 	}
 	VirtualMachine::the().interpreter().raise_exception(
 		type_error("'>=' not supported between instances of '{}' and '{}'",
-			object_name(this->type()),
-			object_name(other->type())));
+			type()->name(),
+			other->type()->name()));
 	return nullptr;
 }
 

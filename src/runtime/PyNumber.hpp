@@ -40,7 +40,5 @@ class PyNumber : public PyBaseObject
 	static const PyNumber *as_number(const PyObject *obj);
 
   private:
-	PyNumber(Number number, PyObjectType type, const TypePrototype &type_)
-		: PyBaseObject(type, type_), m_value(number)
-	{}
+	PyNumber(Number number, const TypePrototype &type) : PyBaseObject(type), m_value(number) {}
 };

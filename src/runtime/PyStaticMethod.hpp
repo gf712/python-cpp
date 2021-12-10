@@ -37,21 +37,5 @@ class PyStaticMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PyStaticMethod *as(PyObject *obj)
-{
-	if (obj->type() == PyObjectType::PY_STATIC_METHOD) {
-		return static_cast<PyStaticMethod *>(obj);
-	}
-	return nullptr;
-}
-
-template<> inline const PyStaticMethod *as(const PyObject *obj)
-{
-	if (obj->type() == PyObjectType::PY_STATIC_METHOD) {
-		return static_cast<const PyStaticMethod *>(obj);
-	}
-	return nullptr;
-}

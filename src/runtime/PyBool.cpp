@@ -4,9 +4,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyBool::PyBool(bool name)
-	: PyBaseObject(PyObjectType::PY_BOOL, BuiltinTypes::the().bool_()), m_value(name)
-{}
+PyBool::PyBool(bool name) : PyBaseObject(BuiltinTypes::the().bool_()), m_value(name) {}
 
 std::string PyBool::to_string() const { return m_value ? "True" : "False"; }
 
@@ -25,7 +23,7 @@ PyBool *PyBool::create(bool value)
 	return heap.allocate_static<PyBool>(value).get();
 }
 
-PyType *PyBool::type_() const { return ::bool_(); }
+PyType *PyBool::type() const { return ::bool_(); }
 
 PyObject *py_true()
 {
@@ -58,4 +56,16 @@ std::unique_ptr<TypePrototype> PyBool::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(bool_flag, []() { type = ::register_bool(); });
 	return std::move(type);
+}
+
+template<> PyBool *as(PyObject *node)
+{
+	if (node->type() == bool_()) { return static_cast<PyBool *>(node); }
+	return nullptr;
+}
+
+template<> const PyBool *as(const PyObject *node)
+{
+	if (node->type() == bool_()) { return static_cast<const PyBool *>(node); }
+	return nullptr;
 }

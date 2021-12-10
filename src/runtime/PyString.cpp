@@ -15,6 +15,19 @@
 
 #include <numeric>
 
+template<> PyString *as(PyObject *obj)
+{
+	if (obj->type() == str()) { return static_cast<PyString *>(obj); }
+	return nullptr;
+}
+
+
+template<> const PyString *as(const PyObject *obj)
+{
+	if (obj->type() == str()) { return static_cast<const PyString *>(obj); }
+	return nullptr;
+}
+
 namespace utf8 {
 // Code point <-> UTF-8 conversion
 // First code point	Last code point	Byte 1	Byte 2	Byte 3	Byte 4
@@ -65,7 +78,8 @@ PyString *PyString::create(const std::string &value)
 
 PyObject *PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a String
+	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a
+	// String
 	// FIXME: handle bytes_or_buffer argument
 	// FIXME: handle encoding argument
 	// FIXME: handle errors argument
@@ -79,8 +93,7 @@ PyObject *PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 	return PyString::create(std::get<String>(string).s);
 }
 
-PyString::PyString(std::string s)
-	: PyBaseObject(PyObjectType::PY_STRING, BuiltinTypes::the().str()), m_value(std::move(s))
+PyString::PyString(std::string s) : PyBaseObject(BuiltinTypes::the().str()), m_value(std::move(s))
 {}
 
 size_t PyString::__hash__() const { return std::hash<std::string>{}(m_value); }
@@ -94,8 +107,8 @@ PyObject *PyString::__add__(const PyObject *obj) const
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
 			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return py_none();
 	}
 }
@@ -107,8 +120,8 @@ PyObject *PyString::__eq__(const PyObject *obj) const
 		return m_value == obj_string->value() ? py_true() : py_false();
 	} else {
 		type_error("'==' not supported between instances of '{}' and '{}'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -120,8 +133,8 @@ PyObject *PyString::__lt__(const PyObject *obj) const
 		return m_value < obj_string->value() ? py_true() : py_false();
 	} else {
 		type_error("'==' not supported between instances of '{}' and '{}'",
-			object_name(type()),
-			object_name(obj->type()));
+			type()->name(),
+			obj->type()->name());
 		return nullptr;
 	}
 }
@@ -498,7 +511,7 @@ std::optional<int32_t> PyString::codepoint() const
 	}
 }
 
-PyType *PyString::type_() const { return str(); }
+PyType *PyString::type() const { return str(); }
 
 namespace {
 

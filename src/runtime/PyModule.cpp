@@ -37,8 +37,7 @@ std::optional<std::string> resolve_path(std::string module_name)
 
 
 PyModule::PyModule(PyString *module_name)
-	: PyBaseObject(PyObjectType::PY_MODULE, BuiltinTypes::the().module()),
-	  m_module_name(std::move(module_name))
+	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(std::move(module_name))
 {
 	m_attributes.insert_or_assign("__name__", module_name);
 }
@@ -116,7 +115,7 @@ void PyModule::insert(PyString *key, const Value &value)
 	m_attributes.insert_or_assign(key->value(), PyObject::from(value));
 }
 
-PyType *PyModule::type_() const { return module(); }
+PyType *PyModule::type() const { return module(); }
 
 namespace {
 
@@ -133,4 +132,17 @@ std::unique_ptr<TypePrototype> PyModule::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(module_flag, []() { type = ::register_module(); });
 	return std::move(type);
+}
+
+template<> PyModule *as(PyObject *obj)
+{
+	if (obj->type() == module()) { return static_cast<PyModule *>(obj); }
+	return nullptr;
+}
+
+
+template<> const PyModule *as(const PyObject *obj)
+{
+	if (obj->type() == module()) { return static_cast<const PyModule *>(obj); }
+	return nullptr;
 }

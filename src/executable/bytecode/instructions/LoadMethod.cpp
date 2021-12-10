@@ -3,6 +3,7 @@
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyType.hpp"
+#include "runtime/types/builtin.hpp"
 
 
 void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
@@ -16,8 +17,7 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		ASSERT(module->symbol_table().contains(name))
 		auto func_maybe = module->symbol_table().at(name);
 		if (auto func = std::get<PyObject *>(func_maybe)) {
-			ASSERT(func->type() == PyObjectType::PY_FUNCTION
-				   || func->type() == PyObjectType::PY_NATIVE_FUNCTION)
+			ASSERT(func->type() == function() || func->type() == native_function())
 			vm.reg(m_destination) = std::move(func);
 		} else {
 			// not a callable, raise exception

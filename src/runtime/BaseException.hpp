@@ -16,5 +16,5 @@ class BaseException : public PyBaseObject
 
 	static std::unique_ptr<TypePrototype> register_type();
 
-	 PyType *type_() const;
+	 PyType *type() const;
 };

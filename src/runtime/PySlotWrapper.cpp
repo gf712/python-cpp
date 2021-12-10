@@ -40,8 +40,8 @@ PyObject *PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 PySlotWrapper::PySlotWrapper(PyString *name,
 	PyType *underlying_type,
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function)
-	: PyBaseObject(PyObjectType::PY_SLOT_WRAPPER, BuiltinTypes::the().slot_wrapper()),
-	  m_name(std::move(name)), m_underlying_type(underlying_type), m_slot(std::move(function))
+	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
+	  m_underlying_type(underlying_type), m_slot(std::move(function))
 {}
 
 PySlotWrapper *PySlotWrapper::create(PyString *name,
@@ -51,7 +51,7 @@ PySlotWrapper *PySlotWrapper::create(PyString *name,
 	return VirtualMachine::the().heap().allocate<PySlotWrapper>(name, underlying_type, function);
 }
 
-PyType *PySlotWrapper::type_() const { return slot_wrapper(); }
+PyType *PySlotWrapper::type() const { return slot_wrapper(); }
 
 namespace {
 
@@ -68,4 +68,16 @@ std::unique_ptr<TypePrototype> PySlotWrapper::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(slot_wrapper_flag, []() { type = ::register_slot_wrapper(); });
 	return std::move(type);
+}
+
+template<> PySlotWrapper *as(PyObject *obj)
+{
+	if (obj->type() == slot_wrapper()) { return static_cast<PySlotWrapper *>(obj); }
+	return nullptr;
+}
+
+template<> const PySlotWrapper *as(const PyObject *obj)
+{
+	if (obj->type() == slot_wrapper()) { return static_cast<const PySlotWrapper *>(obj); }
+	return nullptr;
 }

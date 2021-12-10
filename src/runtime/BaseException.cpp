@@ -3,11 +3,11 @@
 #include "types/builtin.hpp"
 
 BaseException::BaseException(std::string exception_name, std::string &&name)
-	: PyBaseObject(PyObjectType::PY_BASE_EXCEPTION, BuiltinTypes::the().exception()),
-	  m_exception_name(std::move(exception_name)), m_message(std::move(name))
+	: PyBaseObject(BuiltinTypes::the().exception()), m_exception_name(std::move(exception_name)),
+	  m_message(std::move(name))
 {}
 
-PyType *BaseException::type_() const { return exception(); }
+PyType *BaseException::type() const { return exception(); }
 
 namespace {
 

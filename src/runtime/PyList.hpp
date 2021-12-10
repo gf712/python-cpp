@@ -28,7 +28,7 @@ class PyList : public PyBaseObject
 	void sort();
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 
   private:
 	PyList();
@@ -54,17 +54,5 @@ class PyListIterator : public PyBaseObject
 	PyObject *__next__();
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 };
-
-template<> inline PyList *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_LIST) { return static_cast<PyList *>(node); }
-	return nullptr;
-}
-
-template<> inline const PyList *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_LIST) { return static_cast<const PyList *>(node); }
-	return nullptr;
-}

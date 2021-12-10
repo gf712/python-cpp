@@ -180,7 +180,9 @@ class Slab
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 128) { return block128->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 256) { return block256->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 512) { return block512->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) { return block1024->allocate(); }
+		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) {
+			return block1024->allocate();
+		}
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
 			return block2048->allocate();
 		} else {
@@ -288,10 +290,7 @@ class Heap
 		uint8_t *obj_ptr = allocate_gc(ptr);
 		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
 
-		if constexpr (std::is_base_of_v<PyObject, T>)
-			spdlog::debug("Allocated {} on the heap @{}",
-				object_name(static_cast<PyObject *>(obj)->type()),
-				(void *)obj);
+		if constexpr (std::is_base_of_v<PyObject, T>) log_allocation(static_cast<PyObject *>(obj));
 		return obj;
 	}
 
@@ -312,6 +311,7 @@ class Heap
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;
+	void log_allocation(PyObject *obj) const;
 
 	Heap();
 };

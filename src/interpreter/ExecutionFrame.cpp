@@ -2,10 +2,10 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/types/builtin.hpp"
 
 
 ExecutionFrame::ExecutionFrame() {}
-
 
 ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	size_t register_count,
@@ -25,7 +25,7 @@ ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	} else {
 		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
 		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
-			   == PyObjectType::PY_MODULE)
+			   == module())
 		// TODO: could this just return the builtin singleton?
 		new_frame->m_builtins =
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));

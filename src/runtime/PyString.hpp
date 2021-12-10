@@ -54,24 +54,10 @@ class PyString : public PyBaseObject
 	PyString *upper() const;
 
 	static std::unique_ptr<TypePrototype> register_type();
-	PyType *type_() const override;
+	PyType *type() const override;
 
   private:
 	PyString(std::string s);
 
 	size_t get_position_from_slice(int64_t) const;
 };
-
-
-template<> inline PyString *as(PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_STRING) { return static_cast<PyString *>(node); }
-	return nullptr;
-}
-
-
-template<> inline const PyString *as(const PyObject *node)
-{
-	if (node->type() == PyObjectType::PY_STRING) { return static_cast<const PyString *>(node); }
-	return nullptr;
-}
