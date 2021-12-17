@@ -5,7 +5,7 @@
 class PySlotWrapper : public PyBaseObject
 {
 	PyString *m_name;
-	PyType *m_underlying_type;
+	PyType *m_slot_type;
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> m_slot;
 
 	friend class Heap;
@@ -26,6 +26,7 @@ class PySlotWrapper : public PyBaseObject
 
 	PyObject *__repr__() const;
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyObject *__get__(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &visitor) override;
 

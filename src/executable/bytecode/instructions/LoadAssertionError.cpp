@@ -7,7 +7,7 @@
 
 void LoadAssertionError::execute(VirtualMachine &vm, Interpreter &) const
 {
-	vm.reg(m_assertion_location) = vm.heap().allocate<PyNativeFunction>(
+	vm.reg(m_assertion_location) = PyNativeFunction::create(
 		"__assertion__", [&vm](PyTuple *args, PyDict *kwargs) -> PyObject * {
 			ASSERT(args->size() < 2)
 			// TODO: implement kwargs

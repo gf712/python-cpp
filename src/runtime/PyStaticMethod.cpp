@@ -1,6 +1,8 @@
 #include "PyStaticMethod.hpp"
+#include "PyFunction.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -26,39 +28,30 @@ PyObject *PyStaticMethod::__repr__() const { return PyString::create(to_string()
 
 PyObject *PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
 {
-	auto *result = [this](PyTuple *args, PyDict *kwargs) -> PyObject * {
-		if (std::holds_alternative<TypeBoundFunctionType>(m_static_method)) {
-			ASSERT(m_underlying_type)
-			return std::get<TypeBoundFunctionType>(m_static_method)(
-				m_underlying_type, args, kwargs);
-		} else {
-			ASSERT(!m_underlying_type)
-			return std::get<FreeFunctionType>(m_static_method)(args, kwargs);
-		}
-	}(args, kwargs);
-
-	// FIXME: this should be independent from the VM's registers
-	VirtualMachine::the().reg(0) = result;
-
-	return result;
+	ASSERT(m_static_method->is_callable())
+	return m_static_method->call(args, kwargs);
 }
 
-PyStaticMethod::PyStaticMethod(PyString *name,
-	PyType *underlying_type,
-	std::variant<TypeBoundFunctionType, FreeFunctionType> function)
-	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
-	  m_underlying_type(underlying_type), m_static_method(std::move(function))
+PyStaticMethod::PyStaticMethod(PyString *name, PyType *underlying_type, PyObject *function)
+	: PyBaseObject(BuiltinTypes::the().static_method()), m_name(std::move(name)),
+	  m_underlying_type(underlying_type), m_static_method(function)
 {}
 
-PyStaticMethod *
-	PyStaticMethod::create(PyString *name, PyType *underlying_type, TypeBoundFunctionType function)
-{
-	return VirtualMachine::the().heap().allocate<PyStaticMethod>(name, underlying_type, function);
-}
 
-PyStaticMethod *PyStaticMethod::create(PyString *name, FreeFunctionType function)
+PyStaticMethod *PyStaticMethod::create(PyString *name, PyObject *function)
 {
 	return VirtualMachine::the().heap().allocate<PyStaticMethod>(name, nullptr, function);
+}
+
+PyObject *PyStaticMethod::__get__(PyObject * /*instance*/, PyObject * /*owner*/) const
+{
+	// this check is probably not needed, but it is still here because CPython can raise this error
+	if (!m_static_method) {
+		// TODO: should raise runtime error
+		//       RuntimeError("uninitialized staticmethod object")
+		return nullptr;
+	}
+	return m_static_method;
 }
 
 PyType *PyStaticMethod::type() const { return ::static_method(); }

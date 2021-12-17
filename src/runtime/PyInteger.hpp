@@ -11,4 +11,5 @@ class PyInteger final : public PyNumber
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
+	size_t as_size_t() const;
 };

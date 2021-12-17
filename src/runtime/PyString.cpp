@@ -431,7 +431,7 @@ PyString *PyString::join(PyTuple *args, PyDict *kwargs) const
 	std::string begin = std::visit(overloaded{ [](const auto &) -> std::string {
 												  // TODO: should raise -> join only works with
 												  // strings
-												  TODO()
+												  TODO();
 												  return {};
 											  },
 									   [](const String &value) { return value.s; },
@@ -450,7 +450,7 @@ PyString *PyString::join(PyTuple *args, PyDict *kwargs) const
 				   + std::visit(overloaded{ [](const auto &) -> std::string {
 											   // TODO: should raise -> join only works with
 											   // strings
-											   TODO()
+											   TODO();
 											   return {};
 										   },
 									[](const String &value) { return value.s; },

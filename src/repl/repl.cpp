@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 		return run_and_execute_script(argc, argv, result["bytecode"].as<bool>());
 	}
 
-	TODO()
+	TODO();
 
 	// FIXME
 	// linenoiseHistoryLoad("history.txt");

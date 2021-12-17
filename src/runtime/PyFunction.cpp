@@ -1,6 +1,8 @@
 #include "PyFunction.hpp"
+#include "PyBoundMethod.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
+#include "PyNone.hpp"
 #include "PyString.hpp"
 #include "TypeError.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -60,6 +62,12 @@ PyType *PyFunction::type() const { return function(); }
 PyObject *PyFunction::__repr__() const
 {
 	return PyString::create(fmt::format("<function {}>", m_name));
+}
+
+PyObject *PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const
+{
+	if (!instance || instance == py_none()) { return const_cast<PyFunction *>(this); }
+	return PyBoundMethod::create(instance, const_cast<PyFunction *>(this));
 }
 
 PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const
@@ -126,8 +134,8 @@ std::unique_ptr<TypePrototype> PyFunction::register_type()
 }
 
 
-PyNativeFunction::PyNativeFunction(std::string name,
-	std::function<PyObject *(PyTuple *, PyDict *)> function)
+PyNativeFunction::PyNativeFunction(std::string &&name,
+	std::function<PyObject *(PyTuple *, PyDict *)> &&function)
 	: PyBaseObject(BuiltinTypes::the().native_function()), m_name(std::move(name)),
 	  m_function(std::move(function))
 {}
@@ -135,6 +143,11 @@ PyNativeFunction::PyNativeFunction(std::string name,
 PyObject *PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
 	return VirtualMachine::the().interpreter().call(this, args, kwargs);
+}
+
+PyObject *PyNativeFunction::__repr__() const
+{
+	return PyString::create(fmt::format("built-in method {} at {}", m_name, (void *)this));
 }
 
 void PyNativeFunction::visit_graph(Visitor &visitor)
@@ -151,7 +164,7 @@ std::once_flag native_function_flag;
 
 std::unique_ptr<TypePrototype> register_native_function()
 {
-	return std::move(klass<PyNativeFunction>("native_function").type);
+	return std::move(klass<PyNativeFunction>("builtin_function_or_method").type);
 }
 }// namespace
 

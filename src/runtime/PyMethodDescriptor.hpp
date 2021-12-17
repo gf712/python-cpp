@@ -3,7 +3,7 @@
 #include "PyObject.hpp"
 #include "vm/VM.hpp"
 
-class PyMethodWrapper : public PyBaseObject
+class PyMethodDescriptor : public PyBaseObject
 {
 	PyString *m_name;
 	PyType *m_underlying_type;
@@ -12,19 +12,19 @@ class PyMethodWrapper : public PyBaseObject
 
 	friend class Heap;
 
-	PyMethodWrapper(PyString *name,
+	PyMethodDescriptor(PyString *name,
 		PyType *underlying_type,
 		std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function,
 		std::vector<PyObject *> &&captures);
 
   public:
 	template<typename... Args>
-	static PyMethodWrapper *create(PyString *name,
+	static PyMethodDescriptor *create(PyString *name,
 		PyType *underlying_type,
 		std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function,
 		Args &&... args)
 	{
-		return VirtualMachine::the().heap().allocate<PyMethodWrapper>(
+		return VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
 			name, underlying_type, function, std::vector<PyObject *>{ args... });
 	}
 
@@ -38,6 +38,7 @@ class PyMethodWrapper : public PyBaseObject
 
 	PyObject *__repr__() const;
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyObject *__get__(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &visitor) override;
 

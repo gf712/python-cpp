@@ -12,7 +12,7 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
-#include "runtime/PyMethodWrapper.hpp"
+#include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyRange.hpp"
@@ -39,7 +39,7 @@ BuiltinTypes::BuiltinTypes()
 	  m_builtin_method(PyBuiltInMethod::register_type()),
 	  m_slot_wrapper(PySlotWrapper::register_type()),
 	  m_bound_method(PyBoundMethod::register_type()),
-	  m_method_wrapper(PyMethodWrapper::register_type()),
+	  m_method_wrapper(PyMethodDescriptor::register_type()),
 	  m_static_method(PyStaticMethod::register_type())
 {}
 

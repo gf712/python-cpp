@@ -13,7 +13,7 @@ PyEllipsis *PyEllipsis::create()
 	return heap.allocate_static<PyEllipsis>().get();
 }
 
-PyObject *PyEllipsis::__add__(const PyObject *) const { TODO() }
+PyObject *PyEllipsis::__add__(const PyObject *) const { TODO(); }
 
 PyObject *PyEllipsis::__repr__() const
 {

@@ -29,7 +29,7 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 	const bool test_result = std::visit(
 		overloaded{ [](PyObject *const &obj) -> bool { return obj->bool_() == py_true(); },
 			[](const auto &) -> bool {
-				TODO()
+				TODO();
 				return false;
 			},
 			[](const NameConstant &value) -> bool {

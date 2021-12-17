@@ -29,7 +29,7 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 						   ASSERT_EQ(*double_result,
 							   std::get<double>(std::get<Number>(expected_value).value));
 					   } else {
-						   TODO()
+						   TODO();
 					   }
 				   },
 			[&](const String &string_value) {
@@ -40,12 +40,12 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 					ASSERT_EQ(
 						*bool_result, std::get<bool>(std::get<NameConstant>(expected_value).value));
 				} else {
-					TODO()
+					TODO();
 				}
 			},
 			[&](const auto &val) {
 				(void)val;
-				TODO()
+				TODO();
 				// ASSERT_EQ(result_, std::get<result_.index()>(expected_));
 			} },
 		result_value);
@@ -472,7 +472,7 @@ void compare_subscript(const std::shared_ptr<ASTNode> &result,
 		}
 
 	} else {
-		TODO()
+		TODO();
 	}
 
 	const auto result_ctx = as<Subscript>(result)->context();
@@ -685,7 +685,7 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
-		TODO()
+		TODO();
 	}
 	}
 }

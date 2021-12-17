@@ -3,9 +3,11 @@
 #include "spdlog/spdlog.h"
 #include <bit>
 
-#define TODO()                                                  \
-	spdlog::error("Not implemented {}:{}", __FILE__, __LINE__); \
-	std::abort();
+#define TODO();                                                      \
+	do {                                                            \
+		spdlog::error("Not implemented {}:{}", __FILE__, __LINE__); \
+		std::abort();                                               \
+	} while (0)
 
 #define ASSERT(condition)                                                           \
 	if (!(condition)) {                                                             \

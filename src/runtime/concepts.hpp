@@ -22,6 +22,21 @@ template<typename T> concept HasInit = requires(T *self, PyTuple *args, PyDict *
 	self->__init__(args, kwargs);
 };
 
+template<typename T> concept HasGetAttro = requires(const T *self, PyObject *attr)
+{
+	self->__getattribute__(attr);
+};
+
+template<typename T> concept HasGet = requires(const T *self, PyObject *instance, PyObject *owner)
+{
+	self->__get__(instance, owner);
+};
+
+template<typename T> concept HasSetAttro = requires(T *self, PyObject *attr, PyObject *value)
+{
+	self->__setattribute__(attr, value);
+};
+
 template<typename T> concept HasHash = requires(const T *self) { self->__hash__(); };
 
 template<typename T> concept HasDelete = requires(T *self) { self->~T(); };

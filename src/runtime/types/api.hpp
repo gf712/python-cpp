@@ -13,7 +13,7 @@ template<typename T> struct klass
 	{
 		(void)module;
 		(void)name;
-		TODO()
+		TODO();
 		// module->insert(name_, type);
 	}
 

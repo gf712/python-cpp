@@ -25,7 +25,7 @@ std::string PyBoundMethod::to_string() const
 {
 	return fmt::format("<bound method '{}' of '{}'>",
 		m_method->name(),
-		m_self->attributes().at("__qualname__")->to_string());
+		m_self->getattribute(PyString::create("__qualname__"))->to_string());
 }
 
 PyObject *PyBoundMethod::__repr__() const { return PyString::create(to_string()); }

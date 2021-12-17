@@ -10,7 +10,7 @@ std::string PyBool::to_string() const { return m_value ? "True" : "False"; }
 
 PyObject *PyBool::__repr__() const { return PyString::from(String{ to_string() }); }
 
-PyObject *PyBool::__add__(const PyObject *) const { TODO() }
+PyObject *PyBool::__add__(const PyObject *) const { TODO(); }
 
 PyObject *PyBool::__bool__() const
 {

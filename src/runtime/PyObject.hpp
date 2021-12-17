@@ -37,6 +37,10 @@ struct MethodDefinition
 using CallSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
 using NewSlotFunctionType = std::function<PyObject *(const PyType *, PyTuple *, PyDict *)>;
 using InitSlotFunctionType = std::function<std::optional<int32_t>(PyObject *, PyTuple *, PyDict *)>;
+
+using GetAttroFunctionType = std::function<PyObject *(const PyObject *, PyObject *)>;
+using SetAttroFunctionType = std::function<PyObject *(PyObject *, PyObject *, PyObject *)>;
+
 using LenSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using ReprSlotFunctionType = std::function<PyObject *(const PyObject *)>;
@@ -55,54 +59,77 @@ using ExpSlotFunctionType = std::function<PyObject *(const PyObject *, const PyO
 using LeftShiftSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 
+using GetSlotFunctionType = std::function<PyObject *(const PyObject *, PyObject *, PyObject *)>;
 using HashSlotFunctionType = std::function<size_t(const PyObject *)>;
 using CompareSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
+
+using TraverseFunctionType = std::function<void(PyObject *, Cell::Visitor &)>;
 
 struct TypePrototype
 {
 	std::string __name__;
-	std::optional<NewSlotFunctionType> __new__;
-	std::optional<InitSlotFunctionType> __init__;
+	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
+	std::optional<std::variant<InitSlotFunctionType, PyObject *>> __init__;
 	PyType *__class__{ nullptr };
 
-	std::optional<AddSlotFunctionType> __add__;
-	std::optional<SubtractSlotFunctionType> __sub__;
-	std::optional<MultiplySlotFunctionType> __mul__;
-	std::optional<ExpSlotFunctionType> __exp__;
-	std::optional<LeftShiftSlotFunctionType> __lshift__;
-	std::optional<ModuloSlotFunctionType> __mod__;
+	std::optional<std::variant<GetAttroFunctionType, PyObject *>> __getattribute__;
+	std::optional<std::variant<SetAttroFunctionType, PyObject *>> __setattribute__;
 
-	std::optional<AbsSlotFunctionType> __abs__;
-	std::optional<AbsSlotFunctionType> __neg__;
-	std::optional<AbsSlotFunctionType> __pos__;
-	std::optional<AbsSlotFunctionType> __invert__;
+	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __add__;
+	std::optional<std::variant<SubtractSlotFunctionType, PyObject *>> __sub__;
+	std::optional<std::variant<MultiplySlotFunctionType, PyObject *>> __mul__;
+	std::optional<std::variant<ExpSlotFunctionType, PyObject *>> __exp__;
+	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
+	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
 
-	std::optional<CallSlotFunctionType> __call__;
-	// std::variant<std::monostate, NewSlotFunctionType, PyFunction *> __new__;
-	std::optional<LenSlotFunctionType> __len__;
-	std::optional<BoolSlotFunctionType> __bool__;
-	std::optional<ReprSlotFunctionType> __repr__;
-	std::optional<IterSlotFunctionType> __iter__;
-	std::optional<NextSlotFunctionType> __next__;
-	std::optional<HashSlotFunctionType> __hash__;
+	std::optional<std::variant<AbsSlotFunctionType, PyObject *>> __abs__;
+	std::optional<std::variant<NegSlotFunctionType, PyObject *>> __neg__;
+	std::optional<std::variant<PosSlotFunctionType, PyObject *>> __pos__;
+	std::optional<std::variant<InvertSlotFunctionType, PyObject *>> __invert__;
 
-	std::optional<CompareSlotFunctionType> __eq__;
-	std::optional<CompareSlotFunctionType> __gt__;
-	std::optional<CompareSlotFunctionType> __ge__;
-	std::optional<CompareSlotFunctionType> __le__;
-	std::optional<CompareSlotFunctionType> __lt__;
-	std::optional<CompareSlotFunctionType> __ne__;
-	// std::variant<std::monostate, RichCompareSlotFunctionType, PyFunction *> __richcompare__;
+	std::optional<std::variant<CallSlotFunctionType, PyObject *>> __call__;
+	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
+	std::optional<std::variant<BoolSlotFunctionType, PyObject *>> __bool__;
+	std::optional<std::variant<ReprSlotFunctionType, PyObject *>> __repr__;
+	std::optional<std::variant<IterSlotFunctionType, PyObject *>> __iter__;
+	std::optional<std::variant<NextSlotFunctionType, PyObject *>> __next__;
+	std::optional<std::variant<HashSlotFunctionType, PyObject *>> __hash__;
+
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __eq__;
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __gt__;
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __ge__;
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __le__;
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __lt__;
+	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __ne__;
+
+	std::optional<std::variant<GetSlotFunctionType, PyObject *>> __get__;
 	std::vector<MethodDefinition> __methods__;
 	PyDict *__dict__{ nullptr };
 
 	PyTuple *__mro__{ nullptr };
 	PyTuple *__bases__{ nullptr };
+	std::optional<TraverseFunctionType> traverse;
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
 	void add_method(MethodDefinition &&method) { __methods__.push_back(std::move(method)); }
 };
+
+namespace {
+template<typename T, typename... U>
+size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
+{
+	// adapted from https://stackoverflow.com/a/35920804
+	if (std::holds_alternative<std::function<T(U...)>>(f)) {
+		using FunctionType = T (*)(U...);
+		auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
+		return bit_cast<size_t>(*fn_ptr);
+	} else {
+		// FIXME: is it valid to take this path? Is there use case?
+		return bit_cast<size_t>(std::get<PyObject *>(f));
+	}
+}
+}// namespace
 
 class PyObject : public Cell
 {
@@ -114,7 +141,7 @@ class PyObject : public Cell
 
   protected:
 	const TypePrototype &m_type_prototype;
-	std::unordered_map<std::string, PyObject *> m_attributes;
+	PyDict *m_attributes{ nullptr };
 
   public:
 	using PyResult = std::variant<PyObject *, NotImplemented_>;
@@ -128,11 +155,11 @@ class PyObject : public Cell
 
 	template<typename T> static PyObject *from(const T &value);
 
-	PyObject *get(std::string name, Interpreter &interpreter) const;
-	void put(std::string name, PyObject *);
-	const std::unordered_map<std::string, PyObject *> &attributes() const { return m_attributes; }
-
 	void visit_graph(Visitor &) override;
+
+	PyObject *getattribute(PyObject *attribute) const;
+	PyObject *setattribute(PyObject *attribute, PyObject *value);
+	PyObject *get(PyObject *instance, PyObject *owner) const;
 
 	PyObject *add(const PyObject *other) const;
 	PyObject *subtract(const PyObject *other) const;
@@ -167,6 +194,8 @@ class PyObject : public Cell
 	virtual PyObject *new_(PyTuple *args, PyDict *kwargs) const;
 	std::optional<int32_t> init(PyTuple *args, PyDict *kwargs);
 
+	PyObject *__getattribute__(PyObject *attribute) const;
+	PyObject *__setattribute__(PyObject *attribute, PyObject *value);
 	PyObject *__eq__(const PyObject *other) const;
 	PyObject *__repr__() const;
 	size_t __hash__() const;
@@ -176,6 +205,9 @@ class PyObject : public Cell
 	bool is_callable() const;
 	const std::string &name() const;
 	const TypePrototype &type_prototype() const { return m_type_prototype; }
+	const PyDict &attributes() const { return *m_attributes; }
+	PyObject *get_method(PyObject *name) const;
+	PyObject *get_attribute(PyObject *name) const;
 };
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
@@ -307,6 +339,27 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 			return static_cast<const Type *>(self)->__bool__();
 		};
 	}
+	if constexpr (HasGetAttro<Type>) {
+		type_prototype->__getattribute__ = +[](const PyObject *self, PyObject *attr) -> PyObject * {
+			return static_cast<const Type *>(self)->__getattribute__(attr);
+		};
+	}
+	if constexpr (HasSetAttro<Type>) {
+		type_prototype->__setattribute__ =
+			+[](PyObject *self, PyObject *attr, PyObject *value) -> PyObject * {
+			return static_cast<Type *>(self)->__setattribute__(attr, value);
+		};
+	}
+	if constexpr (HasGet<Type>) {
+		type_prototype->__get__ =
+			+[](const PyObject *self, PyObject *instance, PyObject *owner) -> PyObject * {
+			return static_cast<const Type *>(self)->__get__(instance, owner);
+		};
+	}
+
+	type_prototype->traverse =
+		+[](PyObject *self, Cell::Visitor &visitor) { self->visit_graph(visitor); };
+
 	return type_prototype;
 }
 

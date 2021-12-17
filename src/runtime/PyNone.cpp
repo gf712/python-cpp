@@ -11,7 +11,7 @@ std::string PyNone::to_string() const { return "None"; }
 
 PyObject *PyNone::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyNone::__add__(const PyObject *) const { TODO() }
+PyObject *PyNone::__add__(const PyObject *) const { TODO(); }
 
 PyNone *PyNone::create()
 {

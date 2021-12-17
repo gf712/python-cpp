@@ -20,7 +20,7 @@ std::string PyBytes::to_string() const
 	return fmt::format("PyBytes {}", os.str());
 }
 
-PyObject *PyBytes::__add__(const PyObject *) const { TODO() }
+PyObject *PyBytes::__add__(const PyObject *) const { TODO(); }
 
 PyType *PyBytes::type() const
 {

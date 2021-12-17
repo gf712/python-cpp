@@ -63,7 +63,7 @@ class Store final : public Instruction
 	{
 		return fmt::format("STORE           r{:<3}  {:<3}", m_destination, m_source);
 	}
-	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
+	void execute(VirtualMachine &, Interpreter &) const final { TODO(); }
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };

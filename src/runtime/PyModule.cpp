@@ -39,7 +39,8 @@ std::optional<std::string> resolve_path(std::string module_name)
 PyModule::PyModule(PyString *module_name)
 	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(std::move(module_name))
 {
-	m_attributes.insert_or_assign("__name__", module_name);
+	m_attributes = PyDict::create();
+	m_attributes->insert(PyString::create("__name__"), module_name);
 }
 
 PyObject *PyModule::__repr__() const
@@ -95,12 +96,12 @@ PyModule *PyModule::create(PyString *name)
 			if (auto pystr = as<PyString>(std::get<PyObject *>(k))) {
 				module->m_symbol_table[pystr] = v;
 			} else {
-				TODO()
+				TODO();
 			}
 		} else if (std::holds_alternative<String>(k)) {
 			module->m_symbol_table[PyString::create(std::get<String>(k).s)] = v;
 		} else {
-			TODO()
+			TODO();
 		}
 	}
 
@@ -112,7 +113,7 @@ PyModule *PyModule::create(PyString *name)
 void PyModule::insert(PyString *key, const Value &value)
 {
 	m_symbol_table.insert_or_assign(key, value);
-	m_attributes.insert_or_assign(key->value(), PyObject::from(value));
+	m_attributes->insert(key, PyObject::from(value));
 }
 
 PyType *PyModule::type() const { return module(); }

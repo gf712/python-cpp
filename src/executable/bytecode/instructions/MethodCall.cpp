@@ -3,7 +3,7 @@
 
 #include "runtime/AttributeError.hpp"
 #include "runtime/PyDict.hpp"
-#include "runtime/PyMethodWrapper.hpp"
+#include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PySlotWrapper.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"

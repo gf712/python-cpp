@@ -56,7 +56,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyFunction.cpp
     runtime/PyInteger.cpp
     runtime/PyList.cpp
-    runtime/PyMethodWrapper.cpp
+    runtime/PyMethodDescriptor.cpp
     runtime/PyModule.cpp
     runtime/PyNone.cpp
     runtime/PyNumber.cpp

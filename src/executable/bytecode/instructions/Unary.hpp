@@ -57,7 +57,7 @@ class UnaryInvert final : public Instruction
 		return fmt::format("UNARY_INVERT    r{:<3} r{:<3}", m_destination, m_source);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
+	void execute(VirtualMachine &, Interpreter &) const final { TODO(); }
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
@@ -75,7 +75,7 @@ class UnaryNot final : public Instruction
 		return fmt::format("UNARY_NOT       r{:<3} r{:<3}", m_destination, m_source);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final { TODO() }
+	void execute(VirtualMachine &, Interpreter &) const final { TODO(); }
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };

@@ -9,12 +9,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyDict::PyDict(MapType &&map)
-	: PyBaseObject(BuiltinTypes::the().dict()), m_map(std::move(map))
-{}
-PyDict::PyDict(const MapType &map)
-	: PyBaseObject(BuiltinTypes::the().dict()), m_map(map)
-{}
+PyDict::PyDict(MapType &&map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(std::move(map)) {}
+PyDict::PyDict(const MapType &map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(map) {}
 PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
 
 PyDict *PyDict::create() { return VirtualMachine::the().heap().allocate<PyDict>(); }
@@ -95,7 +91,7 @@ void PyDict::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyDict::type() const { return dict(); }
+PyType *PyDict::type() const { return ::dict(); }
 
 namespace {
 
@@ -162,8 +158,8 @@ std::unique_ptr<TypePrototype> PyDictItems::register_type()
 }
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict)
-	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()),
-	  m_pydictitems(pydict), m_current_iterator(m_pydictitems.m_pydict.map().begin())
+	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()), m_pydictitems(pydict),
+	  m_current_iterator(m_pydictitems.m_pydict.map().begin())
 {}
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict, size_t position)

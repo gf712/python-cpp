@@ -2,7 +2,7 @@
 
 #include "PyObject.hpp"
 #include "PyTuple.hpp"
-
+#include "vm/VM.hpp"
 
 class PyCode : public PyBaseObject
 {
@@ -55,6 +55,7 @@ class PyFunction : public PyBaseObject
 	PyDict *globals() const { return m_globals; }
 
 	PyObject *__repr__() const;
+	PyObject *__get__(PyObject *instance, PyObject *owner) const;
 
 	void visit_graph(Visitor &) override;
 
@@ -65,21 +66,32 @@ class PyFunction : public PyBaseObject
 
 class PyNativeFunction : public PyBaseObject
 {
+	friend class Heap;
+
 	std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
 	std::vector<PyObject *> m_captures;
 
-  public:
-	PyNativeFunction(std::string name, std::function<PyObject *(PyTuple *, PyDict *)> function);
+	PyNativeFunction(std::string &&name, std::function<PyObject *(PyTuple *, PyDict *)> &&function);
 
 	// TODO: fix tracking of lambda captures
 	template<typename... Args>
-	PyNativeFunction(std::string name,
-		std::function<PyObject *(PyTuple *, PyDict *)> function,
+	PyNativeFunction(std::string &&name,
+		std::function<PyObject *(PyTuple *, PyDict *)> &&function,
 		Args &&... args)
-		: PyNativeFunction(name, function)
+		: PyNativeFunction(std::move(name), std::move(function))
 	{
 		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
+	}
+
+  public:
+	template<typename... Args>
+	static PyNativeFunction *create(std::string name,
+		std::function<PyObject *(PyTuple *, PyDict *)> function,
+		Args &&... args)
+	{
+		return VirtualMachine::the().heap().allocate<PyNativeFunction>(
+			std::move(name), std::move(function), std::forward<Args>(args)...);
 	}
 
 	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
@@ -91,6 +103,7 @@ class PyNativeFunction : public PyBaseObject
 
 	const std::string &name() const { return m_name; }
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyObject *__repr__() const;
 
 	void visit_graph(Visitor &) override;
 

@@ -1,5 +1,6 @@
 #include "Modules.hpp"
 #include "runtime/CustomPyObject.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
@@ -309,8 +310,8 @@ PyList *dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		// attributes, and recursively of the attributes of its class’s base classes.
 		else {
 			auto object = PyObject::from(arg);
-			for (const auto &[k, _] : object->attributes()) {
-				dir_list->elements().push_back(PyString::create(k));
+			for (const auto &[k, _] : object->attributes().map()) {
+				dir_list->elements().push_back(k);
 			}
 		}
 	}
@@ -356,9 +357,70 @@ PyObject *staticmethod(const PyTuple *args, const PyDict *kwargs, Interpreter &i
 
 	auto *function = as<PyFunction>(PyObject::from(args->elements()[0]));
 
-	return PyStaticMethod::create(PyString::create(function->function_name()),
-		[function](PyTuple *args, PyDict *kwargs) { return function->__call__(args, kwargs); });
+	return PyStaticMethod::create(PyString::create(function->function_name()), function);
 }
+
+PyObject *isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (args->size() != 2) {
+		interpreter.raise_exception(
+			type_error("isinstance expected 2 arguments, got {}", args->size()));
+		return nullptr;
+	}
+
+	if (kwargs && !kwargs->map().empty()) {
+		interpreter.raise_exception(type_error("isinstance() takes no keyword arguments"));
+		return nullptr;
+	}
+	auto *object = PyObject::from(args->elements()[0]);
+	auto *classinfo = PyObject::from(args->elements()[1]);
+
+	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
+		TODO();
+	} else if (auto *class_info_type = as<PyType>(classinfo)) {
+		if (object->type() == class_info_type) {
+			return py_true();
+		} else {
+			auto *mro = object->type()->mro();
+			for (const auto &m : mro->elements()) {
+				if (std::get<PyObject *>(m) == class_info_type) { return py_true(); }
+			}
+			return py_false();
+		}
+	} else {
+		TODO();
+	}
+}
+
+PyObject *issubclass(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (args->size() != 2) {
+		interpreter.raise_exception(
+			type_error("issubclass expected 2 arguments, got {}", args->size()));
+		return nullptr;
+	}
+
+	if (kwargs && !kwargs->map().empty()) {
+		interpreter.raise_exception(type_error("issubclass() takes no keyword arguments"));
+		return nullptr;
+	}
+	auto *class_ = PyObject::from(args->elements()[0]);
+	auto *classinfo = PyObject::from(args->elements()[1]);
+
+	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
+		TODO();
+	} else if (auto *class_info_type = as<PyType>(classinfo)) {
+		auto *class_as_type = as<PyType>(class_);
+		if (!class_as_type) {
+			interpreter.raise_exception(type_error("issubclass() arg 1 must be a class"));
+			return nullptr;
+		}
+		return class_as_type->issubclass(class_info_type) ? py_true() : py_false();
+	} else {
+		TODO();
+	}
+}
+
 
 }// namespace
 
@@ -462,6 +524,18 @@ PyModule *builtins_module(Interpreter &interpreter)
 		heap.allocate<PyNativeFunction>("iter", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return iter(args, kwargs, interpreter);
 		}));
+
+	s_builtin_module->insert(PyString::create("isinstance"),
+		heap.allocate<PyNativeFunction>(
+			"isinstance", [&interpreter](PyTuple *args, PyDict *kwargs) {
+				return isinstance(args, kwargs, interpreter);
+			}));
+
+	s_builtin_module->insert(PyString::create("issubclass"),
+		heap.allocate<PyNativeFunction>(
+			"issubclass", [&interpreter](PyTuple *args, PyDict *kwargs) {
+				return issubclass(args, kwargs, interpreter);
+			}));
 
 	s_builtin_module->insert(PyString::create("locals"),
 		heap.allocate<PyNativeFunction>("locals", [&interpreter](PyTuple *args, PyDict *kwargs) {

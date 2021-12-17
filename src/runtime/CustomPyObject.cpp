@@ -10,16 +10,6 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-namespace {
-template<typename T, typename... U> size_t get_address(std::function<T(U...)> f)
-{
-	// adapted from https://stackoverflow.com/a/35920804
-	using FunctionType = T (*)(U...);
-	auto fn_ptr = f.template target<FunctionType>();
-	return bit_cast<size_t>(*fn_ptr);
-}
-}// namespace
-
 CustomPyObject::CustomPyObject(const PyType *type)
 	: PyBaseObject(type->underlying_type()), m_type_obj(type)
 {}
@@ -59,6 +49,7 @@ PyObject *CustomPyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwa
 			}
 		}
 	}
+	// FIXME: if custom allocators are ever added, should call the type's allocator here
 	return VirtualMachine::the().heap().allocate<CustomPyObject>(type);
 }
 

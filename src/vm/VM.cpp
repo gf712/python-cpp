@@ -117,7 +117,7 @@ const Interpreter &VirtualMachine::interpreter() const
 
 void VirtualMachine::show_current_instruction(size_t index, size_t window) const
 {
-	TODO()
+	TODO();
 	(void)index;
 	(void)window;
 

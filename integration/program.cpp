@@ -65,7 +65,7 @@ template<typename T> void check_value(const PyObject *obj, T expected_value)
 		ASSERT_TRUE(pystring);
 		ASSERT_EQ(pystring->value(), expected_value);
 	} else {
-		TODO()
+		TODO();
 	}
 }
 

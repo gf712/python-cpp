@@ -42,9 +42,9 @@ void UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 					value_error("too many values to unpack (expected {})", m_destination.size());
 					return;
 				}
-				TODO()
+				TODO();
 			}
-			TODO()
+			TODO();
 		}
 	} else if (std::holds_alternative<Number>(source)) {
 		type_error("cannot unpack non-iterable int object");

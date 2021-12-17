@@ -22,24 +22,24 @@ namespace optimizer {
 				break;
 			}
 			case BinaryOpType::MINUS: {
-				TODO()
+				TODO();
 			}
 			case BinaryOpType::MULTIPLY: {
-				TODO()
+				TODO();
 			}
 			case BinaryOpType::EXP: {
-				TODO()
+				TODO();
 			}
 			case BinaryOpType::MODULO: {
-				TODO()
+				TODO();
 			}
 			case BinaryOpType::SLASH:
-				TODO()
+				TODO();
 			case BinaryOpType::LEFTSHIFT: {
-				TODO()
+				TODO();
 			}
 			case BinaryOpType::RIGHTSHIFT:
-				TODO()
+				TODO();
 			}
 		}
 

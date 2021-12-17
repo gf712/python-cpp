@@ -76,12 +76,12 @@ void BytecodeGenerator::visit(const BinaryExpr *node)
 		emit<Modulo>(m_function_id, dst_register, lhs_register, rhs_register);
 	} break;
 	case BinaryOpType::SLASH:
-		TODO()
+		TODO();
 	case BinaryOpType::LEFTSHIFT: {
 		emit<LeftShift>(m_function_id, dst_register, lhs_register, rhs_register);
 	} break;
 	case BinaryOpType::RIGHTSHIFT:
-		TODO()
+		TODO();
 	}
 
 	m_last_register = dst_register;
@@ -255,7 +255,7 @@ void BytecodeGenerator::visit(const For *node)
 
 	// call the __next__ implementation
 	auto target_ids = as<Name>(node->target())->ids();
-	if (target_ids.size() != 1) { TODO() }
+	if (target_ids.size() != 1) { TODO(); }
 	auto target_name = target_ids[0];
 
 	bind(forloop_start_label);
@@ -319,7 +319,7 @@ void BytecodeGenerator::visit(const Compare *node)
 		emit<LessThan>(m_function_id, result_reg, lhs_reg, rhs_reg);
 	} break;
 	default: {
-		TODO()
+		TODO();
 	}
 	}
 	m_last_register = result_reg;
@@ -477,31 +477,31 @@ void BytecodeGenerator::visit(const AugAssign *node)
 		emit<InplaceAdd>(m_function_id, lhs_register, rhs_register);
 	} break;
 	case BinaryOpType::MINUS: {
-		TODO()
+		TODO();
 	} break;
 	case BinaryOpType::MULTIPLY: {
-		TODO()
+		TODO();
 	} break;
 	case BinaryOpType::EXP: {
-		TODO()
+		TODO();
 	} break;
 	case BinaryOpType::MODULO: {
-		TODO()
+		TODO();
 	} break;
 	case BinaryOpType::SLASH:
-		TODO()
+		TODO();
 	case BinaryOpType::LEFTSHIFT: {
-		TODO()
+		TODO();
 	} break;
 	case BinaryOpType::RIGHTSHIFT:
-		TODO()
+		TODO();
 	}
 
 	if (auto named_target = as<Name>(node->target())) {
-		if (named_target->ids().size() != 1) { TODO() }
+		if (named_target->ids().size() != 1) { TODO(); }
 		emit<StoreName>(m_function_id, named_target->ids()[0], lhs_register);
 	} else {
-		TODO()
+		TODO();
 	}
 	m_last_register = lhs_register;
 }
@@ -527,13 +527,13 @@ void BytecodeGenerator::visit(const Module *node)
 	m_last_register = Register{ 0 };
 }
 
-void BytecodeGenerator::visit(const Subscript *) { TODO() }
+void BytecodeGenerator::visit(const Subscript *) { TODO(); }
 
-void BytecodeGenerator::visit(const Raise *) { TODO() }
+void BytecodeGenerator::visit(const Raise *) { TODO(); }
 
-void BytecodeGenerator::visit(const Try *) { TODO() }
+void BytecodeGenerator::visit(const Try *) { TODO(); }
 
-void BytecodeGenerator::visit(const ExceptHandler *) { TODO() }
+void BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
 void BytecodeGenerator::visit(const UnaryExpr *node)
 {

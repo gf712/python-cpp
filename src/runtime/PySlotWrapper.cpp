@@ -1,6 +1,9 @@
 #include "PySlotWrapper.hpp"
+#include "PyFunction.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
+#include "TypeError.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -8,14 +11,14 @@
 std::string PySlotWrapper::to_string() const
 {
 	return fmt::format(
-		"<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
+		"<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_slot_type->name());
 }
 
 void PySlotWrapper::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	visitor.visit(*m_name);
-	visitor.visit(*m_underlying_type);
+	visitor.visit(*m_slot_type);
 }
 
 PyObject *PySlotWrapper::__repr__() const { return PyString::create(to_string()); }
@@ -37,18 +40,41 @@ PyObject *PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 	return result;
 }
 
+PyObject *PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
+{
+	if (!instance) { return const_cast<PySlotWrapper *>(this); }
+	if (instance->type() != m_slot_type) {
+		VirtualMachine::the().interpreter().raise_exception(
+			type_error("descriptor '{}' for '{}' objects "
+					   "doesn't apply to a '{}' object",
+				m_name->value(),
+				m_slot_type->underlying_type().__name__,
+				instance->type()->underlying_type().__name__));
+		return nullptr;
+	}
+	return PyNativeFunction::create(
+		m_name->value(),
+		[this](PyTuple *args, PyDict *kwargs) {
+			return const_cast<PySlotWrapper *>(this)->__call__(args, kwargs);
+		},
+		const_cast<PySlotWrapper *>(this),
+		instance);
+}
+
 PySlotWrapper::PySlotWrapper(PyString *name,
-	PyType *underlying_type,
+	PyType *slot_type,
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function)
 	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
-	  m_underlying_type(underlying_type), m_slot(std::move(function))
+	  m_slot_type(slot_type), m_slot(std::move(function))
 {}
 
 PySlotWrapper *PySlotWrapper::create(PyString *name,
-	PyType *underlying_type,
+	PyType *slot_type,
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function)
 {
-	return VirtualMachine::the().heap().allocate<PySlotWrapper>(name, underlying_type, function);
+	ASSERT(name)
+	ASSERT(slot_type)
+	return VirtualMachine::the().heap().allocate<PySlotWrapper>(name, slot_type, function);
 }
 
 PyType *PySlotWrapper::type() const { return slot_wrapper(); }
