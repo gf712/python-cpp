@@ -13,6 +13,18 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+template<> PyList *as(PyObject *obj)
+{
+	if (obj->type() == list()) { return static_cast<PyList *>(obj); }
+	return nullptr;
+}
+
+template<> const PyList *as(const PyObject *obj)
+{
+	if (obj->type() == list()) { return static_cast<const PyList *>(obj); }
+	return nullptr;
+}
+
 PyList::PyList() : PyBaseObject(BuiltinTypes::the().list()) {}
 
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
@@ -68,6 +80,27 @@ PyObject *PyList::__iter__() const
 
 PyObject *PyList::__len__() const { return PyInteger::create(m_elements.size()); }
 
+PyObject *PyList::__eq__(const PyObject *other) const
+{
+	if (!as<PyList>(other)) { return py_false(); }
+
+	auto *other_list = as<PyList>(other);
+	// Value contains PyObject* so we can't just compare vectors with std::vector::operator==
+	// otherwise if we compare PyObject* with PyObject* we compare the pointers, rather
+	// than PyObject::__eq__(const PyObject*)
+	if (m_elements.size() != other_list->elements().size()) { return py_false(); }
+	auto &interpreter = VirtualMachine::the().interpreter();
+	const bool result = std::equal(m_elements.begin(),
+		m_elements.end(),
+		other_list->elements().begin(),
+		[&interpreter](const auto &lhs, const auto &rhs) {
+			const auto &result = equals(lhs, rhs, interpreter);
+			ASSERT(result.has_value())
+			return truthy(*result, interpreter);
+		});
+	return result ? py_true() : py_false();
+}
+
 void PyList::sort()
 {
 	std::sort(m_elements.begin(), m_elements.end(), [](const Value &lhs, const Value &rhs) -> bool {
@@ -121,8 +154,7 @@ std::unique_ptr<TypePrototype> PyList::register_type()
 
 
 PyListIterator::PyListIterator(const PyList &pylist)
-	: PyBaseObject(BuiltinTypes::the().list_iterator()),
-	  m_pylist(pylist)
+	: PyBaseObject(BuiltinTypes::the().list_iterator()), m_pylist(pylist)
 {}
 
 std::string PyListIterator::to_string() const
@@ -167,16 +199,4 @@ std::unique_ptr<TypePrototype> PyListIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
 	return std::move(type);
-}
-
-template<> PyList *as(PyObject *obj)
-{
-	if (obj->type() == list()) { return static_cast<PyList *>(obj); }
-	return nullptr;
-}
-
-template<> const PyList *as(const PyObject *obj)
-{
-	if (obj->type() == list()) { return static_cast<const PyList *>(obj); }
-	return nullptr;
 }

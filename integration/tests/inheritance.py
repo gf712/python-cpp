@@ -40,7 +40,6 @@ assert issubclass(Derived, Base1)
 assert issubclass(Base, Base1) == False
 assert issubclass(Derived, object)
 
-# FIXME: enable tests when list and tuple equality is added
-# assert Base.mro() == [Base, object]
-# assert Derived.mro() == [Derived, Base, Base1, object]
-# assert Derived.__bases__ == (Base, Base1)
+assert Base.mro() == [Base, object]
+assert Derived.mro() == [Derived, Base, Base1, object]
+assert Derived.__bases__ == (Base, Base1)

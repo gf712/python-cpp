@@ -17,6 +17,7 @@ class PyList : public PyBaseObject
 	PyObject *__repr__() const;
 	PyObject *__iter__() const;
 	PyObject *__len__() const;
+	PyObject *__eq__(const PyObject *other) const;
 
 	const std::vector<Value> &elements() const { return m_elements; }
 	std::vector<Value> &elements() { return m_elements; }

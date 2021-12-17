@@ -1,4 +1,5 @@
 #include "PyTuple.hpp"
+#include "PyBool.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
 #include "StopIterationException.hpp"
@@ -6,6 +7,18 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
+
+template<> PyTuple *as(PyObject *obj)
+{
+	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
+	return nullptr;
+}
+
+template<> const PyTuple *as(const PyObject *obj)
+{
+	if (obj->type() == tuple()) { return static_cast<const PyTuple *>(obj); }
+	return nullptr;
+}
 
 PyTuple::PyTuple() : PyBaseObject(BuiltinTypes::the().tuple()) {}
 
@@ -44,25 +57,13 @@ std::string PyTuple::to_string() const
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
 			std::visit(overloaded{ [&os](const auto &value) { os << value; },
-						   [&os, this](PyObject *value) {
-							   if (value == this) {
-								   os << "{...}";
-							   } else {
-								   os << value->repr()->to_string();
-							   }
-						   } },
+						   [&os](PyObject *value) { os << value->repr()->to_string(); } },
 				*it);
 			std::advance(it, 1);
 			os << ", ";
 		}
 		std::visit(overloaded{ [&os](const auto &value) { os << value; },
-					   [&os, this](PyObject *value) {
-						   if (value == this) {
-							   os << "{...}";
-						   } else {
-							   os << value->repr()->to_string();
-						   }
-					   } },
+					   [&os](PyObject *value) { os << value->repr()->to_string(); } },
 			*it);
 	}
 	if (m_elements.size() == 1) { os << ','; }
@@ -80,6 +81,27 @@ PyObject *PyTuple::__iter__() const
 }
 
 PyObject *PyTuple::__len__() const { return PyInteger::create(m_elements.size()); }
+
+PyObject *PyTuple::__eq__(const PyObject *other) const
+{
+	if (!as<PyTuple>(other)) { return py_false(); }
+
+	auto *other_tuple = as<PyTuple>(other);
+	// Value contains PyObject* so we can't just compare vectors with std::vector::operator==
+	// otherwise if we compare PyObject* with PyObject* we compare the pointers, rather
+	// than PyObject::__eq__(const PyObject*)
+	if (m_elements.size() != other_tuple->elements().size()) { return py_false(); }
+	auto &interpreter = VirtualMachine::the().interpreter();
+	const bool result = std::equal(m_elements.begin(),
+		m_elements.end(),
+		other_tuple->elements().begin(),
+		[&interpreter](const auto &lhs, const auto &rhs) {
+			const auto &result = equals(lhs, rhs, interpreter);
+			ASSERT(result.has_value())
+			return truthy(*result, interpreter);
+		});
+	return result ? py_true() : py_false();
+}
 
 PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
 
@@ -182,17 +204,4 @@ std::unique_ptr<TypePrototype> PyTupleIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(tuple_iterator_flag, []() { type = ::register_tuple_iterator(); });
 	return std::move(type);
-}
-
-template<> PyTuple *as(PyObject *obj)
-{
-	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
-	return nullptr;
-}
-
-
-template<> const PyTuple *as(const PyObject *obj)
-{
-	if (obj->type() == tuple()) { return static_cast<const PyTuple *>(obj); }
-	return nullptr;
 }
