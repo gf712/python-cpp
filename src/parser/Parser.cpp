@@ -365,6 +365,11 @@ struct FromPattern
 	static bool matches(std::string_view token_value) { return token_value == "from"; }
 };
 
+struct IsPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "is"; }
+};
+
 struct ImportPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "import"; }
@@ -823,6 +828,7 @@ struct AtomPattern : Pattern<AtomPattern>
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("NAME");
@@ -1197,6 +1203,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::RSQB,
 												 Token::TokenType::RBRACE>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>>>>;
 		if (pattern5::match(p)) {
@@ -1752,6 +1759,49 @@ struct GtBitwiseOrPattern : Pattern<GtBitwiseOrPattern>
 	}
 };
 
+struct IsNotBitwiseOrPattern : Pattern<IsNotBitwiseOrPattern>
+{
+	// is_bitwise_or: 'is' 'not' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
+				BitwiseOrPattern>;
+		spdlog::debug("IsNotBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'is not' bitwise_or ");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::IsNot, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
+struct IsBitwiseOrPattern : Pattern<IsBitwiseOrPattern>
+{
+	// is_bitwise_or: 'is' bitwise_or
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
+				BitwiseOrPattern>;
+		spdlog::debug("IsBitwiseOrPattern");
+		if (pattern1::match(p)) {
+			spdlog::debug("'is' bitwise_or ");
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Is, rhs);
+			p.push_to_stack(comparisson);
+			return true;
+		}
+		return false;
+	}
+};
+
 struct CompareOpBitwiseOrPairPattern : Pattern<CompareOpBitwiseOrPairPattern>
 {
 	// compare_op_bitwise_or_pair:
@@ -1802,6 +1852,18 @@ struct CompareOpBitwiseOrPairPattern : Pattern<CompareOpBitwiseOrPairPattern>
 		using pattern6 = PatternMatch<GtBitwiseOrPattern>;
 		if (pattern6::match(p)) {
 			spdlog::debug("gt_bitwise_or");
+			return true;
+		}
+		// isnot_bitwise_or
+		using pattern9 = PatternMatch<IsNotBitwiseOrPattern>;
+		if (pattern9::match(p)) {
+			spdlog::debug("isnot_bitwise_or");
+			return true;
+		}
+		// is_bitwise_or
+		using pattern10 = PatternMatch<IsBitwiseOrPattern>;
+		if (pattern10::match(p)) {
+			spdlog::debug("is_bitwise_or");
 			return true;
 		}
 		return false;

@@ -1624,3 +1624,30 @@ TEST(Parser, UnaryNot)
 		""));
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, CompareIsNot)
+{
+	constexpr std::string_view program = "assert a is not False\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assert>(
+		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD),
+			Compare::OpType::IsNot,
+			std::make_shared<Constant>(false)),
+		nullptr));
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, CompareIs)
+{
+	constexpr std::string_view program = "assert a is False\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assert>(
+		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD),
+			Compare::OpType::Is,
+			std::make_shared<Constant>(false)),
+		nullptr));
+	assert_generates_ast(program, expected_ast);
+}
