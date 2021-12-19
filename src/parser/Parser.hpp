@@ -19,14 +19,12 @@ class Parser
 	std::deque<std::deque<std::shared_ptr<ast::ASTNode>>> m_stack;
 	Lexer &m_lexer;
 	size_t m_token_position{ 0 };
-	const bool m_ignore_nl_token{ true };
-	const bool m_ignore_comments{ true };
 
   public:
 	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>(l.filename())), m_lexer(l)
 	{
-		m_lexer.ignore_nl_token() = m_ignore_nl_token;
-		m_lexer.ignore_comments() = m_ignore_comments;
+		m_lexer.ignore_nl_token() = true;
+		m_lexer.ignore_comments() = true;
 
 		m_stack.emplace_back();
 	}

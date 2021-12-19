@@ -60,7 +60,7 @@ std::optional<std::string> getline(const std::string &prompt)
 }// namespace repl
 
 namespace {
-int run_and_execute_script(int argc, char **argv, bool print_bytecode)
+int run_and_execute_script(int argc, char **argv, bool print_bytecode, bool print_tokens)
 {
 	size_t arg_idx{ 1 };
 	const char *filename = argv[arg_idx];
@@ -70,6 +70,12 @@ int run_and_execute_script(int argc, char **argv, bool print_bytecode)
 
 	auto &vm = VirtualMachine::the();
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
+	if (print_tokens) {
+		auto l = Lexer::create(std::filesystem::absolute(filename));
+		std::cout << "Generated tokens: \n";
+		while (auto token = l.next_token()) { std::cout << *token << '\n'; }
+		std::cout << std::endl;
+	}
 	parser::Parser p{ lexer };
 	p.parse();
 	auto bytecode = codegen::BytecodeGenerator::compile(
@@ -91,6 +97,7 @@ int main(int argc, char **argv)
 	options.add_options()
 		("f,filename", "Script path", cxxopts::value<std::string>())
 		("b,bytecode", "Print the script's bytecode to stdout", cxxopts::value<bool>()->default_value("false"))
+		("t,tokenize", "Print the script's tokens to stdout", cxxopts::value<bool>()->default_value("false"))
 		("d,debug", "Enable debug logging", cxxopts::value<bool>()->default_value("false"))
 		("trace", "Enable trace logging", cxxopts::value<bool>()->default_value("false"))
 		("h,help", "Print usage");
@@ -115,7 +122,8 @@ int main(int argc, char **argv)
 	if (trace) { spdlog::set_level(spdlog::level::trace); }
 
 	if (result.count("filename")) {
-		return run_and_execute_script(argc, argv, result["bytecode"].as<bool>());
+		return run_and_execute_script(
+			argc, argv, result["bytecode"].as<bool>(), result["tokenize"].as<bool>());
 	}
 
 	TODO();

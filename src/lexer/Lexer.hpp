@@ -105,10 +105,10 @@ class Token
 	enum class TokenType;
 
   private:
-	const TokenType m_token_type;
-	const TokenType m_token_exact_type;
-	const Position m_start;
-	const Position m_end;
+	TokenType m_token_type;
+	TokenType m_token_exact_type;
+	Position m_start;
+	Position m_end;
 
   public:
 	enum class TokenType {
@@ -174,6 +174,7 @@ class Lexer
 	bool m_ignore_nl_token{ false };
 	bool m_ignore_comments{ false };
 	const std::string m_filename;
+	std::vector<Token> m_current_line_tokens;
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -205,9 +206,9 @@ class Lexer
 	std::optional<Token> next_token()
 	{
 		if (!m_tokens_to_emit.empty()) return pop_front();
-		if (m_tokens_to_emit.empty() && m_cursor > m_program.size()) { return {}; }
 		if (read_more_tokens()) { return pop_front(); }
-		if (m_tokens_to_emit.empty() && m_cursor != m_program.size()) {
+		if (m_tokens_to_emit.empty() && m_cursor > m_program.size()) { return {}; }
+		if (m_tokens_to_emit.empty()) {
 			spdlog::error("Failed to parse program at position {}", m_position);
 			std::abort();
 		}
@@ -234,328 +235,47 @@ class Lexer
 	bool &ignore_comments() { return m_ignore_comments; }
 
   private:
-	bool read_more_tokens()
-	{
-		if (m_cursor == m_program.size()) {
-			auto original_position = m_position;
-			increment_row_position();
-			while (m_indent_values.size() > 1) {
-				m_tokens_to_emit.emplace_back(Token::TokenType::DEDENT, m_position, m_position);
-				m_indent_values.pop_back();
-			}
-			m_tokens_to_emit.emplace_back(
-				Token::TokenType::ENDMARKER, original_position, m_position);
-			return true;
-		}
+	void push_token(Token::TokenType token_type, const Position &start, const Position &end);
 
-		if (try_empty_line()) { return true; }
-		if (try_read_indent()) { return true; }
-		if (try_read_newline()) { return true; }
-		try_read_space();
-		if (try_read_comment()) { return true; }
-		if (try_read_name()) { return true; }
-		if (try_read_string()) { return true; }
-		if (try_read_operation()) { return true; }
-		if (try_read_number()) { return true; }
+	bool read_more_tokens();
 
-		return false;
-	}
+	bool read_more_tokens_loop();
 
-	bool try_read_comment()
-	{
-		if (peek(0) == '#') {
-			const auto original_position = m_position;
-			advance(1);
-			advance_while([](const char c) {
-				// TODO: make newline check platform agnostic
-				//       in windows this can be "\r\n"
-				return std::isalnum(c) || c != '\n';
-			});
+	void push_new_line();
 
-			if (!m_ignore_comments) {
-				m_tokens_to_emit.emplace_back(
-					Token::TokenType::COMMENT, original_position, m_position);
-			} else {
-				increment_row_position();
-				const auto current_position = m_position;
-				// the comment is essentially removed from the source
-				// which means a line with only a comment becomes NL
-				// otherwise it's just a NEWLINE
-				if (original_position.column == 0 && m_ignore_nl_token) {
-					if (m_cursor > m_program.size()) {
-						m_tokens_to_emit.emplace_back(
-							Token::TokenType::NEWLINE, current_position, m_position);
-					}
-				} else if (!m_ignore_nl_token) {
-					m_tokens_to_emit.emplace_back(
-						Token::TokenType::NL, original_position, m_position);
-					m_tokens_to_emit.emplace_back(
-						Token::TokenType::NEWLINE, current_position, m_position);
-				} else {
-					m_tokens_to_emit.emplace_back(
-						Token::TokenType::NEWLINE, current_position, m_position);
-				}
-			}
+	void push_empty_line();
 
-			return true;
-		}
+	std::optional<size_t> comment_start() const;
 
-		return false;
-	}
+	bool try_read_comment();
 
-	bool try_empty_line()
-	{
-		const auto original_position = m_position;
-		const auto cursor = m_cursor;
-		// if it's a newline
-		if (std::isspace(peek(0)) && !std::isblank(peek(0))) {
-			if (original_position.column == 0) {
-				increment_row_position();
-				if (!m_ignore_nl_token) {
-					m_tokens_to_emit.emplace_back(
-						Token::TokenType::NL, original_position, m_position);
-				}
-				return true;
-			} else {
-				return false;
-			}
-		}
-		while (advance_if([](const char c) { return std::isblank(c); })) {}
-		if (std::isspace(peek(0))) {
-			increment_row_position();
-			if (!m_ignore_nl_token) {
-				m_tokens_to_emit.emplace_back(Token::TokenType::NL, original_position, m_position);
-			}
-			return true;
-		}
-		m_position = original_position;
-		m_cursor = cursor;
-		return false;
-	}
+	bool try_empty_line();
 
-	bool try_read_indent()
-	{
-		// if we are the start of a new line we need to check indent/dedent
-		if (m_position.column == 0) {
-			const Position original_position = m_position;
-			const auto [indent_value, position_increment] = compute_indent_level();
-			increment_column_position(position_increment);
-			if (indent_value > m_indent_values.back()) {
-				m_tokens_to_emit.emplace_back(
-					Token::TokenType::INDENT, original_position, m_position);
-				m_indent_values.push_back(indent_value);
-				return true;
-			} else if (indent_value < m_indent_values.back()) {
-				while (indent_value != m_indent_values.back()) {
-					m_tokens_to_emit.emplace_back(
-						Token::TokenType::DEDENT, original_position, m_position);
-					m_indent_values.pop_back();
-				}
-				return true;
-			}
-		}
-		return false;
-	}
+	bool try_read_indent();
 
-	std::tuple<size_t, size_t> compute_indent_level()
-	{
-		size_t pos = 0;
-		size_t indentation_value = 0;
-		while (std::isblank(peek(pos))) {
-			if (peek(pos) == '\t') {
-				indentation_value += tab_size;
-			} else {
-				indentation_value++;
-			}
-			pos += 1;
-		}
-		return { indentation_value, pos };
-	}
+	std::tuple<size_t, size_t> compute_indent_level();
 
-	bool try_read_number()
-	{
-		const Position original_position = m_position;
+	bool try_read_number();
 
-		if (!(peek(0) == '.' || std::isdigit(peek(0)))) { return false; }
+	bool try_read_string();
 
-		bool is_decimal_part = peek(0) == '.';
-		size_t position = 1;
+	std::optional<Token::TokenType> try_read_operation_with_one_character() const;
 
-		while (std::isdigit(peek(position)) || (!is_decimal_part && peek(position) == '.')) {
-			position++;
-		}
-		advance(position);
-		m_tokens_to_emit.emplace_back(Token::TokenType::NUMBER, original_position, m_position);
+	std::optional<Token::TokenType> try_read_operation_with_two_characters() const;
 
-		return true;
-	}
+	std::optional<Token::TokenType> try_read_operation_with_three_characters() const;
 
-	bool try_read_string()
-	{
-		const Position original_position = m_position;
+	bool try_read_operation();
 
-		if (!(peek(0) == '\"' || peek(0) == '\'')) { return false; }
+	bool try_read_space();
 
-		const bool double_quote = peek(0) == '\"';
+	bool try_read_newline();
 
-		size_t position = 1;
+	bool try_read_name();
 
-		if (double_quote) {
-			while (!(peek(position) == '\"')) { position++; }
-		} else {
-			while (!(peek(position) == '\'')) { position++; }
-		}
-		advance(position + 1);
+	char peek(size_t i) const;
 
-		m_tokens_to_emit.emplace_back(Token::TokenType::STRING, original_position, m_position);
-
-		return true;
-	}
-
-	std::optional<Token::TokenType> try_read_operation_with_one_character() const
-	{
-		if (std::isalnum(peek(0))) return {};
-
-		if (peek(0) == '(') return Token::TokenType::LPAREN;
-		if (peek(0) == ')') return Token::TokenType::RPAREN;
-		if (peek(0) == '[') return Token::TokenType::LSQB;
-		if (peek(0) == ']') return Token::TokenType::RSQB;
-		if (peek(0) == ':') return Token::TokenType::COLON;
-		if (peek(0) == ',') return Token::TokenType::COMMA;
-		if (peek(0) == ';') return Token::TokenType::SEMI;
-		if (peek(0) == '+') return Token::TokenType::PLUS;
-		if (peek(0) == '-') return Token::TokenType::MINUS;
-		if (peek(0) == '*') return Token::TokenType::STAR;
-		if (peek(0) == '/') return Token::TokenType::SLASH;
-		if (peek(0) == '|') return Token::TokenType::VBAR;
-		if (peek(0) == '&') return Token::TokenType::AMPER;
-		if (peek(0) == '<') return Token::TokenType::LESS;
-		if (peek(0) == '>') return Token::TokenType::GREATER;
-		if (peek(0) == '=') return Token::TokenType::EQUAL;
-		if (peek(0) == '.') return Token::TokenType::DOT;
-		if (peek(0) == '%') return Token::TokenType::PERCENT;
-		if (peek(0) == '{') return Token::TokenType::LBRACE;
-		if (peek(0) == '}') return Token::TokenType::RBRACE;
-		if (peek(0) == '~') return Token::TokenType::TILDE;
-		if (peek(0) == '^') return Token::TokenType::CIRCUMFLEX;
-		if (peek(0) == '@') return Token::TokenType::AT;
-		return {};
-	}
-
-	std::optional<Token::TokenType> try_read_operation_with_two_characters() const
-	{
-		if (m_cursor + 1 >= m_program.size()) return {};
-		if (std::isalnum(peek(0)) || std::isalnum(peek(1))) return {};
-		if (peek(0) == '=' && peek(1) == '=') return Token::TokenType::EQEQUAL;
-		if (peek(0) == '!' && peek(1) == '=') return Token::TokenType::NOTEQUAL;
-		if (peek(0) == '<' && peek(1) == '=') return Token::TokenType::LESSEQUAL;
-		if (peek(0) == '>' && peek(1) == '=') return Token::TokenType::GREATEREQUAL;
-		if (peek(0) == '<' && peek(1) == '<') return Token::TokenType::LEFTSHIFT;
-		if (peek(0) == '>' && peek(1) == '>') return Token::TokenType::RIGHTSHIFT;
-		if (peek(0) == '*' && peek(1) == '*') return Token::TokenType::DOUBLESTAR;
-		if (peek(0) == '+' && peek(1) == '=') return Token::TokenType::PLUSEQUAL;
-		if (peek(0) == '-' && peek(1) == '=') return Token::TokenType::MINEQUAL;
-		if (peek(0) == '*' && peek(1) == '=') return Token::TokenType::STAREQUAL;
-		if (peek(0) == '%' && peek(1) == '=') return Token::TokenType::PERCENTEQUAL;
-		if (peek(0) == '&' && peek(1) == '=') return Token::TokenType::AMPEREQUAL;
-		if (peek(0) == '|' && peek(1) == '=') return Token::TokenType::VBAREQUAL;
-		if (peek(0) == '^' && peek(1) == '=') return Token::TokenType::CIRCUMFLEXEQUAL;
-		if (peek(0) == '/' && peek(1) == '/') return Token::TokenType::DOUBLESLASH;
-		if (peek(0) == ':' && peek(1) == '=') return Token::TokenType::COLONEQUAL;
-		if (peek(0) == '@' && peek(1) == '=') return Token::TokenType::ATEQUAL;
-		if (peek(0) == '-' && peek(1) == '>') return Token::TokenType::RARROW;
-		return {};
-	}
-
-	std::optional<Token::TokenType> try_read_operation_with_three_characters() const
-	{
-		if (m_cursor + 2 >= m_program.size()) return {};
-		if (std::isalnum(peek(0)) || std::isalnum(peek(1)) || std::isalnum(peek(2))) return {};
-		if (peek(0) == '<' && peek(1) == '<' && peek(2) == '=')
-			return Token::TokenType::LEFTSHIFTEQUAL;
-		if (peek(0) == '>' && peek(1) == '>' && peek(2) == '=')
-			return Token::TokenType::RIGHTSHIFTEQUAL;
-		if (peek(0) == '*' && peek(1) == '*' && peek(2) == '=')
-			return Token::TokenType::DOUBLESTAREQUAL;
-		if (peek(0) == '/' && peek(1) == '/' && peek(2) == '=')
-			return Token::TokenType::DOUBLESLASHEQUAL;
-		if (peek(0) == '.' && peek(1) == '.' && peek(2) == '.') 
-			return Token::TokenType::ELLIPSIS;
-		return {};
-	}
-
-	bool try_read_operation()
-	{
-		const Position original_position = m_position;
-		std::optional<Token::TokenType> type;
-
-		if (type = try_read_operation_with_three_characters(); type.has_value()) {
-			advance(3);
-		} else if (type = try_read_operation_with_two_characters(); type.has_value()) {
-			advance(2);
-		} else if (type = try_read_operation_with_one_character(); type.has_value()) {
-			advance(1);
-		} else {
-			return false;
-		}
-
-		m_tokens_to_emit.emplace_back(*type, original_position, m_position);
-
-		return true;
-	}
-
-	bool try_read_space()
-	{
-		const size_t whitespace_size = advance_while([](const char c) { return std::isblank(c); });
-		if (whitespace_size > 0) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	bool try_read_newline()
-	{
-		if (!peek("\n")) { return false; }
-
-		const Position original_position = m_position;
-		increment_row_position();
-		m_tokens_to_emit.emplace_back(Token::TokenType::NEWLINE, original_position, m_position);
-		return true;
-	}
-
-	bool try_read_name()
-	{
-		auto valid_start_name = [](const char c) { return std::isalpha(c) || c == '_'; };
-
-		if (!valid_start_name(peek(0))) { return false; }
-		const Position original_position = m_position;
-		// name must start with alpha
-		if (!advance_if([valid_start_name](const char c) { return valid_start_name(c); })) {
-			return false;
-		}
-
-		auto valid_name = [](const char c) { return std::isalnum(c) || c == '_'; };
-
-		advance_while([valid_name](const char c) { return valid_name(c); });
-		m_tokens_to_emit.emplace_back(Token::TokenType::NAME, original_position, m_position);
-		return true;
-	}
-
-	char peek(size_t i) const
-	{
-		ASSERT(m_cursor + i < m_program.size())
-		return m_program[m_cursor + i];
-	}
-
-	bool peek(std::string_view pattern) const
-	{
-		int j = 0;
-		for (size_t i = m_cursor; i < m_cursor + pattern.size(); ++i) {
-			if (m_program[i] != pattern[j++]) { return false; }
-		}
-		return true;
-	}
+	bool peek(std::string_view pattern) const;
 
 	template<typename ConditionType> size_t advance_while(ConditionType &&condition)
 	{
@@ -566,21 +286,9 @@ class Lexer
 
 	void advance(std::string_view pattern) { advance(pattern.size()); }
 
-	void advance(const size_t positions)
-	{
-		m_cursor += positions;
-		m_position.column += positions;
-		m_position.pointer_to_program = &m_program[m_cursor];
-	}
+	void advance(const size_t positions);
 
-	bool advance_if(const char pattern)
-	{
-		if (m_program[m_cursor] == pattern) {
-			increment_column_position(1);
-			return true;
-		}
-		return false;
-	}
+	bool advance_if(const char pattern);
 
 	template<typename ConditionType> bool advance_if(ConditionType &&condition)
 	{
@@ -589,25 +297,9 @@ class Lexer
 		return true;
 	}
 
-	Token pop_front()
-	{
-		auto &result = m_tokens_to_emit.front();
-		m_tokens_to_emit.pop_front();
-		return result;
-	}
+	Token pop_front();
 
-	void increment_row_position()
-	{
-		m_cursor++;
-		m_position.column = 0;
-		m_position.row++;
-		m_position.pointer_to_program = &m_program[m_cursor];
-	}
+	void increment_row_position();
 
-	void increment_column_position(size_t idx)
-	{
-		m_cursor += idx;
-		m_position.column += idx;
-		m_position.pointer_to_program = &m_program[m_cursor];
-	}
+	void increment_column_position(size_t idx);
 };

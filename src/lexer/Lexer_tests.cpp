@@ -28,12 +28,10 @@ void assert_generates_tokens_without_nl_token(std::string_view program,
 	}
 }
 
-
 void assert_generates_tokens_without_comment_tokens(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
 {
 	const auto tokens = generate_tokens(program, true, true);
-	for (const auto &t : tokens) { std::cout << t.to_string() << '\n'; }
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
@@ -43,7 +41,6 @@ void assert_generates_tokens_without_comment_tokens(std::string_view program,
 				   i);
 	}
 }
-
 
 void assert_generates_tokens(std::string_view program,
 	const std::vector<Token::TokenType> &expected_tokens)
@@ -480,7 +477,7 @@ TEST(Lexer, Comments)
 {
 	constexpr std::string_view program =
 		"import math #important module \n"
-		"# get the pi constant \n"
+		"   # get the pi constant \n"// comments do not have indentation
 		"PI = math.pi\n"
 		"# do something useful \n";
 	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
@@ -488,7 +485,7 @@ TEST(Lexer, Comments)
 		Token::TokenType::COMMENT,
 		Token::TokenType::NEWLINE,
 		Token::TokenType::COMMENT,
-		Token::TokenType::NEWLINE,
+		Token::TokenType::NL,
 		Token::TokenType::NAME,
 		Token::TokenType::EQUAL,
 		Token::TokenType::NAME,
@@ -496,7 +493,7 @@ TEST(Lexer, Comments)
 		Token::TokenType::NAME,
 		Token::TokenType::NEWLINE,
 		Token::TokenType::COMMENT,
-		Token::TokenType::NEWLINE,
+		Token::TokenType::NL,
 		Token::TokenType::ENDMARKER };
 	assert_generates_tokens(program, expected_tokens);
 }
