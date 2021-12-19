@@ -557,6 +557,8 @@ void BytecodeGenerator::visit(const UnaryExpr *node)
 	m_last_register = dst_register;
 }
 
+void BytecodeGenerator::visit(const BoolOp *) { TODO(); }
+
 void BytecodeGenerator::visit(const Assert *node)
 {
 	static size_t assert_count = 0;

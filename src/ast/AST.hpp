@@ -24,6 +24,7 @@ namespace ast {
 	__AST_NODE_TYPE(Assert)             \
 	__AST_NODE_TYPE(AugAssign)          \
 	__AST_NODE_TYPE(BinaryExpr)         \
+	__AST_NODE_TYPE(BoolOp)             \
 	__AST_NODE_TYPE(Call)               \
 	__AST_NODE_TYPE(ClassDefinition)    \
 	__AST_NODE_TYPE(Compare)            \
@@ -954,6 +955,52 @@ class Assert : public ASTNode
 	void codegen(CodeGenerator *) const override;
 
   private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+
+#define BOOL_OPERATIONS \
+	__COMPARE_OP(And)   \
+	__COMPARE_OP(Or)
+
+class BoolOp : public ASTNode
+{
+  public:
+	enum class OpType {
+#define __COMPARE_OP(x) x,
+		BOOL_OPERATIONS
+#undef __COMPARE_OP
+	};
+
+  private:
+	OpType m_op;
+	std::vector<std::shared_ptr<ASTNode>> m_values;
+
+  public:
+	BoolOp(OpType op, std::vector<std::shared_ptr<ASTNode>> values)
+		: ASTNode(ASTNodeType::BoolOp), m_op(op), m_values(std::move(values))
+	{
+		ASSERT(m_values.size() >= 2);
+	}
+
+	OpType op() const { return m_op; }
+	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	std::string_view op_type_to_string(OpType type) const
+	{
+		switch (type) {
+#define __COMPARE_OP(x) \
+	case OpType::x:     \
+		return #x;
+			BOOL_OPERATIONS
+#undef __COMPARE_OP
+		}
+		ASSERT_NOT_REACHED()
+	}
+
 	void print_this_node(const std::string &indent) const override;
 };
 

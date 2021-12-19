@@ -38,6 +38,8 @@ class Parser
 
 	std::shared_ptr<ast::ASTNode> pop_back()
 	{
+		ASSERT(!m_stack.empty())
+		ASSERT(!m_stack.back().empty())
 		auto node = m_stack.back().back();
 		m_stack.back().pop_back();
 		return node;
@@ -45,6 +47,8 @@ class Parser
 
 	std::shared_ptr<ast::ASTNode> pop_front()
 	{
+		ASSERT(!m_stack.empty())
+		ASSERT(!m_stack.back().empty())
 		auto node = m_stack.back().front();
 		m_stack.back().pop_front();
 		return node;

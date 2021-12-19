@@ -572,6 +572,22 @@ void compare_unary_op(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_optype, expected_optype);
 }
 
+void compare_bool_op(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	const auto result_op = as<BoolOp>(result)->op();
+	const auto expected_op = as<BoolOp>(expected)->op();
+	ASSERT_EQ(result_op, expected_op);
+
+	const auto result_values = as<BoolOp>(result)->values();
+	const auto expected_values = as<BoolOp>(expected)->values();
+
+	ASSERT_EQ(result_values.size(), expected_values.size());
+	for (size_t i = 0; i < result_values.size(); ++i) {
+		dispatch(result_values[i], expected_values[i]);
+	}
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -683,6 +699,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_unary_op(result, expected);
 		break;
 	}
+	case ASTNodeType::BoolOp: {
+		compare_bool_op(result, expected);
+		break;
+	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
 		TODO();
@@ -694,9 +714,9 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 {
 	auto lexer = Lexer::create(std::string(program), "_parser_test_.py");
 	parser::Parser p{ lexer };
-	spdlog::set_level(spdlog::level::debug);
+	// spdlog::set_level(spdlog::level::debug);
 	p.parse();
-	spdlog::set_level(spdlog::level::info);
+	// spdlog::set_level(spdlog::level::info);
 
 	ASSERT_EQ(p.module()->body().size(), expected_module->body().size());
 
@@ -1649,5 +1669,27 @@ TEST(Parser, CompareIs)
 			Compare::OpType::Is,
 			std::make_shared<Constant>(false)),
 		nullptr));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, BoolOpAnd)
+{
+	constexpr std::string_view program = "a and b\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<BoolOp>(BoolOp::OpType::And,
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::LOAD),
+			std::make_shared<Name>("b", ContextType::LOAD) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, BoolOpOr)
+{
+	constexpr std::string_view program = "a or b\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<BoolOp>(BoolOp::OpType::Or,
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::LOAD),
+			std::make_shared<Name>("b", ContextType::LOAD) }));
 	assert_generates_ast(program, expected_ast);
 }

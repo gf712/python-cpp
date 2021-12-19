@@ -387,4 +387,13 @@ void UnaryExpr::print_this_node(const std::string &indent) const
 	m_operand->print_node(new_indent);
 }
 
+void BoolOp::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}BoolOp", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - op_type: {}", indent, op_type_to_string(m_op));
+	spdlog::debug("{}Values:");
+	for (const auto &value : m_values) { value->print_node(new_indent); }
+}
+
 }// namespace ast

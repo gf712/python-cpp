@@ -110,19 +110,20 @@ struct OneOrMorePattern : Pattern<OneOrMorePattern<PatternTypes...>>
 
 
 // ApplyInBetweenPattern<NamedExpressionPattern, SingleTokenPattern<Token::TokenType::COMMA>>>
-template<typename MainPatternType, typename InBetweenPattern>
-struct ApplyInBetweenPattern : Pattern<ApplyInBetweenPattern<MainPatternType, InBetweenPattern>>
+template<typename MaInKeywordPatternType, typename InBetweenPattern>
+struct ApplyInBetweenPattern
+	: Pattern<ApplyInBetweenPattern<MaInKeywordPatternType, InBetweenPattern>>
 {
 	static bool matches_impl(Parser &p)
 	{
-		using MainPatternType_ = PatternMatch<MainPatternType>;
+		using MaInKeywordPatternType_ = PatternMatch<MaInKeywordPatternType>;
 		using InBetweenPattern_ = PatternMatch<InBetweenPattern>;
 
-		if (!MainPatternType_::match(p)) { return false; }
+		if (!MaInKeywordPatternType_::match(p)) { return false; }
 
 		auto original_token_position = p.token_position();
 		while (InBetweenPattern_::match(p)) {
-			if (!MainPatternType_::match(p)) {
+			if (!MaInKeywordPatternType_::match(p)) {
 				p.token_position() = original_token_position;
 				break;
 			}
@@ -335,67 +336,77 @@ template<typename lhs, typename rhs> struct AndNotLiteral : Pattern<AndNotLitera
 	}
 };
 
-struct AsPattern
+struct AndKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "and"; }
+};
+
+struct AsKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "as"; }
 };
 
-struct AssertPattern
+struct AssertKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "assert"; }
 };
 
-struct ExceptPattern
+struct ExceptKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
 };
 
-struct FinallyPattern
+struct FinallyKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "finally"; }
 };
 
-struct ForPattern
+struct ForKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "for"; }
 };
 
-struct FromPattern
+struct FromKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "from"; }
 };
 
-struct IsPattern
+struct IsKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "is"; }
 };
 
-struct ImportPattern
+struct ImportKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "import"; }
 };
 
-struct InPattern
+struct InKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "in"; }
 };
 
-struct NotPattern
+struct NotKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "not"; }
 };
 
-struct RaisePattern
+struct OrKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "or"; }
+};
+
+struct RaiseKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "raise"; }
 };
 
-struct TryPattern
+struct TryKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "try"; }
 };
 
-struct WhilePattern
+struct WhileKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "while"; }
 };
@@ -826,10 +837,12 @@ struct AtomPattern : Pattern<AtomPattern>
 		// NAME
 		// using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>>>;
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("NAME");
 
@@ -1202,10 +1215,12 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::GREATER,
 												 Token::TokenType::RSQB,
 												 Token::TokenType::RBRACE>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>>>>;
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>>>>;
 		if (pattern5::match(p)) {
 			spdlog::debug("ϵ");
 			return true;
@@ -1765,8 +1780,8 @@ struct IsNotBitwiseOrPattern : Pattern<IsNotBitwiseOrPattern>
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				BitwiseOrPattern>;
 		spdlog::debug("IsNotBitwiseOrPattern");
 		if (pattern1::match(p)) {
@@ -1787,7 +1802,7 @@ struct IsBitwiseOrPattern : Pattern<IsBitwiseOrPattern>
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 				BitwiseOrPattern>;
 		spdlog::debug("IsBitwiseOrPattern");
 		if (pattern1::match(p)) {
@@ -1909,7 +1924,7 @@ struct InversionPattern : Pattern<InversionPattern>
 		spdlog::debug("InversionPattern");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				ComparissonPattern>;
 		if (pattern1::match(p)) {
 			const auto &node = p.pop_back();
@@ -1931,11 +1946,28 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 	//     | inversion
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
 		spdlog::debug("ConjunctionPattern");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		// inversion ('and' inversion )+
+		using pattern1 = PatternMatch<InversionPattern,
+			OneOrMorePattern<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
+				InversionPattern>>;
+		if (pattern1::match(p)) {
+			std::vector<std::shared_ptr<ASTNode>> values;
+			values.reserve(p.stack().size());
+			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::And, values));
+			return true;
+		}
+
 		// inversion
 		using pattern2 = PatternMatch<InversionPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			while (!p.stack().empty()) { scope.parent().push_back(p.pop_front()); }
+			return true;
+		}
 
 		return false;
 	}
@@ -1948,11 +1980,28 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 	//     | conjunction
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
 		spdlog::debug("DisjunctionPattern");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		// conjunction ('or' conjunction )+
+		using pattern1 = PatternMatch<ConjunctionPattern,
+			OneOrMorePattern<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
+				ConjunctionPattern>>;
+		if (pattern1::match(p)) {
+			std::vector<std::shared_ptr<ASTNode>> values;
+			values.reserve(p.stack().size());
+			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::Or, values));
+			return true;
+		}
+
 		// conjunction
 		using pattern2 = PatternMatch<ConjunctionPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			while (!p.stack().empty()) { scope.parent().push_back(p.pop_front()); }
+			return true;
+		}
 
 		return false;
 	}
@@ -2251,9 +2300,9 @@ struct DottedAsNamePattern : Pattern<DottedAsNamePattern>
 		spdlog::debug("dotted_as_name");
 		using pattern1 = PatternMatch<DottedNamePattern>;
 		if (pattern1::match(p)) {
-			using pattern1a =
-				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>,
-					SingleTokenPattern<Token::TokenType::NAME>>;
+			using pattern1a = PatternMatch<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+				SingleTokenPattern<Token::TokenType::NAME>>;
 			if (pattern1a::match(p)) {
 				spdlog::debug("['as' NAME ]");
 				const auto token = p.lexer().peek_token(p.token_position() - 1);
@@ -2290,9 +2339,9 @@ struct ImportNamePattern : Pattern<ImportNamePattern>
 	{
 		p.push_to_stack(std::make_shared<Import>());
 		spdlog::debug("import_name");
-		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ImportPattern>,
-				DottedAsNamesPattern>;
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ImportKeywordPattern>,
+			DottedAsNamesPattern>;
 		if (pattern1::match(p)) {
 			spdlog::debug("'import' dotted_as_names");
 			return true;
@@ -2302,7 +2351,7 @@ struct ImportNamePattern : Pattern<ImportNamePattern>
 };
 
 
-struct ImportFromPattern : Pattern<ImportFromPattern>
+struct ImportFromKeywordPattern : Pattern<ImportFromKeywordPattern>
 {
 	// import_from:
 	// | 'from' ('.' | '...')* dotted_name 'import' import_from_targets
@@ -2328,7 +2377,7 @@ struct ImportStatementPattern : Pattern<ImportStatementPattern>
 			spdlog::debug("import_name");
 			return true;
 		}
-		using pattern2 = PatternMatch<ImportFromPattern>;
+		using pattern2 = PatternMatch<ImportFromKeywordPattern>;
 		if (pattern2::match(p)) {
 			spdlog::debug("import_from");
 			return true;
@@ -2348,9 +2397,10 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 		spdlog::debug("raise_stmt");
 		const auto initial_stack_size = p.stack().size();
 		using pattern1 = PatternMatch<
-			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>,
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
 			ExpressionPattern,
-			ZeroOrOnePattern<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>,
+			ZeroOrOnePattern<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
 				ExpressionPattern>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("'raise' expression ['from' expression ] ");
@@ -2368,8 +2418,8 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 			return true;
 		}
 
-		using pattern2 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>>;
+		using pattern2 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>>;
 		if (pattern2::match(p)) {
 			spdlog::debug("'raise'");
 			ASSERT(p.stack().size() == initial_stack_size)
@@ -2387,10 +2437,10 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 	{
 		spdlog::debug("AssertStatementPattern");
 		const auto initial_stack_size = p.stack().size();
-		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>,
-				ExpressionPattern,
-				ZeroOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, ExpressionPattern>>;
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
+			ExpressionPattern,
+			ZeroOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, ExpressionPattern>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("assert_stmt: 'assert' expression [',' expression ]");
 			ASSERT((p.stack().size() - initial_stack_size) > 0)
@@ -2925,9 +2975,9 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 		spdlog::debug("ForStatementPattern");
 		BlockScope scope{ p };
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForKeywordPattern>,
 				StarTargetsPattern,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, InPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, InKeywordPattern>,
 				StarExpressionsPattern,
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
@@ -2965,15 +3015,15 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 		spdlog::debug("ExceptBlockPattern");
 		{
 			BlockScope scope{ p };
-			using pattern1 =
-				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptPattern>,
-					ExpressionPattern>;
+			using pattern1 = PatternMatch<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptKeywordPattern>,
+				ExpressionPattern>;
 			if (pattern1::match(p)) {
 				spdlog::debug("'except' expression");
 				std::string name{};
-				using pattern1a =
-					PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>,
-						SingleTokenPattern<Token::TokenType::NAME>>;
+				using pattern1a = PatternMatch<
+					AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+					SingleTokenPattern<Token::TokenType::NAME>>;
 				if (pattern1a::match(p)) {
 					spdlog::debug("['as' NAME ]");
 					auto token = p.lexer().peek_token(p.token_position() - 1);
@@ -2995,10 +3045,10 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 		}
 		{
 			BlockScope scope{ p };
-			using pattern2 =
-				PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptPattern>,
-					SingleTokenPattern<Token::TokenType::COLON>,
-					BlockPattern>;
+			using pattern2 = PatternMatch<
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptKeywordPattern>,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
 			if (pattern2::match(p)) {
 				spdlog::debug("'except' ':' block");
 				std::vector<std::shared_ptr<ASTNode>> body;
@@ -3018,10 +3068,10 @@ struct FinallyBlockPattern : Pattern<FinallyBlockPattern>
 	static bool matches_impl(Parser &p)
 	{
 		spdlog::debug("FinallyBlockPattern");
-		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FinallyPattern>,
-				SingleTokenPattern<Token::TokenType::COLON>,
-				BlockPattern>;
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FinallyKeywordPattern>,
+			SingleTokenPattern<Token::TokenType::COLON>,
+			BlockPattern>;
 		if (pattern1::match(p)) {
 			spdlog::debug("'finally' ':' block");
 			return true;
@@ -3041,7 +3091,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 		BlockScope scope{ p };
 		// 'try' ':' block
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, TryPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, TryKeywordPattern>,
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
@@ -3115,11 +3165,11 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 		BlockScope scope{ p };
 
 		// 'while' named_expression ':' block
-		using pattern0 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, WhilePattern>,
-				NamedExpressionPattern,
-				SingleTokenPattern<Token::TokenType::COLON>,
-				BlockPattern>;
+		using pattern0 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, WhileKeywordPattern>,
+			NamedExpressionPattern,
+			SingleTokenPattern<Token::TokenType::COLON>,
+			BlockPattern>;
 		if (pattern0::match(p)) {
 			spdlog::debug("'while' named_expression ':' block");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
