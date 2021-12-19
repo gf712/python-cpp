@@ -1611,3 +1611,16 @@ TEST(Parser, UnaryExprMix)
 		""));
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, UnaryNot)
+{
+	constexpr std::string_view program = "a = not b\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<UnaryExpr>(
+			UnaryOpType::NOT, std::make_shared<Name>("b", ContextType::LOAD)),
+		""));
+	assert_generates_ast(program, expected_ast);
+}

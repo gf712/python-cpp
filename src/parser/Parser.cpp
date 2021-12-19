@@ -375,6 +375,11 @@ struct InPattern
 	static bool matches(std::string_view token_value) { return token_value == "in"; }
 };
 
+struct NotPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "not"; }
+};
+
 struct RaisePattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "raise"; }
@@ -817,7 +822,8 @@ struct AtomPattern : Pattern<AtomPattern>
 		// using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaisePattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>>>;
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>>>;
 		if (pattern1::match(p)) {
 			spdlog::debug("NAME");
 
@@ -1191,6 +1197,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::RSQB,
 												 Token::TokenType::RBRACE>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsPattern>>>>;
 		if (pattern5::match(p)) {
 			spdlog::debug("ϵ");
@@ -1839,6 +1846,14 @@ struct InversionPattern : Pattern<InversionPattern>
 	{
 		spdlog::debug("InversionPattern");
 		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotPattern>,
+				ComparissonPattern>;
+		if (pattern1::match(p)) {
+			const auto &node = p.pop_back();
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::NOT, node));
+			return true;
+		}
 		// comparison
 		using pattern2 = PatternMatch<ComparissonPattern>;
 		if (pattern2::match(p)) { return true; }
@@ -2315,6 +2330,7 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 				ExpressionPattern,
 				ZeroOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, ExpressionPattern>>;
 		if (pattern1::match(p)) {
+			spdlog::debug("assert_stmt: 'assert' expression [',' expression ]");
 			ASSERT((p.stack().size() - initial_stack_size) > 0)
 			ASSERT((p.stack().size() - initial_stack_size) <= 2)
 
