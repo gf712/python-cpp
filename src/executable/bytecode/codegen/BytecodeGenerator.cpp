@@ -5,6 +5,7 @@
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
+#include "executable/bytecode/instructions/IsOp.hpp"
 #include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
 #include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
@@ -319,6 +320,12 @@ void BytecodeGenerator::visit(const Compare *node)
 	} break;
 	case Compare::OpType::Lt: {
 		emit<LessThan>(m_function_id, result_reg, lhs_reg, rhs_reg);
+	} break;
+	case Compare::OpType::Is: {
+		emit<IsOp>(m_function_id, result_reg, lhs_reg, rhs_reg, false);
+	} break;
+	case Compare::OpType::IsNot: {
+		emit<IsOp>(m_function_id, result_reg, lhs_reg, rhs_reg, true);
 	} break;
 	default: {
 		TODO();

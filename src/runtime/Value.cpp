@@ -301,6 +301,13 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 		rhs);
 }
 
+bool is(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	// TODO: Could probably be more efficient, but at least guarantees that Python singletons
+	//		 always are true in this comparisson when compared to the same singleton 
+	return PyObject::from(lhs) == PyObject::from(rhs);
+}
+
 bool truthy(const Value &value, Interpreter &)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
