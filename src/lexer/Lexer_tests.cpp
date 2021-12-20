@@ -68,6 +68,94 @@ TEST(Lexer, SimpleNumericAssignment)
 	assert_generates_tokens(program, expected_tokens);
 }
 
+TEST(Lexer, HexNumber)
+{
+	constexpr std::string_view program = "a = 0xDEAD_C0DE\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, BinaryNumber)
+{
+	constexpr std::string_view program = "a = 0b0101010111\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, OctNumber)
+{
+	constexpr std::string_view program = "a = 0o0712536\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, DecimalNumber)
+{
+	constexpr std::string_view program = "a = 42_000_42\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, ExpNumber)
+{
+	constexpr std::string_view program = "a = 5_687e-068_43\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, ExpNumberNoSign)
+{
+	constexpr std::string_view program = "a = 1e100\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, Float)
+{
+	constexpr std::string_view program = "a = 42.424218069\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, ImaginaryNumber)
+{
+	constexpr std::string_view program = "a = 76_534.0j\n";
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER };
+	assert_generates_tokens(program, expected_tokens);
+}
+
 TEST(Lexer, SimpleStringAssignment)
 {
 	constexpr std::string_view program = "a = \"2\"\n";

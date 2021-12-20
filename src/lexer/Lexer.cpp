@@ -216,21 +216,214 @@ std::tuple<size_t, size_t> Lexer::compute_indent_level()
 	return { indentation_value, pos };
 }
 
+template<typename FunctorType>
+std::optional<size_t> Lexer::parse_digits(size_t n, FunctorType &&f) const
+{
+	bool previous_is_underscore = false;
+	while (f(peek(n)) || peek(n) == '_') {
+		if (peek(n) == '_' && previous_is_underscore) {
+			// invalid decimal
+			// TODO: Python interpreter should throw syntax error
+			return {};
+		} else if (peek(n) == '_') {
+			previous_is_underscore = true;
+		} else {
+			previous_is_underscore = false;
+		}
+		n++;
+	}
+	if (peek(n - 1) == '_') {
+		// number cannot end in an underscore
+		TODO();
+		return {};
+	}
+	return n;
+}
+
+std::optional<size_t> Lexer::int_number(size_t n) const
+{
+	// ugly, but it isn't trivial to chain/pipe these operations in a generic way
+	if (auto end = hex_number(n)) {
+		return *end;
+	} else if (auto end = bin_number(n)) {
+		return *end;
+	} else if (auto end = oct_number(n)) {
+		return *end;
+	} else if (auto end = dec_number(n)) {
+		return *end;
+	} else {
+		return {};
+	}
+}
+
+std::optional<size_t> Lexer::hex_number(size_t n) const
+{
+	if (peek(n++) != '0') { return {}; }
+	if (peek(n) != 'x' && peek(n) != 'X') { return {}; }
+	n++;
+	auto is_hex_value = [](const unsigned char val) {
+		// [0-9a-fA-F]
+		return std::isdigit(val) || (val >= 'a' && val <= 'f') || (val >= 'A' && val <= 'F');
+	};
+	if (!is_hex_value(peek(n))) { return {}; }
+	n++;
+	auto result = parse_digits(n, is_hex_value);
+	if (result.has_value() && *result < 3) { return {}; }
+	return result;
+}
+
+std::optional<size_t> Lexer::bin_number(size_t n) const
+{
+	if (peek(n++) != '0') { return {}; }
+	if (peek(n) != 'b' && peek(n) != 'B') { return {}; }
+	n++;
+	auto is_bin_value = [](const unsigned char val) {
+		// [01]
+		return val == '0' || val == '1';
+	};
+	if (!is_bin_value(peek(n))) { return {}; }
+	n++;
+	auto result = parse_digits(n, is_bin_value);
+	if (result.has_value() && *result < 3) { return {}; }
+	return result;
+}
+
+std::optional<size_t> Lexer::oct_number(size_t n) const
+{
+	if (peek(n++) != '0') { return {}; }
+	if (peek(n) != 'o' && peek(n) != 'O') { return {}; }
+	n++;
+	auto is_oct_value = [](const unsigned char val) {
+		// [0-7]
+		return val >= '0' && val <= '7';
+	};
+	if (!is_oct_value(peek(n))) { return {}; }
+	n++;
+	auto result = parse_digits(n, is_oct_value);
+	if (result.has_value() && *result < 3) { return {}; }
+	return result;
+}
+
+std::optional<size_t> Lexer::dec_number(size_t n) const
+{
+	bool previous_is_underscore = false;
+	// (?:0(?:_?0)*
+	if (peek(n) == '_') {
+		// number cannot start with underscore
+		TODO();
+		return {};
+	}
+	auto result = parse_digits(n, [](const char c) { return c == '0'; });
+	if (!result) { return {}; }
+	n = *result;
+	if (n > 0) {
+		// we found a valid decimal number with just 0s (possibly with '_')
+		return n;
+	}
+
+	ASSERT(n == 0)
+	ASSERT(previous_is_underscore == false)
+	// [1-9](?:_?[0-9])*)
+	if (!std::isdigit(peek(n))) { return {}; }
+	n++;
+	result = parse_digits(n, [](const char c) { return std::isdigit(c); });
+	if (!result) { return {}; }
+	n = *result;
+	if (n > 0) { return n; }
+	return {};
+}
+
+std::optional<size_t> Lexer::exp_number(size_t n) const
+{
+	if (peek(n) != 'e' && peek(n) != 'E') { return {}; }
+	n++;
+	if (peek(n) == '-' || peek(n) == '+') { n++; }
+
+	if (!std::isdigit(peek(n))) { return {}; }
+	n++;
+	return parse_digits(n, [](const char c) { return std::isdigit(c); });
+}
+
+std::optional<size_t> Lexer::point_float_number(size_t n) const
+{
+	// [0-9](?:_?[0-9])*
+	if (std::isdigit(peek(n))) {
+		n++;
+		auto result = parse_digits(n, [](const char c) { return std::isdigit(c); });
+		if (!result) { return {}; }
+		n = *result;
+	}
+
+	// \.(?:[0-9](?:_?[0-9])*)?`
+	if (peek(n) != '.') { return {}; }
+	n++;
+	if (!std::isdigit(peek(n))) { return {}; }
+	n++;
+	return parse_digits(n, [](const char c) { return std::isdigit(c); });
+}
+
+std::optional<size_t> Lexer::exp_float_number(size_t n) const
+{
+	// [0-9](?:_?[0-9])*)
+	if (!(peek(n) >= '0' && peek(n) <= '9')) { return {}; }
+	n++;
+	auto result = parse_digits(n, [](const char c) { return std::isdigit(c); });
+	if (result) { return exp_number(*result); }
+	return {};
+}
+
+std::optional<size_t> Lexer::imag_number(size_t n) const
+{
+	auto result = [this](size_t n) -> std::optional<size_t> {
+		// [0-9](?:_?[0-9])*)
+		if (!(peek(n) >= '0' && peek(n) <= '9')) { return {}; }
+		n++;
+		auto result = parse_digits(n, [](const char c) { return std::isdigit(c); });
+		if (!result) { return {}; }
+		n = *result;
+
+		if (!(peek(n) == 'j' && peek(n) == 'J')) { return {}; }
+		n++;
+		return n;
+	}(n);
+
+	if (!result) {
+		result = [this](size_t n) -> std::optional<size_t> {
+			if (auto result = float_number(n)) {
+				if (peek(*result) == 'j' || peek(*result) == 'J') { return *result + 1; }
+			}
+			return {};
+		}(n);
+	}
+
+	return result;
+}
+
+std::optional<size_t> Lexer::float_number(size_t n) const
+{
+	if (auto end = point_float_number(n)) {
+		return *end;
+	} else if (auto end = exp_float_number(n)) {
+		return *end;
+	} else {
+		return {};
+	}
+}
+
 bool Lexer::try_read_number()
 {
 	const Position original_position = m_position;
-
-	if (!(peek(0) == '.' || std::isdigit(peek(0)))) { return false; }
-
-	bool is_decimal_part = peek(0) == '.';
-	size_t position = 1;
-
-	while (std::isdigit(peek(position)) || (!is_decimal_part && peek(position) == '.')) {
-		position++;
+	size_t n = 0;
+	if (auto end = imag_number(n)) {
+		increment_column_position(*end);
+	} else if (auto end = float_number(n)) {
+		increment_column_position(*end);
+	} else if (auto end = int_number(n)) {
+		increment_column_position(*end);
+	} else {
+		return false;
 	}
-	advance(position);
 	push_token(Token::TokenType::NUMBER, original_position, m_position);
-
 	return true;
 }
 

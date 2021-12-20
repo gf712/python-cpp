@@ -273,6 +273,20 @@ class Lexer
 
 	bool try_read_name();
 
+	std::optional<size_t> hex_number(size_t) const;
+	std::optional<size_t> bin_number(size_t) const;
+	std::optional<size_t> oct_number(size_t) const;
+	std::optional<size_t> dec_number(size_t) const;
+	std::optional<size_t> int_number(size_t) const;
+	std::optional<size_t> exp_number(size_t) const;
+	std::optional<size_t> point_float_number(size_t) const;
+	std::optional<size_t> exp_float_number(size_t) const;
+	std::optional<size_t> float_number(size_t) const;
+	std::optional<size_t> imag_number(size_t) const;
+
+	template<typename FunctorType>
+	std::optional<size_t> parse_digits(size_t n, FunctorType &&f) const;
+
 	char peek(size_t i) const;
 
 	bool peek(std::string_view pattern) const;
