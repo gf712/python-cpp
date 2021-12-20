@@ -9,7 +9,9 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/JumpIfFalseOrPop.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
+    executable/bytecode/instructions/JumpIfTrueOrPop.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp

@@ -5,7 +5,9 @@
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
+#include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
+#include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
 #include "executable/bytecode/instructions/LoadAssertionError.hpp"
 #include "executable/bytecode/instructions/LoadAttr.hpp"
 #include "executable/bytecode/instructions/LoadBuildClass.hpp"
@@ -225,11 +227,11 @@ void BytecodeGenerator::visit(const If *node)
 	emit<Jump>(m_function_id, end_label);
 
 	// else
-	bind(orelse_start_label);
+	bind(*orelse_start_label);
 	for (const auto &orelse_statement : node->orelse()) {
 		generate(orelse_statement.get(), m_function_id);
 	}
-	bind(end_label);
+	bind(*end_label);
 
 	m_last_register = Register{};
 }
@@ -258,7 +260,7 @@ void BytecodeGenerator::visit(const For *node)
 	if (target_ids.size() != 1) { TODO(); }
 	auto target_name = target_ids[0];
 
-	bind(forloop_start_label);
+	bind(*forloop_start_label);
 	emit<ForIter>(
 		m_function_id, iter_variable_register, iterator_register, target_name, forloop_end_label);
 
@@ -269,7 +271,7 @@ void BytecodeGenerator::visit(const For *node)
 	emit<Jump>(m_function_id, forloop_start_label);
 
 	// orelse
-	bind(forloop_end_label);
+	bind(*forloop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
 	m_last_register = Register{};
@@ -287,7 +289,7 @@ void BytecodeGenerator::visit(const While *node)
 		make_label(fmt::format("WHILE_END_{}", while_loop_count++), m_function_id);
 
 	// test
-	bind(while_loop_start_label);
+	bind(*while_loop_start_label);
 	const auto test_result_register = generate(node->test().get(), m_function_id);
 	emit<JumpIfFalse>(m_function_id, test_result_register, while_loop_end_label);
 
@@ -296,7 +298,7 @@ void BytecodeGenerator::visit(const While *node)
 	emit<Jump>(m_function_id, while_loop_start_label);
 
 	// orelse
-	bind(while_loop_end_label);
+	bind(*while_loop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
 	m_last_register = Register{};
@@ -557,7 +559,39 @@ void BytecodeGenerator::visit(const UnaryExpr *node)
 	m_last_register = dst_register;
 }
 
-void BytecodeGenerator::visit(const BoolOp *) { TODO(); }
+void BytecodeGenerator::visit(const BoolOp *node)
+{
+	static size_t bool_op_count = 0;
+	auto end_label = make_label(fmt::format("BOOL_OP_END_{}", bool_op_count++), m_function_id);
+	Register result_register = allocate_register();
+	Register last_result;
+	switch (node->op()) {
+	case BoolOp::OpType::And: {
+		auto it = node->values().begin();
+		auto end = node->values().end();
+		while (std::next(it) != end) {
+			last_result = generate((*it).get(), m_function_id);
+			emit<JumpIfFalseOrPop>(m_function_id, last_result, result_register, end_label);
+			it++;
+		}
+		last_result = generate((*it).get(), m_function_id);
+	} break;
+	case BoolOp::OpType::Or: {
+		auto it = node->values().begin();
+		auto end = node->values().end();
+		while (std::next(it) != end) {
+			last_result = generate((*it).get(), m_function_id);
+			emit<JumpIfTrueOrPop>(m_function_id, last_result, result_register, end_label);
+			it++;
+		}
+		last_result = generate((*it).get(), m_function_id);
+	}
+	}
+	emit<Move>(m_function_id, result_register, last_result);
+
+	bind(*end_label);
+	m_last_register = result_register;
+}
 
 void BytecodeGenerator::visit(const Assert *node)
 {
@@ -574,8 +608,6 @@ void BytecodeGenerator::visit(const Assert *node)
 	const auto msg_register = [this, &node]() -> std::optional<Register> {
 		if (node->msg()) {
 			const auto msg_register = generate(node->msg().get(), m_function_id);
-			// emit<FunctionCall>(
-			// 	m_function_id, assertion_function_register, std::vector{ msg_register });
 			return msg_register;
 		} else {
 			return {};
@@ -587,7 +619,7 @@ void BytecodeGenerator::visit(const Assert *node)
 	} else {
 		emit<RaiseVarargs>(m_function_id, assertion_function_register);
 	}
-	bind(end_label);
+	bind(*end_label);
 
 	m_last_register = Register{};
 }

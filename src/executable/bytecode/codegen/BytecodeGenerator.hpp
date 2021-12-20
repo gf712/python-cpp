@@ -54,7 +54,10 @@ class BytecodeGenerator : public ast::CodeGenerator
   private:
 	FunctionBlocks m_functions;
 	size_t m_function_id{ 0 };
-	std::set<Label> m_labels;
+
+	// a non-owning list of all generated Labels
+	std::vector<Label *> m_labels;
+
 	std::vector<size_t> m_frame_register_count;
 	Register m_last_register{};
 	ASTContext m_ctx;
@@ -85,31 +88,35 @@ class BytecodeGenerator : public ast::CodeGenerator
 		return m_functions.at(idx).instructions;
 	}
 
-	Label make_label(const std::string &name, size_t function_id)
+	std::shared_ptr<Label> make_label(const std::string &name, size_t function_id)
 	{
 		spdlog::debug("New label to be added: name={} function_id={}", name, function_id);
-		if (auto result = m_labels.emplace(name, function_id); result.second) {
-			return *result.first;
-		}
-		ASSERT_NOT_REACHED()
+		auto new_label = std::make_shared<Label>(name, function_id);
+
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), new_label.get()) == m_labels.end())
+
+		m_labels.emplace_back(new_label.get());
+
+		return new_label;
 	}
 
-	Label label(const Label &l) const
+	const Label &label(const Label &l) const
 	{
-		if (auto result = m_labels.find(l); result != m_labels.end()) { return *result; }
-		ASSERT_NOT_REACHED()
+		if (auto it = std::find(m_labels.begin(), m_labels.end(), &l); it != m_labels.end()) {
+			return **it;
+		} else {
+			ASSERT_NOT_REACHED()
+		}
 	}
 
-	const std::set<Label> labels() const { return m_labels; }
+	const std::vector<Label *> &labels() const { return m_labels; }
 
 	void bind(Label &label)
 	{
-		if (auto result = m_labels.find(label); result != m_labels.end()) {
-			const size_t current_instruction_position = function(result->function_id()).size();
-			result->set_position(current_instruction_position);
-			return;
-		}
-		ASSERT_NOT_REACHED()
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), &label) != m_labels.end())
+		auto &instructions = function(label.function_id());
+		const size_t current_instruction_position = instructions.size();
+		label.set_position(current_instruction_position);
 	}
 
 	size_t register_count() const { return m_frame_register_count.back(); }

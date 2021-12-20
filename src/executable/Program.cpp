@@ -51,3 +51,11 @@ std::string Program::to_string() const
 	ss << m_main_function->to_string() << '\n';
 	return ss.str();
 }
+
+std::string FunctionBlock::to_string() const
+{
+	std::ostringstream os;
+	os << "Function name: " << metadata.function_name << '\n';
+	for (const auto &ins : instructions) { os << ins->to_string() << '\n'; }
+	return os.str();
+}

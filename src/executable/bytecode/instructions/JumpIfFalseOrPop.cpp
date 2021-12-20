@@ -1,7 +1,7 @@
-#include "JumpIfTrue.hpp"
+#include "JumpIfFalseOrPop.hpp"
 #include "runtime/PyBool.hpp"
 
-void JumpIfTrue::execute(VirtualMachine &vm, Interpreter &) const
+void JumpIfFalseOrPop::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
@@ -22,13 +22,14 @@ void JumpIfTrue::execute(VirtualMachine &vm, Interpreter &) const
 						   }
 					   } },
 			result);
-	if (test_result) {
+	vm.reg(m_result_register) = NameConstant{ test_result };
+	if (!test_result) {
 		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
-}
+};
 
-void JumpIfTrue::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void JumpIfFalseOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
 	m_label->set_position(m_label->position() - instruction_idx - 1);
 	m_label->immutable();

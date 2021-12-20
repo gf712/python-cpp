@@ -51,19 +51,19 @@ class LoadConst final : public Instruction
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
 
-class Store final : public Instruction
+class Move final : public Instruction
 {
 	Register m_destination;
 	Register m_source;
 
   public:
-	Store(Register destination, Register source) : m_destination(destination), m_source(source) {}
-	~Store() override {}
+	Move(Register destination, Register source) : m_destination(destination), m_source(source) {}
+	~Move() override {}
 	std::string to_string() const final
 	{
-		return fmt::format("STORE           r{:<3}  {:<3}", m_destination, m_source);
+		return fmt::format("STORE           r{:<3}  r{:<3}", m_destination, m_source);
 	}
-	void execute(VirtualMachine &, Interpreter &) const final { TODO(); }
+	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 };
@@ -323,17 +323,17 @@ class MakeFunction : public Instruction
 class JumpIfFalse final : public Instruction
 {
 	Register m_test_register;
-	Label m_label;
+	std::shared_ptr<Label> m_label;
 	std::optional<int32_t> m_offset;
 
   public:
-	JumpIfFalse(Register test_register, Label label)
+	JumpIfFalse(Register test_register, std::shared_ptr<Label> label)
 		: m_test_register(test_register), m_label(std::move(label))
 	{}
 
 	std::string to_string() const final
 	{
-		return fmt::format("JUMP_IF_FALSE   position: {}", m_label.position());
+		return fmt::format("JUMP_IF_FALSE   position: {}", m_label->position());
 	}
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
@@ -343,14 +343,14 @@ class JumpIfFalse final : public Instruction
 
 class Jump final : public Instruction
 {
-	Label m_label;
+	std::shared_ptr<Label> m_label;
 	std::optional<int32_t> m_offset;
 
   public:
-	Jump(Label label) : m_label(std::move(label)) {}
+	Jump(std::shared_ptr<Label> label) : m_label(std::move(label)) {}
 	std::string to_string() const final
 	{
-		return fmt::format("JUMP            position: {}", m_label.position());
+		return fmt::format("JUMP            position: {}", m_label->position());
 	}
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
@@ -489,10 +489,13 @@ class ForIter final : public Instruction
 	Register m_dst;
 	Register m_src;
 	std::string m_next_value_name;
-	Label m_exit_label;
+	std::shared_ptr<Label> m_exit_label;
 
   public:
-	ForIter(Register dst, Register src, std::string next_value_name, Label exit_label)
+	ForIter(Register dst,
+		Register src,
+		std::string next_value_name,
+		std::shared_ptr<Label> exit_label)
 		: m_dst(dst), m_src(src), m_next_value_name(std::move(next_value_name)),
 		  m_exit_label(std::move(exit_label))
 	{}

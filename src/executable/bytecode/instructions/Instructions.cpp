@@ -12,6 +12,11 @@
 #include "runtime/StopIterationException.hpp"
 
 
+void Move::execute(VirtualMachine &vm, Interpreter &) const
+{
+	vm.reg(m_destination) = vm.reg(m_source);
+}
+
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	ASSERT(interpreter.functions(m_function_id)->backend() == FunctionExecutionBackend::BYTECODE)
@@ -41,29 +46,29 @@ void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 			} },
 		result);
 	if (!test_result) {
-		const auto ip = vm.instruction_pointer() + m_label.position();
+		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
 };
 
 
-void JumpIfFalse::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
+void JumpIfFalse::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
-	m_label = generator.label(m_label);
-	m_label.set_position(m_label.position() - instruction_idx - 1);
+	m_label->set_position(m_label->position() - instruction_idx - 1);
+	m_label->immutable();
 }
 
 void Jump::execute(VirtualMachine &vm, Interpreter &) const
 {
-	const auto ip = vm.instruction_pointer() + m_label.position();
+	const auto ip = vm.instruction_pointer() + m_label->position();
 	vm.set_instruction_pointer(ip);
 };
 
 
-void Jump::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
+void Jump::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
-	m_label = generator.label(m_label);
-	m_label.set_position(m_label.position() - instruction_idx - 1);
+	m_label->set_position(m_label->position() - instruction_idx - 1);
+	m_label->immutable();
 }
 
 void Equal::execute(VirtualMachine &vm, Interpreter &interpreter) const
@@ -156,7 +161,7 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				interpreter.set_status(Interpreter::Status::OK);
 				// FIXME: subtract one since the vm will advance the ip by one.
 				//        is this always true?
-				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label.position() - 1);
+				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label->position() - 1);
 			}
 			return;
 		}
@@ -167,8 +172,7 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	}
 }
 
-void ForIter::relocate(codegen::BytecodeGenerator &generator, size_t instruction_idx)
+void ForIter::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
-	m_exit_label = generator.label(m_exit_label);
-	m_exit_label.set_position(m_exit_label.position() - instruction_idx);
+	m_exit_label->set_position(m_exit_label->position() - instruction_idx);
 }

@@ -674,8 +674,8 @@ struct TuplePattern : Pattern<TuplePattern>
 	//     | '(' [star_named_expression ',' [star_named_expressions]  ] ')'
 	static bool matches_impl(Parser &p)
 	{
-		BlockScope list_scope{ p };
-		spdlog::debug("list");
+		BlockScope tuple_scope{ p };
+		spdlog::debug("tuple");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrMorePattern<StarNamedExpression,
 				SingleTokenPattern<Token::TokenType::COMMA>,
@@ -684,7 +684,7 @@ struct TuplePattern : Pattern<TuplePattern>
 		if (pattern1::match(p)) {
 			auto tuple = std::make_shared<Tuple>(ContextType::LOAD);
 			while (!p.stack().empty()) { tuple->append(p.pop_front()); }
-			list_scope.parent().push_back(std::move(tuple));
+			tuple_scope.parent().push_back(std::move(tuple));
 			return true;
 		}
 		return false;
@@ -694,7 +694,22 @@ struct TuplePattern : Pattern<TuplePattern>
 
 struct GroupPattern : Pattern<GroupPattern>
 {
-	static bool matches_impl(Parser &) { return false; }
+	static bool matches_impl(Parser &p)
+	{
+		// group:
+		//     | '(' (yield_expr | named_expression) ')'
+		spdlog::debug("group");
+
+		// TODO: add yield_expr
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+			NamedExpressionPattern,
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
+		if (pattern1::match(p)) {
+			spdlog::debug("'(' (yield_expr | named_expression) ')'");
+			return true;
+		}
+		return false;
+	}
 };
 
 

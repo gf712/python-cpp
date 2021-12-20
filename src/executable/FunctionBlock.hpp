@@ -1,9 +1,9 @@
 #pragma once
 
+#include "forward.hpp"
 #include <memory>
 #include <string>
 #include <vector>
-#include "forward.hpp"
 
 using InstructionVector = std::vector<std::unique_ptr<Instruction>>;
 
@@ -19,6 +19,7 @@ struct FunctionBlock
 {
 	FunctionMetaData metadata;
 	InstructionVector instructions;
+	std::string to_string() const;
 };
 
 using FunctionBlocks = std::vector<FunctionBlock>;

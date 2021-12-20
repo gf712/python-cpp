@@ -17,3 +17,5 @@ assert type(1.0) == float, "A literal float should be of type float"
 
 assert -a == -1, "Failed to turn positive integer to negative integer"
 assert -c == -10.0, "Failed to turn positive float to negative float"
+
+assert (a + c) * 2 == 22, "Failed to respect operator precedence with parenthesis"

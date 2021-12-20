@@ -6,23 +6,33 @@
 #include <string>
 
 class Label
+	: NonCopyable
+	, NonMoveable
 {
 	std::string m_label_name;
 	size_t m_function_id;
 	mutable std::optional<int64_t> m_position;
+	bool m_immutable{ false };
 
   public:
 	Label(std::string name, int64_t function_id)
 		: m_label_name(std::move(name)), m_function_id(function_id)
 	{}
 
-	void set_position(int64_t position) const { m_position = position; }
+	void set_position(int64_t position) const
+	{
+		// a hack to make sure multiple instructions cannot relocate a
+		// shared label
+		if (!m_immutable) { m_position = position; }
+	}
 
 	int64_t position() const
 	{
 		ASSERT(m_position.has_value());
 		return *m_position;
 	}
+
+	void immutable() { m_immutable = true; }
 
 	size_t function_id() const { return m_function_id; }
 
