@@ -827,6 +827,50 @@ struct SetCompPattern : Pattern<SetCompPattern>
 };
 
 
+// this function assumes that we have a valid number
+std::shared_ptr<ASTNode> parse_number(std::string value)
+{
+	std::erase_if(value, [](const char c) { return c == '_'; });
+
+	// FIXME: check for overlflow without throwing exceptions
+	// TODO:  handle very large ints
+
+	if (value[1] == 'o' || value[1] == 'O') {
+		// octal
+		std::string oct_str{ value.begin() + 2, value.end() };
+		int64_t int_value = std::stoll(oct_str, nullptr, 8);
+		return std::make_shared<Constant>(int_value);
+	} else if (value[1] == 'x' || value[1] == 'X') {
+		// hex
+		int64_t int_value = std::stoll(value, nullptr, 16);
+		return std::make_shared<Constant>(int_value);
+	} else if (value[1] == 'b' || value[1] == 'B') {
+		// binary
+		std::string bin_str{ value.begin() + 2, value.end() };
+		int64_t int_value = std::stoll(bin_str, nullptr, 2);
+		return std::make_shared<Constant>(int_value);
+	} else if (value.find_first_of("jJ") != std::string::npos) {
+		// imaginary number
+		TODO();
+	} else if (value.find_first_of("eE") != std::string::npos) {
+		// scientific notation
+		// FIXME: seems innefficient, since we know that it is in scientific notation?
+		std::istringstream os(value);
+		double float_value;
+		os >> float_value;
+		return std::make_shared<Constant>(float_value);
+	} else if (value.find('.') != std::string::npos) {
+		// float
+		double float_value = std::stod(value);
+		return std::make_shared<Constant>(float_value);
+	} else {
+		// int
+		int64_t int_value = std::stoll(value);
+		return std::make_shared<Constant>(int_value);
+	}
+}
+
+
 struct AtomPattern : Pattern<AtomPattern>
 {
 	// atom:
@@ -888,15 +932,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string number{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
-			auto dot_iter = std::find(number.begin(), number.end(), '.');
-			if (dot_iter == number.end()) {
-				// it's an int
-				int64_t int_value = std::stoll(number);
-				p.push_to_stack(std::make_shared<Constant>(int_value));
-			} else {
-				double float_value = std::stod(number);
-				p.push_to_stack(std::make_shared<Constant>(float_value));
-			}
+			p.push_to_stack(parse_number(number));
 
 			return true;
 		}

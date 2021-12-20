@@ -19,3 +19,8 @@ assert -a == -1, "Failed to turn positive integer to negative integer"
 assert -c == -10.0, "Failed to turn positive float to negative float"
 
 assert (a + c) * 2 == 22, "Failed to respect operator precedence with parenthesis"
+
+assert 1E100 == 1e100, "Failed to create a number from scientific notation"
+assert 0xDEADBEEF == 3735928559, "Failed to create a number from hex"
+assert 0o125 == 85, "Failed to create a number from octal"
+assert 0b01110001 == 113, "Failed to create a number from binary"
