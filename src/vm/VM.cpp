@@ -12,7 +12,7 @@
 #define DEBUG_VM 0
 
 StackFrame::StackFrame(size_t frame_size,
-	InstructionVector::const_iterator return_address,
+	InstructionBlock::const_iterator return_address,
 	VirtualMachine *vm_)
 	: registers(frame_size, nullptr), return_address(return_address), vm(vm_)
 {
@@ -42,26 +42,36 @@ VirtualMachine::VirtualMachine()
 int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame_size)
 {
 	ASSERT(function->backend() == FunctionExecutionBackend::BYTECODE)
-	const auto func_ip = std::static_pointer_cast<Bytecode>(function)->begin();
+	const auto &first_block = std::static_pointer_cast<Bytecode>(function)->begin();
+	const auto func_ip = first_block->begin();
 	int result = EXIT_SUCCESS;
 
 	push_frame(frame_size);
 	const auto stack_size = m_stack.size();
-	for (m_instruction_pointer = func_ip;; ++m_instruction_pointer) {
-		const auto &instruction = *m_instruction_pointer;
-		// spdlog::info(instruction->to_string());
-		instruction->execute(*this, interpreter());
 
-		// we left the current stack frame in the previous instruction
-		if (m_stack.size() != stack_size) { break; }
-		// dump();
-		if (interpreter().execution_frame()->exception()) {
-			interpreter().unwind();
-			break;
-		} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
-			// bail, an error occured
-			std::cout << interpreter().exception_message() << '\n';
-			break;
+	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
+	//            What you can do is leave a block (and not the function) at any time and
+	//            start executing the next block from its first instruction
+	for (const auto &block_view : *std::static_pointer_cast<Bytecode>(function)) {
+		m_instruction_pointer = block_view.begin();
+		const auto end = block_view.end();
+		for (; m_instruction_pointer != end; ++m_instruction_pointer) {
+			const auto &instruction = *m_instruction_pointer;
+			// spdlog::info(instruction->to_string());
+			instruction->execute(*this, interpreter());
+
+			// we left the current stack frame in the previous instruction
+			if (m_stack.size() != stack_size) { break; }
+			// dump();
+			if (interpreter().execution_frame()->exception()) {
+				interpreter().unwind();
+				m_instruction_pointer = func_ip;
+				break;
+			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
+				// bail, an error occured
+				std::cout << interpreter().exception_message() << '\n';
+				break;
+			}
 		}
 	}
 
@@ -76,30 +86,41 @@ int VirtualMachine::execute(std::shared_ptr<Program> program)
 	// push frame BEFORE setting the ip, so that we can save the return address
 	push_frame(frame_size);
 
-	m_instruction_pointer = program->begin();
-	const auto end = program->end();
+	const auto &begin_function_block = program->begin();
+	const auto &end_function_block = program->end();
+
+	m_instruction_pointer = begin_function_block->begin();
 	const auto stack_size = m_stack.size();
 	// can only initialize interpreter after creating the initial stack frame
 	m_interpreter_session->start_new_interpreter(program);
 	const auto initial_ip = m_instruction_pointer;
-	for (; m_instruction_pointer != end; ++m_instruction_pointer) {
-		ASSERT((*m_instruction_pointer).get())
-		const auto &instruction = *m_instruction_pointer;
-		// spdlog::info(instruction->to_string());
-		instruction->execute(*this, interpreter());
-		// we left the current stack frame in the previous instruction
-		if (m_stack.size() != stack_size) { break; }
-		// dump();
-		if (interpreter().execution_frame()->exception()) {
-			interpreter().unwind();
-			// restore instruction pointer
-			m_instruction_pointer = initial_ip;
-			return EXIT_FAILURE;
-		} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
-			// bail, an error occured
-			std::cout << interpreter().exception_message() << '\n';
-			m_instruction_pointer = initial_ip;
-			return EXIT_FAILURE;
+	auto block_view = begin_function_block;
+
+	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
+	//            What you can do is leave a block (and not the function) at any time and
+	//            start executing the next block from its first instruction
+	for (; block_view != end_function_block; ++block_view) {
+		m_instruction_pointer = block_view->begin();
+		const auto end = block_view->end();
+		for (; m_instruction_pointer != end; ++m_instruction_pointer) {
+			ASSERT((*m_instruction_pointer).get())
+			const auto &instruction = *m_instruction_pointer;
+			// spdlog::info(instruction->to_string());
+			instruction->execute(*this, interpreter());
+			// we left the current stack frame in the previous instruction
+			if (m_stack.size() != stack_size) { break; }
+			// dump();
+			if (interpreter().execution_frame()->exception()) {
+				interpreter().unwind();
+				// restore instruction pointer
+				m_instruction_pointer = initial_ip;
+				return EXIT_FAILURE;
+			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
+				// bail, an error occured
+				std::cout << interpreter().exception_message() << '\n';
+				m_instruction_pointer = initial_ip;
+				return EXIT_FAILURE;
+			}
 		}
 	}
 

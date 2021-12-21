@@ -19,9 +19,10 @@ class BytecodeGenerator;
 struct FunctionInfo
 {
 	size_t function_id;
+	FunctionBlock &function;
 	BytecodeGenerator *generator;
 
-	FunctionInfo(size_t, BytecodeGenerator *);
+	FunctionInfo(size_t, FunctionBlock &, BytecodeGenerator *);
 	~FunctionInfo();
 };
 
@@ -54,6 +55,7 @@ class BytecodeGenerator : public ast::CodeGenerator
   private:
 	FunctionBlocks m_functions;
 	size_t m_function_id{ 0 };
+	InstructionBlock *m_current_block{ nullptr };
 
 	// a non-owning list of all generated Labels
 	std::vector<Label *> m_labels;
@@ -72,8 +74,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
 	{
-		m_functions.at(function_id)
-			.instructions.push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
+		ASSERT(m_current_block)
+		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
 
 	friend std::ostream &operator<<(std::ostream &os, BytecodeGenerator &generator);
@@ -82,10 +84,18 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	const FunctionBlocks &functions() const { return m_functions; }
 
-	const InstructionVector &function(size_t idx) const
+	const std::vector<InstructionBlock> &function(size_t idx) const
 	{
 		ASSERT(idx < m_functions.size())
-		return m_functions.at(idx).instructions;
+		return std::next(m_functions.begin(), idx)->blocks;
+	}
+
+	const InstructionBlock &function(size_t idx, size_t block) const
+	{
+		ASSERT(idx < m_functions.size())
+		auto f = std::next(m_functions.begin(), idx);
+		ASSERT(block < f->blocks.size())
+		return f->blocks[block];
 	}
 
 	std::shared_ptr<Label> make_label(const std::string &name, size_t function_id)
@@ -114,8 +124,12 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void bind(Label &label)
 	{
 		ASSERT(std::find(m_labels.begin(), m_labels.end(), &label) != m_labels.end())
-		auto &instructions = function(label.function_id());
-		const size_t current_instruction_position = instructions.size();
+		auto &blocks = function(label.function_id());
+		const auto instructions_size = std::transform_reduce(
+			blocks.begin(), blocks.end(), 0u, std::plus<size_t>{}, [](const auto &ins) {
+				return ins.size();
+			});
+		const size_t current_instruction_position = instructions_size;
 		label.set_position(current_instruction_position);
 	}
 
@@ -128,6 +142,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 	}
 	FunctionInfo allocate_function();
 
+	InstructionBlock *allocate_block(size_t);
+
 	void enter_function() { m_frame_register_count.emplace_back(start_register); }
 
 	void exit_function(size_t function_id);
@@ -137,8 +153,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
-	template<typename T>
-	Register generate(const T *node, size_t function_id) requires std::is_base_of_v<ast::ASTNode, T>
+	Register generate(const ast::ASTNode *node, size_t function_id)
 	{
 		m_ctx.push_node(node);
 		const auto old_function_id = m_function_id;
@@ -151,5 +166,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
 	void relocate_labels(const FunctionBlocks &functions);
+
+	void set_insert_point(InstructionBlock *block) { m_current_block = block; }
 };
 }// namespace codegen

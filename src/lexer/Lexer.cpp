@@ -37,7 +37,6 @@ void Lexer::push_token(Token::TokenType token_type, const Position &start, const
 {
 	m_tokens_to_emit.emplace_back(token_type, start, end);
 	m_current_line_tokens.emplace_back(token_type, start, end);
-	// spdlog::info("Pushed token {}", m_current_line_tokens.back().to_string());
 }
 
 bool Lexer::read_more_tokens_loop()

@@ -15,11 +15,11 @@ using Registers = std::vector<Value>;
 struct StackFrame : NonCopyable
 {
 	Registers registers;
-	InstructionVector::const_iterator return_address;
+	InstructionBlock::const_iterator return_address;
 	VirtualMachine *vm{ nullptr };
 
 	StackFrame(size_t frame_size,
-		InstructionVector::const_iterator return_address,
+		InstructionBlock::const_iterator return_address,
 		VirtualMachine *);
 	StackFrame(StackFrame &&);
 	~StackFrame();
@@ -30,7 +30,7 @@ class VirtualMachine
 	, NonMoveable
 {
 	std::stack<StackFrame> m_stack;
-	InstructionVector::const_iterator m_instruction_pointer;
+	InstructionBlock::const_iterator m_instruction_pointer;
 	Heap &m_heap;
 	std::unique_ptr<InterpreterSession> m_interpreter_session;
 
@@ -77,12 +77,12 @@ class VirtualMachine
 	Interpreter &interpreter();
 	const Interpreter &interpreter() const;
 
-	void set_instruction_pointer(InstructionVector::const_iterator pos)
+	void set_instruction_pointer(InstructionBlock::const_iterator pos)
 	{
 		m_instruction_pointer = pos;
 	}
 
-	const InstructionVector::const_iterator &instruction_pointer() const
+	const InstructionBlock::const_iterator &instruction_pointer() const
 	{
 		return m_instruction_pointer;
 	}
@@ -113,7 +113,7 @@ class VirtualMachine
 		if (m_stack.empty()) {
 			// the stack of main doesn't need a return address, since once it is popped
 			// we shut down and there is nothing left to do
-			m_stack.push(StackFrame{ frame_size, InstructionVector::const_iterator{}, this });
+			m_stack.push(StackFrame{ frame_size, InstructionBlock::const_iterator{}, this });
 		} else {
 			// return address is the instruction after the current instruction
 			const auto return_address = m_instruction_pointer;

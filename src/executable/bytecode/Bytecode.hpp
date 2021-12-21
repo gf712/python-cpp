@@ -13,16 +13,13 @@
 
 class Bytecode : public Function
 {
-	View m_bytecode_view;
+	std::vector<View> m_block_views;
 
   public:
-	Bytecode(size_t registers_needed,
-		std::string m_function_name,
-		InstructionVector::const_iterator begin,
-		InstructionVector::const_iterator end);
+	Bytecode(size_t registers_needed, std::string m_function_name, std::vector<View> block_views);
 
-	auto begin() const { return m_bytecode_view.begin(); }
-	auto end() const { return m_bytecode_view.end(); }
+	auto begin() const { return m_block_views.begin(); }
+	auto end() const { return m_block_views.end(); }
 
 	std::string to_string() const override;
 };

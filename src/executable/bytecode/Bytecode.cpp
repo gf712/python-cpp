@@ -3,17 +3,20 @@
 
 Bytecode::Bytecode(size_t registers_needed,
 	std::string m_function_name,
-	InstructionVector::const_iterator begin,
-	InstructionVector::const_iterator end)
+	std::vector<View> block_views)
 	: Function(registers_needed, m_function_name, FunctionExecutionBackend::BYTECODE),
-	  m_bytecode_view(begin, end)
+	  m_block_views(block_views)
 {}
 
 std::string Bytecode::to_string() const
 {
 	std::ostringstream os;
-	for (const auto &ins : m_bytecode_view) {
-		os << fmt::format("{} {}", (void *)ins.get(), ins->to_string()) << '\n';
+	size_t block_idx{ 0 };
+	for (const auto &block : m_block_views) {
+		os << "- block " << block_idx++ << ":\n";
+		for (const auto &ins : block) {
+			os << fmt::format("    {} {}", (void *)ins.get(), ins->to_string()) << '\n';
+		}
 	}
 
 	return os.str();
