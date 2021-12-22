@@ -12,11 +12,13 @@ class VirtualMachine;
 
 using Registers = std::vector<Value>;
 
+struct State;
 struct StackFrame : NonCopyable
 {
 	Registers registers;
 	InstructionBlock::const_iterator return_address;
 	VirtualMachine *vm{ nullptr };
+	std::unique_ptr<State> state;
 
 	StackFrame(size_t frame_size,
 		InstructionBlock::const_iterator return_address,
@@ -33,6 +35,7 @@ class VirtualMachine
 	InstructionBlock::const_iterator m_instruction_pointer;
 	Heap &m_heap;
 	std::unique_ptr<InterpreterSession> m_interpreter_session;
+	State *m_state{ nullptr };
 
 	friend StackFrame;
 
@@ -93,6 +96,8 @@ class VirtualMachine
 
 	int call(const std::shared_ptr<Function> &, size_t frame_size);
 	void ret();
+	void jump_blocks(size_t block_count);
+	void set_exception_handling();
 
 	void shutdown_interpreter(Interpreter &);
 
@@ -108,30 +113,6 @@ class VirtualMachine
 
 	void show_current_instruction(size_t index, size_t window) const;
 
-	void push_frame(size_t frame_size)
-	{
-		if (m_stack.empty()) {
-			// the stack of main doesn't need a return address, since once it is popped
-			// we shut down and there is nothing left to do
-			m_stack.push(StackFrame{ frame_size, InstructionBlock::const_iterator{}, this });
-		} else {
-			// return address is the instruction after the current instruction
-			const auto return_address = m_instruction_pointer;
-			m_stack.push(StackFrame{ frame_size, return_address, this });
-		}
-	}
-
-	void pop_frame()
-	{
-		if (m_stack.size() > 1) {
-			auto return_value = m_stack.top().registers[0];
-			ASSERT((*m_stack.top().return_address).get());
-			m_instruction_pointer = m_stack.top().return_address;
-			m_stack.pop();
-			m_stack.top().registers[0] = std::move(return_value);
-		} else {
-			// FIXME: this is an ugly way to keep the state of the interpreter
-			// m_stack.pop();
-		}
-	}
+	void push_frame(size_t frame_size);
+	void pop_frame();
 };

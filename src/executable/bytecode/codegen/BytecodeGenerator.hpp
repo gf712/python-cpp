@@ -75,6 +75,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
 	{
 		ASSERT(m_current_block)
+		(void)function_id;
 		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
 
@@ -84,7 +85,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	const FunctionBlocks &functions() const { return m_functions; }
 
-	const std::vector<InstructionBlock> &function(size_t idx) const
+	const std::list<InstructionBlock> &function(size_t idx) const
 	{
 		ASSERT(idx < m_functions.size())
 		return std::next(m_functions.begin(), idx)->blocks;
@@ -95,7 +96,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		ASSERT(idx < m_functions.size())
 		auto f = std::next(m_functions.begin(), idx);
 		ASSERT(block < f->blocks.size())
-		return f->blocks[block];
+		return *std::next(f->blocks.begin(), block);
 	}
 
 	std::shared_ptr<Label> make_label(const std::string &name, size_t function_id)

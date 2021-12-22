@@ -5,12 +5,15 @@ set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
     executable/bytecode/Bytecode.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
+    executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/IsOp.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/JumpForward.cpp
     executable/bytecode/instructions/JumpIfFalseOrPop.cpp
+    executable/bytecode/instructions/JumpIfNotExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
     executable/bytecode/instructions/JumpIfTrueOrPop.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
@@ -21,6 +24,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/MethodCall.cpp
     executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReturnValue.cpp
+    executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/StoreAttr.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/Unary.cpp

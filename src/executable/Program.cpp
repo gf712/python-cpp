@@ -25,7 +25,8 @@ Program::Program(FunctionBlocks &&func_blocks, std::string filename, std::vector
 	main_blocks.reserve(main_func.blocks.size());
 
 	for (size_t start_idx = 0; auto &block : main_func.blocks) {
-		ASSERT(!block.empty())
+		// ASSERT(!block.empty())
+		if (block.empty()) { continue; }
 		for (auto &ins : block) { m_instructions.push_back(std::move(ins)); }
 		InstructionVector::const_iterator start = m_instructions.cbegin() + start_idx;
 		InstructionVector::const_iterator end = m_instructions.end();

@@ -21,7 +21,7 @@ struct FunctionMetaData
 struct FunctionBlock
 {
 	FunctionMetaData metadata;
-	std::vector<InstructionBlock> blocks;
+	std::list<InstructionBlock> blocks;
 	std::string to_string() const;
 };
 

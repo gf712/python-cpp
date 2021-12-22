@@ -927,7 +927,7 @@ class Try : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ExceptHandler>> &handlers() const { return m_handlers; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
-	const std::vector<std::shared_ptr<ASTNode>> &cause() const { return m_finalbody; }
+	const std::vector<std::shared_ptr<ASTNode>> &finalbody() const { return m_finalbody; }
 
 	void codegen(CodeGenerator *) const override;
 

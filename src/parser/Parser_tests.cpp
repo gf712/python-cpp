@@ -516,11 +516,11 @@ void compare_try(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<A
 		dispatch(result_orelse[i], expected_orelse[i]);
 	}
 
-	const auto result_cause = as<Try>(result)->cause();
-	const auto expected_cause = as<Try>(expected)->cause();
-	ASSERT_EQ(result_cause.size(), expected_cause.size());
-	for (size_t i = 0; i < result_cause.size(); ++i) {
-		dispatch(result_cause[i], expected_cause[i]);
+	const auto result_finalbody = as<Try>(result)->finalbody();
+	const auto expected_finalbody = as<Try>(expected)->finalbody();
+	ASSERT_EQ(result_finalbody.size(), expected_finalbody.size());
+	for (size_t i = 0; i < result_finalbody.size(); ++i) {
+		dispatch(result_finalbody[i], expected_finalbody[i]);
 	}
 }
 

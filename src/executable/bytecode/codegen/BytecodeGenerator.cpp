@@ -1,12 +1,15 @@
 #include "BytecodeGenerator.hpp"
 
+#include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "executable/bytecode/instructions/IsOp.hpp"
+#include "executable/bytecode/instructions/JumpForward.hpp"
 #include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
+#include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
 #include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
 #include "executable/bytecode/instructions/LoadAssertionError.hpp"
@@ -17,6 +20,7 @@
 #include "executable/bytecode/instructions/MethodCall.hpp"
 #include "executable/bytecode/instructions/RaiseVarargs.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
+#include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
 #include "executable/bytecode/instructions/Unary.hpp"
@@ -553,7 +557,70 @@ void BytecodeGenerator::visit(const Subscript *) { TODO(); }
 
 void BytecodeGenerator::visit(const Raise *) { TODO(); }
 
-void BytecodeGenerator::visit(const Try *) { TODO(); }
+namespace {
+	size_t list_node_distance(const std::list<InstructionBlock> &block_list,
+		InstructionBlock *start,
+		InstructionBlock *end)
+	{
+		if (start == end) { return 0; }
+		std::optional<size_t> start_idx;
+		std::optional<size_t> end_idx;
+
+		for (size_t idx = 0; const auto &el : block_list) {
+			if (&el == start) {
+				start_idx = idx;
+			} else if (&el == end) {
+				end_idx = idx;
+			}
+			idx++;
+		}
+
+		ASSERT(start_idx)
+		ASSERT(end_idx)
+		return *end_idx - *start_idx;
+	}
+}// namespace
+
+void BytecodeGenerator::visit(const Try *node)
+{
+	auto *body_block = allocate_block(m_function_id);
+
+	std::vector<InstructionBlock *> exception_handler_blocks;
+	exception_handler_blocks.resize(node->handlers().size() * 2);
+	std::generate(exception_handler_blocks.begin(), exception_handler_blocks.end(), [this]() {
+		return allocate_block(m_function_id);
+	});
+
+	auto *finally_block = allocate_block(m_function_id);
+
+	emit<SetupExceptionHandling>(m_function_id);
+	set_insert_point(body_block);
+
+	for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
+
+	emit<JumpForward>(
+		m_function_id, list_node_distance(function(m_function_id), body_block, finally_block));
+
+	for (size_t idx = 0; const auto &handler : node->handlers()) {
+		auto *exception_handler_block = exception_handler_blocks[idx];
+		set_insert_point(exception_handler_block);
+		auto exception_type_reg = generate(handler->type().get(), m_function_id);
+		emit<JumpIfNotExceptionMatch>(m_function_id, exception_type_reg);
+		idx++;
+		set_insert_point(exception_handler_blocks[idx]);
+		for (const auto &el : handler->body()) { generate(el.get(), m_function_id); }
+		emit<ClearExceptionState>(m_function_id);
+		emit<JumpForward>(m_function_id,
+			list_node_distance(
+				function(m_function_id), exception_handler_blocks[idx], finally_block));
+		idx++;
+	}
+
+	set_insert_point(finally_block);
+	for (const auto &statement : node->finalbody()) { generate(statement.get(), m_function_id); }
+
+	m_last_register = Register{ 0 };
+}
 
 void BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
