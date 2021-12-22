@@ -1,8 +1,25 @@
 #include "Parser.hpp"
 
-#define PARSER_ERROR()                                       \
-	spdlog::error("Parser error {}:{}", __FILE__, __LINE__); \
-	std::abort();
+#define PARSER_ERROR()                                           \
+	do {                                                         \
+		spdlog::error("Parser error {}:{}", __FILE__, __LINE__); \
+		std::abort();                                            \
+	} while (0);
+
+#ifndef NDEBUG
+#define DEBUG_LOG(...)              \
+	do {                            \
+		spdlog::debug(__VA_ARGS__); \
+	} while (0);
+#else
+#define DEBUG_LOG(MSG, ...)
+#endif
+
+#ifndef NDEBUG
+#define PRINT_STACK() p.print_stack();
+#else
+#define PRINT_STACK()
+#endif
 
 using namespace ast;
 using namespace parser;
@@ -129,7 +146,7 @@ struct ApplyInBetweenPattern
 			}
 			original_token_position = p.token_position();
 		}
-		spdlog::debug(
+		DEBUG_LOG(
 			"ApplyInBetweenPattern: {}", p.lexer().peek_token(p.token_position())->to_string());
 
 		return true;
@@ -160,7 +177,7 @@ struct ZeroOrOnePattern : Pattern<ZeroOrOnePattern<PatternTypes...>>
 		auto original_token_position = p.token_position();
 		if (PatternType::match(p)) { return true; }
 		p.token_position() = original_token_position;
-		spdlog::debug("ZeroOrOnePattern (no match): {}",
+		DEBUG_LOG("ZeroOrOnePattern (no match): {}",
 			p.lexer().peek_token(p.token_position())->to_string());
 		return true;
 	}
@@ -423,7 +440,7 @@ struct StarAtomPattern : Pattern<StarAtomPattern>
 		// NAME
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'(' target_with_star_atom ')'");
+			DEBUG_LOG("'(' target_with_star_atom ')'");
 
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string id{ p.lexer().get(token->start(), token->end()) };
@@ -439,14 +456,14 @@ struct TLookahead : Pattern<TLookahead>
 	// t_lookahead: '(' | '[' | '.'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("t_lookahead");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("t_lookahead");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
 		using pattern1 = PatternMatch<OrPattern<SingleTokenPattern<Token::TokenType::LPAREN>,
 			SingleTokenPattern<Token::TokenType::LSQB>,
 			SingleTokenPattern<Token::TokenType::DOT>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("t_lookahead: '(' | '[' | '.'");
+			DEBUG_LOG("t_lookahead: '(' | '[' | '.'");
 			return true;
 		}
 		return false;
@@ -465,12 +482,12 @@ struct TPrimaryPattern : Pattern<TPrimaryPattern>
 	// 	| atom &t_lookahead
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("t_primary");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("t_primary");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
 		using pattern5 = PatternMatch<AtomPattern, LookAhead<TLookahead>>;
 		if (pattern5::match(p)) {
-			spdlog::debug("atom &t_lookahead");
+			DEBUG_LOG("atom &t_lookahead");
 			return true;
 		}
 		return false;
@@ -487,8 +504,8 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 	// 		| star_atom
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("target_with_star_atom");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("target_with_star_atom");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
 		// t_primary '.' NAME !t_lookahead
 		using pattern1 = PatternMatch<TPrimaryPattern,
@@ -496,11 +513,11 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 			SingleTokenPattern<Token::TokenType::NAME>,
 			NegativeLookAhead<TLookahead>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("t_primary '.' NAME !t_lookahead");
+			DEBUG_LOG("t_primary '.' NAME !t_lookahead");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
 			const auto primary = p.pop_back();
-			spdlog::debug("{}", name);
+			DEBUG_LOG("{}", name);
 			primary->print_node("");
 			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
 			p.push_to_stack(attribute);
@@ -513,7 +530,7 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 			SingleTokenPattern<Token::TokenType::RSQB>,
 			NegativeLookAhead<TLookahead>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("t_primary '[' slices ']' !t_lookahead");
+			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
 			auto subscript = p.pop_back();
 			auto name = p.pop_back();
 			ASSERT(as<Subscript>(subscript))
@@ -528,7 +545,7 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 		// star_atom
 		using pattern3 = PatternMatch<StarAtomPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("star_atom");
+			DEBUG_LOG("star_atom");
 			return true;
 		}
 		return false;
@@ -543,13 +560,13 @@ struct StarTargetPattern : Pattern<StarTargetPattern>
 	//     | target_with_star_atom
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("star_target");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("star_target");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
 		// target_with_star_atom
 		using pattern2 = PatternMatch<TargetWithStarAtomPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("target_with_star_atom");
+			DEBUG_LOG("target_with_star_atom");
 			return true;
 		}
 		return false;
@@ -563,20 +580,20 @@ struct StarTargetsPattern : Pattern<StarTargetsPattern>
 	// | star_target (',' star_target )* [',']
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("star_targets");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("star_targets");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
 		// star_target !','
 		using pattern1 = PatternMatch<StarTargetPattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("star_target !','");
+			DEBUG_LOG("star_target !','");
 			return true;
 		}
 		using pattern2 = PatternMatch<StarTargetPattern,
 			OneOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, StarTargetPattern>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("star_target (',' star_target )* [',']");
+			DEBUG_LOG("star_target (',' star_target )* [',']");
 			return true;
 		}
 
@@ -591,7 +608,7 @@ struct StringPattern : Pattern<StringPattern>
 	{
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::STRING>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("strings: STRING+");
+			DEBUG_LOG("strings: STRING+");
 			// auto token = tokens.begin() - 1;
 			auto token = p.lexer().peek_token(p.token_position() - 1);
 			// FIXME: this assumes that STRING is surrounded by a single/double quotes
@@ -630,7 +647,7 @@ struct StarNamedExpressions : Pattern<StarNamedExpressions>
 	// star_named_expressions: ','.star_named_expression+ [',']
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("star_named_expressions");
+		DEBUG_LOG("star_named_expressions");
 		using pattern1 = PatternMatch<
 			ApplyInBetweenPattern<StarNamedExpression, SingleTokenPattern<Token::TokenType::COMMA>>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
@@ -647,7 +664,7 @@ struct ListPattern : Pattern<ListPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope list_scope{ p };
-		spdlog::debug("list");
+		DEBUG_LOG("list");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
 			ZeroOrMorePattern<StarNamedExpressions>,
 			SingleTokenPattern<Token::TokenType::RSQB>>;
@@ -675,7 +692,7 @@ struct TuplePattern : Pattern<TuplePattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope tuple_scope{ p };
-		spdlog::debug("tuple");
+		DEBUG_LOG("tuple");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrMorePattern<StarNamedExpression,
 				SingleTokenPattern<Token::TokenType::COMMA>,
@@ -698,14 +715,14 @@ struct GroupPattern : Pattern<GroupPattern>
 	{
 		// group:
 		//     | '(' (yield_expr | named_expression) ')'
-		spdlog::debug("group");
+		DEBUG_LOG("group");
 
 		// TODO: add yield_expr
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			NamedExpressionPattern,
 			SingleTokenPattern<Token::TokenType::RPAREN>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'(' (yield_expr | named_expression) ')'");
+			DEBUG_LOG("'(' (yield_expr | named_expression) ')'");
 			return true;
 		}
 		return false;
@@ -725,12 +742,12 @@ struct KVPairPattern : Pattern<KVPairPattern>
 	// kvpair: expression ':' expression
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("kvpair");
+		DEBUG_LOG("kvpair");
 		using pattern1 = PatternMatch<ExpressionPattern,
 			SingleTokenPattern<Token::TokenType::COLON>,
 			ExpressionPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("kvpair: expression ':' expression");
+			DEBUG_LOG("kvpair: expression ':' expression");
 			auto value = p.pop_back();
 			auto key = p.pop_back();
 			auto dict = p.stack().back();
@@ -750,16 +767,16 @@ struct DoubleStarredKVPairPattern : Pattern<DoubleStarredKVPairPattern>
 	// 		| kvpair
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("double_starred_kvpair");
+		DEBUG_LOG("double_starred_kvpair");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESTAR>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'**' bitwise_or");
+			DEBUG_LOG("'**' bitwise_or");
 			return true;
 		}
 
 		using pattern2 = PatternMatch<KVPairPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("kvpair");
+			DEBUG_LOG("kvpair");
 			return true;
 		}
 
@@ -772,12 +789,12 @@ struct DoubleStarredKVPairsPattern : Pattern<DoubleStarredKVPairsPattern>
 	// double_starred_kvpairs: ','.double_starred_kvpair+ [',']
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("double_starred_kvpairs");
+		DEBUG_LOG("double_starred_kvpairs");
 		using pattern1 = PatternMatch<ApplyInBetweenPattern<DoubleStarredKVPairPattern,
 										  SingleTokenPattern<Token::TokenType::COMMA>>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("','.double_starred_kvpair+ [',']");
+			DEBUG_LOG("','.double_starred_kvpair+ [',']");
 			return true;
 		}
 		return false;
@@ -794,12 +811,12 @@ struct DictPattern : Pattern<DictPattern>
 		BlockScope dict_scope{ p };
 		p.push_to_stack(std::make_shared<Dict>());
 		// '{' [double_starred_kvpairs] '}'
-		spdlog::debug("'{' [double_starred_kvpairs] '}'");
+		DEBUG_LOG("'{' [double_starred_kvpairs] '}'");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LBRACE>,
 			ZeroOrOnePattern<DoubleStarredKVPairsPattern>,
 			SingleTokenPattern<Token::TokenType::RBRACE>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'{' [double_starred_kvpairs] '}'");
+			DEBUG_LOG("'{' [double_starred_kvpairs] '}'");
 			dict_scope.parent().push_back(p.pop_back());
 			return true;
 		}
@@ -887,11 +904,11 @@ struct AtomPattern : Pattern<AtomPattern>
 	// 	| '...'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("atom");
+		DEBUG_LOG("atom");
 		{
 			const auto token = p.lexer().peek_token(p.token_position());
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
-			spdlog::debug(name);
+			DEBUG_LOG(name);
 		}
 		// NAME
 		// using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
@@ -903,7 +920,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("NAME");
+			DEBUG_LOG("NAME");
 
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
@@ -921,14 +938,14 @@ struct AtomPattern : Pattern<AtomPattern>
 		// strings
 		using pattern6 = PatternMatch<OneOrMorePattern<StringPattern>>;
 		if (pattern6::match(p)) {
-			spdlog::debug("strings");
+			DEBUG_LOG("strings");
 			return true;
 		}
 
 		// NUMBER
 		using pattern7 = PatternMatch<SingleTokenPattern<Token::TokenType::NUMBER>>;
 		if (pattern7::match(p)) {
-			spdlog::debug("NUMBER");
+			DEBUG_LOG("NUMBER");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string number{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
@@ -940,14 +957,14 @@ struct AtomPattern : Pattern<AtomPattern>
 		// 	| (tuple | group | genexp)
 		using pattern8 = PatternMatch<OrPattern<TuplePattern, GroupPattern, GenexPattern>>;
 		if (pattern8::match(p)) {
-			spdlog::debug("(tuple | group | genexp)");
+			DEBUG_LOG("(tuple | group | genexp)");
 			return true;
 		}
 
 		// 	| (list | listcomp)
 		using pattern9 = PatternMatch<OrPattern<ListPattern, ListCompPattern>>;
 		if (pattern9::match(p)) {
-			spdlog::debug("(list | listcomp)");
+			DEBUG_LOG("(list | listcomp)");
 			return true;
 		}
 
@@ -955,7 +972,7 @@ struct AtomPattern : Pattern<AtomPattern>
 		using pattern10 =
 			PatternMatch<OrPattern<DictPattern, SetPattern, DictCompPattern, SetCompPattern>>;
 		if (pattern10::match(p)) {
-			spdlog::debug("(dict | set | dictcomp | setcomp)");
+			DEBUG_LOG("(dict | set | dictcomp | setcomp)");
 			return true;
 		}
 
@@ -977,12 +994,12 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 	// 	| expression !':='
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("NamedExpressionPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("NamedExpressionPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		using pattern2 = PatternMatch<ExpressionPattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COLONEQUAL>>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("expression !':='");
+			DEBUG_LOG("expression !':='");
 			return true;
 		}
 		return false;
@@ -999,12 +1016,12 @@ struct KwargsOrStarredPattern : Pattern<KwargsOrStarredPattern>
 	{
 		const auto token = p.lexer().peek_token(p.token_position());
 		std::string maybe_name{ p.lexer().get(token->start(), token->end()) };
-		spdlog::debug("kwarg_or_starred");
+		DEBUG_LOG("kwarg_or_starred");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
 			SingleTokenPattern<Token::TokenType::EQUAL>,
 			ExpressionPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("NAME '=' expression");
+			DEBUG_LOG("NAME '=' expression");
 			p.push_to_stack(std::make_shared<Keyword>(maybe_name, p.pop_back()));
 			return true;
 		}
@@ -1021,11 +1038,11 @@ struct KwargsPattern : Pattern<KwargsPattern>
 	//     | ','.kwarg_or_double_starred+
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("kwargs");
+		DEBUG_LOG("kwargs");
 		using pattern2 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<KwargsOrStarredPattern,
 			SingleTokenPattern<Token::TokenType::COMMA>>>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("','.kwarg_or_starred+");
+			DEBUG_LOG("','.kwarg_or_starred+");
 			return true;
 		}
 		return false;
@@ -1038,7 +1055,7 @@ struct StarredExpressionPattern : Pattern<StarredExpressionPattern>
 	//     | '*' expression
 	static bool matches_impl(Parser &)
 	{
-		spdlog::debug("StarredExpressionPattern");
+		DEBUG_LOG("StarredExpressionPattern");
 		return false;
 	}
 };
@@ -1051,8 +1068,8 @@ struct ArgsPattern : Pattern<ArgsPattern>
 	// 	| kwargs
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ArgsPattern");
-		spdlog::debug(
+		DEBUG_LOG("ArgsPattern");
+		DEBUG_LOG(
 			"Testing pattern: ','.(starred_expression | named_expression !'=')+ [',' kwargs ]");
 		using pattern1 = PatternMatch<
 			ApplyInBetweenPattern<
@@ -1062,14 +1079,14 @@ struct ArgsPattern : Pattern<ArgsPattern>
 				SingleTokenPattern<Token::TokenType::COMMA>>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>, KwargsPattern>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("','.(starred_expression | named_expression !'=')+ [',' kwargs ]'");
-			spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+			DEBUG_LOG("','.(starred_expression | named_expression !'=')+ [',' kwargs ]'");
+			DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 			return true;
 		}
 		using pattern2 = PatternMatch<KwargsPattern>;
-		spdlog::debug("Testing pattern: kwargs");
+		DEBUG_LOG("Testing pattern: kwargs");
 		if (pattern2::match(p)) {
-			spdlog::debug("kwargs");
+			DEBUG_LOG("kwargs");
 			return true;
 		}
 		return false;
@@ -1083,13 +1100,13 @@ struct ArgumentsPattern : Pattern<ArgumentsPattern>
 	//     | args [','] &')'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ArgumentsPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ArgumentsPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		using pattern1 = PatternMatch<ArgsPattern,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>,
 			LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("args [','] &')'");
+			DEBUG_LOG("args [','] &')'");
 			return true;
 		}
 		return false;
@@ -1103,7 +1120,7 @@ struct SlicePattern : Pattern<SlicePattern>
 	//     | named_expression
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("SlicePattern");
+		DEBUG_LOG("SlicePattern");
 		using pattern1 = PatternMatch<ZeroOrOnePattern<ExpressionPattern>,
 			SingleTokenPattern<Token::TokenType::COLON>,
 			ZeroOrOnePattern<ExpressionPattern>,
@@ -1111,7 +1128,7 @@ struct SlicePattern : Pattern<SlicePattern>
 				ZeroOrOnePattern<ExpressionPattern>>>;
 		const auto initial_size = p.stack().size();
 		if (pattern1::match(p)) {
-			spdlog::debug("[expression] ':' [expression] [':' [expression] ]");
+			DEBUG_LOG("[expression] ':' [expression] [':' [expression] ]");
 			Subscript::SliceType slice;
 			if ((p.stack().size() - initial_size) > 1) {
 				if ((p.stack().size() - initial_size) == 3) {
@@ -1137,7 +1154,7 @@ struct SlicePattern : Pattern<SlicePattern>
 
 		using pattern2 = PatternMatch<NamedExpressionPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("named_expression");
+			DEBUG_LOG("named_expression");
 			Subscript::SliceType slice = Subscript::Index{ p.pop_back() };
 			as<ast::Subscript>(p.stack().back())->set_slice(slice);
 			return true;
@@ -1154,13 +1171,13 @@ struct SlicesPattern : Pattern<SlicesPattern>
 	//     | ','.slice+ [',']
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("SlicesPattern");
+		DEBUG_LOG("SlicesPattern");
 		p.push_to_stack(std::make_shared<Subscript>());
 
 		using pattern1 = PatternMatch<SlicePattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("slice !','");
+			DEBUG_LOG("slice !','");
 			return true;
 		}
 
@@ -1168,7 +1185,7 @@ struct SlicesPattern : Pattern<SlicesPattern>
 			ApplyInBetweenPattern<SlicePattern, SingleTokenPattern<Token::TokenType::DOT>>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("','.slice+ [',']");
+			DEBUG_LOG("','.slice+ [',']");
 			return true;
 		}
 
@@ -1186,14 +1203,14 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 	// 		| ϵ
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("PrimaryPattern_");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("PrimaryPattern_");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		BlockScope primary_scope{ p };
 		// '.' NAME primary'
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
 			SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'.' NAME");
+			DEBUG_LOG("'.' NAME");
 			auto value = primary_scope.parent().back();
 			primary_scope.parent().pop_back();
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
@@ -1201,7 +1218,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			using pattern1a = PatternMatch<PrimaryPattern_>;
 			p.push_to_stack(std::make_shared<Attribute>(value, name, ContextType::LOAD));
 			if (pattern1a::match(p)) {
-				spdlog::debug("'.' NAME primary'");
+				DEBUG_LOG("'.' NAME primary'");
 				primary_scope.parent().push_back(p.pop_back());
 				return true;
 			}
@@ -1214,9 +1231,9 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			SingleTokenPattern<Token::TokenType::RPAREN>,
 			PrimaryPattern_>;
 		if (pattern3::match(p)) {
-			spdlog::debug("'(' [arguments] ')' primary'");
-			p.print_stack();
-			spdlog::debug("--------------");
+			DEBUG_LOG("'(' [arguments] ')' primary'");
+			PRINT_STACK();
+			DEBUG_LOG("--------------");
 			std::vector<std::shared_ptr<ASTNode>> args;
 			std::vector<std::shared_ptr<Keyword>> kwargs;
 			for (const auto &node : p.stack()) {
@@ -1229,7 +1246,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			auto function = primary_scope.parent().back();
 			primary_scope.parent().pop_back();
 			primary_scope.parent().push_back(std::make_shared<Call>(function, args, kwargs));
-			p.print_stack();
+			PRINT_STACK();
 			return true;
 		}
 
@@ -1238,7 +1255,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			SlicesPattern,
 			SingleTokenPattern<Token::TokenType::RSQB>>;
 		if (pattern4::match(p)) {
-			spdlog::debug("'[' slices ']' primary'");
+			DEBUG_LOG("'[' slices ']' primary'");
 			ASSERT(as<Subscript>(p.stack().back()))
 			primary_scope.parent().push_back(p.pop_back());
 			return true;
@@ -1249,6 +1266,9 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			PatternMatch<LookAhead<OrPattern<SingleTokenPattern<Token::TokenType::NEWLINE,
 												 Token::TokenType::DOUBLESTAR,
 												 Token::TokenType::STAR,
+												 Token::TokenType::AT,
+												 Token::TokenType::SLASH,
+												 Token::TokenType::DOUBLESLASH,
 												 Token::TokenType::PLUS,
 												 Token::TokenType::MINUS,
 												 Token::TokenType::LEFTSHIFT,
@@ -1273,7 +1293,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>>>>;
 		if (pattern5::match(p)) {
-			spdlog::debug("ϵ");
+			DEBUG_LOG("ϵ");
 			return true;
 		}
 		return false;
@@ -1368,11 +1388,11 @@ struct FactorPattern : Pattern<FactorPattern>
 	//     | power
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("factor");
+		DEBUG_LOG("factor");
 		// '+' factor
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, FactorPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'+' factor");
+			DEBUG_LOG("'+' factor");
 			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::ADD, p.pop_back()));
 			return true;
 		}
@@ -1380,7 +1400,7 @@ struct FactorPattern : Pattern<FactorPattern>
 		// '-' factor
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, FactorPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("'-' factor");
+			DEBUG_LOG("'-' factor");
 			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::SUB, p.pop_back()));
 			return true;
 		}
@@ -1388,7 +1408,7 @@ struct FactorPattern : Pattern<FactorPattern>
 		// '~' factor
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::TILDE>, FactorPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("'~' factor");
+			DEBUG_LOG("'~' factor");
 			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::INVERT, p.pop_back()));
 			return true;
 		}
@@ -1396,7 +1416,7 @@ struct FactorPattern : Pattern<FactorPattern>
 		// power
 		using pattern4 = PatternMatch<PowerPattern>;
 		if (pattern4::match(p)) {
-			spdlog::debug("power");
+			DEBUG_LOG("power");
 			return true;
 		}
 
@@ -1433,10 +1453,24 @@ struct TermPattern_ : Pattern<TermPattern_>
 		}
 		using pattern2 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::SLASH>, FactorPattern, TermPattern_>;
-		if (pattern2::match(p)) { return true; }
-		// using pattern3 =
-		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
-		// if (pattern3::match(tokens, p)) { return true; }
+		if (pattern2::match(p)) {
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::SLASH, lhs, rhs);
+			p.push_to_stack(binary_op);
+			return true;
+		}
+
+		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESLASH>,
+			FactorPattern,
+			TermPattern_>;
+		if (pattern3::match(p)) {
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::FLOORDIV, lhs, rhs);
+			p.push_to_stack(binary_op);
+			return true;
+		}
 		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>,
 			FactorPattern,
 			TermPattern_>;
@@ -1447,10 +1481,9 @@ struct TermPattern_ : Pattern<TermPattern_>
 			p.push_to_stack(binary_op);
 			return true;
 		}
-		// using pattern5 =
-		// 	PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
-		// if (pattern5::match(tokens, p)) { return true; }
-		// ϵ
+		using pattern5 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::AT>, FactorPattern, TermPattern_>;
+		if (pattern5::match(p)) { TODO(); }
 		return true;
 	}
 };
@@ -1484,19 +1517,19 @@ struct SumPattern_ : Pattern<SumPattern_>
 	//     | ϵ
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("SumPattern_");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("SumPattern_");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// '+' term sum'
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, TermPattern, SumPattern_>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'+' term sum'");
-			p.print_stack();
+			DEBUG_LOG("'+' term sum'");
+			PRINT_STACK();
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::PLUS, lhs, rhs);
 			p.push_to_stack(binary_op);
-			p.print_stack();
+			PRINT_STACK();
 			return true;
 		}
 
@@ -1504,7 +1537,7 @@ struct SumPattern_ : Pattern<SumPattern_>
 		using pattern2 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, TermPattern, SumPattern_>;
 		if (pattern2::match(p)) {
-			spdlog::debug("'-' term sum'");
+			DEBUG_LOG("'-' term sum'");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			if (auto rhs_binop = as<BinaryExpr>(rhs)) {
@@ -1538,7 +1571,7 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) {
-			spdlog::debug("ϵ");
+			DEBUG_LOG("ϵ");
 			return true;
 		}
 		return false;
@@ -1557,12 +1590,12 @@ struct SumPattern : Pattern<SumPattern>
 	// sum: term sum'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("SumPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("SumPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// term sum'
 		using pattern1 = PatternMatch<TermPattern, SumPattern_>;
 		if (pattern1::match(p)) {
-			spdlog::debug("term sum'");
+			DEBUG_LOG("term sum'");
 			return true;
 		}
 
@@ -1578,8 +1611,8 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 	//  		  | ϵ
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ShiftExprPattern_");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ShiftExprPattern_");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// '<<' sum shift_expr'
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LEFTSHIFT>,
 			SumPattern,
@@ -1596,7 +1629,13 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::RIGHTSHIFT>,
 			SumPattern,
 			ShiftExprPattern_>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			auto rhs = p.pop_back();
+			auto lhs = p.pop_back();
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::RIGHTSHIFT, lhs, rhs);
+			p.push_to_stack(binary_op);
+			return true;
+		}
 
 		// ϵ
 		using pattern3 = PatternMatch<LookAhead<SingleTokenPattern<Token::TokenType::NEWLINE,
@@ -1615,7 +1654,7 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE>>>;
 		if (pattern3::match(p)) {
-			spdlog::debug("shift_expr: ϵ");
+			DEBUG_LOG("shift_expr: ϵ");
 			return true;
 		}
 		return false;
@@ -1633,11 +1672,11 @@ struct ShiftExprPattern : Pattern<ShiftExprPattern>
 	// shift_expr: sum shift_expr'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ShiftExprPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ShiftExprPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		using pattern1 = PatternMatch<SumPattern, ShiftExprPattern_>;
 		if (pattern1::match(p)) {
-			spdlog::debug("shift_expr '<<' sum");
+			DEBUG_LOG("shift_expr '<<' sum");
 			return true;
 		}
 		return false;
@@ -1651,12 +1690,12 @@ struct BitwiseAndPattern : Pattern<BitwiseAndPattern>
 	//     | shift_expr
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("BitwiseAndPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("BitwiseAndPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// shift_expr
 		using pattern2 = PatternMatch<ShiftExprPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("shift_expr");
+			DEBUG_LOG("shift_expr");
 			return true;
 		}
 
@@ -1671,12 +1710,12 @@ struct BitwiseXorPattern : Pattern<BitwiseXorPattern>
 	//     | bitwise_and
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("BitwiseXorPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("BitwiseXorPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// bitwise_and
 		using pattern2 = PatternMatch<BitwiseAndPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("bitwise_and");
+			DEBUG_LOG("bitwise_and");
 			return true;
 		}
 
@@ -1692,12 +1731,12 @@ struct BitwiseOrPattern : Pattern<BitwiseOrPattern>
 	//     | bitwise_xor
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("BitwiseOrPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("BitwiseOrPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// bitwise_xor
 		using pattern2 = PatternMatch<BitwiseXorPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("bitwise_xor");
+			DEBUG_LOG("bitwise_xor");
 			return true;
 		}
 
@@ -1712,9 +1751,9 @@ struct EqBitwiseOrPattern : Pattern<EqBitwiseOrPattern>
 	{
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::EQEQUAL>, BitwiseOrPattern>;
-		spdlog::debug("EqBitwiseOrPattern");
+		DEBUG_LOG("EqBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'==' bitwise_or");
+			DEBUG_LOG("'==' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Eq, rhs);
@@ -1733,9 +1772,9 @@ struct NotEqBitwiseOrPattern : Pattern<NotEqBitwiseOrPattern>
 	{
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::NOTEQUAL>, BitwiseOrPattern>;
-		spdlog::debug("NotEqBitwiseOrPattern");
+		DEBUG_LOG("NotEqBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'!=' bitwise_or");
+			DEBUG_LOG("'!=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::NotEq, rhs);
@@ -1753,9 +1792,9 @@ struct LtEqBitwiseOrPattern : Pattern<LtEqBitwiseOrPattern>
 	{
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::LESSEQUAL>, BitwiseOrPattern>;
-		spdlog::debug("LtEqBitwiseOrPattern");
+		DEBUG_LOG("LtEqBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'<=' bitwise_or");
+			DEBUG_LOG("'<=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::LtE, rhs);
@@ -1772,9 +1811,9 @@ struct LtBitwiseOrPattern : Pattern<LtBitwiseOrPattern>
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LESS>, BitwiseOrPattern>;
-		spdlog::debug("LtBitwiseOrPattern");
+		DEBUG_LOG("LtBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'<' bitwise_or");
+			DEBUG_LOG("'<' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Lt, rhs);
@@ -1792,9 +1831,9 @@ struct GtEqBitwiseOrPattern : Pattern<GtEqBitwiseOrPattern>
 	{
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::GREATEREQUAL>, BitwiseOrPattern>;
-		spdlog::debug("GtEqBitwiseOrPattern");
+		DEBUG_LOG("GtEqBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'>=' bitwise_or");
+			DEBUG_LOG("'>=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::GtE, rhs);
@@ -1812,9 +1851,9 @@ struct GtBitwiseOrPattern : Pattern<GtBitwiseOrPattern>
 	{
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::GREATER>, BitwiseOrPattern>;
-		spdlog::debug("GtBitwiseOrPattern");
+		DEBUG_LOG("GtBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'>' bitwise_or");
+			DEBUG_LOG("'>' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Gt, rhs);
@@ -1834,9 +1873,9 @@ struct IsNotBitwiseOrPattern : Pattern<IsNotBitwiseOrPattern>
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				BitwiseOrPattern>;
-		spdlog::debug("IsNotBitwiseOrPattern");
+		DEBUG_LOG("IsNotBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'is not' bitwise_or ");
+			DEBUG_LOG("'is not' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::IsNot, rhs);
@@ -1855,9 +1894,9 @@ struct IsBitwiseOrPattern : Pattern<IsBitwiseOrPattern>
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 				BitwiseOrPattern>;
-		spdlog::debug("IsBitwiseOrPattern");
+		DEBUG_LOG("IsBitwiseOrPattern");
 		if (pattern1::match(p)) {
-			spdlog::debug("'is' bitwise_or ");
+			DEBUG_LOG("'is' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Is, rhs);
@@ -1883,53 +1922,53 @@ struct CompareOpBitwiseOrPairPattern : Pattern<CompareOpBitwiseOrPairPattern>
 	//     | is_bitwise_or
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("CompareOpBitwiseOrPairPattern");
+		DEBUG_LOG("CompareOpBitwiseOrPairPattern");
 		// eq_bitwise_or
 		using pattern1 = PatternMatch<EqBitwiseOrPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("eq_bitwise_or");
+			DEBUG_LOG("eq_bitwise_or");
 			return true;
 		}
 		// noteq_bitwise_or
 		using pattern2 = PatternMatch<NotEqBitwiseOrPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("not_eq_bitwise_or");
+			DEBUG_LOG("not_eq_bitwise_or");
 			return true;
 		}
 		// lte_bitwise_or
 		using pattern3 = PatternMatch<LtEqBitwiseOrPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("lte_bitwise_or");
+			DEBUG_LOG("lte_bitwise_or");
 			return true;
 		}
 		// lt_bitwise_or
 		using pattern4 = PatternMatch<LtBitwiseOrPattern>;
 		if (pattern4::match(p)) {
-			spdlog::debug("lt_bitwise_or");
+			DEBUG_LOG("lt_bitwise_or");
 			return true;
 		}
 		// gte_bitwise_or
 		using pattern5 = PatternMatch<GtEqBitwiseOrPattern>;
 		if (pattern5::match(p)) {
-			spdlog::debug("gte_bitwise_or");
+			DEBUG_LOG("gte_bitwise_or");
 			return true;
 		}
 		// gt_bitwise_or
 		using pattern6 = PatternMatch<GtBitwiseOrPattern>;
 		if (pattern6::match(p)) {
-			spdlog::debug("gt_bitwise_or");
+			DEBUG_LOG("gt_bitwise_or");
 			return true;
 		}
 		// isnot_bitwise_or
 		using pattern9 = PatternMatch<IsNotBitwiseOrPattern>;
 		if (pattern9::match(p)) {
-			spdlog::debug("isnot_bitwise_or");
+			DEBUG_LOG("isnot_bitwise_or");
 			return true;
 		}
 		// is_bitwise_or
 		using pattern10 = PatternMatch<IsBitwiseOrPattern>;
 		if (pattern10::match(p)) {
-			spdlog::debug("is_bitwise_or");
+			DEBUG_LOG("is_bitwise_or");
 			return true;
 		}
 		return false;
@@ -1944,20 +1983,20 @@ struct ComparissonPattern : Pattern<ComparissonPattern>
 	//     | bitwise_or
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ComparissonPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ComparissonPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// bitwise_or compare_op_bitwise_or_pair+
 		using pattern1 =
 			PatternMatch<BitwiseOrPattern, OneOrMorePattern<CompareOpBitwiseOrPairPattern>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("bitwise_or compare_op_bitwise_or_pair+");
+			DEBUG_LOG("bitwise_or compare_op_bitwise_or_pair+");
 			return true;
 		}
 
 		// bitwise_or
 		using pattern2 = PatternMatch<BitwiseOrPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("bitwise_or");
+			DEBUG_LOG("bitwise_or");
 			return true;
 		}
 
@@ -1972,8 +2011,8 @@ struct InversionPattern : Pattern<InversionPattern>
 	//     | comparison
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("InversionPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("InversionPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				ComparissonPattern>;
@@ -1998,8 +2037,8 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
-		spdlog::debug("ConjunctionPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ConjunctionPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// inversion ('and' inversion )+
 		using pattern1 = PatternMatch<InversionPattern,
 			OneOrMorePattern<
@@ -2032,8 +2071,8 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
-		spdlog::debug("DisjunctionPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("DisjunctionPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// conjunction ('or' conjunction )+
 		using pattern1 = PatternMatch<ConjunctionPattern,
 			OneOrMorePattern<
@@ -2066,8 +2105,8 @@ struct ExpressionPattern : Pattern<ExpressionPattern>
 	//     | lambdef
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ExpressionPattern");
-		spdlog::debug("{}", p.lexer().peek_token(p.token_position())->to_string());
+		DEBUG_LOG("ExpressionPattern");
+		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// disjunction
 		using pattern2 = PatternMatch<DisjunctionPattern>;
 		if (pattern2::match(p)) { return true; }
@@ -2105,7 +2144,7 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 			OneOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, StarExpressionPattern>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("star_expression (',' star_expression )+ [',']");
+			DEBUG_LOG("star_expression (',' star_expression )+ [',']");
 			auto result = std::make_shared<Tuple>(ContextType::LOAD);
 			std::vector<std::shared_ptr<ASTNode>> expressions;
 			while (p.stack().size() > initial_stack_size) { expressions.push_back(p.pop_back()); }
@@ -2119,13 +2158,13 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 		using pattern2 =
 			PatternMatch<StarExpressionPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("star_expression ','");
+			DEBUG_LOG("star_expression ','");
 			return true;
 		}
 		// star_expression
 		using pattern3 = PatternMatch<StarExpressionPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("star_expression");
+			DEBUG_LOG("star_expression");
 			return true;
 		}
 		return false;
@@ -2141,10 +2180,10 @@ struct SingleTargetPattern : Pattern<SingleTargetPattern>
 	//     | '(' single_target ')'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("SingleTargetPattern");
+		DEBUG_LOG("SingleTargetPattern");
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("NAME");
+			DEBUG_LOG("NAME");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
 			p.push_to_stack(std::make_shared<Name>(name, ContextType::STORE));
@@ -2155,7 +2194,7 @@ struct SingleTargetPattern : Pattern<SingleTargetPattern>
 			SingleTargetPattern,
 			SingleTokenPattern<Token::TokenType::RPAREN>>;
 		if (pattern3::match(p)) {
-			spdlog::debug("'(' single_target ')'");
+			DEBUG_LOG("'(' single_target ')'");
 			return true;
 		}
 
@@ -2184,7 +2223,7 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 	{
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUSEQUAL>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'+='");
+			DEBUG_LOG("'+='");
 			const auto &lhs = p.pop_back();
 			// defer rhs assignment to caller. Am I shooting myself in the foot?
 			// at least a null dereference goes with a bang...
@@ -2218,14 +2257,13 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 			PatternMatch<OneOrMorePattern<StarTargetsPattern, EqualMatch>, StarExpressionsPattern>;
 		size_t start_position = p.stack().size();
 		if (pattern3::match(p)) {
-			spdlog::debug(
-				"(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
+			DEBUG_LOG("(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
 			auto targets = std::make_shared<Tuple>(ContextType::STORE);
 			auto expressions = p.pop_back();
 			const auto &stack = p.stack();
 			for (size_t i = start_position; i < stack.size(); ++i) { targets->append(stack[i]); }
 			while (p.stack().size() > start_position) { p.pop_back(); }
-			p.print_stack();
+			PRINT_STACK();
 			expressions->print_node("");
 
 			auto assignment = [&]() {
@@ -2248,7 +2286,7 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 			AugAssignPattern,
 			OrPattern<YieldExpressionPattern, StarExpressionsPattern>>;
 		if (pattern4::match(p)) {
-			spdlog::debug("single_target augassign ~ (yield_expr | star_expressions)");
+			DEBUG_LOG("single_target augassign ~ (yield_expr | star_expressions)");
 			const auto &rhs = p.pop_back();
 			auto aug_assign = p.pop_back();
 			as<AugAssign>(aug_assign)->set_value(rhs);
@@ -2292,13 +2330,13 @@ struct DottedNamePattern_ : Pattern<DottedNamePattern_>
 	//	   | ϵ
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("dotted_name");
+		DEBUG_LOG("dotted_name");
 		const auto token = p.lexer().peek_token(p.token_position() + 1);
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
 			SingleTokenPattern<Token::TokenType::NAME>,
 			DottedNamePattern_>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'.' NAME dotted_name'");
+			DEBUG_LOG("'.' NAME dotted_name'");
 			std::string name{ p.lexer().get(token->start(), token->end()) };
 			p.push_to_stack(std::make_shared<Constant>(name));
 			return true;
@@ -2306,7 +2344,7 @@ struct DottedNamePattern_ : Pattern<DottedNamePattern_>
 		using pattern2 = PatternMatch<
 			LookAhead<SingleTokenPattern<Token::TokenType::NEWLINE, Token::TokenType::NAME>>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("ϵ");
+			DEBUG_LOG("ϵ");
 			return true;
 		}
 
@@ -2320,14 +2358,14 @@ struct DottedNamePattern : Pattern<DottedNamePattern>
 	// 	   NAME dotted_name'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("dotted_name");
+		DEBUG_LOG("dotted_name");
 		const auto token = p.lexer().peek_token(p.token_position());
 		std::string name{ p.lexer().get(token->start(), token->end()) };
 		size_t stack_position = p.stack().size();
 		using pattern2 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::NAME>, DottedNamePattern_>;
 		if (pattern2::match(p)) {
-			spdlog::debug("NAME dotted_name'");
+			DEBUG_LOG("NAME dotted_name'");
 			std::static_pointer_cast<Import>(p.stack()[stack_position - 1])->add_dotted_name(name);
 			while (p.stack().size() > stack_position) {
 				const auto &node = p.pop_back();
@@ -2348,14 +2386,14 @@ struct DottedAsNamePattern : Pattern<DottedAsNamePattern>
 	//     | dotted_name' ['as' NAME ]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("dotted_as_name");
+		DEBUG_LOG("dotted_as_name");
 		using pattern1 = PatternMatch<DottedNamePattern>;
 		if (pattern1::match(p)) {
 			using pattern1a = PatternMatch<
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
 				SingleTokenPattern<Token::TokenType::NAME>>;
 			if (pattern1a::match(p)) {
-				spdlog::debug("['as' NAME ]");
+				DEBUG_LOG("['as' NAME ]");
 				const auto token = p.lexer().peek_token(p.token_position() - 1);
 				std::string asname{ p.lexer().get(token->start(), token->end()) };
 				std::static_pointer_cast<Import>(p.stack().back())->set_asname(asname);
@@ -2372,11 +2410,11 @@ struct DottedAsNamesPattern : Pattern<DottedAsNamesPattern>
 	//     | ','.dotted_as_name+
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("dotted_as_names");
+		DEBUG_LOG("dotted_as_names");
 		using pattern1 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<DottedAsNamePattern,
 			SingleTokenPattern<Token::TokenType::COMMA>>>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("','.dotted_as_name+");
+			DEBUG_LOG("','.dotted_as_name+");
 			return true;
 		}
 		return false;
@@ -2389,12 +2427,12 @@ struct ImportNamePattern : Pattern<ImportNamePattern>
 	static bool matches_impl(Parser &p)
 	{
 		p.push_to_stack(std::make_shared<Import>());
-		spdlog::debug("import_name");
+		DEBUG_LOG("import_name");
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ImportKeywordPattern>,
 			DottedAsNamesPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'import' dotted_as_names");
+			DEBUG_LOG("'import' dotted_as_names");
 			return true;
 		}
 		return false;
@@ -2409,7 +2447,7 @@ struct ImportFromKeywordPattern : Pattern<ImportFromKeywordPattern>
 	// | 'from' ('.' | '...')+ 'import' import_from_targets
 	static bool matches_impl(Parser &)
 	{
-		spdlog::debug("import_from");
+		DEBUG_LOG("import_from");
 		return false;
 	}
 };
@@ -2422,15 +2460,15 @@ struct ImportStatementPattern : Pattern<ImportStatementPattern>
 	//		| import_from
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("import_stmt");
+		DEBUG_LOG("import_stmt");
 		using pattern1 = PatternMatch<ImportNamePattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("import_name");
+			DEBUG_LOG("import_name");
 			return true;
 		}
 		using pattern2 = PatternMatch<ImportFromKeywordPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("import_from");
+			DEBUG_LOG("import_from");
 			return true;
 		}
 		return false;
@@ -2445,7 +2483,7 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 	//     | 'raise'
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("raise_stmt");
+		DEBUG_LOG("raise_stmt");
 		const auto initial_stack_size = p.stack().size();
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
@@ -2454,7 +2492,7 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
 				ExpressionPattern>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'raise' expression ['from' expression ] ");
+			DEBUG_LOG("'raise' expression ['from' expression ] ");
 			ASSERT((p.stack().size() - initial_stack_size) > 0)
 			ASSERT((p.stack().size() - initial_stack_size) < 3)
 			if ((p.stack().size() - initial_stack_size) == 1) {
@@ -2472,7 +2510,7 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 		using pattern2 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("'raise'");
+			DEBUG_LOG("'raise'");
 			ASSERT(p.stack().size() == initial_stack_size)
 			p.push_to_stack(std::make_shared<Raise>());
 			return true;
@@ -2486,14 +2524,14 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 	// assert_stmt: 'assert' expression [',' expression ]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("AssertStatementPattern");
+		DEBUG_LOG("AssertStatementPattern");
 		const auto initial_stack_size = p.stack().size();
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
 			ExpressionPattern,
 			ZeroOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, ExpressionPattern>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("assert_stmt: 'assert' expression [',' expression ]");
+			DEBUG_LOG("assert_stmt: 'assert' expression [',' expression ]");
 			ASSERT((p.stack().size() - initial_stack_size) > 0)
 			ASSERT((p.stack().size() - initial_stack_size) <= 2)
 
@@ -2533,32 +2571,32 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 	{
 		using pattern1 = PatternMatch<AssignmentPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("assignment");
+			DEBUG_LOG("assignment");
 			return true;
 		}
 		using pattern2 = PatternMatch<StarExpressionsPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("star_expressions");
+			DEBUG_LOG("star_expressions");
 			return true;
 		}
 		using pattern3 = PatternMatch<ReturnStatementPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("return_stmt");
+			DEBUG_LOG("return_stmt");
 			return true;
 		}
 		using pattern4 = PatternMatch<ImportStatementPattern>;
 		if (pattern4::match(p)) {
-			spdlog::debug("import_stmt");
+			DEBUG_LOG("import_stmt");
 			return true;
 		}
 		using pattern5 = PatternMatch<RaiseStatementPattern>;
 		if (pattern5::match(p)) {
-			spdlog::debug("raise_stmt");
+			DEBUG_LOG("raise_stmt");
 			return true;
 		}
 		using pattern9 = PatternMatch<AssertStatementPattern>;
 		if (pattern9::match(p)) {
-			spdlog::debug("assert_stmt");
+			DEBUG_LOG("assert_stmt");
 			return true;
 		}
 		return false;
@@ -2619,7 +2657,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 		// TODO: implement TYPE_COMMENT?
 		using pattern1 = PatternMatch<ParamPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("param ',' TYPE_COMMENT?");
+			DEBUG_LOG("param ',' TYPE_COMMENT?");
 			auto arg = p.pop_back();
 			auto args = p.stack().back();
 			ASSERT(as<Arguments>(args));
@@ -2633,7 +2671,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 		using pattern2 =
 			PatternMatch<ParamPattern, LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
 		if (pattern2::match(p)) {
-			spdlog::debug("param TYPE_COMMENT? &')'");
+			DEBUG_LOG("param TYPE_COMMENT? &')'");
 			auto arg = p.pop_back();
 			auto args = p.stack().back();
 			ASSERT(as<Arguments>(args));
@@ -2659,9 +2697,9 @@ struct ParametersPattern : Pattern<ParametersPattern>
 		p.push_to_stack(std::make_shared<Arguments>());
 		using pattern3 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>>;
 		if (pattern3::match(p)) {
-			spdlog::debug("param_no_default+ param_with_default* [star_etc]");
+			DEBUG_LOG("param_no_default+ param_with_default* [star_etc]");
 			// p.push_to_stack();
-			p.print_stack();
+			PRINT_STACK();
 			return true;
 		}
 		return false;
@@ -2677,8 +2715,8 @@ struct ParamsPattern : Pattern<ParamsPattern>
 	{
 		using pattern1 = PatternMatch<ParametersPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("parameters");
-			p.print_stack();
+			DEBUG_LOG("parameters");
+			PRINT_STACK();
 			return true;
 		}
 		return false;
@@ -2699,14 +2737,14 @@ struct BlockPattern : Pattern<BlockPattern>
 			StatementsPattern,
 			SingleTokenPattern<Token::TokenType::DEDENT>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("NEWLINE INDENT statements DEDENT");
+			DEBUG_LOG("NEWLINE INDENT statements DEDENT");
 			for (const auto &node : p.stack()) { node->print_node(""); }
 			return true;
 		}
 
 		using pattern2 = PatternMatch<SimpleStatementPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("simple_stmt");
+			DEBUG_LOG("simple_stmt");
 			return true;
 		}
 		return false;
@@ -2721,7 +2759,7 @@ struct FunctionNamePattern : Pattern<FunctionNamePattern>
 	{
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern1::match(p)) {
-			spdlog::debug("function_name: NAME");
+			DEBUG_LOG("function_name: NAME");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string function_name{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
@@ -2745,7 +2783,7 @@ struct FunctionDefinitionPattern : Pattern<FunctionDefinitionPattern>
 				SingleTokenPattern<Token::TokenType::RPAREN>,
 				SingleTokenPattern<Token::TokenType::COLON>>;
 		if (pattern1::match(p)) {
-			spdlog::debug(
+			DEBUG_LOG(
 				"function_def: 'def' function_name '(' [params] ')' ['->' expression ] ':' "
 				"[func_type_comment]");
 			return true;
@@ -2768,7 +2806,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 		// function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("function_def_raw: function_def");
+			DEBUG_LOG("function_def_raw: function_def");
 			auto name = p.pop_front();
 			auto args = [&]() -> std::shared_ptr<ast::ASTNode> {
 				if ((p.stack().size() - stack_size) > 0) {
@@ -2783,7 +2821,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 			{
 				BlockScope inner_scope{ p };
 				using pattern1a = PatternMatch<ZeroOrOnePattern<BlockPattern>>;
-				if (pattern1a::match(p)) { spdlog::debug("block"); }
+				if (pattern1a::match(p)) { DEBUG_LOG("block"); }
 				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
 			}
 
@@ -2815,7 +2853,7 @@ struct FunctionDefinitionStatementPattern : Pattern<FunctionDefinitionStatementP
 		// function_def_raw
 		using pattern2 = PatternMatch<FunctionDefinitionRawStatement>;
 		if (pattern2::match(p)) {
-			spdlog::debug("function_def_raw");
+			DEBUG_LOG("function_def_raw");
 			return true;
 		}
 		return false;
@@ -2850,7 +2888,7 @@ struct ElseBlockStatementPattern : Pattern<ElseBlockStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("else_block: 'else' ':' block");
+			DEBUG_LOG("else_block: 'else' ':' block");
 			return true;
 		}
 		return false;
@@ -2873,15 +2911,15 @@ struct ElifStatementPattern : Pattern<ElifStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern0::match(p)) {
-			spdlog::debug("'if' named_expression ':' block");
+			DEBUG_LOG("'if' named_expression ':' block");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
 			std::vector<std::shared_ptr<ASTNode>> body;
 			{
 				BlockScope inner_scope{ p };
 				using pattern1 = PatternMatch<ElifStatementPattern>;
-				if (pattern1::match(p)) { spdlog::debug("elif_stmt"); }
+				if (pattern1::match(p)) { DEBUG_LOG("elif_stmt"); }
 				using pattern2 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
-				if (pattern2::match(p)) { spdlog::debug("[else_block]"); }
+				if (pattern2::match(p)) { DEBUG_LOG("[else_block]"); }
 				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
 			}
 			auto test = p.pop_front();
@@ -2901,7 +2939,7 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 	//     | 'if' named_expression ':' block [else_block]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("IfStatementPattern");
+		DEBUG_LOG("IfStatementPattern");
 		BlockScope scope{ p };
 
 		// 'if' named_expression ':' block
@@ -2911,15 +2949,15 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern0::match(p)) {
-			spdlog::debug("'if' named_expression ':' block");
+			DEBUG_LOG("'if' named_expression ':' block");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
 			std::vector<std::shared_ptr<ASTNode>> body;
 			{
 				BlockScope inner_scope{ p };
 				using pattern1 = PatternMatch<ElifStatementPattern>;
-				if (pattern1::match(p)) { spdlog::debug("elif_stmt"); }
+				if (pattern1::match(p)) { DEBUG_LOG("elif_stmt"); }
 				using pattern2 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
-				if (pattern2::match(p)) { spdlog::debug("[else_block]"); }
+				if (pattern2::match(p)) { DEBUG_LOG("[else_block]"); }
 				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
 			}
 			auto test = p.pop_front();
@@ -2944,7 +2982,7 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 	//     | 'class' NAME ['(' [arguments] ')' ] ':' block
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ClassDefinitionRawPattern");
+		DEBUG_LOG("ClassDefinitionRawPattern");
 		BlockScope scope{ p };
 		ASSERT(p.stack().empty())
 		// 'class' NAME ['(' [arguments] ')' ] ':'
@@ -2962,9 +3000,9 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 					SingleTokenPattern<Token::TokenType::RPAREN>>,
 				SingleTokenPattern<Token::TokenType::COLON>>;
 		if (pattern0::match(p)) {
-			spdlog::debug("'class' NAME ['(' [arguments] ')' ] ':'");
+			DEBUG_LOG("'class' NAME ['(' [arguments] ')' ] ':'");
 			// FIXME: assumes no inheritance
-			spdlog::debug("class name: {}", class_name);
+			DEBUG_LOG("class name: {}", class_name);
 
 			std::vector<std::shared_ptr<ASTNode>> bases;
 			std::vector<std::shared_ptr<Keyword>> keywords;
@@ -2983,7 +3021,7 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 				BlockScope block_scope{ p };
 				using pattern1 = PatternMatch<BlockPattern>;
 				if (pattern1::match(p)) {
-					spdlog::debug("block");
+					DEBUG_LOG("block");
 				} else {
 					return false;
 				}
@@ -3009,7 +3047,7 @@ struct ClassDefinitionPattern : Pattern<ClassDefinitionPattern>
 		// class_def_raw
 		using pattern2 = PatternMatch<ClassDefinitionRawPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("class_def_raw");
+			DEBUG_LOG("class_def_raw");
 			return true;
 		}
 		return false;
@@ -3023,7 +3061,7 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 	//     | ASYNC 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ForStatementPattern");
+		DEBUG_LOG("ForStatementPattern");
 		BlockScope scope{ p };
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForKeywordPattern>,
@@ -3033,12 +3071,12 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("for_stmt");
+			DEBUG_LOG("for_stmt");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
 			{
 				BlockScope else_scope{ p };
 				using pattern1 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
-				if (pattern1::match(p)) { spdlog::debug("[else_block]"); }
+				if (pattern1::match(p)) { DEBUG_LOG("[else_block]"); }
 				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
 			}
 			// FIXME: type comment is currently not considered
@@ -3063,29 +3101,29 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 	//     | 'except' ':' block
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("ExceptBlockPattern");
+		DEBUG_LOG("ExceptBlockPattern");
 		{
 			BlockScope scope{ p };
 			using pattern1 = PatternMatch<
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ExceptKeywordPattern>,
 				ExpressionPattern>;
 			if (pattern1::match(p)) {
-				spdlog::debug("'except' expression");
+				DEBUG_LOG("'except' expression");
 				std::string name{};
 				using pattern1a = PatternMatch<
 					AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
 					SingleTokenPattern<Token::TokenType::NAME>>;
 				if (pattern1a::match(p)) {
-					spdlog::debug("['as' NAME ]");
+					DEBUG_LOG("['as' NAME ]");
 					auto token = p.lexer().peek_token(p.token_position() - 1);
-					spdlog::debug("{}", token->to_string());
+					DEBUG_LOG("{}", token->to_string());
 					name = std::string{ token->start().pointer_to_program,
 						token->end().pointer_to_program };
 				}
 				using pattern1b =
 					PatternMatch<SingleTokenPattern<Token::TokenType::COLON>, BlockPattern>;
 				if (pattern1b::match(p)) {
-					spdlog::debug("':' block");
+					DEBUG_LOG("':' block");
 					std::vector<std::shared_ptr<ASTNode>> body;
 					const auto type = p.pop_front();
 					while (!p.stack().empty()) { body.push_back(p.pop_front()); }
@@ -3101,7 +3139,7 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 			if (pattern2::match(p)) {
-				spdlog::debug("'except' ':' block");
+				DEBUG_LOG("'except' ':' block");
 				std::vector<std::shared_ptr<ASTNode>> body;
 				while (!p.stack().empty()) { body.push_back(p.pop_front()); }
 				scope.parent().push_front(std::make_shared<ExceptHandler>(nullptr, "", body));
@@ -3118,13 +3156,13 @@ struct FinallyBlockPattern : Pattern<FinallyBlockPattern>
 	//     | 'finally' ':' block
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("FinallyBlockPattern");
+		DEBUG_LOG("FinallyBlockPattern");
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FinallyKeywordPattern>,
 			SingleTokenPattern<Token::TokenType::COLON>,
 			BlockPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'finally' ':' block");
+			DEBUG_LOG("'finally' ':' block");
 			return true;
 		}
 		return false;
@@ -3138,7 +3176,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 	// 		| 'try' ':' block except_block+ [else_block] [finally_block]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("TryStatementPattern");
+		DEBUG_LOG("TryStatementPattern");
 		BlockScope scope{ p };
 		// 'try' ':' block
 		using pattern1 =
@@ -3146,7 +3184,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("'try' ':' block");
+			DEBUG_LOG("'try' ':' block");
 
 			std::vector<std::shared_ptr<ASTNode>> body;
 			std::vector<std::shared_ptr<ExceptHandler>> handlers;
@@ -3158,7 +3196,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 				BlockScope finally_scope{ p };
 				using pattern1a = PatternMatch<FinallyBlockPattern>;
 				if (pattern1a::match(p)) {
-					spdlog::debug("finally_block");
+					DEBUG_LOG("finally_block");
 					while (!p.stack().empty()) { finally.push_back(p.pop_front()); }
 					match = true;
 				}
@@ -3168,7 +3206,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 				BlockScope except_block{ p };
 				using pattern1b = PatternMatch<OneOrMorePattern<ExceptBlockPattern>>;
 				if (pattern1b::match(p)) {
-					spdlog::debug("except_block");
+					DEBUG_LOG("except_block");
 					while (!p.stack().empty()) {
 						auto node = p.pop_back();
 						ASSERT(as<ExceptHandler>(node))
@@ -3181,7 +3219,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 						BlockScope else_block{ p };
 						using pattern1c = PatternMatch<ElseBlockStatementPattern>;
 						if (pattern1c::match(p)) {
-							spdlog::debug("[else_block]");
+							DEBUG_LOG("[else_block]");
 							while (!p.stack().empty()) { orelse.push_back(p.pop_front()); }
 						}
 					}
@@ -3190,7 +3228,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 						BlockScope finally_block{ p };
 						using pattern1d = PatternMatch<FinallyBlockPattern>;
 						if (pattern1d::match(p)) {
-							spdlog::debug("[finally_block]");
+							DEBUG_LOG("[finally_block]");
 							while (!p.stack().empty()) { finally.push_back(p.pop_front()); }
 						}
 					}
@@ -3212,7 +3250,7 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 	//     | 'while' named_expression ':' block [else_block]
 	static bool matches_impl(Parser &p)
 	{
-		spdlog::debug("WhileStatementPattern");
+		DEBUG_LOG("WhileStatementPattern");
 		BlockScope scope{ p };
 
 		// 'while' named_expression ':' block
@@ -3222,13 +3260,13 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 			SingleTokenPattern<Token::TokenType::COLON>,
 			BlockPattern>;
 		if (pattern0::match(p)) {
-			spdlog::debug("'while' named_expression ':' block");
+			DEBUG_LOG("'while' named_expression ':' block");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
 			std::vector<std::shared_ptr<ASTNode>> body;
 			{
 				BlockScope inner_scope{ p };
 				using pattern1 = PatternMatch<ZeroOrOnePattern<ElseBlockStatementPattern>>;
-				if (pattern1::match(p)) { spdlog::debug("[else_block]"); }
+				if (pattern1::match(p)) { DEBUG_LOG("[else_block]"); }
 				for (auto &&node : p.stack()) { orelse.push_back(std::move(node)); }
 			}
 			auto test = p.pop_front();
@@ -3257,46 +3295,46 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 		// function_def
 		using pattern1 = PatternMatch<FunctionDefinitionStatementPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("function_def");
-			p.print_stack();
+			DEBUG_LOG("function_def");
+			PRINT_STACK();
 			return true;
 		}
 		// if_stmt
 		using pattern2 = PatternMatch<IfStatementPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("if_stmt");
-			p.print_stack();
+			DEBUG_LOG("if_stmt");
+			PRINT_STACK();
 			return true;
 		}
 
 		using pattern3 = PatternMatch<ClassDefinitionPattern>;
 		if (pattern3::match(p)) {
-			spdlog::debug("class_def");
-			p.print_stack();
+			DEBUG_LOG("class_def");
+			PRINT_STACK();
 			return true;
 		}
 
 		// for_stmt
 		using pattern5 = PatternMatch<ForStatementPattern>;
 		if (pattern5::match(p)) {
-			spdlog::debug("for_stmt");
-			p.print_stack();
+			DEBUG_LOG("for_stmt");
+			PRINT_STACK();
 			return true;
 		}
 
 		// try_stmt
 		using pattern6 = PatternMatch<TryStatementPattern>;
 		if (pattern6::match(p)) {
-			spdlog::debug("try_stmt");
-			p.print_stack();
+			DEBUG_LOG("try_stmt");
+			PRINT_STACK();
 			return true;
 		}
 
 		// while_stmt
 		using pattern7 = PatternMatch<WhileStatementPattern>;
 		if (pattern7::match(p)) {
-			spdlog::debug("while_stmt");
-			p.print_stack();
+			DEBUG_LOG("while_stmt");
+			PRINT_STACK();
 			return true;
 		}
 		return false;
@@ -3312,12 +3350,12 @@ struct StatementPattern : Pattern<StatementPattern>
 	{
 		using pattern1 = PatternMatch<CompoundStatementPattern>;
 		if (pattern1::match(p)) {
-			spdlog::debug("compound_stmt");
+			DEBUG_LOG("compound_stmt");
 			return true;
 		}
 		using pattern2 = PatternMatch<SimpleStatementPattern>;
 		if (pattern2::match(p)) {
-			spdlog::debug("simple_stmt");
+			DEBUG_LOG("simple_stmt");
 			return true;
 		}
 		return false;
@@ -3355,7 +3393,9 @@ struct FilePattern : Pattern<FilePattern>
 namespace parser {
 void Parser::parse()
 {
-	spdlog::debug("Parser return code: {}", FilePattern::matches(*this));
+	const auto result = FilePattern::matches(*this);
+	(void)result;
+	DEBUG_LOG("Parser return code: {}", result);
 	m_module->print_node("");
 }
 }// namespace parser

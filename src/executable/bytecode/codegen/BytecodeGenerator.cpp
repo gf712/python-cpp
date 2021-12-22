@@ -84,6 +84,8 @@ void BytecodeGenerator::visit(const BinaryExpr *node)
 	} break;
 	case BinaryOpType::SLASH:
 		TODO();
+	case BinaryOpType::FLOORDIV:
+		TODO();
 	case BinaryOpType::LEFTSHIFT: {
 		emit<LeftShift>(dst_register, lhs_register, rhs_register);
 	} break;
@@ -510,6 +512,8 @@ void BytecodeGenerator::visit(const AugAssign *node)
 		TODO();
 	} break;
 	case BinaryOpType::SLASH:
+		TODO();
+	case BinaryOpType::FLOORDIV:
 		TODO();
 	case BinaryOpType::LEFTSHIFT: {
 		TODO();

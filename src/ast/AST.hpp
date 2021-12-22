@@ -338,6 +338,7 @@ class UnaryExpr : public ASTNode
 	__BINARY_OP(MULTIPLY)  \
 	__BINARY_OP(EXP)       \
 	__BINARY_OP(SLASH)     \
+	__BINARY_OP(FLOORDIV)  \
 	__BINARY_OP(LEFTSHIFT) \
 	__BINARY_OP(RIGHTSHIFT)
 

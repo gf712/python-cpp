@@ -33,8 +33,12 @@ namespace optimizer {
 			case BinaryOpType::MODULO: {
 				TODO();
 			}
-			case BinaryOpType::SLASH:
+			case BinaryOpType::SLASH: {
 				TODO();
+			}
+			case BinaryOpType::FLOORDIV: {
+				TODO();
+			}
 			case BinaryOpType::LEFTSHIFT: {
 				TODO();
 			}
