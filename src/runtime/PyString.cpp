@@ -106,9 +106,9 @@ PyObject *PyString::__add__(const PyObject *obj) const
 		return PyString::create(m_value + rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
-			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name());
+			type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+				type()->name(),
+				obj->type()->name()));
 		return py_none();
 	}
 }

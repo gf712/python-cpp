@@ -13,7 +13,6 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_float;
 	std::unique_ptr<TypePrototype> m_integer;
 	std::unique_ptr<TypePrototype> m_none;
-	std::unique_ptr<TypePrototype> m_exception;
 	std::unique_ptr<TypePrototype> m_module;
 	std::unique_ptr<TypePrototype> m_custom_object;
 
@@ -40,6 +39,8 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_method_wrapper;
 	std::unique_ptr<TypePrototype> m_static_method;
 
+	std::unique_ptr<TypePrototype> m_base_exception;
+
 	BuiltinTypes();
 
   public:
@@ -57,7 +58,6 @@ class BuiltinTypes
 	TypePrototype &float_() const { return *m_float; }
 	TypePrototype &integer() const { return *m_integer; }
 	TypePrototype &none() const { return *m_none; }
-	TypePrototype &exception() const { return *m_exception; }
 	TypePrototype &module() const { return *m_module; }
 	TypePrototype &custom_object() const { return *m_custom_object; }
 
@@ -83,6 +83,8 @@ class BuiltinTypes
 	TypePrototype &bound_method() const { return *m_bound_method; }
 	TypePrototype &method_wrapper() const { return *m_method_wrapper; }
 	TypePrototype &static_method() const { return *m_static_method; }
+
+	TypePrototype &base_exception() const { return *m_base_exception; }
 };
 
 PyType *type();
@@ -93,7 +95,6 @@ PyType *str();
 PyType *float_();
 PyType *integer();
 PyType *none();
-PyType *exception();
 PyType *module();
 PyType *custom_object();
 PyType *dict();

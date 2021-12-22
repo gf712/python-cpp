@@ -1,37 +1,35 @@
 #pragma once
 
-#include "BaseException.hpp"
+#include "Exception.hpp"
+#include "PyString.hpp"
+#include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
 
-class TypeError : public BaseException
+class TypeError : public Exception
 {
 	friend class Heap;
 	template<typename... Args>
 	friend PyObject *type_error(const std::string &message, Args &&... args);
 
-  public:
-	std::string to_string() const override { return "TypeError"; }
-
   private:
-	TypeError(std::string message) : BaseException("TypeError", std::move(message)) {}
+	TypeError(PyTuple *args);
 
-	static TypeError *create(const std::string &value)
+	static TypeError *create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate_static<TypeError>(value).get();
+		return heap.allocate<TypeError>(args);
 	}
-};
 
+  public:
+	static PyType *register_type(PyModule *);
+
+	PyType *type() const override;
+};
 
 template<typename... Args> inline PyObject *type_error(const std::string &message, Args &&... args)
 {
-	static PyObject *type_error_{ nullptr };
-	if (!type_error_) {
-		type_error_ = TypeError::create(fmt::format(message, std::forward<Args>(args)...));
-	} else {
-		static_cast<TypeError *>(type_error_)
-			->set_message(fmt::format(message, std::forward<Args>(args)...));
-	}
-	return type_error_;
+	auto *args_tuple =
+		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
+	return TypeError::create(args_tuple);
 }

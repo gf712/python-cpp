@@ -8,6 +8,7 @@
 #include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
+#include "TypeError.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
@@ -261,9 +262,9 @@ std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interp
 					return result;
 				} else {
 					interpreter.raise_exception(
-						"TypeError: unsupported operand type(s) for <=: \'{}\' and \'{}\'",
-						py_lhs->type()->name(),
-						py_rhs->type()->name());
+						type_error("unsupported operand type(s) for <=: \'{}\' and \'{}\'",
+							py_lhs->type()->name(),
+							py_rhs->type()->name()));
 					return {};
 				}
 			} },
@@ -291,9 +292,9 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 					return result;
 				} else {
 					interpreter.raise_exception(
-						"TypeError: unsupported operand type(s) for <: \'{}\' and \'{}\'",
-						py_lhs->type()->name(),
-						py_rhs->type()->name());
+						type_error("unsupported operand type(s) for <: \'{}\' and \'{}\'",
+							py_lhs->type()->name(),
+							py_rhs->type()->name()));
 					return {};
 				}
 			} },
@@ -304,7 +305,7 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 bool is(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	// TODO: Could probably be more efficient, but at least guarantees that Python singletons
-	//		 always are true in this comparisson when compared to the same singleton 
+	//		 always are true in this comparisson when compared to the same singleton
 	return PyObject::from(lhs) == PyObject::from(rhs);
 }
 

@@ -53,9 +53,9 @@ PyObject *PyNumber::__add__(const PyObject *obj) const
 		return PyNumber::create(m_value + rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
-			"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name());
+			type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+				type()->name(),
+				obj->type()->name()));
 		return nullptr;
 	}
 }
@@ -66,9 +66,9 @@ PyObject *PyNumber::__sub__(const PyObject *obj) const
 		return PyNumber::create(m_value - rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
-			"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name());
+			type_error("unsupported operand type(s) for -: \'{}\' and \'{}\'",
+				type()->name(),
+				obj->type()->name()));
 		return nullptr;
 	}
 }
@@ -79,9 +79,9 @@ PyObject *PyNumber::__mod__(const PyObject *obj) const
 		return PyNumber::create(m_value % rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
-			"TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name());
+			type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
+				type()->name(),
+				obj->type()->name()));
 		return nullptr;
 	}
 }
@@ -92,9 +92,9 @@ PyObject *PyNumber::__mul__(const PyObject *obj) const
 		return PyNumber::create(m_value * rhs->value());
 	} else {
 		VirtualMachine::the().interpreter().raise_exception(
-			"TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name());
+			type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
+				type()->name(),
+				obj->type()->name()));
 		return nullptr;
 	}
 }

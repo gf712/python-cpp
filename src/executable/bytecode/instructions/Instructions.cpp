@@ -9,7 +9,7 @@
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyTuple.hpp"
-#include "runtime/StopIterationException.hpp"
+#include "runtime/StopIteration.hpp"
 
 
 void Move::execute(VirtualMachine &vm, Interpreter &) const

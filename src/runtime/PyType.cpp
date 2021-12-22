@@ -506,7 +506,7 @@ PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 	auto *obj = new_(args, kwargs);
 	if (!obj) {
 		VirtualMachine::the().interpreter().raise_exception(
-			fmt::format("cannot create '{}' instances", m_type_prototype.__name__));
+			type_error("cannot create '{}' instances", m_type_prototype.__name__));
 		return nullptr;
 	}
 

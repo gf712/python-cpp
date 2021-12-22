@@ -2,6 +2,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyType.hpp"
 #include "runtime/types/builtin.hpp"
 
 
@@ -35,15 +36,15 @@ ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 
 void ExecutionFrame::set_exception_to_catch(PyObject *exception)
 {
-	m_exception_to_catch = std::move(exception);
+	m_exception_to_catch = exception;
 }
 
-void ExecutionFrame::set_exception(PyObject *exception) { m_exception = std::move(exception); }
+void ExecutionFrame::set_exception(PyObject *exception) { m_exception = exception; }
 
 bool ExecutionFrame::catch_exception(PyObject *exception) const
 {
 	if (m_exception_to_catch)
-		return m_exception_to_catch == exception;
+		return exception->type()->issubclass(m_exception_to_catch->type());
 	else
 		return false;
 }

@@ -52,7 +52,11 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/BuiltinsModule.cpp
     runtime/modules/SysModule.cpp
     runtime/types/builtin.cpp
+    runtime/AssertionError.cpp
+    runtime/AttributeError.cpp
     runtime/BaseException.cpp
+    runtime/Exception.cpp
+    runtime/NameError.cpp
     runtime/PyBoundMethod.cpp
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
@@ -74,7 +78,10 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyType.cpp
     runtime/PySlotWrapper.cpp
     runtime/PyStaticMethod.cpp
-    runtime/Value.cpp)
+    runtime/StopIteration.cpp
+    runtime/TypeError.cpp
+    runtime/Value.cpp
+    runtime/ValueError.cpp)
 
 set(VM_SOURCE_FILES # cmake-format: sortable
                     vm/VM.cpp)

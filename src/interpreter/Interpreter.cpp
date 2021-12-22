@@ -1,6 +1,7 @@
 #include "Interpreter.hpp"
 
 #include "runtime/BaseException.hpp"
+#include "runtime/NameError.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyNone.hpp"
@@ -54,7 +55,8 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame = ExecutionFrame::create(nullptr, local_registers, globals, locals); //, nullptr);
+	m_current_frame =
+		ExecutionFrame::create(nullptr, local_registers, globals, locals);//, nullptr);
 	m_global_frame = m_current_frame;
 }
 
@@ -157,7 +159,7 @@ std::optional<Value> Interpreter::get_object(const std::string &name)
 		if (auto it = builtins.find(pystr_name); it != builtins.end()) {
 			obj = it->second;
 		} else {
-			raise_exception("NameError: name '{:s}' is not defined", name);
+			raise_exception(name_error("name '{:s}' is not defined", name));
 			obj = py_none();
 		}
 	}

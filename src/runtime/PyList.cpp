@@ -7,7 +7,7 @@
 #include "PyNumber.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
-#include "StopIterationException.hpp"
+#include "StopIteration.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"

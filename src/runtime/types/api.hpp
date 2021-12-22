@@ -2,19 +2,25 @@
 
 #include "builtin.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyModule.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
 template<typename T> struct klass
 {
 	std::unique_ptr<TypePrototype> type;
+	PyModule *m_module;
 
 	klass(PyModule *module, std::string_view name)
+		: type(TypePrototype::create<T>(name)), m_module(module)
+	{}
+
+	template<typename... BaseType>
+	requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> &&...)
+	klass(PyModule *module, std::string_view name, BaseType &&... bases)
+		: type(TypePrototype::create<T>(name)), m_module(module)
 	{
-		(void)module;
-		(void)name;
-		TODO();
-		// module->insert(name_, type);
+		type->__bases__ = PyTuple::create(bases...);
 	}
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
@@ -49,5 +55,12 @@ template<typename T> struct klass
 				return (static_cast<T *>(self)->*F)(args, kwargs);
 			} });
 		return *this;
+	}
+
+	PyType *finalize()
+	{
+		auto *type_ = PyType::initialize(*type.release());
+		m_module->insert(PyString::create(type_->name()), type_);
+		return type_;
 	}
 };

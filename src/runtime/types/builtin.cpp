@@ -1,6 +1,5 @@
 #include "builtin.hpp"
 
-#include "runtime/BaseException.hpp"
 #include "runtime/CustomPyObject.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
@@ -22,16 +21,15 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
-
 BuiltinTypes::BuiltinTypes()
 	: m_type(PyType::register_type()), m_str(PyString::register_type()),
 	  m_bool(PyBool::register_type()), m_bytes(PyBytes::register_type()),
 	  m_ellipsis(PyEllipsis::register_type()), m_float(PyFloat::register_type()),
 	  m_integer(PyInteger::register_type()), m_none(PyNone::register_type()),
-	  m_exception(BaseException::register_type()), m_module(PyModule::register_type()),
-	  m_custom_object(CustomPyObject::register_type()), m_function(PyFunction::register_type()),
-	  m_native_function(PyNativeFunction::register_type()), m_code(PyCode::register_type()),
-	  m_dict(PyDict::register_type()), m_dict_items(PyDictItems::register_type()),
+	  m_module(PyModule::register_type()), m_custom_object(CustomPyObject::register_type()),
+	  m_function(PyFunction::register_type()), m_native_function(PyNativeFunction::register_type()),
+	  m_code(PyCode::register_type()), m_dict(PyDict::register_type()),
+	  m_dict_items(PyDictItems::register_type()),
 	  m_dict_items_iterator(PyDictItemsIterator::register_type()), m_list(PyList::register_type()),
 	  m_list_iterator(PyListIterator::register_type()), m_tuple(PyTuple::register_type()),
 	  m_tuple_iterator(PyTupleIterator::register_type()), m_range(PyRange::register_type()),
@@ -62,7 +60,6 @@ INITIALIZE_TYPE(str)
 INITIALIZE_TYPE(float_)
 INITIALIZE_TYPE(integer)
 INITIALIZE_TYPE(none)
-INITIALIZE_TYPE(exception)
 INITIALIZE_TYPE(module)
 INITIALIZE_TYPE(custom_object)
 

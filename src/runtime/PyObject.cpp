@@ -17,7 +17,7 @@
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "PyType.hpp"
-#include "StopIterationException.hpp"
+#include "StopIteration.hpp"
 #include "TypeError.hpp"
 #include "types/builtin.hpp"
 
@@ -361,9 +361,9 @@ PyObject *PyObject::add(const PyObject *other) const
 		return call_slot(*other->m_type_prototype.__add__, other, this);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for +: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -373,9 +373,9 @@ PyObject *PyObject::subtract(const PyObject *other) const
 		return call_slot(*m_type_prototype.__sub__, this, other);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for -: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for -: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -387,9 +387,9 @@ PyObject *PyObject::multiply(const PyObject *other) const
 		return call_slot(*other->m_type_prototype.__mul__, other, this);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for *: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -399,9 +399,9 @@ PyObject *PyObject::exp(const PyObject *other) const
 		return call_slot(*m_type_prototype.__exp__, this, other);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for **: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -411,9 +411,9 @@ PyObject *PyObject::lshift(const PyObject *other) const
 		return call_slot(*m_type_prototype.__lshift__, this, other);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for <<: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for <<: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -423,9 +423,9 @@ PyObject *PyObject::modulo(const PyObject *other) const
 		return call_slot(*m_type_prototype.__mod__, this, other);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: unsupported operand type(s) for %: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__);
+		type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -433,7 +433,7 @@ PyObject *PyObject::abs() const
 {
 	if (m_type_prototype.__abs__.has_value()) { return call_slot(*m_type_prototype.__abs__, this); }
 	VirtualMachine::the().interpreter().raise_exception(
-		"TypeError: bad operand type for abs(): '{}'", m_type_prototype.__name__);
+		type_error("bad operand type for abs(): '{}'", m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -441,7 +441,7 @@ PyObject *PyObject::neg() const
 {
 	if (m_type_prototype.__neg__.has_value()) { return call_slot(*m_type_prototype.__neg__, this); }
 	VirtualMachine::the().interpreter().raise_exception(
-		"bad operand type for unary -: '{}'", m_type_prototype.__name__);
+		type_error("bad operand type for unary -: '{}'", m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -449,7 +449,7 @@ PyObject *PyObject::pos() const
 {
 	if (m_type_prototype.__pos__.has_value()) { return call_slot(*m_type_prototype.__pos__, this); }
 	VirtualMachine::the().interpreter().raise_exception(
-		"bad operand type for unary +: '{}'", m_type_prototype.__name__);
+		type_error("bad operand type for unary +: '{}'", m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -459,7 +459,7 @@ PyObject *PyObject::invert() const
 		return call_slot(*m_type_prototype.__invert__, this);
 	}
 	VirtualMachine::the().interpreter().raise_exception(
-		"bad operand type for unary ~: '{}'", m_type_prototype.__name__);
+		type_error("bad operand type for unary ~: '{}'", m_type_prototype.__name__));
 	return nullptr;
 }
 
@@ -476,7 +476,7 @@ PyObject *PyObject::len() const
 	if (m_type_prototype.__len__.has_value()) { return call_slot(*m_type_prototype.__len__, this); }
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: object of type '{}' has no len()", type()->name()));
+		type_error("object of type '{}' has no len()", type()->name()));
 	return nullptr;
 }
 
@@ -487,7 +487,7 @@ PyObject *PyObject::iter() const
 	}
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: '{}' object is not iterable", type()->name()));
+		type_error("'{}' object is not iterable", type()->name()));
 	return nullptr;
 }
 
@@ -498,7 +498,7 @@ PyObject *PyObject::next()
 	}
 
 	VirtualMachine::the().interpreter().raise_exception(
-		fmt::format("TypeError: '{}' object is not an iterator", type()->name()));
+		type_error("'{}' object is not an iterator", type()->name()));
 	return nullptr;
 }
 

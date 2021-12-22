@@ -22,7 +22,6 @@ class Interpreter
 	std::vector<PyModule *> m_available_modules;
 	PyModule *m_module;
 	Status m_status{ Status::OK };
-	std::string m_exception_message;
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
 	std::shared_ptr<Program> m_program;
@@ -33,18 +32,9 @@ class Interpreter
 	void set_status(Status status) { m_status = status; }
 	Status status() const { return m_status; }
 
-	const std::string &exception_message() const { return m_exception_message; }
-
-	template<typename... Ts> void raise_exception(std::string_view p, Ts &&... args)
-	{
-		m_status = Status::EXCEPTION;
-		m_exception_message = fmt::format(p, std::forward<Ts>(args)...);
-	}
-
 	template<typename... Ts> void raise_exception(PyObject *exception)
 	{
 		m_status = Status::EXCEPTION;
-		// m_exception_message = "DEPRECATED :(";
 		m_current_frame->set_exception(std::move(exception));
 	}
 

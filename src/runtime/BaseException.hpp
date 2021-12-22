@@ -2,19 +2,26 @@
 
 #include "PyObject.hpp"
 
+
 class BaseException : public PyBaseObject
 {
-	std::string m_exception_name;
-	std::string m_message;
+	PyTuple *m_args;
+
+  protected:
+	BaseException(const TypePrototype &type, PyTuple *args);
+
+	static PyType *s_base_exception_type;
 
   public:
-	BaseException(std::string exception_name, std::string &&name);
+	BaseException(PyTuple *args);
 
-	std::string what() const { return fmt::format("{}: {}", m_exception_name, m_message); }
+	std::string what() const;
 
-	void set_message(std::string msg) { m_message = std::move(msg); }
+	std::string to_string() const override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static PyType *register_type(PyModule *);
 
-	 PyType *type() const;
+	PyType *type() const override;
+
+	void visit_graph(Visitor &) override;
 };

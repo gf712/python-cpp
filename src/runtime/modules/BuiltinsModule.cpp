@@ -1,4 +1,6 @@
 #include "Modules.hpp"
+#include "runtime/AssertionError.hpp"
+#include "runtime/AttributeError.hpp"
 #include "runtime/CustomPyObject.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
@@ -13,8 +15,9 @@
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
-#include "runtime/StopIterationException.hpp"
+#include "runtime/StopIteration.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
 
 #include "executable/bytecode/Bytecode.hpp"
@@ -57,7 +60,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 				auto obj =
 					std::visit([](const auto &value) { return PyObject::from(value); }, maybe_str);
 				interpreter.raise_exception(
-					"TypeError: sep must be None or a string, not {}", obj->type()->name());
+					type_error("sep must be None or a string, not {}", obj->type()->name()));
 				return nullptr;
 			}
 			separator = std::get<String>(maybe_str).s;
@@ -68,7 +71,7 @@ PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpre
 				auto obj =
 					std::visit([](const auto &value) { return PyObject::from(value); }, maybe_str);
 				interpreter.raise_exception(
-					"TypeError: end must be None or a string, not {}", obj->type()->name());
+					type_error("end must be None or a string, not {}", obj->type()->name()));
 				return nullptr;
 			}
 			end = std::get<String>(maybe_str).s;
@@ -106,7 +109,7 @@ PyObject *iter(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 	ASSERT(args->size() == 1)
 	const auto &arg = args->operator[](0);
 	if (kwargs) {
-		interpreter.raise_exception("TypeError: iter() takes no keyword arguments");
+		interpreter.raise_exception(type_error("iter() takes no keyword arguments"));
 		return py_none();
 	}
 	return arg->iter();
@@ -117,7 +120,7 @@ PyObject *next(const PyTuple *args, const PyDict *kwargs, Interpreter &interpret
 {
 	ASSERT(args->size() == 1)
 	if (kwargs) {
-		interpreter.raise_exception("TypeError: next() takes no keyword arguments");
+		interpreter.raise_exception(type_error("next() takes no keyword arguments"));
 		return py_none();
 	}
 	const auto &arg = args->operator[](0);
@@ -257,12 +260,12 @@ PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 		} else {
 			// FIXME: when float is separated from integer fix this
 			interpreter.raise_exception(
-				"TypeError: 'float' object cannot be interpreted as an integer",
-				args->operator[](0)->type()->name());
+				type_error("'float' object cannot be interpreted as an integer",
+					args->operator[](0)->type()->name()));
 		}
 	} else {
-		interpreter.raise_exception("TypeError: '{}' object cannot be interpreted as an integer",
-			args->operator[](0)->type()->name());
+		interpreter.raise_exception(type_error("'{}' object cannot be interpreted as an integer",
+			args->operator[](0)->type()->name()));
 	}
 	return nullptr;
 }
@@ -279,8 +282,8 @@ PyObject *ord(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 				as<PyInteger>(size)->value().to_string());
 		}
 	} else {
-		interpreter.raise_exception("TypeError: ord() expected string of length 1, but {} found",
-			args->operator[](0)->type()->name());
+		interpreter.raise_exception(type_error("ord() expected string of length 1, but {} found",
+			args->operator[](0)->type()->name()));
 	}
 	return nullptr;
 }
@@ -434,7 +437,6 @@ auto initialize_types()
 	float_();
 	integer();
 	none();
-	exception();
 	module();
 	custom_object();
 	dict();
@@ -463,13 +465,23 @@ auto initialize_types()
 		float_(),
 		integer(),
 		none(),
-		exception(),
 		custom_object(),
 		dict(),
 		list(),
 		tuple(),
 		range(),
 	};
+}
+
+auto initialize_exceptions(PyModule *blt)
+{
+	BaseException::register_type(blt);
+	Exception::register_type(blt);
+	TypeError::register_type(blt);
+	AssertionError::register_type(blt);
+	AttributeError::register_type(blt);
+	StopIteration::register_type(blt);
+	ValueError::register_type(blt);
 }
 
 PyModule *builtins_module(Interpreter &interpreter)
@@ -488,6 +500,8 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module = heap.allocate<PyModule>(PyString::create("__builtins__"));
 
 	for (auto *type : types) { s_builtin_module->insert(PyString::create(type->name()), type); }
+
+	initialize_exceptions(s_builtin_module);
 
 	s_builtin_module->insert(PyString::create("__build_class__"),
 		heap.allocate<PyNativeFunction>(

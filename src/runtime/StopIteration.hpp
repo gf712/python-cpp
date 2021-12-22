@@ -5,19 +5,19 @@
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
-class AssertionError : public Exception
+class StopIteration : public Exception
 {
 	friend class Heap;
 	template<typename... Args>
-	friend PyObject *assertion_error(const std::string &message, Args &&... args);
+	friend PyObject *stop_iteration(const std::string &message, Args &&... args);
 
   private:
-	AssertionError(PyTuple *args);
+	StopIteration(PyTuple *args);
 
-	static AssertionError *create(PyTuple *args)
+	static StopIteration *create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<AssertionError>(args);
+		return heap.allocate<StopIteration>(args);
 	}
 
   public:
@@ -27,9 +27,9 @@ class AssertionError : public Exception
 };
 
 template<typename... Args>
-inline PyObject *assertion_error(const std::string &message, Args &&... args)
+inline PyObject *stop_iteration(const std::string &message, Args &&... args)
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return AssertionError::create(args_tuple);
+	return StopIteration::create(args_tuple);
 }

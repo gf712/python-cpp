@@ -77,7 +77,7 @@ int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame
 				break;
 			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
 				// bail, an error occured
-				std::cout << interpreter().exception_message() << '\n';
+				TODO();
 				break;
 			}
 		}
@@ -137,16 +137,7 @@ int VirtualMachine::execute(std::shared_ptr<Program> program)
 					break;
 				}
 			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
-				if (!m_state->catch_exception) {
-					// bail, an error occured
-					std::cout << interpreter().exception_message() << '\n';
-					m_instruction_pointer = initial_ip;
-					return EXIT_FAILURE;
-				} else {
-					// interpreter().set_status(Interpreter::Status::OK);
-					m_state->catch_exception = false;
-					break;
-				}
+				TODO();
 			}
 		}
 		if (m_state->jump_block_count.has_value()) {

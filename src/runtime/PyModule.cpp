@@ -2,6 +2,7 @@
 #include "PyDict.hpp"
 #include "PyList.hpp"
 #include "PyString.hpp"
+#include "ValueError.hpp"
 #include "executable/Program.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "modules/Modules.hpp"
@@ -70,8 +71,9 @@ PyModule *PyModule::create(PyString *name)
 
 	const auto filepath = resolve_path(name->value());
 	if (!filepath.has_value()) {
+		// FIXME: should throw ModuleNotFoundError, not ValueError
 		vm.interpreter().raise_exception(
-			"ModuleNotFoundError: No module named '{}'", name->value());
+			value_error("ModuleNotFoundError: No module named '{}'", name->value()));
 		return nullptr;
 	}
 
