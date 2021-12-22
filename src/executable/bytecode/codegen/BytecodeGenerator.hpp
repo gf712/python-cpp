@@ -72,10 +72,9 @@ class BytecodeGenerator : public ast::CodeGenerator
 		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
 
-	template<typename OpType, typename... Args> void emit(size_t function_id, Args &&... args)
+	template<typename OpType, typename... Args> void emit(Args &&... args)
 	{
 		ASSERT(m_current_block)
-		(void)function_id;
 		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
 
