@@ -9,7 +9,7 @@ class PyTuple : public PyBaseObject
 {
 	friend class Heap;
 
-	std::vector<Value> m_elements;
+	const std::vector<Value> m_elements;
 
   protected:
 	PyTuple();

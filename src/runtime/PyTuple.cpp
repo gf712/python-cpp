@@ -8,6 +8,17 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+
+namespace {
+std::vector<Value> make_value_vector(const std::vector<PyObject *> &elements)
+{
+	std::vector<Value> result;
+	result.reserve(elements.size());
+	result.insert(result.end(), elements.begin(), elements.end());
+	return result;
+}
+}// namespace
+
 template<> PyTuple *as(PyObject *obj)
 {
 	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
@@ -20,15 +31,13 @@ template<> const PyTuple *as(const PyObject *obj)
 	return nullptr;
 }
 
-PyTuple::PyTuple() : PyBaseObject(BuiltinTypes::the().tuple()) {}
+PyTuple::PyTuple(std::vector<Value> &&elements)
+	: PyBaseObject(BuiltinTypes::the().tuple()), m_elements(std::move(elements))
+{}
 
-PyTuple::PyTuple(std::vector<Value> &&elements) : PyTuple() { m_elements = std::move(elements); }
+PyTuple::PyTuple() : PyTuple(std::vector<Value>{}) {}
 
-PyTuple::PyTuple(const std::vector<PyObject *> &elements) : PyTuple()
-{
-	m_elements.reserve(elements.size());
-	for (auto *el : elements) { m_elements.push_back(el); }
-}
+PyTuple::PyTuple(const std::vector<PyObject *> &elements) : PyTuple(make_value_vector(elements)) {}
 
 PyTuple *PyTuple::create()
 {
