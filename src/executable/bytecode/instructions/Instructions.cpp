@@ -153,7 +153,8 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
 		const auto &next_value = (*iterable_object)->next();
-		if (auto last_exception = interpreter.execution_frame()->exception()) {
+		if (interpreter.execution_frame()->exception_info().has_value()) {
+			auto *last_exception = interpreter.execution_frame()->exception_info()->exception;
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
 				// exit loop in error state and handle unwinding to interpreter
 			} else {

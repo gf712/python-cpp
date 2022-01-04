@@ -6,6 +6,25 @@
 
 PyType *BaseException::s_base_exception_type = nullptr;
 
+template<> BaseException *as(PyObject *obj)
+{
+	ASSERT(BaseException::s_base_exception_type)
+	if (obj->type() == BaseException::s_base_exception_type) {
+		return static_cast<BaseException *>(obj);
+	}
+	return nullptr;
+}
+
+
+template<> const BaseException *as(const PyObject *obj)
+{
+	ASSERT(BaseException::s_base_exception_type)
+	if (obj->type() == BaseException::s_base_exception_type) {
+		return static_cast<const BaseException *>(obj);
+	}
+	return nullptr;
+}
+
 BaseException::BaseException(PyTuple *args)
 	: PyBaseObject(s_base_exception_type->underlying_type()), m_args(args)
 {}

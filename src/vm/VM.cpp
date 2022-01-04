@@ -71,14 +71,20 @@ int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame
 			// we left the current stack frame in the previous instruction
 			if (m_stack.size() != stack_size) { break; }
 			// dump();
-			if (interpreter().execution_frame()->exception()) {
-				interpreter().unwind();
-				m_instruction_pointer = func_ip;
-				break;
+			if (interpreter().execution_frame()->exception_info().has_value()) {
+				if (!m_state->catch_exception) {
+					interpreter().unwind();
+					// restore instruction pointer
+					m_instruction_pointer = func_ip;
+					return EXIT_FAILURE;
+				} else {
+					interpreter().execution_frame()->stash_exception();
+					interpreter().set_status(Interpreter::Status::OK);
+					m_state->catch_exception = false;
+					break;
+				}
 			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
-				// bail, an error occured
 				TODO();
-				break;
 			}
 		}
 		if (m_state->jump_block_count.has_value()) {
@@ -125,14 +131,15 @@ int VirtualMachine::execute(std::shared_ptr<Program> program)
 			// we left the current stack frame in the previous instruction
 			if (m_stack.size() != stack_size) { break; }
 			// dump();
-			if (interpreter().execution_frame()->exception()) {
+			if (interpreter().execution_frame()->exception_info().has_value()) {
 				if (!m_state->catch_exception) {
 					interpreter().unwind();
 					// restore instruction pointer
 					m_instruction_pointer = initial_ip;
 					return EXIT_FAILURE;
 				} else {
-					// interpreter().execution_frame()->set_exception(nullptr);
+					interpreter().execution_frame()->stash_exception();
+					interpreter().set_status(Interpreter::Status::OK);
 					m_state->catch_exception = false;
 					break;
 				}

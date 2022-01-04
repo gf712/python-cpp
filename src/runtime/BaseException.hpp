@@ -6,6 +6,8 @@
 class BaseException : public PyBaseObject
 {
 	PyTuple *m_args;
+	friend BaseException *as<>(PyObject *obj);
+	friend const BaseException *as<>(const PyObject *obj);
 
   protected:
 	BaseException(const TypePrototype &type, PyTuple *args);

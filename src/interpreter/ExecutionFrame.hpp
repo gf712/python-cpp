@@ -14,6 +14,11 @@ class ExecutionFrame : public Cell
 	friend Heap;
 	friend Interpreter;
 
+	struct ExceptionInfo
+	{
+		PyObject *exception{ nullptr };
+	};
+
   protected:
 	// parameters
 	std::array<std::optional<Value>, 16> m_parameters;
@@ -21,16 +26,14 @@ class ExecutionFrame : public Cell
 	PyModule *m_builtins;
 	PyDict *m_globals;
 	PyDict *m_locals;
-	// PyDict *m_ns;
 	ExecutionFrame *m_parent{ nullptr };
-	PyObject *m_exception{ nullptr };
 	PyObject *m_exception_to_catch{ nullptr };
+	std::optional<ExceptionInfo> m_exception;
+	std::optional<ExceptionInfo> m_stashed_exception;
 
   public:
 	static ExecutionFrame *
-		create(ExecutionFrame *parent, size_t register_count, PyDict *globals, PyDict *locals
-			// PyDict *ns
-		);
+		create(ExecutionFrame *parent, size_t register_count, PyDict *globals, PyDict *locals);
 
 	const std::optional<Value> &parameter(size_t parameter_idx) const
 	{
@@ -51,7 +54,16 @@ class ExecutionFrame : public Cell
 
 	void set_exception(PyObject *exception);
 
-	PyObject *exception() const { return m_exception; }
+	void clear_stashed_exception();
+
+	void stash_exception();
+
+	const std::optional<ExceptionInfo> &exception_info() const { return m_exception; }
+
+	const std::optional<ExceptionInfo> &stashed_exception_info() const
+	{
+		return m_stashed_exception;
+	}
 
 	bool catch_exception(PyObject *) const;
 

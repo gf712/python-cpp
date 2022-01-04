@@ -1,21 +1,15 @@
 #include "ClearExceptionState.hpp"
 
 namespace {
-bool has_active_exception(Interpreter &interpreter)
+bool has_stashed_exception(Interpreter &interpreter)
 {
-	return interpreter.execution_frame()->exception()
-		   || interpreter.status() == Interpreter::Status::EXCEPTION;
+	return interpreter.execution_frame()->stashed_exception_info().has_value();
 }
 }// namespace
 
 void ClearExceptionState::execute(VirtualMachine &, Interpreter &interpreter) const
 {
-	ASSERT(has_active_exception(interpreter))
+	ASSERT(has_stashed_exception(interpreter))
 
-	if (!interpreter.execution_frame()->exception()) {
-		// TODO: this is a deprecated API, need to remove usage
-		TODO();
-	}
-
-	interpreter.execution_frame()->set_exception(nullptr);
+	interpreter.execution_frame()->clear_stashed_exception();
 }

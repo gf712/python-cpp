@@ -2,6 +2,7 @@
 #include "runtime/AssertionError.hpp"
 #include "runtime/AttributeError.hpp"
 #include "runtime/CustomPyObject.hpp"
+#include "runtime/NameError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
@@ -482,6 +483,7 @@ auto initialize_exceptions(PyModule *blt)
 	AttributeError::register_type(blt);
 	StopIteration::register_type(blt);
 	ValueError::register_type(blt);
+	NameError::register_type(blt);
 }
 
 PyModule *builtins_module(Interpreter &interpreter)

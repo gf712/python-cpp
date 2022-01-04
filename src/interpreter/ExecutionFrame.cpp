@@ -11,15 +11,13 @@ ExecutionFrame::ExecutionFrame() {}
 ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	size_t register_count,
 	PyDict *globals,
-	PyDict *locals
-	/* PyDict *ns */)
+	PyDict *locals)
 {
 	auto *new_frame = Heap::the().allocate<ExecutionFrame>();
 	new_frame->m_parent = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
-	// new_frame->m_ns = ns;
 
 	if (new_frame->m_parent) {
 		new_frame->m_builtins = new_frame->m_parent->m_builtins;
@@ -39,7 +37,22 @@ void ExecutionFrame::set_exception_to_catch(PyObject *exception)
 	m_exception_to_catch = exception;
 }
 
-void ExecutionFrame::set_exception(PyObject *exception) { m_exception = exception; }
+void ExecutionFrame::set_exception(PyObject *exception)
+{
+	if (exception) {
+		// make sure that we are not accidentally overriding an active exception with another
+		// exception
+		ASSERT(!m_exception.has_value())
+		m_exception = ExceptionInfo{ .exception = exception };
+	} else {
+		// FIXME: create a ExecutionFrame::clear_exception method instead
+		m_exception.reset();
+	}
+}
+
+void ExecutionFrame::clear_stashed_exception() { m_stashed_exception.reset(); }
+
+void ExecutionFrame::stash_exception() { m_stashed_exception.swap(m_exception); }
 
 bool ExecutionFrame::catch_exception(PyObject *exception) const
 {
@@ -64,29 +77,19 @@ PyDict *ExecutionFrame::locals() const { return m_locals; }
 PyDict *ExecutionFrame::globals() const { return m_globals; }
 PyModule *ExecutionFrame::builtins() const { return m_builtins; }
 
-ExecutionFrame *ExecutionFrame::exit()
-{
-	// if (m_ns) {
-	// 	for (const auto &[k, v] : m_locals->map()) { m_ns->insert(k, v); }
-	// }
-	return m_parent;
-}
+ExecutionFrame *ExecutionFrame::exit() { return m_parent; }
 
 std::string ExecutionFrame::to_string() const
 {
 	const auto locals = m_locals ? m_locals->to_string() : "";
 	const auto globals = m_globals ? m_globals->to_string() : "";
 	const auto builtins = m_builtins ? m_builtins->to_string() : "";
-	// const auto ns = m_ns ? m_ns->to_string() : "";
 	const void *parent = m_parent ? &m_parent : nullptr;
 
-	return fmt::format(
-		"ExecutionFrame(locals={}, globals={}, builtins={}, namespace={}, "
-		"parent={})",
+	return fmt::format("ExecutionFrame(locals={}, globals={}, builtins={}, parent={})",
 		locals,
 		globals,
 		builtins,
-		0,// ns,
 		parent);
 }
 
@@ -96,7 +99,9 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 	if (m_locals) m_locals->visit_graph(visitor);
 	if (m_globals) m_globals->visit_graph(visitor);
 	if (m_builtins) m_builtins->visit_graph(visitor);
-	// if (m_ns) m_ns->visit_graph(visitor);
+	if (m_exception_to_catch) m_exception_to_catch->visit_graph(visitor);
+	if (m_exception.has_value()) m_exception->exception->visit_graph(visitor);
+	if (m_stashed_exception.has_value()) m_stashed_exception->exception->visit_graph(visitor);
 	for (const auto &val : m_parameters) {
 		if (val.has_value() && std::holds_alternative<PyObject *>(*val)) {
 			std::get<PyObject *>(*val)->visit_graph(visitor);
