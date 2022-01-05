@@ -396,4 +396,9 @@ void BoolOp::print_this_node(const std::string &indent) const
 	for (const auto &value : m_values) { value->print_node(new_indent); }
 }
 
+void Pass::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Pass", indent);
+}
+
 }// namespace ast

@@ -413,6 +413,11 @@ struct OrKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "or"; }
 };
 
+struct PassKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "pass"; }
+};
+
 struct RaiseKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "raise"; }
@@ -918,7 +923,8 @@ struct AtomPattern : Pattern<AtomPattern>
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>>>;
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("NAME");
 
@@ -1291,7 +1297,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>>>>;
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>>;
 		if (pattern5::match(p)) {
 			DEBUG_LOG("ϵ");
 			return true;
@@ -2592,6 +2599,13 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern5 = PatternMatch<RaiseStatementPattern>;
 		if (pattern5::match(p)) {
 			DEBUG_LOG("raise_stmt");
+			return true;
+		}
+		using pattern6 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>;
+		if (pattern6::match(p)) {
+			DEBUG_LOG("pass");
+			p.push_to_stack(std::make_shared<Pass>());
 			return true;
 		}
 		using pattern9 = PatternMatch<AssertStatementPattern>;

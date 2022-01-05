@@ -39,6 +39,7 @@ namespace ast {
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(Name)               \
+	__AST_NODE_TYPE(Pass)               \
 	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
 	__AST_NODE_TYPE(Subscript)          \
@@ -1005,6 +1006,16 @@ class BoolOp : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 };
 
+class Pass : public ASTNode
+{
+  public:
+	Pass() : ASTNode(ASTNodeType::Pass) {}
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
 
 template<typename NodeType> std::shared_ptr<NodeType> as(std::shared_ptr<ASTNode> node);
 
