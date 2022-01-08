@@ -111,9 +111,9 @@ void compare_function_definition(const std::shared_ptr<ASTNode> &result,
 	const auto expected_name = as<FunctionDefinition>(expected)->name();
 	EXPECT_EQ(result_name, expected_name);
 
-	// const auto result_args = as<FunctionDefinition>(result)->args();
-	// const auto expected_args = as<FunctionDefinition>(expected)->args();
-	// dispatch(result_args, expected_args);
+	const auto result_args = as<FunctionDefinition>(result)->args();
+	const auto expected_args = as<FunctionDefinition>(expected)->args();
+	dispatch(result_args, expected_args);
 
 	const auto result_body = as<FunctionDefinition>(result)->body();
 	const auto expected_body = as<FunctionDefinition>(expected)->body();
@@ -575,6 +575,8 @@ void compare_unary_op(const std::shared_ptr<ASTNode> &result,
 void compare_bool_op(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
+	ASSERT_EQ(result->node_type(), ASTNodeType::BoolOp);
+
 	const auto result_op = as<BoolOp>(result)->op();
 	const auto expected_op = as<BoolOp>(expected)->op();
 	ASSERT_EQ(result_op, expected_op);
@@ -586,6 +588,35 @@ void compare_bool_op(const std::shared_ptr<ASTNode> &result,
 	for (size_t i = 0; i < result_values.size(); ++i) {
 		dispatch(result_values[i], expected_values[i]);
 	}
+}
+
+void compare_arguments(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Arguments);
+
+	const auto result_args = as<Arguments>(result)->args();
+	const auto expected_args = as<Arguments>(expected)->args();
+
+	ASSERT_EQ(result_args.size(), expected_args.size());
+
+	for (size_t i = 0; i < result_args.size(); ++i) { dispatch(result_args[i], expected_args[i]); }
+}
+
+void compare_argument(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Argument);
+
+	const auto result_name = as<Argument>(result)->name();
+	const auto expected_name = as<Argument>(expected)->name();
+
+	ASSERT_EQ(result_name, expected_name);
+
+	const auto result_annotation = as<Argument>(result)->annotation();
+	const auto expected_annotation = as<Argument>(expected)->annotation();
+
+	dispatch(result_annotation, expected_annotation);
 }
 
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
@@ -701,6 +732,14 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::BoolOp: {
 		compare_bool_op(result, expected);
+		break;
+	}
+	case ASTNodeType::Arguments: {
+		compare_arguments(result, expected);
+		break;
+	}
+	case ASTNodeType::Argument: {
+		compare_argument(result, expected);
 		break;
 	}
 	default: {
@@ -867,8 +906,8 @@ TEST(Parser, FunctionDefinition)
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
 		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
-			std::make_shared<Argument>("a", "", ""),
-			std::make_shared<Argument>("b", "", ""),
+			std::make_shared<Argument>("a", nullptr, ""),
+			std::make_shared<Argument>("b", nullptr, ""),
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
@@ -877,6 +916,31 @@ TEST(Parser, FunctionDefinition)
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
+		""// type_comment
+		));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, FunctionDefinitionTypeAnnotation)
+{
+	constexpr std::string_view program =
+		"def add(a: int, b: int) -> int:\n"
+		"   return a + b\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
+			std::make_shared<Argument>("a", std::make_shared<Name>("int", ContextType::LOAD), ""),
+			std::make_shared<Argument>("b", std::make_shared<Name>("int", ContextType::LOAD), ""),
+		}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Return>(std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
+				std::make_shared<Name>("a", ContextType::LOAD),
+				std::make_shared<Name>("b", ContextType::LOAD))),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::make_shared<Name>("int", ContextType::LOAD),// returns
 		""// type_comment
 		));
 
@@ -893,7 +957,7 @@ TEST(Parser, MultilineFunctionDefinition)
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("plus_one",// function_name
 		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
-			std::make_shared<Argument>("a", "", ""),
+			std::make_shared<Argument>("a", nullptr, ""),
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
@@ -1110,8 +1174,8 @@ TEST(Parser, ClassDefinition)
 		std::vector<std::shared_ptr<ast::ASTNode>>{
 			std::make_shared<FunctionDefinition>("__init__",// function_name
 				std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
-					std::make_shared<Argument>("self", "", ""),
-					std::make_shared<Argument>("value", "", ""),
+					std::make_shared<Argument>("self", nullptr, ""),
+					std::make_shared<Argument>("value", nullptr, ""),
 				}),// args
 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Assign>(
 					std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Attribute>(

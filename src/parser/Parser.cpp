@@ -2640,6 +2640,24 @@ struct DefPattern
 	static bool matches(std::string_view token_value) { return token_value == "def"; }
 };
 
+struct AnnotationPattern : Pattern<AnnotationPattern>
+{
+	// annotation: ':' expression
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("annotation");
+		BlockScope scope{ p };
+		// ':' expression
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::COLON>, ExpressionPattern>;
+		if (pattern1::match(p)) {
+			ASSERT(p.stack().size() == 1)
+			scope.parent().push_back(p.pop_back());
+			return true;
+		}
+		return false;
+	}
+};
 
 struct ParamPattern : Pattern<ParamPattern>
 {
@@ -2651,14 +2669,21 @@ struct ParamPattern : Pattern<ParamPattern>
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string argname{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
-			std::string annotation = "";
+			using pattern1a = PatternMatch<AnnotationPattern>;
+			std::shared_ptr<ASTNode> annotation = [&p]() -> std::shared_ptr<ASTNode> {
+				if (pattern1a::match(p)) {
+					const auto &type = p.pop_back();
+					return type;
+				} else {
+					return nullptr;
+				}
+			}();
 			p.push_to_stack(std::make_shared<Argument>(argname, annotation, ""));
 			return true;
 		}
 		return false;
 	}
 };
-
 
 struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 {
@@ -2795,6 +2820,7 @@ struct FunctionDefinitionPattern : Pattern<FunctionDefinitionPattern>
 				SingleTokenPattern<Token::TokenType::LPAREN>,
 				ZeroOrMorePattern<ParamsPattern>,
 				SingleTokenPattern<Token::TokenType::RPAREN>,
+				ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::RARROW>, ExpressionPattern>,
 				SingleTokenPattern<Token::TokenType::COLON>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG(
@@ -2816,19 +2842,26 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
-		const auto stack_size = p.stack().size();
 		// function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("function_def_raw: function_def");
 			auto name = p.pop_front();
 			auto args = [&]() -> std::shared_ptr<ast::ASTNode> {
-				if ((p.stack().size() - stack_size) > 0) {
+				if (!p.stack().empty()) {
 					return p.pop_front();
 				} else {
 					return std::make_shared<Arguments>();
 				}
 			}();
+			auto returns = [&]() -> std::shared_ptr<ast::ASTNode> {
+				if (!p.stack().empty()) {
+					return p.pop_front();
+				} else {
+					return nullptr;
+				}
+			}();
+
 			if (args) { args->print_node(""); }
 			name->print_node("");
 			std::vector<std::shared_ptr<ASTNode>> body;
@@ -2846,7 +2879,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 				as<Arguments>(args),
 				body,
 				std::vector<std::shared_ptr<ASTNode>>{},
-				nullptr,
+				returns,
 				"");
 			scope.parent().push_back(function);
 			function->print_node("");

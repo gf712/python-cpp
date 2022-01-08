@@ -111,7 +111,13 @@ void Argument::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Argument", indent);
 	spdlog::debug("{}  - arg: {}", indent, m_arg);
-	spdlog::debug("{}  - annotation: {}", indent, m_annotation);
+	if (m_annotation) {
+		spdlog::debug("{}  - annotation:", indent);
+		std::string new_indent = indent + std::string(6, ' ');
+		m_annotation->print_node(new_indent);
+	} else {
+		spdlog::debug("{}  - annotation: None", indent);
+	}
 	spdlog::debug("{}  - type_comment: {}", indent, m_type_comment);
 }
 
@@ -396,9 +402,6 @@ void BoolOp::print_this_node(const std::string &indent) const
 	for (const auto &value : m_values) { value->print_node(new_indent); }
 }
 
-void Pass::print_this_node(const std::string &indent) const
-{
-	spdlog::debug("{}Pass", indent);
-}
+void Pass::print_this_node(const std::string &indent) const { spdlog::debug("{}Pass", indent); }
 
 }// namespace ast

@@ -432,11 +432,11 @@ class Return : public ASTNode
 class Argument final : public ASTNode
 {
 	const std::string m_arg;
-	const std::string m_annotation;
+	const std::shared_ptr<ASTNode> m_annotation;
 	const std::string m_type_comment;
 
   public:
-	Argument(std::string arg, std::string annotation, std::string type_comment)
+	Argument(std::string arg, std::shared_ptr<ASTNode> annotation, std::string type_comment)
 		: ASTNode(ASTNodeType::Argument), m_arg(std::move(arg)),
 		  m_annotation(std::move(annotation)), m_type_comment(std::move(type_comment))
 	{}
@@ -444,6 +444,7 @@ class Argument final : public ASTNode
 	void print_this_node(const std::string &indent) const final;
 
 	const std::string &name() const { return m_arg; }
+	const std::shared_ptr<ASTNode> &annotation() const { return m_annotation; }
 
 	void codegen(CodeGenerator *) const override;
 };
