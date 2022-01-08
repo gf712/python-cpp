@@ -380,6 +380,7 @@ PyObject *isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &int
 	auto *classinfo = PyObject::from(args->elements()[1]);
 
 	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
+		(void)class_info_tuple;
 		TODO();
 	} else if (auto *class_info_type = as<PyType>(classinfo)) {
 		if (object->type() == class_info_type) {
@@ -412,6 +413,7 @@ PyObject *issubclass(const PyTuple *args, const PyDict *kwargs, Interpreter &int
 	auto *classinfo = PyObject::from(args->elements()[1]);
 
 	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
+		(void)class_info_tuple;
 		TODO();
 	} else if (auto *class_info_type = as<PyType>(classinfo)) {
 		auto *class_as_type = as<PyType>(class_);

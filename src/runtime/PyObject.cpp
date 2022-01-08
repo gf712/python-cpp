@@ -659,7 +659,7 @@ PyObject *PyObject::get_method(PyObject *name) const
 
 PyObject *PyObject::__setattribute__(PyObject *attribute, PyObject *value)
 {
-	if (const auto *pystr = as<PyString>(attribute)) {
+	if (as<PyString>(attribute)) {
 		if (!m_attributes) { m_attributes = PyDict::create(); }
 		m_attributes->insert(attribute, value);
 	} else {
