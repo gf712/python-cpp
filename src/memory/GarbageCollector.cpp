@@ -56,6 +56,10 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	for (const auto &interpreter : VirtualMachine::the().interpreter_session()->interpreters()) {
 		auto *execution_frame = interpreter->execution_frame();
 		if (execution_frame) { roots.insert(execution_frame); }
+		for (const auto &module: interpreter->get_available_modules()) {
+			ASSERT(module)
+			roots.insert(module);
+		}
 	}
 
 	return roots;
@@ -106,10 +110,14 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { // std::reference_wrapper{ heap.slab().block_128() },
-		// std::reference_wrapper{ heap.slab().block_256() },
+	std::array blocks = {
+		std::reference_wrapper{ heap.slab().block_32() },
+		std::reference_wrapper{ heap.slab().block_64() },
+		std::reference_wrapper{ heap.slab().block_128() },
+		std::reference_wrapper{ heap.slab().block_256() },
 		std::reference_wrapper{ heap.slab().block_512() },
-		std::reference_wrapper{ heap.slab().block_1024() }
+		std::reference_wrapper{ heap.slab().block_1024() },
+		std::reference_wrapper{ heap.slab().block_2048() },
 	};
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
@@ -138,10 +146,14 @@ void MarkSweepGC::sweep(Heap &heap) const
 {
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
-	std::array blocks = { // std::reference_wrapper{ heap.slab().block_128() },
-		// std::reference_wrapper{ heap.slab().block_256() },
+	std::array blocks = {
+		std::reference_wrapper{ heap.slab().block_32() },
+		std::reference_wrapper{ heap.slab().block_64() },
+		std::reference_wrapper{ heap.slab().block_128() },
+		std::reference_wrapper{ heap.slab().block_256() },
 		std::reference_wrapper{ heap.slab().block_512() },
-		std::reference_wrapper{ heap.slab().block_1024() }
+		std::reference_wrapper{ heap.slab().block_1024() },
+		std::reference_wrapper{ heap.slab().block_2048() },
 	};
 	// sweep all the dead objects
 	for (const auto &block : blocks) {
@@ -154,6 +166,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 						auto *obj = static_cast<PyObject *>(cell);
 						spdlog::trace("Deallocating {}@{}", obj->type()->name(), (void *)obj);
 					}
+					spdlog::trace("Calling destructor of object at {}", (void *)cell);
 					cell->~Cell();
 					chunk.deallocate(memory);
 				}
@@ -165,6 +178,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 
 void MarkSweepGC::run(Heap &heap) const
 {
+	if (m_pause) { return; }
 	if (m_iterations_since_last_sweep++ < m_frequency) { return; }
 
 	mark_all_cell_unreachable(heap);
@@ -177,3 +191,6 @@ void MarkSweepGC::run(Heap &heap) const
 
 	m_iterations_since_last_sweep = 0;
 }
+
+void MarkSweepGC::resume() { m_pause = false; }
+void MarkSweepGC::pause() { m_pause = true; }

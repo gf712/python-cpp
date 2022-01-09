@@ -8,6 +8,7 @@ class PyTupleIterator;
 class PyTuple : public PyBaseObject
 {
 	friend class Heap;
+	friend class PyTupleIterator;
 
 	const std::vector<Value> m_elements;
 
@@ -59,6 +60,9 @@ class PyTupleIterator : public PyBaseObject
 
 	PyTupleIterator(const PyTuple &pytuple);
 	PyTupleIterator(const PyTuple &pytuple, size_t position);
+
+  protected:
+	void visit_graph(Visitor &) override;
 
   public:
 	using difference_type = std::vector<Value>::difference_type;

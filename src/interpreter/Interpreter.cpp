@@ -116,13 +116,8 @@ PyObject *Interpreter::call(const std::shared_ptr<Function> &func, ExecutionFram
 	m_current_frame = function_frame;
 	vm.call(func, function_frame->m_register_count);
 
-	// cleanup
-	auto current_frame = std::unique_ptr<ExecutionFrame, void (*)(ExecutionFrame *)>(
-		m_current_frame, [](ExecutionFrame *ptr) {
-			spdlog::debug("Deallocationg ExecutionFrame {}", (void *)ptr);
-			ptr->~ExecutionFrame();
-		});
-	m_current_frame = current_frame->exit();
+	// cleanup: the current_frame will be garbage collected
+	m_current_frame = m_current_frame->exit();
 
 	return PyObject::from(vm.reg(0));
 }

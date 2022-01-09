@@ -33,7 +33,7 @@ class PyType : public PyBaseObject
 
 	const TypePrototype &underlying_type() const { return m_underlying_type; }
 
-	void visit_graph(Visitor &visitor) override { PyObject::visit_graph(visitor); }
+	void visit_graph(Visitor &visitor) override;
 
 	static std::unique_ptr<TypePrototype> register_type();
 

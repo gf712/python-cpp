@@ -96,16 +96,16 @@ std::string ExecutionFrame::to_string() const
 void ExecutionFrame::visit_graph(Visitor &visitor)
 {
 	visitor.visit(*this);
-	if (m_locals) m_locals->visit_graph(visitor);
-	if (m_globals) m_globals->visit_graph(visitor);
-	if (m_builtins) m_builtins->visit_graph(visitor);
-	if (m_exception_to_catch) m_exception_to_catch->visit_graph(visitor);
-	if (m_exception.has_value()) m_exception->exception->visit_graph(visitor);
-	if (m_stashed_exception.has_value()) m_stashed_exception->exception->visit_graph(visitor);
+	if (m_locals) visitor.visit(*m_locals);
+	if (m_globals) visitor.visit(*m_globals);
+	if (m_builtins) visitor.visit(*m_builtins);
+	if (m_exception_to_catch) visitor.visit(*m_exception_to_catch);
+	if (m_exception.has_value()) visitor.visit(*m_exception->exception);
+	if (m_stashed_exception.has_value()) visitor.visit(*m_stashed_exception->exception);
 	for (const auto &val : m_parameters) {
 		if (val.has_value() && std::holds_alternative<PyObject *>(*val)) {
-			std::get<PyObject *>(*val)->visit_graph(visitor);
+			visitor.visit(*std::get<PyObject *>(*val));
 		}
 	}
-	if (m_parent) { m_parent->visit_graph(visitor); }
+	if (m_parent) { visitor.visit(*m_parent); }
 }

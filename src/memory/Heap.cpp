@@ -103,14 +103,18 @@ void Block::deallocate(uint8_t *ptr)
 
 bool Slab::has_address(uint8_t *address) const
 {
-	{
-		auto &block = block512;
-		for (auto &chunk : block->chunks()) {
-			if (chunk.has_address(address)) { return true; }
-		}
-	}
-	{
-		auto &block = block1024;
+	// TODO: once the ideal block sizes are fixed there should be an iterator
+	//       returning a list of all blocks
+	std::array blocks = {
+		block32.get(),
+		block64.get(),
+		block128.get(),
+		block256.get(),
+		block512.get(),
+		block1024.get(),
+		block2048.get(),
+	};
+	for (const auto& block: blocks) {
 		for (auto &chunk : block->chunks()) {
 			if (chunk.has_address(address)) { return true; }
 		}

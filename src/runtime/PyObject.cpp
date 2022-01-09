@@ -114,8 +114,8 @@ PyObject::PyObject(const TypePrototype &type) : Cell(), m_type_prototype(type) {
 
 void PyObject::visit_graph(Visitor &visitor)
 {
-	if (m_attributes) { visitor.visit(*m_attributes); }
 	visitor.visit(*this);
+	if (m_attributes) { visitor.visit(*m_attributes); }
 }
 
 PyObject *PyObject::__repr__() const

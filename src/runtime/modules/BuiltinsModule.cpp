@@ -23,6 +23,7 @@
 
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
+#include "memory/GarbageCollector.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
@@ -458,6 +459,7 @@ auto initialize_types()
 	slot_wrapper();
 	bound_method();
 	method_wrapper();
+	static_method();
 
 	return std::array{
 		type(),
@@ -498,6 +500,8 @@ PyModule *builtins_module(Interpreter &interpreter)
 	if (s_builtin_module && heap.slab().has_address(bit_cast<uint8_t *>(s_builtin_module))) {
 		return s_builtin_module;
 	}
+
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
 	auto types = initialize_types();
 

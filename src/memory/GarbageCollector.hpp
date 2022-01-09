@@ -65,6 +65,8 @@ class GarbageCollector
   public:
 	virtual ~GarbageCollector() = default;
 	virtual void run(Heap &) const = 0;
+	virtual void resume() = 0;
+	virtual void pause() = 0;
 };
 
 class MarkSweepGC : public GarbageCollector
@@ -72,6 +74,8 @@ class MarkSweepGC : public GarbageCollector
   public:
 	MarkSweepGC();
 	void run(Heap &) const override;
+	void resume() override;
+	void pause() override;
 
 	std::unordered_set<Cell *> collect_roots() const;
 	void mark_all_cell_unreachable(Heap &) const;
@@ -82,4 +86,5 @@ class MarkSweepGC : public GarbageCollector
 	mutable uint8_t *m_stack_bottom{ nullptr };
 	size_t m_frequency;
 	mutable size_t m_iterations_since_last_sweep{ 0 };
+	bool m_pause{ false };
 };

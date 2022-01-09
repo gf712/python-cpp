@@ -22,6 +22,7 @@ void PyStaticMethod::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	visitor.visit(*m_name);
 	if (m_underlying_type) { visitor.visit(*m_underlying_type); }
+	if (m_static_method) { visitor.visit(*m_static_method); }
 }
 
 PyObject *PyStaticMethod::__repr__() const { return PyString::create(to_string()); }

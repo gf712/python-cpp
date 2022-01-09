@@ -73,7 +73,7 @@ TypePrototype clone(std::string name, const TypePrototype &prototype)
 // reorganising the project structure, since some of the functions used here, are not known
 // when PyObject is declared in PyObject.hpp
 template<typename SlotFunctionType, typename... Args>
-static PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&... args_)
+static PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
 {
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		auto result = std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -560,4 +560,53 @@ bool PyType::issubclass(const PyType *other)
 	}
 
 	return false;
+}
+
+void PyType::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+
+#define VISIT_SLOT(__slot__)                                                  \
+	if (m_underlying_type.__slot__.has_value()                                \
+		&& std::holds_alternative<PyObject *>(*m_underlying_type.__slot__)) { \
+		visitor.visit(*std::get<PyObject *>(*m_underlying_type.__slot__));    \
+	}
+
+	VISIT_SLOT(__repr__)
+	VISIT_SLOT(__call__)
+	VISIT_SLOT(__new__)
+	VISIT_SLOT(__init__)
+	VISIT_SLOT(__hash__)
+	VISIT_SLOT(__lt__)
+	VISIT_SLOT(__le__)
+	VISIT_SLOT(__eq__)
+	VISIT_SLOT(__ne__)
+	VISIT_SLOT(__gt__)
+	VISIT_SLOT(__ge__)
+	VISIT_SLOT(__iter__)
+	VISIT_SLOT(__next__)
+	VISIT_SLOT(__len__)
+	VISIT_SLOT(__add__)
+	VISIT_SLOT(__sub__)
+	VISIT_SLOT(__mul__)
+	VISIT_SLOT(__exp__)
+	VISIT_SLOT(__lshift__)
+	VISIT_SLOT(__mod__)
+	VISIT_SLOT(__abs__)
+	VISIT_SLOT(__neg__)
+	VISIT_SLOT(__pos__)
+	VISIT_SLOT(__invert__)
+	VISIT_SLOT(__bool__)
+	VISIT_SLOT(__getattribute__)
+	VISIT_SLOT(__setattribute__)
+	VISIT_SLOT(__get__)
+#undef VISIT_SLOT
+
+	if (m_underlying_type.__dict__) { visitor.visit(*m_underlying_type.__dict__); }
+
+	if (m_underlying_type.__mro__) { visitor.visit(*m_underlying_type.__mro__); }
+
+	if (m_underlying_type.__bases__) { visitor.visit(*m_underlying_type.__bases__); }
+
+	if (m_underlying_type.__class__) { visitor.visit(*m_underlying_type.__class__); }
 }

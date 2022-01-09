@@ -196,6 +196,11 @@ PyObject *PyTupleIterator::operator*() const
 		m_pytuple.elements()[m_current_index]);
 }
 
+void PyTupleIterator::visit_graph(Visitor &visitor) {
+	const_cast<PyTuple&>(m_pytuple).visit_graph(visitor);
+}
+
+
 PyType *PyTupleIterator::type() const { return tuple_iterator(); }
 
 namespace {

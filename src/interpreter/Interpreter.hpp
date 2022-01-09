@@ -56,7 +56,7 @@ class Interpreter
 	std::optional<Value> get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
-	PyObject *allocate_object(const std::string &name, Args &&... args)
+	PyObject *allocate_object(const std::string &name, Args &&...args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {
@@ -68,6 +68,7 @@ class Interpreter
 	}
 
 	PyModule *get_imported_module(PyString *) const;
+	const std::vector<PyModule *> &get_available_modules() const { return m_available_modules; }
 
 	PyModule *module() const { return m_module; }
 
@@ -86,7 +87,7 @@ class Interpreter
 	PyObject *call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs);
 
   private:
-	void internal_setup(const std::string& name,
+	void internal_setup(const std::string &name,
 		std::string entry_script,
 		std::vector<std::string> argv,
 		size_t local_registers);

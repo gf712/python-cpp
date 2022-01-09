@@ -166,10 +166,14 @@ class Slab
 		block2048 = std::make_unique<Block>(2048, 1000);
 	}
 
+	std::unique_ptr<Block> &block_16() { return block16; }
+	std::unique_ptr<Block> &block_32() { return block32; }
+	std::unique_ptr<Block> &block_64() { return block64; }
 	std::unique_ptr<Block> &block_128() { return block128; }
 	std::unique_ptr<Block> &block_256() { return block256; }
 	std::unique_ptr<Block> &block_512() { return block512; }
 	std::unique_ptr<Block> &block_1024() { return block1024; }
+	std::unique_ptr<Block> &block_2048() { return block2048; }
 
 	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
 	{
@@ -259,6 +263,13 @@ class Heap
 	std::unique_ptr<GarbageCollector> m_gc;
 	uintptr_t *m_bottom_stack_pointer;
 
+	struct ScopedGCPause
+	{
+		GarbageCollector &gc_;
+		ScopedGCPause(GarbageCollector &gc) : gc_(gc) { gc_.pause(); }
+		~ScopedGCPause() { gc_.resume(); }
+	};
+
   public:
 	static Heap &the()
 	{
@@ -282,7 +293,7 @@ class Heap
 
 	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
-	template<typename T, typename... Args> T *allocate(Args &&... args)
+	template<typename T, typename... Args> T *allocate(Args &&...args)
 	{
 		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
@@ -296,7 +307,7 @@ class Heap
 
 	void collect_garbage();
 
-	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
+	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
 		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
@@ -308,6 +319,8 @@ class Heap
 	size_t static_memory_size() const { return m_static_memory_size; }
 
 	Slab &slab() { return m_slab; }
+
+	[[nodiscard]] ScopedGCPause scoped_gc_pause() { return ScopedGCPause(*m_gc); }
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;

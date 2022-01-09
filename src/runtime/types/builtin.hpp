@@ -114,4 +114,3 @@ PyType *slot_wrapper();
 PyType *bound_method();
 PyType *method_wrapper();
 PyType *static_method();
-PyType *str();
