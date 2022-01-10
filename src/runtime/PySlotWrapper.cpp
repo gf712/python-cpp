@@ -43,7 +43,7 @@ PyObject *PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 PyObject *PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
 	if (!instance) { return const_cast<PySlotWrapper *>(this); }
-	if (instance->type() != m_slot_type) {
+	if (!instance->type()->issubclass(m_slot_type)) {
 		VirtualMachine::the().interpreter().raise_exception(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",
@@ -52,9 +52,15 @@ PyObject *PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
 				instance->type()->underlying_type().__name__));
 		return nullptr;
 	}
+	// bind slot wrapper to the instance
 	return PyNativeFunction::create(
 		m_name->value(),
-		[this](PyTuple *args, PyDict *kwargs) {
+		[this, instance](PyTuple *args, PyDict *kwargs) {
+			std::vector<Value> args_;
+			args_.reserve(args->size() + 1);
+			args_.push_back(instance);
+			args_.insert(args_.end(), args->elements().begin(), args->elements().end());
+			args = PyTuple::create(args_);
 			return const_cast<PySlotWrapper *>(this)->__call__(args, kwargs);
 		},
 		const_cast<PySlotWrapper *>(this),

@@ -1,7 +1,6 @@
 #include "Modules.hpp"
 #include "runtime/AssertionError.hpp"
 #include "runtime/AttributeError.hpp"
-#include "runtime/CustomPyObject.hpp"
 #include "runtime/NameError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
@@ -442,7 +441,7 @@ auto initialize_types()
 	integer();
 	none();
 	module();
-	custom_object();
+	object();
 	dict();
 	dict_items();
 	dict_items_iterator();
@@ -470,7 +469,7 @@ auto initialize_types()
 		float_(),
 		integer(),
 		none(),
-		custom_object(),
+		object(),
 		dict(),
 		list(),
 		tuple(),

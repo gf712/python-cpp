@@ -41,6 +41,9 @@ using InitSlotFunctionType = std::function<std::optional<int32_t>(PyObject *, Py
 using GetAttroFunctionType = std::function<PyObject *(const PyObject *, PyObject *)>;
 using SetAttroFunctionType = std::function<PyObject *(PyObject *, PyObject *, PyObject *)>;
 
+using GetSlotFunctionType = std::function<PyObject *(const PyObject *, PyObject *, PyObject *)>;
+using SetSlotFunctionType = std::function<bool(PyObject *, PyObject *, PyObject *)>;
+
 using LenSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyObject *(const PyObject *)>;
 using ReprSlotFunctionType = std::function<PyObject *(const PyObject *)>;
@@ -59,7 +62,6 @@ using ExpSlotFunctionType = std::function<PyObject *(const PyObject *, const PyO
 using LeftShiftSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 
-using GetSlotFunctionType = std::function<PyObject *(const PyObject *, PyObject *, PyObject *)>;
 using HashSlotFunctionType = std::function<size_t(const PyObject *)>;
 using CompareSlotFunctionType = std::function<PyObject *(const PyObject *, const PyObject *)>;
 
@@ -74,6 +76,9 @@ struct TypePrototype
 
 	std::optional<std::variant<GetAttroFunctionType, PyObject *>> __getattribute__;
 	std::optional<std::variant<SetAttroFunctionType, PyObject *>> __setattribute__;
+
+	std::optional<std::variant<GetSlotFunctionType, PyObject *>> __get__;
+	std::optional<std::variant<SetSlotFunctionType, PyObject *>> __set__;
 
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __add__;
 	std::optional<std::variant<SubtractSlotFunctionType, PyObject *>> __sub__;
@@ -102,7 +107,6 @@ struct TypePrototype
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __lt__;
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __ne__;
 
-	std::optional<std::variant<GetSlotFunctionType, PyObject *>> __get__;
 	std::vector<MethodDefinition> __methods__;
 	PyDict *__dict__{ nullptr };
 
@@ -151,14 +155,14 @@ class PyObject : public Cell
 
 	virtual ~PyObject() = default;
 
-	virtual PyType *type() const = 0;
+	virtual PyType *type() const;
 
 	template<typename T> static PyObject *from(const T &value);
 
 	void visit_graph(Visitor &) override;
 
 	PyObject *getattribute(PyObject *attribute) const;
-	PyObject *setattribute(PyObject *attribute, PyObject *value);
+	bool setattribute(PyObject *attribute, PyObject *value);
 	PyObject *get(PyObject *instance, PyObject *owner) const;
 
 	PyObject *add(const PyObject *other) const;
@@ -194,6 +198,9 @@ class PyObject : public Cell
 	virtual PyObject *new_(PyTuple *args, PyDict *kwargs) const;
 	std::optional<int32_t> init(PyTuple *args, PyDict *kwargs);
 
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	std::optional<int32_t> __init__(PyTuple *args, PyDict *kwargs);
+
 	PyObject *__getattribute__(PyObject *attribute) const;
 	PyObject *__setattribute__(PyObject *attribute, PyObject *value);
 	PyObject *__eq__(const PyObject *other) const;
@@ -208,6 +215,10 @@ class PyObject : public Cell
 	const PyDict &attributes() const { return *m_attributes; }
 	PyObject *get_method(PyObject *name) const;
 	PyObject *get_attribute(PyObject *name) const;
+
+	static std::unique_ptr<TypePrototype> register_type();
+
+	std::string to_string() const override;
 };
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
