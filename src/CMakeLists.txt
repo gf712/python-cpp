@@ -1,3 +1,5 @@
+find_package(LLVM CONFIG)
+
 set(AST_SOURCE_FILES # cmake-format: sortable
                      ast/AST.cpp ast/optimizers/ConstantFolding.cpp)
 
@@ -45,6 +47,9 @@ set(EXECUTABLE_SOURCE_FILES # cmake-format: sortable
 
 set(LEXER_SOURCE_FILES # cmake-format: sortable
                        lexer/Lexer.cpp)
+
+set(LLVM_BACKEND_FILES # cmake-format: sortable
+                       executable/llvm/LLVMGenerator.cpp)
 
 set(INTERPRETER_SOURCE_FILES
     # cmake-format: sortable
@@ -134,6 +139,27 @@ target_compile_options(
 
 if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
+endif()
+
+if (LLVM_FOUND)
+  message(STATUS "Configuring LLVM backend")
+  add_library(python-cpp-llvm ${LLVM_BACKEND_FILES})
+
+  target_compile_options(
+    python-cpp-llvm
+    PRIVATE -Wall
+            -Wextra
+            -Werror
+            -Wno-unused-parameter
+            -fno-omit-frame-pointer)
+
+  target_include_directories(python-cpp-llvm PRIVATE . ${LLVM_INCLUDE_DIRS})
+  separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+  target_compile_definitions(python-cpp-llvm PRIVATE ${LLVM_DEFINITIONS_LIST})
+  if(STL_SUPPORTS_BIT_CAST)
+    target_compile_definitions(python-cpp-llvm PRIVATE "STL_SUPPORTS_BIT_CAST")
+  endif()
+  target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
 endif()
 
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)
