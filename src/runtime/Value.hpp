@@ -215,6 +215,7 @@ std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &int
 std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
