@@ -243,6 +243,14 @@ std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &)
 		rhs);
 }
 
+std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	(void)lhs;
+	(void)rhs;
+	TODO();
+	return {};
+}
+
 std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter)
 {
 	return std::visit(

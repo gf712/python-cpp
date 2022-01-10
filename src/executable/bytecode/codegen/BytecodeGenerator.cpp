@@ -18,6 +18,7 @@
 #include "executable/bytecode/instructions/LoadMethod.hpp"
 #include "executable/bytecode/instructions/LoadName.hpp"
 #include "executable/bytecode/instructions/MethodCall.hpp"
+#include "executable/bytecode/instructions/NotEqual.hpp"
 #include "executable/bytecode/instructions/RaiseVarargs.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
@@ -325,11 +326,20 @@ void BytecodeGenerator::visit(const Compare *node)
 	case Compare::OpType::Eq: {
 		emit<Equal>(result_reg, lhs_reg, rhs_reg);
 	} break;
-	case Compare::OpType::LtE: {
-		emit<LessThanEquals>(result_reg, lhs_reg, rhs_reg);
+	case Compare::OpType::NotEq: {
+		emit<NotEqual>(result_reg, lhs_reg, rhs_reg);
 	} break;
 	case Compare::OpType::Lt: {
 		emit<LessThan>(result_reg, lhs_reg, rhs_reg);
+	} break;
+	case Compare::OpType::LtE: {
+		emit<LessThanEquals>(result_reg, lhs_reg, rhs_reg);
+	} break;
+	case Compare::OpType::Gt: {
+		TODO();
+	} break;
+	case Compare::OpType::GtE: {
+		TODO();
 	} break;
 	case Compare::OpType::Is: {
 		emit<IsOp>(result_reg, lhs_reg, rhs_reg, false);
@@ -337,9 +347,12 @@ void BytecodeGenerator::visit(const Compare *node)
 	case Compare::OpType::IsNot: {
 		emit<IsOp>(result_reg, lhs_reg, rhs_reg, true);
 	} break;
-	default: {
+	case Compare::OpType::In: {
 		TODO();
-	}
+	} break;
+	case Compare::OpType::NotIn: {
+		TODO();
+	} break;
 	}
 	m_last_register = result_reg;
 }

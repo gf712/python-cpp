@@ -22,6 +22,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
     executable/bytecode/instructions/MethodCall.cpp
+    executable/bytecode/instructions/NotEqual.cpp
     executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
