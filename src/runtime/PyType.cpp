@@ -476,8 +476,20 @@ PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 		}
 	}
 
+	return PyType::build_type(name, bases, ns);
+}
+
+PyType *PyType::build_type(PyString *type_name, PyTuple *bases, PyDict *ns)
+{
 	auto *type = VirtualMachine::the().heap().allocate<PyType>(
-		clone(name->value(), custom_object()->underlying_type()));
+		clone(type_name->value(), custom_object()->underlying_type()));
+
+	for (const auto &[key, value] : ns->map()) {
+		const auto key_str = PyObject::from(key);
+		if (!as<PyString>(key_str)) {
+			VirtualMachine::the().interpreter().raise_exception(type_error(""));
+		}
+	}
 
 	if (bases->elements().empty()) {
 		// all objects inherit from object by default
@@ -485,8 +497,6 @@ PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 	}
 	type->m_underlying_type.__bases__ = bases;
 	type->initialize(ns);
-
-	// if (bases->size() > 0) { TODO(); }
 
 	return type;
 }
