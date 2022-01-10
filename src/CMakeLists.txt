@@ -159,7 +159,12 @@ if (LLVM_FOUND)
   if(STL_SUPPORTS_BIT_CAST)
     target_compile_definitions(python-cpp-llvm PRIVATE "STL_SUPPORTS_BIT_CAST")
   endif()
-  target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
+  llvm_map_components_to_libnames(llvm_libs core)
+  target_link_libraries(python-cpp-llvm PRIVATE ${llvm_libs})
+
+  target_link_libraries(python-cpp PUBLIC python-cpp-llvm)
+
+  target_sources(unittests PRIVATE "executable/llvm/LLVMGenerator_tests.cpp")
 endif()
 
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)

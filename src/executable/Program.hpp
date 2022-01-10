@@ -15,6 +15,10 @@ class Program : NonCopyable
   public:
 	Program(FunctionBlocks &&func_blocks, std::string filename, std::vector<std::string> argv);
 
+	Program(std::vector<std::shared_ptr<Function>> &&functions,
+		std::string filename,
+		std::vector<std::string> argv);
+
 	auto begin() const
 	{
 		// FIXME: assumes all functions are bytecode

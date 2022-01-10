@@ -58,6 +58,12 @@ Program::Program(FunctionBlocks &&func_blocks, std::string filename, std::vector
 	}
 }
 
+Program::Program(std::vector<std::shared_ptr<Function>> &&functions,
+	std::string filename,
+	std::vector<std::string> argv)
+	: m_filename(std::move(filename)), m_argv(std::move(argv)), m_functions(std::move(functions))
+{}
+
 std::string Program::to_string() const
 {
 	std::stringstream ss;

@@ -4,29 +4,44 @@
 #include "executable/Function.hpp"
 
 namespace llvm {
-    class Module;
-}
+class Function;
+class Type;
+class Value;
+}// namespace llvm
 
-class LLVMGenerator: public ast::CodeGenerator {
-    struct Context;
+namespace codegen {
+class LLVMGenerator : public ast::CodeGenerator
+{
+	struct Context;
 
-    public:
-    	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
+	std::unique_ptr<Context> m_ctx;
+
+	LLVMGenerator();
+
+  public:
+	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
 		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
 
-private:
+  private:
+	llvm::Value *generate(const ast::ASTNode *node);
+
 #define __AST_NODE_TYPE(NodeType) void visit(const ast::NodeType *node) override;
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
+
+	llvm::Type *arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation);
+
+	template<typename... Args> void set_error_state(std::string_view msg, Args &&... args);
 };
 
 class LLVMFunction : public ::Function
 {
-    std::unique_ptr<llvm::Module> m_module;
+	const llvm::Function &m_function;
 
   public:
-	LLVMFunction(std::unique_ptr<llvm::Module>&& module);
+	LLVMFunction(const llvm::Function &f);
 
 	std::string to_string() const override;
 };
+}// namespace codegen
