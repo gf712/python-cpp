@@ -19,8 +19,8 @@ void Move::execute(VirtualMachine &vm, Interpreter &) const
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	ASSERT(interpreter.functions(m_function_id)->backend() == FunctionExecutionBackend::BYTECODE)
-	auto function = std::static_pointer_cast<Bytecode>(interpreter.functions(m_function_id));
+	ASSERT(interpreter.function(m_function_name)->backend() == FunctionExecutionBackend::BYTECODE)
+	auto function = std::static_pointer_cast<Bytecode>(interpreter.function(m_function_name));
 
 	auto flags = PyCode::CodeFlags::create();
 	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
@@ -47,8 +47,11 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		m_kwonly_arg_count,
 		flags,
 		interpreter.module());
+
+	const auto start = m_function_name.find_last_of('.') + 1;
+	const std::string demangled_name{ m_function_name.begin() + start, m_function_name.end() };
 	interpreter.allocate_object<PyFunction>(
-		m_function_name, m_function_name, code, interpreter.execution_frame()->globals());
+		demangled_name, m_function_name, code, interpreter.execution_frame()->globals());
 }
 
 

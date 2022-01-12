@@ -30,3 +30,17 @@ TEST(LLVMBackend, CompilesTypeAnnotatedFunction)
 	auto llvm_module = generate_llvm_module(program);
 	ASSERT_TRUE(llvm_module);
 }
+
+// TEST(LLVMBackend, CompilesTypeAnnotatedFibonacci)
+// {
+// 	constexpr std::string_view program =
+// 		"def fibo(n: int) -> int:\n"
+// 		"  if n == 0:\n"
+// 		"    return 0\n"
+// 		"  elif n == 1:\n"
+// 		"    return 1\n"
+// 		"  return fibo(n-1) + fibo(n-2)\n";
+
+// 	auto llvm_module = generate_llvm_module(program);
+// 	ASSERT_TRUE(llvm_module);
+// }

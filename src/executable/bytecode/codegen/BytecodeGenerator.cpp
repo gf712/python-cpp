@@ -1,5 +1,5 @@
 #include "BytecodeGenerator.hpp"
-
+#include "executable/bytecode/BytecodeProgram.hpp"
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/DictMerge.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
@@ -41,6 +41,10 @@
 #include "executable/FunctionBlock.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
+
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 using namespace ast;
 
@@ -84,7 +88,7 @@ void BytecodeGenerator::visit(const Name *node)
 void BytecodeGenerator::visit(const Constant *node)
 {
 	auto dst_register = allocate_register();
-	emit<LoadConst>(dst_register, node->value());
+	emit<LoadConst>(dst_register, *node->value());
 	m_last_register = dst_register;
 }
 
@@ -130,38 +134,43 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 	if (!node->decorator_list().empty()) { TODO(); }
 
 	std::vector<std::string> arg_names;
-	std::optional<size_t> this_function_id;
-	{
-		m_ctx.push_local_args(node->args());
-		auto this_function_info = allocate_function();
-		this_function_id = this_function_info.function_id;
+	m_ctx.push_local_args(node->args());
+	auto this_function_info = allocate_function();
+	this_function_info.function.metadata.function_name =
+		fmt::format("{}.{}", mangle_namespace(m_stack), node->name());
 
-		auto *block = allocate_block(this_function_info.function_id);
-		auto *old_block = m_current_block;
-		set_insert_point(block);
+	m_stack.push(Scope{ .name = node->name() });
 
-		generate(node->args().get(), this_function_info.function_id);
+	auto *block = allocate_block(this_function_info.function_id);
+	auto *old_block = m_current_block;
+	set_insert_point(block);
 
-		for (const auto &node : node->body()) {
-			generate(node.get(), this_function_info.function_id);
-		}
+	auto *block = allocate_block(this_function_info.function_id);
+	auto *old_block = m_current_block;
+	set_insert_point(block);
 
-		// always return None
-		// this can be optimised away later on
-		auto none_value_register = allocate_register();
-		emit<LoadConst>(none_value_register, NameConstant{ NoneType{} });
-		emit<ReturnValue>(none_value_register);
+	generate(node->args().get(), this_function_info.function_id);
 
-		for (const auto &arg_name : node->args()->argument_names()) {
-			arg_names.push_back(arg_name);
-		}
-		for (const auto &arg_name : node->args()->kw_only_argument_names()) {
-			arg_names.push_back(arg_name);
-		}
-
-		set_insert_point(old_block);
-		m_ctx.pop_local_args();
+	for (const auto &node : node->body()) {
+		generate(node.get(), this_function_info.function_id);
 	}
+
+	// always return None
+	// this can be optimised away later on
+	auto none_value_register = allocate_register();
+	emit<LoadConst>(none_value_register, NameConstant{ NoneType{} });
+	emit<ReturnValue>(none_value_register);
+
+	for (const auto &arg_name : node->args()->argument_names()) {
+		arg_names.push_back(arg_name);
+	}
+	for (const auto &arg_name : node->args()->kw_only_argument_names()) {
+		arg_names.push_back(arg_name);
+	}
+
+	set_insert_point(old_block);
+	m_ctx.pop_local_args();
+	m_stack.pop();
 
 	size_t arg_count = node->args()->args().size();
 	size_t kwonly_arg_count = node->args()->kwonlyargs().size();
@@ -184,8 +193,7 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 		}
 	}
 
-	ASSERT(this_function_id)
-	emit<MakeFunction>(*this_function_id,
+	emit<MakeFunction>(this_function_info.function_id,
 		node->name(),
 		arg_names,
 		defaults,
@@ -569,10 +577,14 @@ void BytecodeGenerator::visit(const Tuple *node)
 void BytecodeGenerator::visit(const ClassDefinition *node)
 {
 	if (!node->decorator_list().empty()) { TODO(); }
-
+	std::string class_mangled_name;
 	size_t class_id;
 	{
 		auto this_class_info = allocate_function();
+		m_stack.push(Scope{ .name = node->name() });
+		class_mangled_name =
+			fmt::format("{}.__class__{}__", mangle_namespace(m_stack), node->name());
+		this_class_info.function.metadata.function_name = class_mangled_name;
 		class_id = this_class_info.function_id;
 
 		auto *block = allocate_block(class_id);
@@ -586,14 +598,15 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 		// class definition preamble, a la CPython
 		emit<LoadName>(name_register, "__name__");
 		emit<StoreName>("__module__", name_register);
-		emit<LoadConst>(qualname_register, String{ "A" });
+		emit<LoadConst>(qualname_register, String{ node->name() });
 		emit<StoreName>("__qualname__", qualname_register);
 
 		// the actual class definition
 		for (const auto &el : node->body()) { generate(el.get(), class_id); }
 
-		emit<LoadConst>(return_none_register, NameConstant{ NoneType{} });
+		emit<LoadConst>(return_none_register, NameConstant{ ::NoneType{} });
 		emit<ReturnValue>(return_none_register);
+		m_stack.pop();
 
 		set_insert_point(old_block);
 	}
@@ -621,7 +634,7 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);
-	emit<LoadConst>(class_name_register, String{ node->name() });
+	emit<LoadConst>(class_name_register, String{ class_mangled_name });
 	emit<LoadConst>(class_location_register, Number{ static_cast<int64_t>(class_id) });
 
 	if (kwarg_registers.empty()) {
@@ -748,11 +761,14 @@ void BytecodeGenerator::visit(const Import *node)
 
 void BytecodeGenerator::visit(const Module *node)
 {
+	const auto &module_name = fs::path(node->filename()).stem();
+	m_stack.push(Scope{ .name = module_name });
 	Register last{ 0 };
 	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
 
 	emit<ReturnValue>(last);
 	m_last_register = Register{ 0 };
+	m_stack.pop();
 }
 
 void BytecodeGenerator::visit(const Subscript *) { TODO(); }
@@ -974,7 +990,7 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 {
 	ASSERT(m_frame_register_count.size() == 1)
 	relocate_labels(m_functions);
-	return std::make_shared<Program>(std::move(m_functions), filename, argv);
+	return std::make_shared<BytecodeProgram>(std::move(m_functions), filename, argv);
 }
 
 InstructionBlock *BytecodeGenerator::allocate_block(size_t function_id)
@@ -1003,5 +1019,16 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 	generator.m_functions.front().metadata.register_count = generator.register_count();
 	auto executable = generator.generate_executable(module->filename(), argv);
 	return executable;
+}
+
+std::string BytecodeGenerator::mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const
+{
+	std::string result = s.top().name;
+	s.pop();
+	while (!s.empty()) {
+		result = s.top().name + '.' + std::move(result);
+		s.pop();
+	}
+	return result;
 }
 }// namespace codegen

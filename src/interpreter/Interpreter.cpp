@@ -13,6 +13,7 @@
 
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
+#include "executable/bytecode/BytecodeProgram.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -55,25 +56,24 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame =
-		ExecutionFrame::create(nullptr, local_registers, globals, locals);//, nullptr);
+	m_current_frame = ExecutionFrame::create(nullptr, local_registers, globals, locals);
 	m_global_frame = m_current_frame;
 }
 
-void Interpreter::setup(std::shared_ptr<Program> program)
+void Interpreter::setup(const BytecodeProgram &program)
 {
-	const auto name = fs::path(program->filename()).stem();
-	internal_setup(name, program->filename(), program->argv(), program->main_stack_size());
-	m_program = std::move(program);
+	const auto name = fs::path(program.filename()).stem();
+	internal_setup(name, program.filename(), program.argv(), program.main_stack_size());
+	m_program = &program;
 }
 
-void Interpreter::setup_main_interpreter(std::shared_ptr<Program> program)
+void Interpreter::setup_main_interpreter(const BytecodeProgram &program)
 {
 	auto &heap = VirtualMachine::the().heap();
 
-	internal_setup("__main__", program->filename(), program->argv(), program->main_stack_size());
+	internal_setup("__main__", program.filename(), program.argv(), program.main_stack_size());
 	if (!s_main__) { s_main__ = heap.allocate<PyString>("__main__"); }
-	m_program = std::move(program);
+	m_program = &program;
 }
 
 void Interpreter::unwind()
@@ -100,9 +100,9 @@ PyModule *Interpreter::get_imported_module(PyString *name) const
 	return nullptr;
 }
 
-const std::shared_ptr<Function> &Interpreter::functions(size_t idx) const
+const std::shared_ptr<Function> &Interpreter::function(const std::string &name) const
 {
-	return m_program->function(idx);
+	return m_program->function(name);
 }
 
 PyObject *Interpreter::call(const std::shared_ptr<Function> &func, ExecutionFrame *function_frame)

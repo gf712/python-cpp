@@ -1,4 +1,5 @@
 #include "ConstantFolding.hpp"
+#include "runtime/Value.hpp"
 
 namespace ast {
 namespace optimizer {
@@ -10,14 +11,16 @@ namespace optimizer {
 			&& node->rhs()->node_type() == ASTNodeType::Constant) {
 			const auto &lhs = as<Constant>(node->lhs())->value();
 			const auto &rhs = as<Constant>(node->rhs())->value();
+			ASSERT(lhs)
+			ASSERT(rhs)
 			switch (node->op_type()) {
 			case BinaryOpType::PLUS: {
 				auto result = std::visit(
 					overloaded{ [](const Number &lhs_value, const Number &rhs_value)
 									-> std::optional<Value> { return lhs_value + rhs_value; },
 						[](const auto &, const auto &) -> std::optional<Value> { return {}; } },
-					lhs,
-					rhs);
+					*lhs,
+					*rhs);
 				if (result) { return *result; }
 				break;
 			}

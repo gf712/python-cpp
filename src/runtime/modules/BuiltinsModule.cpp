@@ -22,8 +22,8 @@
 
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
-#include "memory/GarbageCollector.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "memory/GarbageCollector.hpp"
 #include "vm/VM.hpp"
 
 #include "utilities.hpp"
@@ -41,8 +41,7 @@ PyFunction *make_function(const std::string &function_name,
 	PyDict *globals)
 {
 	auto &vm = VirtualMachine::the();
-	ASSERT(vm.interpreter().functions(function_id)->backend() == FunctionExecutionBackend::BYTECODE)
-	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().functions(function_id));
+	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().function(function_name));
 	PyCode *code = vm.heap().allocate<PyCode>(function,
 		function_id,
 		argnames,
@@ -148,22 +147,24 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	// FIXME: should accept metaclass keyword
 	ASSERT(!kwargs || kwargs->map().empty())
 	auto *maybe_function_location = args->operator[](0);
-	auto *class_name = args->operator[](1);
-	spdlog::debug(
-		"__build_class__({}, {})", class_name->to_string(), maybe_function_location->to_string());
+	auto *mangled_class_name = args->operator[](1);
+	spdlog::debug("__build_class__({}, {})",
+		mangled_class_name->to_string(),
+		maybe_function_location->to_string());
 
-	if (!as<PyString>(class_name)) {
+	if (!as<PyString>(mangled_class_name)) {
 		interpreter.raise_exception(type_error("__build_class__: name is not a string"));
 		return nullptr;
 	}
-	auto class_name_as_string = as<PyString>(class_name)->value();
+
+	const auto &mangled_class_name_as_string = as<PyString>(mangled_class_name)->value();
 
 	PyFunction *callable = [&]() -> PyFunction * {
 		if (auto *pynumber = as<PyInteger>(maybe_function_location)) {
 			auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
 			// FIXME: what should be the module for this?
-			return make_function(class_name_as_string,
+			return make_function(mangled_class_name_as_string,
 				function_id,
 				std::vector<std::string>{},
 				0,
@@ -216,6 +217,16 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	// so we have a reference to all class attributes and methods
 	// i.e. {__module__: __name__, __qualname__: 'A', foo: <function A.foo>}
 	callable->call_with_frame(ns, PyTuple::create(), PyDict::create());
+
+	// namespace.__class__CLASSNAME__
+	static constexpr std::string_view prefix = ".__class__";
+	static constexpr std::string_view suffix = "__";
+
+	const auto start = mangled_class_name_as_string.find_last_of('.') + prefix.size();
+
+	const std::string class_name_str{ mangled_class_name_as_string.begin() + start,
+		mangled_class_name_as_string.end() - suffix.size() };
+	auto *class_name = PyString::create(class_name_str);
 
 	auto *call_args = PyTuple::create(class_name, bases, ns);
 

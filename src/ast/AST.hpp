@@ -5,14 +5,20 @@
 #include <optional>
 #include <stack>
 #include <string>
+#include <variant>
 #include <vector>
 
+#include "lexer/Lexer.hpp"
 #include "forward.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
 #include "utilities.hpp"
 
 #include "spdlog/spdlog.h"
+
+struct SourceLocation
+{
+	Position start;
+	Position end;
+};
 
 namespace ast {
 
@@ -55,6 +61,9 @@ namespace ast {
 	__AST_NODE_TYPE(With)               \
 	__AST_NODE_TYPE(WithItem)
 
+struct NoneType
+{
+};
 
 enum class ASTNodeType {
 #define __AST_NODE_TYPE(x) x,
@@ -121,29 +130,21 @@ class ASTNode
 
 class Constant : public ASTNode
 {
-	Value m_value;
+	std::unique_ptr<Value> m_value;
 
   private:
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	explicit Constant(Value value) : ASTNode(ASTNodeType::Constant), m_value(value) {}
-	explicit Constant(double value) : ASTNode(ASTNodeType::Constant), m_value(Number{ value }) {}
-	explicit Constant(int64_t value) : ASTNode(ASTNodeType::Constant), m_value(Number{ value }) {}
-	explicit Constant(bool value) : ASTNode(ASTNodeType::Constant), m_value(NameConstant{ value })
-	{}
-	explicit Constant(NoneType value)
-		: ASTNode(ASTNodeType::Constant), m_value(NameConstant{ value })
-	{}
-	explicit Constant(std::string value)
-		: ASTNode(ASTNodeType::Constant), m_value(String{ std::move(value) })
-	{}
-	explicit Constant(const char *value)
-		: ASTNode(ASTNodeType::Constant), m_value(String{ std::string(value) })
-	{}
+	explicit Constant(double value);
+	explicit Constant(int64_t value);
+	explicit Constant(bool value);
+	explicit Constant(NoneType value);
+	explicit Constant(std::string value);
+	explicit Constant(const char *value);
+	explicit Constant(const Value &);
 
-	const Value &value() const { return m_value; }
-	Value value() { return m_value; }
+	const Value *value() const { return m_value.get(); }
 
 	virtual void codegen(CodeGenerator *) const override;
 };
@@ -537,6 +538,7 @@ class FunctionDefinition final : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 	const std::shared_ptr<ASTNode> m_returns;
 	std::string m_type_comment;
+	SourceLocation m_location;
 
 	void print_this_node(const std::string &indent) const final;
 
@@ -546,11 +548,12 @@ class FunctionDefinition final : public ASTNode
 		std::vector<std::shared_ptr<ASTNode>> body,
 		std::vector<std::shared_ptr<ASTNode>> decorator_list,
 		std::shared_ptr<ASTNode> returns,
-		std::string type_comment)
+		std::string type_comment,
+		SourceLocation location)
 		: ASTNode(ASTNodeType::FunctionDefinition), m_function_name(std::move(function_name)),
 		  m_args(std::move(args)), m_body(std::move(body)),
 		  m_decorator_list(std::move(decorator_list)), m_returns(std::move(returns)),
-		  m_type_comment(std::move(type_comment))
+		  m_type_comment(std::move(type_comment)), m_location(std::move(location))
 	{}
 
 	const std::string &name() const { return m_function_name; }
@@ -559,6 +562,7 @@ class FunctionDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
+	const SourceLocation &source_location() const { return m_location; }
 
 	void add_decorator(std::shared_ptr<ASTNode> decorator)
 	{
@@ -932,7 +936,7 @@ class Raise : public ASTNode
 	std::shared_ptr<ASTNode> m_cause;
 
   public:
-	Raise() : ASTNode(ASTNodeType::Raise), m_cause(std::make_shared<Constant>(NoneType{})) {}
+	Raise();
 
 	Raise(std::shared_ptr<ASTNode> exception, std::shared_ptr<ASTNode> cause)
 		: ASTNode(ASTNodeType::Raise), m_exception(std::move(exception)), m_cause(std::move(cause))

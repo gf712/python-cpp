@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
 
 namespace ast {
 class ASTNode;
@@ -29,5 +30,8 @@ struct Bytes;
 struct Ellipsis;
 struct NoneType;
 struct NameConstant;
+
+class PyObject;
+using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, PyObject *>;
 
 using Register = uint8_t;

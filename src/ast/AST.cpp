@@ -1,5 +1,8 @@
 #include "AST.hpp"
 
+#include "runtime/PyObject.hpp"
+#include "runtime/Value.hpp"
+
 namespace ast {
 
 #define __AST_NODE_TYPE(x)                                                                     \
@@ -16,6 +19,35 @@ AST_NODE_TYPES
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
+
+Constant::Constant(double value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(Number{ value }))
+{}
+
+Constant::Constant(int64_t value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(Number{ value }))
+{}
+
+Constant::Constant(bool value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(NameConstant{ value }))
+{}
+
+Constant::Constant(std::string value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(String{ std::move(value) }))
+{}
+
+Constant::Constant(const char *value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(String{ std::string(value) }))
+{}
+
+Constant::Constant(ast::NoneType)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(NameConstant{ ::NoneType{} }))
+{}
+
+Constant::Constant(const Value &value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(value))
+{}
+
 void Constant::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Constant", indent);
@@ -28,7 +60,7 @@ void Constant::print_this_node(const std::string &indent) const
 				   [&indent](PyObject *const value) {
 					   spdlog::debug("{}  - value: {}", indent, value->to_string());
 				   } },
-		m_value);
+		*m_value);
 }
 
 void List::print_this_node(const std::string &indent) const
@@ -358,6 +390,8 @@ void Subscript::print_this_node(const std::string &indent) const
 	}
 	spdlog::debug("{}  - ctx: {}", indent, m_ctx);
 }
+
+Raise::Raise() : ASTNode(ASTNodeType::Raise), m_cause(std::make_shared<Constant>(NoneType{})) {}
 
 void Raise::print_this_node(const std::string &indent) const
 {

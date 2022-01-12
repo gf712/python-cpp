@@ -12,7 +12,12 @@ class VirtualMachine;
 
 using Registers = std::vector<Value>;
 
-struct State;
+struct State
+{
+	std::optional<size_t> jump_block_count;
+	bool catch_exception{ false };
+};
+
 struct StackFrame : NonCopyable
 {
 	Registers registers;
@@ -75,6 +80,10 @@ class VirtualMachine
 		return {};
 	}
 
+	const std::stack<StackFrame> &stack() const { return m_stack; }
+	const State &state() const { return *m_state; }
+	State &state() { return *m_state; }
+
 	Heap &heap() { return m_heap; }
 
 	Interpreter &interpreter();
@@ -106,13 +115,14 @@ class VirtualMachine
 		return m_interpreter_session;
 	}
 
+	void push_frame(size_t frame_size);
+
+	void pop_frame();
+
   private:
 	VirtualMachine();
 
 	int execute_internal(std::shared_ptr<Program> program);
 
 	void show_current_instruction(size_t index, size_t window) const;
-
-	void push_frame(size_t frame_size);
-	void pop_frame();
 };

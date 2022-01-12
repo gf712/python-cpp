@@ -49,6 +49,11 @@ class BytecodeGenerator : public ast::CodeGenerator
 		const std::vector<const ast::ASTNode *> &parent_nodes() const { return m_parent_nodes; }
 	};
 
+	struct Scope
+	{
+		std::string name;
+	};
+
   public:
 	static constexpr size_t start_register = 1;
 
@@ -63,6 +68,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::vector<size_t> m_frame_register_count;
 	Register m_last_register{};
 	ASTContext m_ctx;
+	std::stack<Scope> m_stack;
 
   public:
 	BytecodeGenerator();
@@ -168,5 +174,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void relocate_labels(const FunctionBlocks &functions);
 
 	void set_insert_point(InstructionBlock *block) { m_current_block = block; }
+
+	std::string mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const;
 };
 }// namespace codegen

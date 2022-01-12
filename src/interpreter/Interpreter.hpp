@@ -9,6 +9,8 @@
 #include <string>
 #include <string_view>
 
+class BytecodeProgram;
+
 class Interpreter
 	: NonCopyable
 	, NonMoveable
@@ -24,7 +26,7 @@ class Interpreter
 	Status m_status{ Status::OK };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
-	std::shared_ptr<Program> m_program;
+	const Program *m_program;
 
   public:
 	Interpreter();
@@ -78,13 +80,13 @@ class Interpreter
 
 	void unwind();
 
-	void setup(std::shared_ptr<Program> program);
-	void setup_main_interpreter(std::shared_ptr<Program> program);
+	void setup(const BytecodeProgram &program);
+	void setup_main_interpreter(const BytecodeProgram &program);
 
 	const std::string &entry_script() const { return m_entry_script; }
 	const std::vector<std::string> &argv() const { return m_argv; }
 
-	const std::shared_ptr<Function> &functions(size_t idx) const;
+	const std::shared_ptr<Function> &function(const std::string &) const;
 
 	PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 

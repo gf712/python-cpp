@@ -1,4 +1,6 @@
 #include "Parser.hpp"
+#include "runtime/Value.hpp"
+#include <sstream>
 
 #define PARSER_ERROR()                                           \
 	do {                                                         \
@@ -1100,7 +1102,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			} else if (name == "False") {
 				p.push_to_stack(std::make_shared<Constant>(false));
 			} else if (name == "None") {
-				p.push_to_stack(std::make_shared<Constant>(NoneType{}));
+				p.push_to_stack(std::make_shared<Constant>(ast::NoneType{}));
 			} else {
 				p.push_to_stack(std::make_shared<Name>(name, ContextType::LOAD));
 			}
@@ -2840,7 +2842,7 @@ struct DottedNamePattern : Pattern<DottedNamePattern>
 			while (p.stack().size() > stack_position) {
 				const auto &node = p.pop_back();
 				std::string value =
-					std::get<String>(static_pointer_cast<Constant>(node)->value()).s;
+					std::get<String>(*static_pointer_cast<Constant>(node)->value()).s;
 				std::static_pointer_cast<Import>(p.stack()[stack_position - 1])
 					->add_dotted_name(value);
 			}
@@ -3684,6 +3686,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 		BlockScope scope{ p };
 		// function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
+		const auto &start = p.lexer().peek_token(0)->start();
 		if (pattern1::match(p)) {
 			DEBUG_LOG("function_def_raw: function_def");
 			auto name = p.pop_front();
@@ -3712,15 +3715,17 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
 			}
 
+			const auto &end = p.lexer().peek_token(0)->end();
 			ASSERT(as<Constant>(name));
 			ASSERT(as<Arguments>(args));
 			auto function = std::make_shared<FunctionDefinition>(
-				std::get<String>(as<Constant>(name)->value()).s,
+				std::get<String>(*as<Constant>(name)->value()).s,
 				as<Arguments>(args),
 				body,
 				std::vector<std::shared_ptr<ASTNode>>{},
 				returns,
-				"");
+				"",
+				SourceLocation{ start, end });
 			scope.parent().push_back(function);
 			function->print_node("");
 			return true;

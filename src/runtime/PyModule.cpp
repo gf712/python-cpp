@@ -4,6 +4,7 @@
 #include "PyString.hpp"
 #include "ValueError.hpp"
 #include "executable/Program.hpp"
+#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "modules/Modules.hpp"
 #include "parser/Parser.hpp"

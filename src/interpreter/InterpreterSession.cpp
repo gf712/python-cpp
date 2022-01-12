@@ -1,7 +1,7 @@
 #include "InterpreterSession.hpp"
 
 
-Interpreter &InterpreterSession::start_new_interpreter(std::shared_ptr<Program> program)
+Interpreter &InterpreterSession::start_new_interpreter(const BytecodeProgram &program)
 {
 	if (m_interpreters.empty()) {
 		auto &interpreter = m_interpreters.emplace_back(std::make_unique<Interpreter>());

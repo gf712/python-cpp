@@ -1,8 +1,7 @@
 #include "ConstantFolding.hpp"
 #include "ast/AST.hpp"
-
 #include "parser/Parser.hpp"
-
+#include "runtime/Value.hpp"
 #include "utilities.hpp"
 
 #include "gtest/gtest.h"
@@ -20,26 +19,26 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 	const auto result_value = as<Constant>(result)->value();
 	const auto expected_value = as<Constant>(expected)->value();
 
-	ASSERT_EQ(result_value.index(), expected_value.index());
+	ASSERT_EQ(result_value->index(), expected_value->index());
 	std::visit(
 		overloaded{ [&](const Number &number_value) {
 					   if (auto *int_result = std::get_if<int64_t>(&number_value.value)) {
 						   ASSERT_EQ(*int_result,
-							   std::get<int64_t>(std::get<Number>(expected_value).value));
+							   std::get<int64_t>(std::get<Number>(*expected_value).value));
 					   } else if (auto *double_result = std::get_if<double>(&number_value.value)) {
 						   ASSERT_EQ(*double_result,
-							   std::get<double>(std::get<Number>(expected_value).value));
+							   std::get<double>(std::get<Number>(*expected_value).value));
 					   } else {
 						   TODO();
 					   }
 				   },
 			[&](const String &string_value) {
-				ASSERT_EQ(string_value.s, std::get<String>(expected_value).s);
+				ASSERT_EQ(string_value.s, std::get<String>(*expected_value).s);
 			},
 			[&](const NameConstant &name_constant_value) {
 				if (auto *bool_result = std::get_if<bool>(&name_constant_value.value)) {
-					ASSERT_EQ(
-						*bool_result, std::get<bool>(std::get<NameConstant>(expected_value).value));
+					ASSERT_EQ(*bool_result,
+						std::get<bool>(std::get<NameConstant>(*expected_value).value));
 				} else {
 					TODO();
 				}
@@ -49,7 +48,7 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 				TODO();
 				// ASSERT_EQ(result_, std::get<result_.index()>(expected_));
 			} },
-		result_value);
+		*result_value);
 }
 
 void compare_assign(const std::shared_ptr<ASTNode> &result,

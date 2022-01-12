@@ -1,10 +1,10 @@
 #include "LLVMGenerator.hpp"
-
-#include "executable/Program.hpp"
+#include "LLVMProgram.hpp"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -78,7 +78,7 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 	std::vector<std::string> argv,
 	compiler::OptimizationLevel lvl)
 {
-	auto module = as<ast::Module>(node);
+	auto module = ast::as<ast::Module>(node);
 	ASSERT(module)
 
 	auto generator = LLVMGenerator();
@@ -89,12 +89,10 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 		return nullptr;
 	}
 
-	std::vector<std::shared_ptr<::Function>> module_functions;
-	for (const auto &f : generator.m_ctx->module->functions()) {
-		module_functions.emplace_back(std::make_shared<LLVMFunction>(f));
-	}
-
-	return std::make_shared<Program>(std::move(module_functions), module->filename(), argv);
+	return std::make_shared<LLVMProgram>(std::move(generator.m_ctx->module),
+		std::move(generator.m_ctx->ctx),
+		module->filename(),
+		argv);
 }
 
 llvm::Value *LLVMGenerator::generate(const ast::ASTNode *node)
@@ -114,7 +112,7 @@ void LLVMGenerator::visit(const ast::Assign *node)
 {
 	auto *value_to_store = generate(node->value().get());
 	for (const auto &target : node->targets()) {
-		if (auto ast_name = as<ast::Name>(target)) {
+		if (auto ast_name = ast::as<ast::Name>(target)) {
 			ASSERT(ast_name->ids().size() == 1)
 			const auto &var_name = ast_name->ids()[0];
 			llvm::Function *f = m_ctx->builder->GetInsertBlock()->getParent();
@@ -204,7 +202,7 @@ void LLVMGenerator::visit(const ast::For *node) { TODO(); }
 
 llvm::Type *LLVMGenerator::arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation)
 {
-	if (auto name = as<ast::Name>(type_annotation)) {
+	if (auto name = ast::as<ast::Name>(type_annotation)) {
 		if (name->ids().size() != 1) {
 			set_error_state("arg type is not a AST node with one id, cannot determine arg type");
 			return nullptr;
@@ -265,21 +263,68 @@ void LLVMGenerator::visit(const ast::FunctionDefinition *node)
 
 	m_ctx->push_stack();
 
-	for (size_t i = 0; const auto &arg : node->args()->args()) {
-		auto *llvm_arg = F->getArg(i);
-		llvm_arg->setName(arg->name());
-		auto *allocation = create_entry_block_alloca(F, arg->name(), arg_types[i]);
-		m_ctx->add_local(arg->name(), allocation);
-		m_ctx->builder->CreateStore(llvm_arg, allocation);
-		i++;
+	{
+		size_t i = 0;
+		for (const auto &arg : node->args()->args()) {
+			auto *llvm_arg = F->getArg(i);
+			llvm_arg->setName(arg->name());
+			auto *allocation = create_entry_block_alloca(F, arg->name(), arg_types[i]);
+			m_ctx->add_local(arg->name(), allocation);
+			m_ctx->builder->CreateStore(llvm_arg, allocation);
+			i++;
+		}
 	}
 
 	for (const auto &statement : node->body()) { generate(statement.get()); }
 
-	m_ctx->pop_stack();
+	// m_ctx->pop_stack();
+	// {
+	// 	std::string repr;
+	// 	raw_string_ostream out{ repr };
+	// 	F->print(out);
+	// 	spdlog::debug("Compiled LLVM function:\n{}", out.str());
+	// }
+
+	// FIXME: For some reason this reports an error but does not return a error message
+	// {
+	// 	std::string repr;
+	// 	raw_string_ostream out{ repr };
+	// 	auto success = verifyFunction(*F, &out);
+	// 	if (!success) { spdlog::error("Failed to compile to LLVM IR: {}", out.str()); }
+	// 	ASSERT(success)
+	// }
 }
 
-void LLVMGenerator::visit(const ast::If *node) { TODO(); }
+void LLVMGenerator::visit(const ast::If *node)
+{
+	auto *condition = generate(node->test().get());
+
+	auto *f = m_ctx->builder->GetInsertBlock()->getParent();
+
+	auto *ThenBB = BasicBlock::Create(*m_ctx->ctx, "then", f);
+	auto *ElseBB = BasicBlock::Create(*m_ctx->ctx, "else");
+	auto *MergeBB = BasicBlock::Create(*m_ctx->ctx, "ifcont");
+
+	m_ctx->builder->CreateCondBr(condition, ThenBB, ElseBB);
+
+	// then
+	m_ctx->builder->SetInsertPoint(ThenBB);
+	for (const auto &statement : node->body()) { generate(statement.get()); }
+	m_ctx->builder->CreateBr(MergeBB);
+
+	// else
+	f->getBasicBlockList().push_back(ElseBB);
+	m_ctx->builder->SetInsertPoint(ElseBB);
+	for (const auto &statement : node->orelse()) { generate(statement.get()); }
+
+	m_ctx->builder->CreateBr(MergeBB);
+	ElseBB = m_ctx->builder->GetInsertBlock();
+
+	// merge block
+	f->getBasicBlockList().push_back(MergeBB);
+	m_ctx->builder->SetInsertPoint(MergeBB);
+	// auto phi_node = m_ctx->builder->CreatePHI();
+}
 
 void LLVMGenerator::visit(const ast::Import *node) { TODO(); }
 

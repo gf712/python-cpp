@@ -6,6 +6,7 @@ set(AST_SOURCE_FILES # cmake-format: sortable
 set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
     executable/bytecode/Bytecode.cpp
+    executable/bytecode/BytecodeProgram.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/DictMerge.cpp
@@ -49,7 +50,8 @@ set(LEXER_SOURCE_FILES # cmake-format: sortable
                        lexer/Lexer.cpp)
 
 set(LLVM_BACKEND_FILES # cmake-format: sortable
-                       executable/llvm/LLVMGenerator.cpp)
+                       executable/llvm/LLVMGenerator.cpp
+                       executable/llvm/LLVMProgram.cpp)
 
 set(INTERPRETER_SOURCE_FILES
     # cmake-format: sortable
@@ -161,6 +163,8 @@ if (LLVM_FOUND)
   endif()
   llvm_map_components_to_libnames(llvm_libs core)
   target_link_libraries(python-cpp-llvm PRIVATE ${llvm_libs})
+  # TODO: not all versions of llvm are ready for C++20, figure out when to use this
+  set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)
 
   target_link_libraries(python-cpp PUBLIC python-cpp-llvm)
 

@@ -26,9 +26,7 @@ class InterpreterSession
 		return *m_interpreters.back();
 	}
 
-	const std::list<std::unique_ptr<Interpreter>>& interpreters() const {
-		return m_interpreters;
-	} 
+	const std::list<std::unique_ptr<Interpreter>> &interpreters() const { return m_interpreters; }
 
 	void shutdown(Interpreter &interpreter)
 	{
@@ -39,5 +37,5 @@ class InterpreterSession
 		ASSERT(initial_size != m_interpreters.size())
 	}
 
-	Interpreter &start_new_interpreter(std::shared_ptr<Program>);
+	Interpreter &start_new_interpreter(const BytecodeProgram &program);
 };
