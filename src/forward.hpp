@@ -24,14 +24,15 @@ class Parser;
 
 struct Load;
 
+namespace py {
 struct Number;
 struct String;
 struct Bytes;
 struct Ellipsis;
 struct NoneType;
 struct NameConstant;
-
 class PyObject;
 using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, PyObject *>;
+}// namespace py
 
 using Register = uint8_t;

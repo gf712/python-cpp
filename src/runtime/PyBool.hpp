@@ -2,10 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 
 class PyBool : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend PyObject *py_true();
 	friend PyObject *py_false();
 
@@ -33,3 +34,5 @@ class PyBool : public PyBaseObject
 
 PyObject *py_true();
 PyObject *py_false();
+
+}// namespace py

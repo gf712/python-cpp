@@ -6,6 +6,7 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
+namespace py {
 template<typename T> struct klass
 {
 	std::unique_ptr<TypePrototype> type;
@@ -78,3 +79,5 @@ template<typename T> struct klass
 		return type_;
 	}
 };
+
+}// namespace py

@@ -4,7 +4,7 @@
 namespace ast {
 namespace optimizer {
 
-	std::variant<Value, std::shared_ptr<BinaryExpr>> evaluate_binary_expr(
+	std::variant<py::Value, std::shared_ptr<BinaryExpr>> evaluate_binary_expr(
 		const std::shared_ptr<BinaryExpr> &node)
 	{
 		if (node->lhs()->node_type() == ASTNodeType::Constant
@@ -16,9 +16,9 @@ namespace optimizer {
 			switch (node->op_type()) {
 			case BinaryOpType::PLUS: {
 				auto result = std::visit(
-					overloaded{ [](const Number &lhs_value, const Number &rhs_value)
-									-> std::optional<Value> { return lhs_value + rhs_value; },
-						[](const auto &, const auto &) -> std::optional<Value> { return {}; } },
+					overloaded{ [](const py::Number &lhs_value, const py::Number &rhs_value)
+									-> std::optional<py::Value> { return lhs_value + rhs_value; },
+						[](const auto &, const auto &) -> std::optional<py::Value> { return {}; } },
 					*lhs,
 					*rhs);
 				if (result) { return *result; }
@@ -58,9 +58,9 @@ namespace optimizer {
 		spdlog::debug("Constant folding optimization");
 		if (node->node_type() == ASTNodeType::BinaryExpr) {
 			auto result = evaluate_binary_expr(as<BinaryExpr>(node));
-			if (std::holds_alternative<Value>(result)) {
+			if (std::holds_alternative<py::Value>(result)) {
 				spdlog::debug("Evaluated binary node - creating new constant node");
-				return std::make_shared<Constant>(std::get<Value>(result));
+				return std::make_shared<Constant>(std::get<py::Value>(result));
 			}
 		} else if (node->node_type() == ASTNodeType::Constant) {
 		} else if (node->node_type() == ASTNodeType::Assign) {

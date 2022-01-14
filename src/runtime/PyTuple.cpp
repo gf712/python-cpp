@@ -8,6 +8,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
 
 namespace {
 std::vector<Value> make_value_vector(const std::vector<PyObject *> &elements)
@@ -19,13 +20,13 @@ std::vector<Value> make_value_vector(const std::vector<PyObject *> &elements)
 }
 }// namespace
 
-template<> PyTuple *as(PyObject *obj)
+template<> PyTuple *py::as(PyObject *obj)
 {
 	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
 	return nullptr;
 }
 
-template<> const PyTuple *as(const PyObject *obj)
+template<> const PyTuple *py::as(const PyObject *obj)
 {
 	if (obj->type() == tuple()) { return static_cast<const PyTuple *>(obj); }
 	return nullptr;

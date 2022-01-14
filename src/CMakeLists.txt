@@ -1,4 +1,4 @@
-find_package(LLVM CONFIG)
+find_package(LLVM CONFIG 10.0)
 
 set(AST_SOURCE_FILES # cmake-format: sortable
                      ast/AST.cpp ast/optimizers/ConstantFolding.cpp)
@@ -155,20 +155,31 @@ if (LLVM_FOUND)
             -Wno-unused-parameter
             -fno-omit-frame-pointer)
 
-  target_include_directories(python-cpp-llvm PRIVATE . ${LLVM_INCLUDE_DIRS})
+  add_library(llvm-interface INTERFACE)
+  target_include_directories(llvm-interface INTERFACE . ${LLVM_INCLUDE_DIRS})
   separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
-  target_compile_definitions(python-cpp-llvm PRIVATE ${LLVM_DEFINITIONS_LIST})
+  target_compile_definitions(llvm-interface INTERFACE ${LLVM_DEFINITIONS_LIST})
+
   if(STL_SUPPORTS_BIT_CAST)
-    target_compile_definitions(python-cpp-llvm PRIVATE "STL_SUPPORTS_BIT_CAST")
+    target_compile_definitions(llvm-interface INTERFACE "STL_SUPPORTS_BIT_CAST")
   endif()
-  llvm_map_components_to_libnames(llvm_libs core)
-  target_link_libraries(python-cpp-llvm PRIVATE ${llvm_libs})
+  llvm_map_components_to_libnames(llvm_libs core orcjit x86asmparser x86codegen)
+  target_link_libraries(llvm-interface INTERFACE ${llvm_libs})
   # TODO: not all versions of llvm are ready for C++20, figure out when to use this
   set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)
 
-  target_link_libraries(python-cpp PUBLIC python-cpp-llvm)
+  add_library(python-cpp-llvm-tests OBJECT "executable/llvm/LLVMGenerator_tests.cpp")
+  add_library(python-cpp-llvm-glue OBJECT "executable/llvm/LLVMPyUtils.cpp")
 
-  target_sources(unittests PRIVATE "executable/llvm/LLVMGenerator_tests.cpp")
+  target_link_libraries(python-cpp-llvm-glue PRIVATE llvm-interface)
+  target_link_libraries(python-cpp-llvm PUBLIC llvm-interface)
+  target_sources(python-cpp-llvm PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-glue>)
+  target_link_libraries(python-cpp-llvm-tests PRIVATE python-cpp-llvm)
+  target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
+  target_compile_definitions(python-cpp PUBLIC USE_LLVM)
+
+  target_sources(unittests PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-tests>)
+  target_link_libraries(unittests PRIVATE python-cpp-llvm)
 endif()
 
 target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)

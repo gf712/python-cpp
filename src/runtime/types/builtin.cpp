@@ -20,6 +20,8 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
+using namespace py;
+
 BuiltinTypes::BuiltinTypes()
 	: m_type(PyType::register_type()), m_str(PyString::register_type()),
 	  m_bool(PyBool::register_type()), m_bytes(PyBytes::register_type()),
@@ -51,6 +53,7 @@ BuiltinTypes::BuiltinTypes()
 		return type;                                          \
 	}
 
+namespace py {
 INITIALIZE_TYPE(type)
 INITIALIZE_TYPE(bool_)
 INITIALIZE_TYPE(bytes)
@@ -84,3 +87,4 @@ INITIALIZE_TYPE(slot_wrapper)
 INITIALIZE_TYPE(bound_method)
 INITIALIZE_TYPE(method_wrapper)
 INITIALIZE_TYPE(static_method)
+}// namespace py

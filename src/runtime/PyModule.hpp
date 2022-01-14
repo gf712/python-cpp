@@ -3,13 +3,15 @@
 #include "PyObject.hpp"
 #include "PyString.hpp"
 
+namespace py {
+
 class PyModule : public PyBaseObject
 {
   public:
 	using MapType = std::unordered_map<PyString *, Value, ValueHash, ValueEqual>;
 
   private:
-	friend class Heap;
+	friend class ::Heap;
 
 	MapType m_symbol_table;
 	PyString *m_module_name;
@@ -36,3 +38,5 @@ class PyModule : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

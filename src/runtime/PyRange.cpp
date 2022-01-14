@@ -8,6 +8,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 PyObject *PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)

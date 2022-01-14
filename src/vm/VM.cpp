@@ -9,6 +9,8 @@
 
 #include <iostream>
 
+using namespace py;
+
 #define DEBUG_VM 0
 
 StackFrame::StackFrame(size_t frame_size,

@@ -1,4 +1,5 @@
 #include "LLVMGenerator.hpp"
+#include "LLVMProgram.hpp"
 
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"

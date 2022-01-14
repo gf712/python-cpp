@@ -5,9 +5,11 @@
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
+namespace py {
+
 class StopIteration : public Exception
 {
-	friend class Heap;
+	friend class ::Heap;
 	template<typename... Args>
 	friend PyObject *stop_iteration(const std::string &message, Args &&... args);
 
@@ -33,3 +35,5 @@ inline PyObject *stop_iteration(const std::string &message, Args &&... args)
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
 	return StopIteration::create(args_tuple);
 }
+
+}// namespace py

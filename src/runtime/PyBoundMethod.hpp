@@ -2,13 +2,16 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyBoundMethod : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	PyObject *m_self;
 	PyFunction *m_method;
 
 	PyBoundMethod(PyObject *self, PyFunction *method);
+
   public:
 	static PyBoundMethod *create(PyObject *self, PyFunction *method);
 
@@ -25,3 +28,5 @@ class PyBoundMethod : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

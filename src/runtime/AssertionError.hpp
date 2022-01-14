@@ -5,9 +5,11 @@
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
+namespace py {
+
 class AssertionError : public Exception
 {
-	friend class Heap;
+	friend class ::Heap;
 	template<typename... Args>
 	friend PyObject *assertion_error(const std::string &message, Args &&... args);
 
@@ -39,3 +41,4 @@ inline PyObject *assertion_error(const std::string &message, Args &&... args)
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
 	return AssertionError::create(args_tuple);
 }
+}// namespace py

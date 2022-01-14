@@ -10,7 +10,7 @@
 
 class VirtualMachine;
 
-using Registers = std::vector<Value>;
+using Registers = std::vector<py::Value>;
 
 struct State
 {
@@ -53,7 +53,7 @@ class VirtualMachine
 		return *vm;
 	}
 
-	Value &reg(size_t idx)
+	py::Value &reg(size_t idx)
 	{
 		auto r = registers();
 		ASSERT(r.has_value())
@@ -61,7 +61,7 @@ class VirtualMachine
 		return r->get()[idx];
 	}
 
-	const Value &reg(size_t idx) const
+	const py::Value &reg(size_t idx) const
 	{
 		auto r = registers();
 		ASSERT(r.has_value())

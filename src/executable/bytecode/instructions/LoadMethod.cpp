@@ -5,6 +5,7 @@
 #include "runtime/PyType.hpp"
 #include "runtime/types/builtin.hpp"
 
+using namespace py;
 
 void LoadMethod::execute(VirtualMachine &vm, Interpreter &) const
 {

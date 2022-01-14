@@ -2,13 +2,15 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PySlotWrapper : public PyBaseObject
 {
 	PyString *m_name;
 	PyType *m_slot_type;
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> m_slot;
 
-	friend class Heap;
+	friend class ::Heap;
 
 	PySlotWrapper(PyString *name,
 		PyType *underlying_type,
@@ -33,3 +35,5 @@ class PySlotWrapper : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

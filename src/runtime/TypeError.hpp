@@ -5,10 +5,11 @@
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
+namespace py {
 
 class TypeError : public Exception
 {
-	friend class Heap;
+	friend class ::Heap;
 	template<typename... Args>
 	friend PyObject *type_error(const std::string &message, Args &&... args);
 
@@ -33,3 +34,5 @@ template<typename... Args> inline PyObject *type_error(const std::string &messag
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
 	return TypeError::create(args_tuple);
 }
+
+}// namespace py

@@ -3,6 +3,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 static PyType *s_assertion_error = nullptr;
 
 AssertionError::AssertionError(PyTuple *args)

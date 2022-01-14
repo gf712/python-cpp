@@ -11,6 +11,8 @@
 #include <variant>
 #include <vector>
 
+namespace py {
+
 struct Number
 {
 	std::variant<int64_t, double> value;
@@ -216,3 +218,5 @@ bool is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 bool in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 bool truthy(const Value &lhs, Interpreter &interpreter);
+
+}// namespace py

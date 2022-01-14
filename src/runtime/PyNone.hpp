@@ -2,9 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyNone : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend PyObject *py_none();
 
 	bool m_value;
@@ -28,3 +30,5 @@ class PyNone : public PyBaseObject
 };
 
 PyObject *py_none();
+
+}// namespace py

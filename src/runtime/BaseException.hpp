@@ -2,6 +2,7 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 
 class BaseException : public PyBaseObject
 {
@@ -29,3 +30,5 @@ class BaseException : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 };
+
+}// namespace py

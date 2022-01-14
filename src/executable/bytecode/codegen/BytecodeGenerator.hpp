@@ -23,7 +23,30 @@ struct FunctionInfo
 	BytecodeGenerator *generator;
 
 	FunctionInfo(size_t, FunctionBlock &, BytecodeGenerator *);
-	~FunctionInfo();
+};
+
+class BytecodeValue : public ast::Value
+{
+	Register m_register;
+
+  public:
+	BytecodeValue(const std::string &name, Register register_)
+		: ast::Value(name), m_register(register_)
+	{}
+
+	Register get_register() const { return m_register; }
+};
+
+class BytecodeFunctionValue : public ast::Value
+{
+	FunctionInfo m_info;
+
+  public:
+	BytecodeFunctionValue(const std::string &name, FunctionInfo &&info)
+		: ast::Value(name), m_info(std::move(info))
+	{}
+
+	const FunctionInfo &function_info() const { return m_info; }
 };
 
 class BytecodeGenerator : public ast::CodeGenerator
@@ -66,7 +89,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::vector<Label *> m_labels;
 
 	std::vector<size_t> m_frame_register_count;
-	Register m_last_register{};
+	size_t m_value_index{ 0 };
 	ASTContext m_ctx;
 	std::stack<Scope> m_stack;
 
@@ -146,7 +169,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		spdlog::debug("New register: {}", m_frame_register_count.back());
 		return m_frame_register_count.back()++;
 	}
-	FunctionInfo allocate_function();
+	BytecodeFunctionValue *create_function(const std::string &);
 
 	InstructionBlock *allocate_block(size_t);
 
@@ -155,19 +178,40 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void exit_function(size_t function_id);
 
   private:
-#define __AST_NODE_TYPE(NodeType) void visit(const ast::NodeType *node) override;
+#define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
-	Register generate(const ast::ASTNode *node, size_t function_id)
+	BytecodeValue *generate(const ast::ASTNode *node, size_t function_id)
 	{
 		m_ctx.push_node(node);
 		const auto old_function_id = m_function_id;
 		m_function_id = function_id;
-		node->codegen(this);
+		auto *value = node->codegen(this);
 		m_function_id = old_function_id;
 		m_ctx.pop_node();
-		return m_last_register;
+		return static_cast<BytecodeValue *>(value);
+	}
+
+	BytecodeValue *create_value(const std::string &name)
+	{
+		m_values.push_back(std::make_unique<BytecodeValue>(
+			name + std::to_string(m_value_index++), allocate_register()));
+		return static_cast<BytecodeValue *>(m_values.back().get());
+	}
+
+	BytecodeValue *create_return_value()
+	{
+		m_values.push_back(
+			std::make_unique<BytecodeValue>("%" + std::to_string(m_value_index++), 0));
+		return static_cast<BytecodeValue *>(m_values.back().get());
+	}
+
+	BytecodeValue *create_value()
+	{
+		m_values.push_back(std::make_unique<BytecodeValue>(
+			"%" + std::to_string(m_value_index++), allocate_register()));
+		return static_cast<BytecodeValue *>(m_values.back().get());
 	}
 
 	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);

@@ -2,11 +2,12 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 
 class PyType : public PyBaseObject
 {
 	template<typename T> friend struct klass;
-	friend class Heap;
+	friend class ::Heap;
 	friend class PyObject;
 
   private:
@@ -55,3 +56,5 @@ class PyType : public PyBaseObject
 
 	static PyType *build_type(PyString *type_name, PyTuple *bases, PyDict *ns);
 };
+
+}// namespace py

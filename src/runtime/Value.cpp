@@ -12,6 +12,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
 
 Number Number::operator/(const Number &other) const
 {
@@ -146,6 +147,8 @@ bool NameConstant::operator==(const Number &other) const
 		return other == Number{ int64_t{ 0 } };
 	}
 }
+
+namespace py {
 
 std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &)
 {
@@ -464,3 +467,5 @@ bool truthy(const Value &value, Interpreter &)
 						  [](PyObject *obj) { return obj->bool_() == py_true(); } },
 		value);
 }
+
+}// namespace py

@@ -2,6 +2,8 @@
 #include "runtime/Value.hpp"
 #include <sstream>
 
+using namespace py;
+
 #define PARSER_ERROR()                                           \
 	do {                                                         \
 		spdlog::error("Parser error {}:{}", __FILE__, __LINE__); \

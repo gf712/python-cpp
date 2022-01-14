@@ -4,6 +4,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyTuple.hpp"
 
+using namespace py;
 
 void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
 {

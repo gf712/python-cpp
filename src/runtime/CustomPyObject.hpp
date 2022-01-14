@@ -2,6 +2,7 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 class CustomPyObject : public PyBaseObject
 {
 	const PyType *m_type_obj;
@@ -13,3 +14,4 @@ class CustomPyObject : public PyBaseObject
 	
 	PyType *type() const override;
 };
+}// namespace py

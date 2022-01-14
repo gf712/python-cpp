@@ -4,8 +4,9 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-PyEllipsis::PyEllipsis() : PyBaseObject(BuiltinTypes::the().ellipsis())
-{}
+using namespace py;
+
+PyEllipsis::PyEllipsis() : PyBaseObject(BuiltinTypes::the().ellipsis()) {}
 
 PyEllipsis *PyEllipsis::create()
 {
@@ -15,14 +16,11 @@ PyEllipsis *PyEllipsis::create()
 
 PyObject *PyEllipsis::__add__(const PyObject *) const { TODO(); }
 
-PyObject *PyEllipsis::__repr__() const
-{
-	return PyString::create("Ellipsis");
-}
+PyObject *PyEllipsis::__repr__() const { return PyString::create("Ellipsis"); }
 
 PyType *PyEllipsis::type() const { return ellipsis(); }
 
-PyObject *py_ellipsis()
+PyObject *py::py_ellipsis()
 {
 	static PyObject *ellipsis = nullptr;
 	if (!ellipsis) { ellipsis = PyEllipsis::create(); }

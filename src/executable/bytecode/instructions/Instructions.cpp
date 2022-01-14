@@ -11,6 +11,7 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/StopIteration.hpp"
 
+using namespace py;
 
 void Move::execute(VirtualMachine &vm, Interpreter &) const
 {
@@ -19,9 +20,6 @@ void Move::execute(VirtualMachine &vm, Interpreter &) const
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	ASSERT(interpreter.function(m_function_name)->backend() == FunctionExecutionBackend::BYTECODE)
-	auto function = std::static_pointer_cast<Bytecode>(interpreter.function(m_function_name));
-
 	auto flags = PyCode::CodeFlags::create();
 	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
 	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARKEYWORDS); }
@@ -38,20 +36,18 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		kw_default_values.push_back(vm.reg(default_value));
 	}
 
-	auto *code = vm.heap().allocate<PyCode>(function,
-		m_function_id,
+	auto *func = interpreter.make_function(m_function_name,
 		m_args,
 		default_values,
 		kw_default_values,
 		m_arg_count,
 		m_kwonly_arg_count,
-		flags,
-		interpreter.module());
-
+		flags);
+	ASSERT(func)
+	// FIXME: demangle should be a function visible in the whole project
 	const auto start = m_function_name.find_last_of('.') + 1;
 	const std::string demangled_name{ m_function_name.begin() + start, m_function_name.end() };
-	interpreter.allocate_object<PyFunction>(
-		demangled_name, m_function_name, code, interpreter.execution_frame()->globals());
+	interpreter.execution_frame()->put_local(demangled_name, func);
 }
 
 

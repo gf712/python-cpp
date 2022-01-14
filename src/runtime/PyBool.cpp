@@ -4,6 +4,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 PyBool::PyBool(bool name) : PyBaseObject(BuiltinTypes::the().bool_()), m_value(name) {}
 
 std::string PyBool::to_string() const { return m_value ? "True" : "False"; }
@@ -12,10 +14,7 @@ PyObject *PyBool::__repr__() const { return PyString::from(String{ to_string() }
 
 PyObject *PyBool::__add__(const PyObject *) const { TODO(); }
 
-PyObject *PyBool::__bool__() const
-{
-	return m_value ? py_true() : py_false();
-}
+PyObject *PyBool::__bool__() const { return m_value ? py_true() : py_false(); }
 
 PyBool *PyBool::create(bool value)
 {
@@ -25,7 +24,7 @@ PyBool *PyBool::create(bool value)
 
 PyType *PyBool::type() const { return ::bool_(); }
 
-PyObject *py_true()
+PyObject *py::py_true()
 {
 	static PyObject *value = nullptr;
 
@@ -34,7 +33,7 @@ PyObject *py_true()
 	return value;
 }
 
-PyObject *py_false()
+PyObject *py::py_false()
 {
 	static PyObject *value = nullptr;
 
@@ -58,13 +57,13 @@ std::unique_ptr<TypePrototype> PyBool::register_type()
 	return std::move(type);
 }
 
-template<> PyBool *as(PyObject *node)
+template<> PyBool *py::as(PyObject *node)
 {
 	if (node->type() == bool_()) { return static_cast<PyBool *>(node); }
 	return nullptr;
 }
 
-template<> const PyBool *as(const PyObject *node)
+template<> const PyBool *py::as(const PyObject *node)
 {
 	if (node->type() == bool_()) { return static_cast<const PyBool *>(node); }
 	return nullptr;

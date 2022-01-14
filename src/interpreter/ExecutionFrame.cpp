@@ -5,6 +5,7 @@
 #include "runtime/PyType.hpp"
 #include "runtime/types/builtin.hpp"
 
+using namespace py;
 
 ExecutionFrame::ExecutionFrame() {}
 

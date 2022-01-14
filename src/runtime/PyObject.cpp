@@ -27,6 +27,8 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 namespace {
 bool is_method_descriptor(PyType *obj_type)
 {

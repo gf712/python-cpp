@@ -50,9 +50,9 @@ using namespace ast;
 
 namespace codegen {
 
-void BytecodeGenerator::visit(const Name *node)
+Value *BytecodeGenerator::visit(const Name *node)
 {
-	m_last_register = allocate_register();
+	auto *dst = create_value();
 
 	if (m_ctx.has_local_args()) {
 		const auto &local_args = m_ctx.local_args();
@@ -61,109 +61,102 @@ void BytecodeGenerator::visit(const Name *node)
 		if (auto it = std::find(arg_names.begin(), arg_names.end(), node->ids()[0]);
 			it != arg_names.end()) {
 			const size_t arg_index = std::distance(arg_names.begin(), it);
-			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
-			return;
+			emit<LoadFast>(dst->get_register(), arg_index, node->ids()[0]);
+			return dst;
 		} else if (auto it = std::find(
 					   kw_only_arg_names.begin(), kw_only_arg_names.end(), node->ids()[0]);
 				   it != kw_only_arg_names.end()) {
 			const size_t arg_index =
 				std::distance(kw_only_arg_names.begin(), it) + arg_names.size();
-			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
-			return;
+			emit<LoadFast>(dst->get_register(), arg_index, node->ids()[0]);
+			return dst;
 		} else if (local_args->vararg() && local_args->vararg()->name() == node->ids()[0]) {
 			const size_t arg_index = local_args->args().size() + local_args->kwonlyargs().size();
-			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
-			return;
+			emit<LoadFast>(dst->get_register(), arg_index, node->ids()[0]);
+			return dst;
 		} else if (local_args->kwarg() && local_args->kwarg()->name() == node->ids()[0]) {
 			size_t arg_index = local_args->args().size() + local_args->kwonlyargs().size();
 			if (local_args->vararg()) { arg_index++; }
-			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
-			return;
+			emit<LoadFast>(dst->get_register(), arg_index, node->ids()[0]);
+			return dst;
 		}
 	}
-	emit<LoadName>(m_last_register, node->ids()[0]);
+	emit<LoadName>(dst->get_register(), node->ids()[0]);
+	return dst;
 }
 
 
-void BytecodeGenerator::visit(const Constant *node)
+Value *BytecodeGenerator::visit(const Constant *node)
 {
-	auto dst_register = allocate_register();
-	emit<LoadConst>(dst_register, *node->value());
-	m_last_register = dst_register;
+	auto *dst = create_value();
+	emit<LoadConst>(dst->get_register(), *node->value());
+	return dst;
 }
 
-void BytecodeGenerator::visit(const BinaryExpr *node)
+Value *BytecodeGenerator::visit(const BinaryExpr *node)
 {
-	auto lhs_register = generate(node->lhs().get(), m_function_id);
-	auto rhs_register = generate(node->rhs().get(), m_function_id);
-	auto dst_register = allocate_register();
+	auto *lhs = generate(node->lhs().get(), m_function_id);
+	auto *rhs = generate(node->rhs().get(), m_function_id);
+	auto *dst = create_value();
 
 	switch (node->op_type()) {
 	case BinaryOpType::PLUS: {
-		emit<Add>(dst_register, lhs_register, rhs_register);
+		emit<Add>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::MINUS: {
-		emit<Subtract>(dst_register, lhs_register, rhs_register);
+		emit<Subtract>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::MULTIPLY: {
-		emit<Multiply>(dst_register, lhs_register, rhs_register);
+		emit<Multiply>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::EXP: {
-		emit<Exp>(dst_register, lhs_register, rhs_register);
+		emit<Exp>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::MODULO: {
-		emit<Modulo>(dst_register, lhs_register, rhs_register);
+		emit<Modulo>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::SLASH: {
-		emit<TrueDivide>(dst_register, lhs_register, rhs_register);
+		emit<TrueDivide>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::FLOORDIV:
 		TODO();
 	case BinaryOpType::LEFTSHIFT: {
-		emit<LeftShift>(dst_register, lhs_register, rhs_register);
+		emit<LeftShift>(dst->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::RIGHTSHIFT:
 		TODO();
 	}
 
-	m_last_register = dst_register;
+	return dst;
 }
 
-void BytecodeGenerator::visit(const FunctionDefinition *node)
+Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 {
 	if (!node->decorator_list().empty()) { TODO(); }
 
 	std::vector<std::string> arg_names;
 	m_ctx.push_local_args(node->args());
-	auto this_function_info = allocate_function();
-	this_function_info.function.metadata.function_name =
+	const std::string &function_name =
 		fmt::format("{}.{}", mangle_namespace(m_stack), node->name());
+	auto *f = create_function(function_name);
 
 	m_stack.push(Scope{ .name = node->name() });
 
-	auto *block = allocate_block(this_function_info.function_id);
+	auto *block = allocate_block(f->function_info().function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
 
-	auto *block = allocate_block(this_function_info.function_id);
-	auto *old_block = m_current_block;
-	set_insert_point(block);
+	generate(node->args().get(), f->function_info().function_id);
 
-	generate(node->args().get(), this_function_info.function_id);
-
-	for (const auto &node : node->body()) {
-		generate(node.get(), this_function_info.function_id);
-	}
+	for (const auto &node : node->body()) { generate(node.get(), f->function_info().function_id); }
 
 	// always return None
 	// this can be optimised away later on
 	auto none_value_register = allocate_register();
-	emit<LoadConst>(none_value_register, NameConstant{ NoneType{} });
+	emit<LoadConst>(none_value_register, py::NameConstant{ py::NoneType{} });
 	emit<ReturnValue>(none_value_register);
 
-	for (const auto &arg_name : node->args()->argument_names()) {
-		arg_names.push_back(arg_name);
-	}
+	for (const auto &arg_name : node->args()->argument_names()) { arg_names.push_back(arg_name); }
 	for (const auto &arg_name : node->args()->kw_only_argument_names()) {
 		arg_names.push_back(arg_name);
 	}
@@ -178,23 +171,20 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 	std::vector<Register> defaults;
 	defaults.reserve(node->args()->defaults().size());
 	for (const auto &default_node : node->args()->defaults()) {
-		defaults.push_back(generate(default_node.get(), m_function_id));
+		defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
 	}
 
-	std::vector<Register> kw_defaults;
+	std::vector<std::optional<Register>> kw_defaults;
 	kw_defaults.reserve(node->args()->kw_defaults().size());
 	for (const auto &default_node : node->args()->kw_defaults()) {
 		if (default_node) {
-			kw_defaults.push_back(generate(default_node.get(), m_function_id));
+			kw_defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
 		} else {
-			const auto nullptr_reg = allocate_register();
-			emit<LoadConst>(nullptr_reg, nullptr);
-			kw_defaults.push_back(nullptr_reg);
+			kw_defaults.push_back(std::nullopt);
 		}
 	}
 
-	emit<MakeFunction>(this_function_info.function_id,
-		node->name(),
+	emit<MakeFunction>(f->get_name(),
 		arg_names,
 		defaults,
 		kw_defaults,
@@ -203,10 +193,15 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 		node->args()->vararg() != nullptr,
 		node->args()->kwarg() != nullptr);
 
-	m_last_register = Register{};
+	m_ctx.pop_local_args();
+	m_stack.pop();
+
+	exit_function(f->function_info().function_id);
+
+	return f;
 }
 
-void BytecodeGenerator::visit(const Arguments *node)
+Value *BytecodeGenerator::visit(const Arguments *node)
 {
 	// if (!node->kw_defaults().empty()) { TODO(); }
 
@@ -215,27 +210,27 @@ void BytecodeGenerator::visit(const Arguments *node)
 	if (node->kwarg()) { generate(node->kwarg().get(), m_function_id); }
 	for (const auto &arg : node->kwonlyargs()) { generate(arg.get(), m_function_id); }
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const Argument *) { m_last_register = Register{}; }
+Value *BytecodeGenerator::visit(const Argument *) { return nullptr; }
 
-void BytecodeGenerator::visit(const Starred *node)
+Value *BytecodeGenerator::visit(const Starred *node)
 {
 	if (node->ctx() != ContextType::LOAD) { TODO(); }
-	m_last_register = generate(node->value().get(), m_function_id);
+	return generate(node->value().get(), m_function_id);
 }
 
-void BytecodeGenerator::visit(const Return *node)
+Value *BytecodeGenerator::visit(const Return *node)
 {
-	auto src_register = generate(node->value().get(), m_function_id);
-	emit<ReturnValue>(src_register);
-	m_last_register = Register{};
+	auto *src = generate(node->value().get(), m_function_id);
+	emit<ReturnValue>(src->get_register());
+	return src;
 }
 
-void BytecodeGenerator::visit(const Assign *node)
+Value *BytecodeGenerator::visit(const Assign *node)
 {
-	const auto src_register = generate(node->value().get(), m_function_id);
+	auto *src = generate(node->value().get(), m_function_id);
 	ASSERT(node->targets().size() > 0)
 
 	for (const auto &target : node->targets()) {
@@ -247,21 +242,21 @@ void BytecodeGenerator::visit(const Assign *node)
 					if (auto it = std::find(arg_names.begin(), arg_names.end(), var);
 						it != arg_names.end()) {
 						const size_t arg_index = std::distance(arg_names.begin(), it);
-						emit<StoreFast>(arg_index, var, src_register);
+						emit<StoreFast>(arg_index, var, src->get_register());
 						continue;
 					}
 				}
-				emit<StoreName>(var, src_register);
+				emit<StoreName>(var, src->get_register());
 			}
 		} else if (auto ast_attr = as<Attribute>(target)) {
-			auto dst_register = generate(ast_attr->value().get(), m_function_id);
-			emit<StoreAttr>(dst_register, src_register, ast_attr->attr());
+			auto *dst = generate(ast_attr->value().get(), m_function_id);
+			emit<StoreAttr>(dst->get_register(), src->get_register(), ast_attr->attr());
 		} else if (auto ast_tuple = as<Tuple>(target)) {
 			std::vector<Register> dst_registers;
 			for (size_t i = 0; i < ast_tuple->elements().size(); ++i) {
 				dst_registers.push_back(allocate_register());
 			}
-			emit<UnpackSequence>(dst_registers, src_register);
+			emit<UnpackSequence>(dst_registers, src->get_register());
 			size_t idx{ 0 };
 			for (const auto &dst_register : dst_registers) {
 				const auto &el = ast_tuple->elements()[idx++];
@@ -271,16 +266,16 @@ void BytecodeGenerator::visit(const Assign *node)
 			TODO();
 		}
 	}
-	m_last_register = src_register;
+	return src;
 }
 
-void BytecodeGenerator::visit(const Call *node)
+Value *BytecodeGenerator::visit(const Call *node)
 {
-	std::vector<Register> arg_registers;
-	std::vector<Register> keyword_registers;
+	std::vector<BytecodeValue *> arg_values;
+	std::vector<BytecodeValue *> keyword_values;
 	std::vector<std::string> keywords;
 
-	auto func_register = generate(node->function().get(), m_function_id);
+	auto *func = generate(node->function().get(), m_function_id);
 
 	auto is_args_expansion = [](const std::shared_ptr<ASTNode> &node) {
 		if (node->node_type() == ASTNodeType::Starred) { return true; }
@@ -298,36 +293,36 @@ void BytecodeGenerator::visit(const Call *node)
 		std::any_of(node->keywords().begin(), node->keywords().end(), is_kwargs_expansion);
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
-		auto list_register = allocate_register();
+		auto *list_value = create_value();
 		bool first_args_expansion = true;
 		std::vector<Register> args_lhs;
 		for (const auto &arg : node->args()) {
 			if (is_args_expansion(arg)) {
 				if (first_args_expansion) {
-					emit<BuildList>(list_register, args_lhs);
+					emit<BuildList>(list_value->get_register(), args_lhs);
 					args_lhs.clear();
 					first_args_expansion = false;
 				}
-				const auto arg_reg = generate(arg.get(), m_function_id);
-				emit<ListExtend>(list_register, arg_reg);
+				auto arg_value = generate(arg.get(), m_function_id);
+				emit<ListExtend>(list_value->get_register(), arg_value->get_register());
 			} else {
-				const auto arg_reg = generate(arg.get(), m_function_id);
+				auto *arg_value = generate(arg.get(), m_function_id);
 				if (first_args_expansion) {
-					args_lhs.push_back(arg_reg);
+					args_lhs.push_back(arg_value->get_register());
 				} else {
-					emit<ListExtend>(list_register, arg_reg);
+					emit<ListExtend>(list_value->get_register(), arg_value->get_register());
 				}
 			}
 		}
 		// we didn't hit any *args, but we still want to build a list of args so that
 		// we can call FunctionCallEx
-		if (first_args_expansion) { emit<BuildList>(list_register, args_lhs); }
-		auto args_tuple = allocate_register();
-		emit<ListToTuple>(args_tuple, list_register);
-		arg_registers.push_back(args_tuple);
+		if (first_args_expansion) { emit<BuildList>(list_value->get_register(), args_lhs); }
+		auto *args_tuple = create_value();
+		emit<ListToTuple>(args_tuple->get_register(), list_value->get_register());
+		arg_values.push_back(args_tuple);
 
 		if (requires_kwargs_expansion) {
-			auto dict_register = allocate_register();
+			auto *dict_value = create_value();
 			std::vector<Register> key_registers;
 			std::vector<Register> value_registers;
 			bool first_kwargs_expansion = true;
@@ -335,46 +330,46 @@ void BytecodeGenerator::visit(const Call *node)
 			for (const auto &el : node->keywords()) {
 				if (is_kwargs_expansion(el)) {
 					if (first_kwargs_expansion) {
-						emit<BuildDict>(dict_register, key_registers, value_registers);
+						emit<BuildDict>(dict_value->get_register(), key_registers, value_registers);
 						value_registers.clear();
 						key_registers.clear();
 						first_kwargs_expansion = false;
 					}
 					const auto kwargs_dict = generate(el->value().get(), m_function_id);
-					emit<DictMerge>(dict_register, kwargs_dict);
+					emit<DictMerge>(dict_value->get_register(), kwargs_dict);
 				} else {
-					const auto &value_reg = generate(el.get(), m_function_id);
+					auto *value = generate(el.get(), m_function_id);
 					const auto &name = *el->arg();
-					const auto key_reg = allocate_register();
-					emit<LoadConst>(key_reg, String{ name });
+					auto *key = create_value();
+					emit<LoadConst>(key->get_register(), py::String{ name });
 					if (first_kwargs_expansion) {
-						key_registers.push_back(key_reg);
-						value_registers.push_back(value_reg);
+						key_registers.push_back(key->get_register());
+						value_registers.push_back(value->get_register());
 					} else {
 						const auto new_dict_reg = allocate_register();
 						emit<BuildDict>(new_dict_reg,
-							std::vector<Register>{ key_reg },
-							std::vector<Register>{ value_reg });
-						emit<DictMerge>(dict_register, new_dict_reg);
+							std::vector<Register>{ key->get_register() },
+							std::vector<Register>{ value->get_register() });
+						emit<DictMerge>(dict_value->get_register(), new_dict_reg);
 					}
 				}
 			}
 			ASSERT(first_kwargs_expansion == false)
-			keyword_registers.push_back(dict_register);
+			keyword_values.push_back(dict_value);
 		} else {
 			// dummy value that will be ignore at runtime, since requires_kwargs_expansion is false
-			keyword_registers.push_back(Register{ 0 });
+			keyword_values.push_back(nullptr);
 		}
 	} else {
-		arg_registers.reserve(node->args().size());
+		arg_values.reserve(node->args().size());
 		for (const auto &arg : node->args()) {
-			arg_registers.push_back(generate(arg.get(), m_function_id));
+			arg_values.push_back(generate(arg.get(), m_function_id));
 		}
-		keyword_registers.reserve(node->keywords().size());
+		keyword_values.reserve(node->keywords().size());
 		keywords.reserve(node->keywords().size());
 
 		for (const auto &keyword : node->keywords()) {
-			keyword_registers.push_back(generate(keyword.get(), m_function_id));
+			keyword_values.push_back(generate(keyword.get(), m_function_id));
 			auto keyword_argname = keyword->arg();
 			if (!keyword_argname.has_value()) { TODO(); }
 			keywords.push_back(*keyword_argname);
@@ -382,23 +377,37 @@ void BytecodeGenerator::visit(const Call *node)
 	}
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
-		ASSERT(arg_registers.size() == 1)
-		ASSERT(keyword_registers.size() == 1)
+		ASSERT(arg_values.size() == 1)
+		ASSERT(keyword_values.size() == 1)
 
-		emit<FunctionCallEx>(func_register,
-			arg_registers[0],
-			keyword_registers[0],
+		emit<FunctionCallEx>(func->get_register(),
+			arg_values[0]->get_register(),
+			keyword_values[0] ? keyword_values[0]->get_register() : Register{ 0 },
 			requires_args_expansion,
 			requires_kwargs_expansion);
 	} else {
 		if (node->function()->node_type() == ASTNodeType::Attribute) {
 			auto attr_name = as<Attribute>(node->function())->attr();
-			emit<MethodCall>(func_register, attr_name, std::move(arg_registers));
+			std::vector<Register> arg_registers;
+			arg_registers.reserve(arg_values.size());
+			for (const auto &arg : arg_values) { arg_registers.push_back(arg->get_register()); }
+			emit<MethodCall>(func->get_register(), attr_name, std::move(arg_registers));
 		} else {
+			std::vector<Register> arg_registers;
+			std::vector<Register> keyword_registers;
+
+			arg_registers.reserve(arg_values.size());
+			for (const auto &arg : arg_values) { arg_registers.push_back(arg->get_register()); }
+
+			keyword_registers.reserve(keyword_values.size());
+			for (const auto &kw : keyword_values) {
+				keyword_registers.push_back(kw->get_register());
+			}
+
 			if (keyword_registers.empty()) {
-				emit<FunctionCall>(func_register, std::move(arg_registers));
+				emit<FunctionCall>(func->get_register(), std::move(arg_registers));
 			} else {
-				emit<FunctionCallWithKeywords>(func_register,
+				emit<FunctionCallWithKeywords>(func->get_register(),
 					std::move(arg_registers),
 					std::move(keyword_registers),
 					std::move(keywords));
@@ -406,10 +415,10 @@ void BytecodeGenerator::visit(const Call *node)
 		}
 	}
 
-	m_last_register = Register{};
+	return create_return_value();
 }
 
-void BytecodeGenerator::visit(const If *node)
+Value *BytecodeGenerator::visit(const If *node)
 {
 	static size_t if_count = 0;
 
@@ -419,8 +428,8 @@ void BytecodeGenerator::visit(const If *node)
 	auto end_label = make_label(fmt::format("END_{}", if_count++), m_function_id);
 
 	// if
-	const auto test_result_register = generate(node->test().get(), m_function_id);
-	emit<JumpIfFalse>(test_result_register, orelse_start_label);
+	auto *test_result = generate(node->test().get(), m_function_id);
+	emit<JumpIfFalse>(test_result->get_register(), orelse_start_label);
 	for (const auto &body_statement : node->body()) {
 		generate(body_statement.get(), m_function_id);
 	}
@@ -433,10 +442,10 @@ void BytecodeGenerator::visit(const If *node)
 	}
 	bind(*end_label);
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const For *node)
+Value *BytecodeGenerator::visit(const For *node)
 {
 	static size_t for_loop_count = 0;
 
@@ -447,13 +456,13 @@ void BytecodeGenerator::visit(const For *node)
 	auto forloop_end_label = make_label(fmt::format("FOR_END_{}", for_loop_count++), m_function_id);
 
 	// generate the iterator
-	const auto iterator_func_register = generate(node->iter().get(), m_function_id);
+	auto *iterator_func = generate(node->iter().get(), m_function_id);
 
 	auto iterator_register = allocate_register();
 	auto iter_variable_register = allocate_register();
 
 	// call the __iter__ implementation
-	emit<GetIter>(iterator_register, iterator_func_register);
+	emit<GetIter>(iterator_register, iterator_func->get_register());
 
 	// call the __next__ implementation
 	auto target_ids = as<Name>(node->target())->ids();
@@ -473,10 +482,10 @@ void BytecodeGenerator::visit(const For *node)
 	bind(*forloop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const While *node)
+Value *BytecodeGenerator::visit(const While *node)
 {
 	static size_t while_loop_count = 0;
 
@@ -489,8 +498,8 @@ void BytecodeGenerator::visit(const While *node)
 
 	// test
 	bind(*while_loop_start_label);
-	const auto test_result_register = generate(node->test().get(), m_function_id);
-	emit<JumpIfFalse>(test_result_register, while_loop_end_label);
+	const auto *test_result = generate(node->test().get(), m_function_id);
+	emit<JumpIfFalse>(test_result->get_register(), while_loop_end_label);
 
 	// body
 	for (const auto &el : node->body()) { generate(el.get(), m_function_id); }
@@ -500,92 +509,94 @@ void BytecodeGenerator::visit(const While *node)
 	bind(*while_loop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const Compare *node)
+Value *BytecodeGenerator::visit(const Compare *node)
 {
-	const auto lhs_reg = generate(node->lhs().get(), m_function_id);
-	const auto rhs_reg = generate(node->rhs().get(), m_function_id);
-	const auto result_reg = allocate_register();
+	const auto *lhs = generate(node->lhs().get(), m_function_id);
+	const auto *rhs = generate(node->rhs().get(), m_function_id);
+	auto *result = create_value();
 
 	switch (node->op()) {
 	case Compare::OpType::Eq: {
-		emit<Equal>(result_reg, lhs_reg, rhs_reg);
+		emit<Equal>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::NotEq: {
-		emit<NotEqual>(result_reg, lhs_reg, rhs_reg);
+		emit<NotEqual>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::Lt: {
-		emit<LessThan>(result_reg, lhs_reg, rhs_reg);
+		emit<LessThan>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::LtE: {
-		emit<LessThanEquals>(result_reg, lhs_reg, rhs_reg);
+		emit<LessThanEquals>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::Gt: {
-		emit<GreaterThan>(result_reg, lhs_reg, rhs_reg);
+		emit<GreaterThan>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::GtE: {
-		emit<GreaterThanEquals>(result_reg, lhs_reg, rhs_reg);
+		emit<GreaterThanEquals>(result->get_register(), lhs->get_register(), rhs->get_register());
 	} break;
 	case Compare::OpType::Is: {
-		emit<IsOp>(result_reg, lhs_reg, rhs_reg, false);
+		emit<IsOp>(result->get_register(), lhs->get_register(), rhs->get_register(), false);
 	} break;
 	case Compare::OpType::IsNot: {
-		emit<IsOp>(result_reg, lhs_reg, rhs_reg, true);
+		emit<IsOp>(result->get_register(), lhs->get_register(), rhs->get_register(), true);
 	} break;
 	case Compare::OpType::In: {
-		emit<InOp>(result_reg, lhs_reg, rhs_reg, false);
+		emit<InOp>(result->get_register(), lhs->get_register(), rhs->get_register(), false);
 	} break;
 	case Compare::OpType::NotIn: {
-		emit<InOp>(result_reg, lhs_reg, rhs_reg, true);
+		emit<InOp>(result->get_register(), lhs->get_register(), rhs->get_register(), true);
 	} break;
 	}
-	m_last_register = result_reg;
+
+	return result;
 }
 
-void BytecodeGenerator::visit(const List *node)
+Value *BytecodeGenerator::visit(const List *node)
 {
 	std::vector<Register> element_registers;
 	element_registers.reserve(node->elements().size());
 
 	for (const auto &el : node->elements()) {
-		element_registers.push_back(generate(el.get(), m_function_id));
+		auto *element_value = generate(el.get(), m_function_id);
+		element_registers.push_back(element_value->get_register());
 	}
 
-	const auto result_reg = allocate_register();
-	emit<BuildList>(result_reg, element_registers);
+	auto *result = create_value();
+	emit<BuildList>(result->get_register(), element_registers);
 
-	m_last_register = result_reg;
+	return result;
 }
 
-void BytecodeGenerator::visit(const Tuple *node)
+Value *BytecodeGenerator::visit(const Tuple *node)
 {
 	std::vector<Register> element_registers;
 	element_registers.reserve(node->elements().size());
 
 	for (const auto &el : node->elements()) {
-		element_registers.push_back(generate(el.get(), m_function_id));
+		auto *element_value = generate(el.get(), m_function_id);
+		element_registers.push_back(element_value->get_register());
 	}
 
-	const auto result_reg = allocate_register();
-	emit<BuildTuple>(result_reg, element_registers);
+	auto *result = create_value();
+	emit<BuildTuple>(result->get_register(), element_registers);
 
-	m_last_register = result_reg;
+	return result;
 }
 
-void BytecodeGenerator::visit(const ClassDefinition *node)
+Value *BytecodeGenerator::visit(const ClassDefinition *node)
 {
 	if (!node->decorator_list().empty()) { TODO(); }
 	std::string class_mangled_name;
 	size_t class_id;
 	{
-		auto this_class_info = allocate_function();
-		m_stack.push(Scope{ .name = node->name() });
 		class_mangled_name =
 			fmt::format("{}.__class__{}__", mangle_namespace(m_stack), node->name());
-		this_class_info.function.metadata.function_name = class_mangled_name;
-		class_id = this_class_info.function_id;
+		auto *class_builder_func = create_function(class_mangled_name);
+		m_stack.push(Scope{ .name = node->name() });
+		class_id = class_builder_func->function_info().function_id;
 
 		auto *block = allocate_block(class_id);
 		auto *old_block = m_current_block;
@@ -598,15 +609,16 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 		// class definition preamble, a la CPython
 		emit<LoadName>(name_register, "__name__");
 		emit<StoreName>("__module__", name_register);
-		emit<LoadConst>(qualname_register, String{ node->name() });
+		emit<LoadConst>(qualname_register, py::String{ node->name() });
 		emit<StoreName>("__qualname__", qualname_register);
 
 		// the actual class definition
 		for (const auto &el : node->body()) { generate(el.get(), class_id); }
 
-		emit<LoadConst>(return_none_register, NameConstant{ ::NoneType{} });
+		emit<LoadConst>(return_none_register, py::NameConstant{ py::NoneType{} });
 		emit<ReturnValue>(return_none_register);
 		m_stack.pop();
+		exit_function(class_builder_func->function_info().function_id);
 
 		set_insert_point(old_block);
 	}
@@ -624,18 +636,19 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 	arg_registers.push_back(class_name_register);
 
 	for (const auto &base : node->bases()) {
-		arg_registers.push_back(generate(base.get(), m_function_id));
+		auto *base_value = generate(base.get(), m_function_id);
+		arg_registers.push_back(base_value->get_register());
 	}
 	for (const auto &keyword : node->keywords()) {
-		kwarg_registers.push_back(generate(keyword.get(), m_function_id));
-		auto keyword_argname = keyword->arg();
-		if (!keyword_argname.has_value()) { TODO(); }
-		keyword_names.push_back(*keyword_argname);
+		auto *kw_value = generate(keyword.get(), m_function_id);
+		kwarg_registers.push_back(kw_value->get_register());
+		if (!keyword->arg().has_value()) { TODO(); }
+		keyword_names.push_back(*keyword->arg());
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);
-	emit<LoadConst>(class_name_register, String{ class_mangled_name });
-	emit<LoadConst>(class_location_register, Number{ static_cast<int64_t>(class_id) });
+	emit<LoadConst>(class_name_register, py::String{ class_mangled_name });
+	emit<LoadConst>(class_location_register, py::Number{ static_cast<int64_t>(class_id) });
 
 	if (kwarg_registers.empty()) {
 		emit<FunctionCall>(builtin_build_class_register, std::move(arg_registers));
@@ -648,10 +661,10 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 
 	emit<StoreName>(node->name(), Register{ 0 });
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const Dict *node)
+Value *BytecodeGenerator::visit(const Dict *node)
 {
 	ASSERT(node->keys().size() == node->values().size())
 
@@ -659,21 +672,23 @@ void BytecodeGenerator::visit(const Dict *node)
 	std::vector<Register> value_registers;
 
 	for (const auto &key : node->keys()) {
-		key_registers.push_back(generate(key.get(), m_function_id));
+		auto *key_value = generate(key.get(), m_function_id);
+		key_registers.push_back(key_value->get_register());
 	}
 	for (const auto &value : node->values()) {
-		value_registers.push_back(generate(value.get(), m_function_id));
+		auto *v = generate(value.get(), m_function_id);
+		value_registers.push_back(v->get_register());
 	}
 
-	const auto result_reg = allocate_register();
-	emit<BuildDict>(result_reg, key_registers, value_registers);
+	auto *result = create_value();
+	emit<BuildDict>(result->get_register(), key_registers, value_registers);
 
-	m_last_register = result_reg;
+	return result;
 }
 
-void BytecodeGenerator::visit(const Attribute *node)
+Value *BytecodeGenerator::visit(const Attribute *node)
 {
-	auto this_value_register = generate(node->value().get(), m_function_id);
+	auto *this_value = generate(node->value().get(), m_function_id);
 
 	const auto *parent_node = m_ctx.parent_nodes()[m_ctx.parent_nodes().size() - 2];
 	auto parent_node_type = parent_node->node_type();
@@ -683,37 +698,37 @@ void BytecodeGenerator::visit(const Attribute *node)
 	// and this attribute
 	if (parent_node_type == ASTNodeType::Call
 		&& static_cast<const Call *>(parent_node)->function().get() == node) {
-		auto method_name_register = allocate_register();
-		emit<LoadMethod>(method_name_register, this_value_register, node->attr());
-		m_last_register = method_name_register;
+		auto method_name = create_value();
+		emit<LoadMethod>(method_name->get_register(), this_value->get_register(), node->attr());
+		return method_name;
 	} else if (node->context() == ContextType::LOAD) {
-		auto attribute_value_register = allocate_register();
-		emit<LoadAttr>(attribute_value_register, this_value_register, node->attr());
-		m_last_register = attribute_value_register;
+		auto *attribute_value = create_value();
+		emit<LoadAttr>(attribute_value->get_register(), this_value->get_register(), node->attr());
+		return attribute_value;
 	} else if (node->context() == ContextType::STORE) {
-		auto attribute_value_register = allocate_register();
-		emit<LoadAttr>(attribute_value_register, this_value_register, node->attr());
-		m_last_register = attribute_value_register;
+		auto *attribute_value = create_value();
+		emit<LoadAttr>(attribute_value->get_register(), this_value->get_register(), node->attr());
+		return attribute_value;
 	} else {
 		TODO();
 	}
 }
 
-void BytecodeGenerator::visit(const Keyword *node)
+Value *BytecodeGenerator::visit(const Keyword *node)
 {
-	m_last_register = generate(node->value().get(), m_function_id);
+	return generate(node->value().get(), m_function_id);
 }
 
-void BytecodeGenerator::visit(const AugAssign *node)
+Value *BytecodeGenerator::visit(const AugAssign *node)
 {
-	const auto lhs_register = generate(node->target().get(), m_function_id);
-	const auto rhs_register = generate(node->value().get(), m_function_id);
+	auto *lhs = generate(node->target().get(), m_function_id);
+	const auto *rhs = generate(node->value().get(), m_function_id);
 	switch (node->op()) {
 	case BinaryOpType::PLUS: {
-		emit<InplaceAdd>(lhs_register, rhs_register);
+		emit<InplaceAdd>(lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::MINUS: {
-		emit<InplaceSub>(lhs_register, rhs_register);
+		emit<InplaceSub>(lhs->get_register(), rhs->get_register());
 	} break;
 	case BinaryOpType::MULTIPLY: {
 		TODO();
@@ -737,17 +752,18 @@ void BytecodeGenerator::visit(const AugAssign *node)
 
 	if (auto named_target = as<Name>(node->target())) {
 		if (named_target->ids().size() != 1) { TODO(); }
-		emit<StoreName>(named_target->ids()[0], lhs_register);
+		emit<StoreName>(named_target->ids()[0], lhs->get_register());
 	} else if (auto attr = as<Attribute>(node->target())) {
 		auto obj_reg = generate(attr->value().get(), m_function_id);
-		emit<StoreAttr>(obj_reg, lhs_register, attr->attr());
+		emit<StoreAttr>(obj_reg, lhs->get_register(), attr->attr());
 	} else {
 		TODO();
 	}
-	m_last_register = lhs_register;
+
+	return lhs;
 }
 
-void BytecodeGenerator::visit(const Import *node)
+Value *BytecodeGenerator::visit(const Import *node)
 {
 	auto module_register = allocate_register();
 	emit<ImportName>(module_register, node->names());
@@ -756,39 +772,44 @@ void BytecodeGenerator::visit(const Import *node)
 	} else {
 		emit<StoreName>(node->names()[0], module_register);
 	}
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const Module *node)
+Value *BytecodeGenerator::visit(const Module *node)
 {
 	const auto &module_name = fs::path(node->filename()).stem();
 	m_stack.push(Scope{ .name = module_name });
-	Register last{ 0 };
+	BytecodeValue *last = nullptr;
 	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
 
-	emit<ReturnValue>(last);
-	m_last_register = Register{ 0 };
+	// TODO: should the module return the last value if there is one?
+	last = create_value();
+	emit<LoadConst>(last->get_register(), py::NameConstant{ py::NoneType{} });
+	emit<ReturnValue>(last->get_register());
 	m_stack.pop();
+	return last;
 }
 
-void BytecodeGenerator::visit(const Subscript *) { TODO(); }
+Value *BytecodeGenerator::visit(const Subscript *) { TODO(); }
 
-void BytecodeGenerator::visit(const Raise *) { TODO(); }
+Value *BytecodeGenerator::visit(const Raise *) { TODO(); }
 
-void BytecodeGenerator::visit(const With *) { TODO(); }
+Value *BytecodeGenerator::visit(const With *) { TODO(); }
 
-void BytecodeGenerator::visit(const WithItem *node)
+Value *BytecodeGenerator::visit(const WithItem *node)
 {
-	const auto ctx_expr = generate(node->context_expr().get(), m_function_id);
+	auto *ctx_expr = generate(node->context_expr().get(), m_function_id);
 
 	if (node->optional_vars()) {
 		ASSERT(as<Name>(node->context_expr()))
 		ASSERT(as<Name>(node->context_expr())->ids().size() == 1)
-		emit<StoreName>(as<Name>(node->context_expr())->ids()[0], ctx_expr);
+		emit<StoreName>(as<Name>(node->context_expr())->ids()[0], ctx_expr->get_register());
 	}
+
+	return ctx_expr;
 }
 
-void BytecodeGenerator::visit(const IfExpr *) { TODO(); }
+Value *BytecodeGenerator::visit(const IfExpr *) { TODO(); }
 
 namespace {
 	size_t list_node_distance(const std::list<InstructionBlock> &block_list,
@@ -814,7 +835,7 @@ namespace {
 	}
 }// namespace
 
-void BytecodeGenerator::visit(const Try *node)
+Value *BytecodeGenerator::visit(const Try *node)
 {
 	auto *body_block = allocate_block(m_function_id);
 
@@ -836,8 +857,8 @@ void BytecodeGenerator::visit(const Try *node)
 	for (size_t idx = 0; const auto &handler : node->handlers()) {
 		auto *exception_handler_block = exception_handler_blocks[idx];
 		set_insert_point(exception_handler_block);
-		auto exception_type_reg = generate(handler->type().get(), m_function_id);
-		emit<JumpIfNotExceptionMatch>(exception_type_reg);
+		auto *exception_type = generate(handler->type().get(), m_function_id);
+		emit<JumpIfNotExceptionMatch>(exception_type->get_register());
 		idx++;
 		set_insert_point(exception_handler_blocks[idx]);
 		for (const auto &el : handler->body()) { generate(el.get(), m_function_id); }
@@ -850,50 +871,50 @@ void BytecodeGenerator::visit(const Try *node)
 	set_insert_point(finally_block);
 	for (const auto &statement : node->finalbody()) { generate(statement.get(), m_function_id); }
 
-	m_last_register = Register{ 0 };
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
+Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
-void BytecodeGenerator::visit(const Global *) { TODO(); }
+Value *BytecodeGenerator::visit(const Global *) { TODO(); }
 
-void BytecodeGenerator::visit(const Delete *) { TODO(); }
+Value *BytecodeGenerator::visit(const Delete *) { TODO(); }
 
-void BytecodeGenerator::visit(const UnaryExpr *node)
+Value *BytecodeGenerator::visit(const UnaryExpr *node)
 {
-	const auto source_register = generate(node->operand().get(), m_function_id);
-	const auto dst_register = allocate_register();
+	const auto *src = generate(node->operand().get(), m_function_id);
+	auto *dst = create_value();
 	switch (node->op_type()) {
 	case UnaryOpType::ADD: {
-		emit<UnaryPositive>(dst_register, source_register);
+		emit<UnaryPositive>(dst->get_register(), src->get_register());
 	} break;
 	case UnaryOpType::SUB: {
-		emit<UnaryNegative>(dst_register, source_register);
+		emit<UnaryNegative>(dst->get_register(), src->get_register());
 	} break;
 	case UnaryOpType::INVERT: {
-		emit<UnaryInvert>(dst_register, source_register);
+		emit<UnaryInvert>(dst->get_register(), src->get_register());
 	} break;
 	case UnaryOpType::NOT: {
-		emit<UnaryNot>(dst_register, source_register);
+		emit<UnaryNot>(dst->get_register(), src->get_register());
 	} break;
 	}
 
-	m_last_register = dst_register;
+	return dst;
 }
 
-void BytecodeGenerator::visit(const BoolOp *node)
+Value *BytecodeGenerator::visit(const BoolOp *node)
 {
 	static size_t bool_op_count = 0;
 	auto end_label = make_label(fmt::format("BOOL_OP_END_{}", bool_op_count++), m_function_id);
-	Register result_register = allocate_register();
-	Register last_result;
+	auto *result = create_value();
+	auto *last_result = create_value();
 	switch (node->op()) {
 	case BoolOp::OpType::And: {
 		auto it = node->values().begin();
 		auto end = node->values().end();
 		while (std::next(it) != end) {
 			last_result = generate((*it).get(), m_function_id);
-			emit<JumpIfFalseOrPop>(last_result, result_register, end_label);
+			emit<JumpIfFalseOrPop>(last_result->get_register(), result->get_register(), end_label);
 			it++;
 		}
 		last_result = generate((*it).get(), m_function_id);
@@ -903,44 +924,44 @@ void BytecodeGenerator::visit(const BoolOp *node)
 		auto end = node->values().end();
 		while (std::next(it) != end) {
 			last_result = generate((*it).get(), m_function_id);
-			emit<JumpIfTrueOrPop>(last_result, result_register, end_label);
+			emit<JumpIfTrueOrPop>(last_result->get_register(), result->get_register(), end_label);
 			it++;
 		}
 		last_result = generate((*it).get(), m_function_id);
 	}
 	}
-	emit<Move>(result_register, last_result);
+	emit<Move>(result->get_register(), last_result->get_register());
 
 	bind(*end_label);
-	m_last_register = result_register;
+	return result;
 }
 
-void BytecodeGenerator::visit(const Assert *node)
+Value *BytecodeGenerator::visit(const Assert *node)
 {
 	static size_t assert_count = 0;
 	auto end_label = make_label(fmt::format("END_{}", assert_count++), m_function_id);
 
-	const auto test_result_register = generate(node->test().get(), m_function_id);
+	auto *test_result = generate(node->test().get(), m_function_id);
 
-	emit<JumpIfTrue>(test_result_register, end_label);
+	emit<JumpIfTrue>(test_result->get_register(), end_label);
 
-	const auto assertion_type_register = allocate_register();
-	emit<LoadAssertionError>(assertion_type_register);
+	auto *assertion_function = create_value();
+	emit<LoadAssertionError>(assertion_function->get_register());
 
 	std::vector<Register> args;
-	if (node->msg()) { args.push_back(generate(node->msg().get(), m_function_id)); }
+	if (node->msg()) { args.push_back(generate(node->msg().get(), m_function_id)->get_register()); }
 
-	emit<FunctionCall>(assertion_type_register, std::move(args));
-	const Register result_register{ 0 };
-	emit<RaiseVarargs>(result_register);
+	emit<FunctionCall>(assertion_function->get_register(), std::move(args));
+	auto *exception = create_return_value();
+	emit<RaiseVarargs>(exception->get_register());
 	bind(*end_label);
 
-	m_last_register = Register{};
+	return nullptr;
 }
 
-void BytecodeGenerator::visit(const Pass *) { m_last_register = Register{}; }
+Value *BytecodeGenerator::visit(const Pass *) { return nullptr; }
 
-void BytecodeGenerator::visit(const NamedExpr *) { TODO(); }
+Value *BytecodeGenerator::visit(const NamedExpr *) { TODO(); }
 
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)
 	: function_id(function_id_), function(f), generator(generator_)
@@ -948,11 +969,9 @@ FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenera
 	generator->enter_function();
 }
 
-FunctionInfo::~FunctionInfo() { generator->exit_function(function_id); }
-
-BytecodeGenerator::BytecodeGenerator() : m_frame_register_count({ start_register })
+BytecodeGenerator::BytecodeGenerator()
 {
-	allocate_function();
+	(void)create_function("__main__entry__");
 	m_current_block = &m_functions.back().blocks.back();
 }
 
@@ -966,13 +985,24 @@ void BytecodeGenerator::exit_function(size_t function_id)
 	m_frame_register_count.pop_back();
 }
 
-FunctionInfo BytecodeGenerator::allocate_function()
+BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &name)
 {
+	// auto &new_func = m_functions.emplace_back();
+	// // allocate the first block
+	// new_func.blocks.emplace_back();
+	// new_func.metadata.function_name = std::to_string(m_functions.size() - 1);
+	// return FunctionInfo{ m_functions.size() - 1, new_func, this };
+
 	auto &new_func = m_functions.emplace_back();
 	// allocate the first block
 	new_func.blocks.emplace_back();
-	new_func.metadata.function_name = std::to_string(m_functions.size() - 1);
-	return FunctionInfo{ m_functions.size() - 1, new_func, this };
+	new_func.metadata.function_name = name;
+	m_values.push_back(std::make_unique<BytecodeFunctionValue>(
+		name, FunctionInfo{ m_functions.size() - 1, new_func, this }));
+	static_cast<BytecodeFunctionValue *>(m_values.back().get())
+		->function_info()
+		.function.metadata.function_name = name;
+	return static_cast<BytecodeFunctionValue *>(m_values.back().get());
 }
 
 void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)

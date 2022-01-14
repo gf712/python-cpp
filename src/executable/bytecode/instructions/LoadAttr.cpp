@@ -2,6 +2,8 @@
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
 
+using namespace py;
+
 void LoadAttr::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto this_value = vm.reg(m_value_source);

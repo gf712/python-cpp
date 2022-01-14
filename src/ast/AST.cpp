@@ -15,49 +15,53 @@ AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
 #define __AST_NODE_TYPE(NodeType) \
-	void NodeType::codegen(CodeGenerator *generator) const { generator->visit(this); }
+	Value *NodeType::codegen(CodeGenerator *generator) const { return generator->visit(this); }
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
 
 Constant::Constant(double value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(Number{ value }))
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(py::Number{ value }))
 {}
 
 Constant::Constant(int64_t value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(Number{ value }))
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(py::Number{ value }))
 {}
 
 Constant::Constant(bool value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(NameConstant{ value }))
+	: ASTNode(ASTNodeType::Constant),
+	  m_value(std::make_unique<py::Value>(py::NameConstant{ value }))
 {}
 
 Constant::Constant(std::string value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(String{ std::move(value) }))
+	: ASTNode(ASTNodeType::Constant),
+	  m_value(std::make_unique<py::Value>(py::String{ std::move(value) }))
 {}
 
 Constant::Constant(const char *value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(String{ std::string(value) }))
+	: ASTNode(ASTNodeType::Constant),
+	  m_value(std::make_unique<py::Value>(py::String{ std::string(value) }))
 {}
 
 Constant::Constant(ast::NoneType)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(NameConstant{ ::NoneType{} }))
+	: ASTNode(ASTNodeType::Constant),
+	  m_value(std::make_unique<py::Value>(py::NameConstant{ py::NoneType{} }))
 {}
 
-Constant::Constant(const Value &value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<Value>(value))
+Constant::Constant(const py::Value &value)
+	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(value))
 {}
 
 void Constant::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Constant", indent);
-	std::visit(overloaded{ [&indent](const String &value) {
+	std::visit(overloaded{ [&indent](const py::String &value) {
 							  spdlog::debug("{}  - value: \"{}\"", indent, value.to_string());
 						  },
 				   [&indent](const auto &value) {
 					   spdlog::debug("{}  - value: {}", indent, value.to_string());
 				   },
-				   [&indent](PyObject *const value) {
+				   [&indent](py::PyObject *const value) {
 					   spdlog::debug("{}  - value: {}", indent, value->to_string());
 				   } },
 		*m_value);

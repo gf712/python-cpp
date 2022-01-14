@@ -2,12 +2,15 @@
 #include "PyTuple.hpp"
 #include "PyType.hpp"
 #include "types/builtin.hpp"
+#include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
 
+using namespace py;
 
 TEST(PyType, ObjectClassParent)
 {
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 	auto *bases = object()->underlying_type().__bases__;
 	EXPECT_TRUE(bases->elements().empty());
 
@@ -21,6 +24,7 @@ TEST(PyType, ObjectClassParent)
 
 TEST(PyType, InheritanceTriangle)
 {
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 	PyType *B1 = PyType::initialize(
 		TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(object()) });
 	PyType *B2 = PyType::initialize(
@@ -39,6 +43,7 @@ TEST(PyType, InheritanceTriangle)
 
 TEST(PyType, InheritanceDiamond)
 {
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 	PyType *A = PyType::initialize(
 		TypePrototype{ .__name__ = "A", .__bases__ = PyTuple::create(object()) });
 	PyType *B1 =

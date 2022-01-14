@@ -10,6 +10,8 @@
 
 #include <csetjmp>
 
+using namespace py;
+
 MarkSweepGC::MarkSweepGC() : m_frequency(1) {}
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const

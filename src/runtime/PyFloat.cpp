@@ -3,6 +3,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
 
 PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
 
@@ -34,13 +35,13 @@ std::unique_ptr<TypePrototype> PyFloat::register_type()
 	return std::move(type);
 }
 
-template<> PyFloat *as(PyObject *obj)
+template<> PyFloat *py::as(PyObject *obj)
 {
 	if (obj->type() == float_()) { return static_cast<PyFloat *>(obj); }
 	return nullptr;
 }
 
-template<> const PyFloat *as(const PyObject *obj)
+template<> const PyFloat *py::as(const PyObject *obj)
 {
 	if (obj->type() == float_()) { return static_cast<const PyFloat *>(obj); }
 	return nullptr;

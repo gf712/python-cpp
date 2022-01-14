@@ -1,8 +1,10 @@
 #include "PyNumber.hpp"
 
+namespace py {
+
 class PyInteger final : public PyNumber
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	PyInteger(int64_t);
 
@@ -15,3 +17,5 @@ class PyInteger final : public PyNumber
 	PyType *type() const override;
 	size_t as_size_t() const;
 };
+
+}// namespace py

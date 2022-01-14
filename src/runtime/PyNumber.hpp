@@ -2,9 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyNumber : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend class PyInteger;
 	friend class PyFloat;
 
@@ -39,3 +41,5 @@ class PyNumber : public PyBaseObject
   private:
 	PyNumber(Number number, const TypePrototype &type) : PyBaseObject(type), m_value(number) {}
 };
+
+}// namespace py

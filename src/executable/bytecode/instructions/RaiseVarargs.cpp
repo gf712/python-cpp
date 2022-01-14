@@ -2,6 +2,8 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTuple.hpp"
 
+using namespace py;
+
 void RaiseVarargs::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	if (m_cause.has_value()) {

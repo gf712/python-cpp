@@ -2,9 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyRange : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	int64_t m_start;
 	int64_t m_stop;
@@ -33,7 +35,7 @@ class PyRange : public PyBaseObject
 
 class PyRangeIterator : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	const PyRange &m_pyrange;
 	int64_t m_current_index;
@@ -49,3 +51,5 @@ class PyRangeIterator : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

@@ -2,6 +2,8 @@
 #include "interpreter/Interpreter.hpp"
 #include "runtime/TypeError.hpp"
 
+using namespace py;
+
 void UnaryPositive::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &val = vm.reg(m_source);

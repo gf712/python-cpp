@@ -2,6 +2,8 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyDictItems;
 class PyDictItemsIterator;
 
@@ -11,7 +13,7 @@ class PyDict : public PyBaseObject
 	using MapType = std::unordered_map<Value, Value, ValueHash, ValueEqual>;
 
   private:
-	friend class Heap;
+	friend class ::Heap;
 	friend PyDictItems;
 	friend PyDictItemsIterator;
 
@@ -49,7 +51,7 @@ class PyDict : public PyBaseObject
 
 class PyDictItems : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend PyDict;
 	friend PyDictItemsIterator;
 
@@ -71,7 +73,7 @@ class PyDictItems : public PyBaseObject
 
 class PyDictItemsIterator : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend PyDictItems;
 
 	const PyDictItems &m_pydictitems;
@@ -102,3 +104,5 @@ class PyDictItemsIterator : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

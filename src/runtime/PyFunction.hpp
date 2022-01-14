@@ -4,6 +4,8 @@
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
 
+namespace py {
+
 class PyCode : public PyBaseObject
 {
   public:
@@ -39,7 +41,6 @@ class PyCode : public PyBaseObject
 	};
 
 	const std::shared_ptr<Function> m_function;
-	const size_t m_function_id;
 	const size_t m_register_count;
 	const std::vector<std::string> m_varnames;
 	const std::vector<Value> m_defaults;
@@ -51,7 +52,6 @@ class PyCode : public PyBaseObject
 
   public:
 	PyCode(std::shared_ptr<Function> function,
-		size_t function_id,
 		std::vector<std::string> varnames,
 		std::vector<Value> defaults,
 		std::vector<Value> kwonly_defaults,
@@ -94,6 +94,8 @@ class PyFunction : public PyBaseObject
 
 	std::string to_string() const override { return fmt::format("PyFunction"); }
 
+	const std::string &name() const { return m_name; }
+
 	PyObject *call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
 
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
@@ -113,7 +115,7 @@ class PyFunction : public PyBaseObject
 
 class PyNativeFunction : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
@@ -157,3 +159,5 @@ class PyNativeFunction : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

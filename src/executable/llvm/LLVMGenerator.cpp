@@ -18,6 +18,16 @@ static AllocaInst *create_entry_block_alloca(llvm::Function *f, const std::strin
 }
 }// namespace
 
+class LLVMGenerator::LLVMValue : public ast::Value
+{
+	llvm::Value *m_value;
+
+  public:
+	LLVMValue(llvm::Value *value) : ast::Value(value->getName()), m_value(value) {}
+
+	llvm::Value *value() const { return m_value; }
+};
+
 struct LLVMGenerator::Context
 {
 	struct State
@@ -37,7 +47,6 @@ struct LLVMGenerator::Context
 	std::unique_ptr<LLVMContext> ctx;
 	std::unique_ptr<IRBuilder<>> builder;
 	std::unique_ptr<Module> module;
-	llvm::Value *last_value{ nullptr };
 
 	Context(const std::string &module_name)
 	{
@@ -85,9 +94,9 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 
 	node->codegen(&generator);
 
-	if (generator.m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) {
-		return nullptr;
-	}
+	// if (generator.m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) {
+	// 	return nullptr;
+	// }
 
 	return std::make_shared<LLVMProgram>(std::move(generator.m_ctx->module),
 		std::move(generator.m_ctx->ctx),
@@ -95,20 +104,26 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 		argv);
 }
 
-llvm::Value *LLVMGenerator::generate(const ast::ASTNode *node)
+LLVMGenerator::LLVMValue *LLVMGenerator::generate(const ast::ASTNode *node)
 {
 	if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return nullptr; }
-	node->codegen(this);
-	return m_ctx->last_value;
+	auto *value = node->codegen(this);
+	ASSERT(value);
+	return static_cast<LLVMGenerator::LLVMValue *>(value);
 }
 
-void LLVMGenerator::visit(const ast::Argument *node) { TODO(); }
+ast::Value *LLVMGenerator::create_value(llvm::Value *value)
+{
+	return m_values.emplace_back(std::make_unique<LLVMGenerator::LLVMValue>(value)).get();
+}
 
-void LLVMGenerator::visit(const ast::Arguments *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Argument *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Attribute *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Arguments *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Assign *node)
+ast::Value *LLVMGenerator::visit(const ast::Attribute *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Assign *node)
 {
 	auto *value_to_store = generate(node->value().get());
 	for (const auto &target : node->targets()) {
@@ -116,7 +131,7 @@ void LLVMGenerator::visit(const ast::Assign *node)
 			ASSERT(ast_name->ids().size() == 1)
 			const auto &var_name = ast_name->ids()[0];
 			llvm::Function *f = m_ctx->builder->GetInsertBlock()->getParent();
-			Type *type = value_to_store->getType();
+			Type *type = value_to_store->value()->getType();
 			if (auto it = m_ctx->scope_stack.top().lookup_table.find(var_name);
 				it != m_ctx->scope_stack.top().lookup_table.end()) {
 				if (type != it->second->getType()) {
@@ -135,27 +150,30 @@ void LLVMGenerator::visit(const ast::Assign *node)
 			}
 			auto *alloca_inst = create_entry_block_alloca(f, var_name, type);
 			m_ctx->add_local(var_name, alloca_inst);
-			m_ctx->builder->CreateStore(value_to_store, alloca_inst);
+			return create_value(m_ctx->builder->CreateStore(value_to_store->value(), alloca_inst));
 		} else {
 			set_error_state("Can only assign to ast::Name");
-			return;
+			return nullptr;
 		}
 	}
+
+	TODO();
+	return nullptr;
 }
 
-void LLVMGenerator::visit(const ast::Assert *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Assert *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::AugAssign *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::AugAssign *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::BinaryExpr *node)
+ast::Value *LLVMGenerator::visit(const ast::BinaryExpr *node)
 {
 	switch (node->op_type()) {
 	case ast::BinaryOpType::PLUS: {
 		auto *lhs = generate(node->lhs().get());
-		if (!lhs) return;
+		if (!lhs) return nullptr;
 		auto *rhs = generate(node->rhs().get());
-		if (!rhs) return;
-		m_ctx->last_value = m_ctx->builder->CreateAdd(lhs, rhs);
+		if (!rhs) return nullptr;
+		return create_value(m_ctx->builder->CreateAdd(lhs->value(), rhs->value()));
 	} break;
 	case ast::BinaryOpType::MINUS: {
 		TODO();
@@ -184,21 +202,47 @@ void LLVMGenerator::visit(const ast::BinaryExpr *node)
 	}
 }
 
-void LLVMGenerator::visit(const ast::BoolOp *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::BoolOp *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Call *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Call *node)
+{
+	if (node->function()->node_type() != ast::ASTNodeType::Name) {
+		set_error_state("arg type is not a Name AST node cannot call function");
+		return nullptr;
+	}
+	auto function_name_node = std::static_pointer_cast<ast::Name>(node->function());
+	ASSERT(function_name_node->ids().size() == 1)
 
-void LLVMGenerator::visit(const ast::ClassDefinition *node) { TODO(); }
+	const auto &function_name = function_name_node->ids()[0];
 
-void LLVMGenerator::visit(const ast::Compare *node) { TODO(); }
+	auto *f = [this, &function_name]() -> llvm::Function * {
+		for (auto &f : m_ctx->module->functions()) {
+			if (function_name == f.getName()) { return &f; }
+		}
+		return nullptr;
+	}();
 
-void LLVMGenerator::visit(const ast::Constant *node) { TODO(); }
+	if (!f) {
+		set_error_state("did not find function {}", function_name);
+		return nullptr;
+	}
 
-void LLVMGenerator::visit(const ast::Dict *node) { TODO(); }
+	TODO();
+	return nullptr;
+	// m_ctx->last_value = m_ctx->builder->CreateCall(f->getFunctionType(), f);
+}
 
-void LLVMGenerator::visit(const ast::ExceptHandler *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::ClassDefinition *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::For *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Compare *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Constant *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Dict *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::ExceptHandler *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::For *node) { TODO(); }
 
 llvm::Type *LLVMGenerator::arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation)
 {
@@ -222,7 +266,7 @@ llvm::Type *LLVMGenerator::arg_type(const std::shared_ptr<ast::ASTNode> &type_an
 	return nullptr;
 }// namespace
 
-void LLVMGenerator::visit(const ast::FunctionDefinition *node)
+ast::Value *LLVMGenerator::visit(const ast::FunctionDefinition *node)
 {
 	std::vector<Type *> arg_types;
 
@@ -230,12 +274,12 @@ void LLVMGenerator::visit(const ast::FunctionDefinition *node)
 		const auto &type_annotation = arg->annotation();
 		if (!type_annotation) {
 			set_error_state("arg is not type annotated, cannot determine arg type");
-			return;
+			return nullptr;
 		}
 		if (auto *type = arg_type(type_annotation)) {
 			arg_types.push_back(type);
 		} else {
-			return;
+			return nullptr;
 		}
 	}
 
@@ -244,7 +288,7 @@ void LLVMGenerator::visit(const ast::FunctionDefinition *node)
 	if (!node->returns()) {
 		// TODO: this would require type checking through the whole function
 		set_error_state("empty return type annotation not implemented");
-		return;
+		return nullptr;
 	}
 
 	const auto &return_type_annotation = node->returns();
@@ -252,7 +296,7 @@ void LLVMGenerator::visit(const ast::FunctionDefinition *node)
 	if (auto *type = arg_type(return_type_annotation)) {
 		return_type = type;
 	} else {
-		return;
+		return nullptr;
 	}
 
 	auto *FT = FunctionType::get(return_type, arg_types, false);
@@ -293,9 +337,11 @@ void LLVMGenerator::visit(const ast::FunctionDefinition *node)
 	// 	if (!success) { spdlog::error("Failed to compile to LLVM IR: {}", out.str()); }
 	// 	ASSERT(success)
 	// }
+
+	return create_value(F);
 }
 
-void LLVMGenerator::visit(const ast::If *node)
+ast::Value *LLVMGenerator::visit(const ast::If *node)
 {
 	auto *condition = generate(node->test().get());
 
@@ -305,7 +351,7 @@ void LLVMGenerator::visit(const ast::If *node)
 	auto *ElseBB = BasicBlock::Create(*m_ctx->ctx, "else");
 	auto *MergeBB = BasicBlock::Create(*m_ctx->ctx, "ifcont");
 
-	m_ctx->builder->CreateCondBr(condition, ThenBB, ElseBB);
+	m_ctx->builder->CreateCondBr(condition->value(), ThenBB, ElseBB);
 
 	// then
 	m_ctx->builder->SetInsertPoint(ThenBB);
@@ -324,31 +370,36 @@ void LLVMGenerator::visit(const ast::If *node)
 	f->getBasicBlockList().push_back(MergeBB);
 	m_ctx->builder->SetInsertPoint(MergeBB);
 	// auto phi_node = m_ctx->builder->CreatePHI();
+	TODO();
+
+	return nullptr;
 }
 
-void LLVMGenerator::visit(const ast::Import *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Import *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Keyword *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Keyword *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::List *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::List *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Module *node)
+ast::Value *LLVMGenerator::visit(const ast::Module *node)
 {
 	m_ctx->module->setSourceFileName(node->filename());
 	m_ctx->module->setModuleIdentifier("test");
 
 	for (const auto &statement : node->body()) {
 		statement->codegen(this);
-		if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return; }
+		// if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return nullptr; }
 	}
 
 	std::string repr;
 	raw_string_ostream out{ repr };
 	m_ctx->module->print(out, nullptr);
 	spdlog::debug("LLVM module:\n{}", out.str());
+
+	return nullptr;
 }
 
-void LLVMGenerator::visit(const ast::Name *node)
+ast::Value *LLVMGenerator::visit(const ast::Name *node)
 {
 	const auto &var_name = node->ids()[0];
 	ASSERT(m_ctx->builder->GetInsertBlock())
@@ -358,33 +409,33 @@ void LLVMGenerator::visit(const ast::Name *node)
 
 	if (!var_alloca) {
 		set_error_state("Could not find '{}' in function", var_name);
-		return;
+		return nullptr;
 	}
 
-	m_ctx->last_value =
-		m_ctx->builder->CreateLoad(var_alloca->getAllocatedType(), var_alloca, var_name);
+	return create_value(
+		m_ctx->builder->CreateLoad(var_alloca->getAllocatedType(), var_alloca, var_name));
 }
 
-void LLVMGenerator::visit(const ast::Pass *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Pass *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Raise *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Raise *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Return *node)
+ast::Value *LLVMGenerator::visit(const ast::Return *node)
 {
 	auto *return_value = generate(node->value().get());
-	m_ctx->builder->CreateRet(return_value);
-	m_ctx->last_value = return_value;
+	m_ctx->builder->CreateRet(return_value->value());
+	return return_value;
 }
 
-void LLVMGenerator::visit(const ast::Subscript *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Subscript *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Try *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Try *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::Tuple *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Tuple *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::UnaryExpr *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::UnaryExpr *node) { TODO(); }
 
-void LLVMGenerator::visit(const ast::While *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::While *node) { TODO(); }
 
 template<typename... Args>
 void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)

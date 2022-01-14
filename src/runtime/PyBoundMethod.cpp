@@ -5,6 +5,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
 	: PyBaseObject(BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
 {}
@@ -60,13 +62,13 @@ std::unique_ptr<TypePrototype> PyBoundMethod::register_type()
 	return std::move(type);
 }
 
-template<> PyBoundMethod *as(PyObject *node)
+template<> PyBoundMethod *py::as(PyObject *node)
 {
 	if (node->type() == bound_method()) { return static_cast<PyBoundMethod *>(node); }
 	return nullptr;
 }
 
-template<> const PyBoundMethod *as(const PyObject *node)
+template<> const PyBoundMethod *py::as(const PyObject *node)
 {
 	if (node->type() == bound_method()) { return static_cast<const PyBoundMethod *>(node); }
 	return nullptr;

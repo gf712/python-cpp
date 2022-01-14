@@ -293,7 +293,7 @@ class Heap
 
 	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
-	template<typename T, typename... Args> T *allocate(Args &&...args)
+	template<typename T, typename... Args> T *allocate(Args &&... args)
 	{
 		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
@@ -301,13 +301,14 @@ class Heap
 		uint8_t *obj_ptr = allocate_gc(ptr);
 		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
 
-		if constexpr (std::is_base_of_v<PyObject, T>) log_allocation(static_cast<PyObject *>(obj));
+		if constexpr (std::is_base_of_v<py::PyObject, T>)
+			log_allocation(static_cast<py::PyObject *>(obj));
 		return obj;
 	}
 
 	void collect_garbage();
 
-	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
+	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
 		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
@@ -324,7 +325,7 @@ class Heap
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;
-	void log_allocation(PyObject *obj) const;
+	void log_allocation(py::PyObject *obj) const;
 
 	Heap();
 };

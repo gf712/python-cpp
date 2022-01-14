@@ -3,10 +3,11 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
 
 PyType *BaseException::s_base_exception_type = nullptr;
 
-template<> BaseException *as(PyObject *obj)
+template<> BaseException *py::as(PyObject *obj)
 {
 	ASSERT(BaseException::s_base_exception_type)
 	if (obj->type() == BaseException::s_base_exception_type) {
@@ -15,8 +16,7 @@ template<> BaseException *as(PyObject *obj)
 	return nullptr;
 }
 
-
-template<> const BaseException *as(const PyObject *obj)
+template<> const BaseException *py::as(const PyObject *obj)
 {
 	ASSERT(BaseException::s_base_exception_type)
 	if (obj->type() == BaseException::s_base_exception_type) {

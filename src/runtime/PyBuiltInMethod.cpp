@@ -4,6 +4,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 PyBuiltInMethod::PyBuiltInMethod(std::string name,
 	std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
 	PyObject *self)
@@ -58,13 +60,13 @@ std::unique_ptr<TypePrototype> PyBuiltInMethod::register_type()
 	return std::move(type);
 }
 
-template<> PyBuiltInMethod *as(PyObject *node)
+template<> PyBuiltInMethod *py::as(PyObject *node)
 {
 	if (node->type() == builtin_method()) { return static_cast<PyBuiltInMethod *>(node); }
 	return nullptr;
 }
 
-template<> const PyBuiltInMethod *as(const PyObject *node)
+template<> const PyBuiltInMethod *py::as(const PyObject *node)
 {
 	if (node->type() == builtin_method()) { return static_cast<const PyBuiltInMethod *>(node); }
 	return nullptr;

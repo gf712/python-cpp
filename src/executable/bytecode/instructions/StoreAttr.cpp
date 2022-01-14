@@ -1,6 +1,8 @@
 #include "StoreAttr.hpp"
 #include "runtime/PyString.hpp"
 
+using namespace py;
+
 void StoreAttr::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto this_value = vm.reg(m_dst);

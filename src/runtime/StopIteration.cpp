@@ -3,6 +3,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 static PyType *s_stop_iteration = nullptr;
 
 StopIteration::StopIteration(PyTuple *args) : Exception(s_stop_iteration->underlying_type(), args)

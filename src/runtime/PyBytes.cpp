@@ -3,6 +3,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
 
 PyBytes::PyBytes(const Bytes &number) : PyBaseObject(BuiltinTypes::the().bytes()), m_value(number)
 {}
@@ -41,13 +42,13 @@ std::unique_ptr<TypePrototype> PyBytes::register_type()
 	return std::move(type);
 }
 
-template<> PyBytes *as(PyObject *obj)
+template<> PyBytes *py::as(PyObject *obj)
 {
 	if (obj->type() == bytes()) { return static_cast<PyBytes *>(obj); }
 	return nullptr;
 }
 
-template<> const PyBytes *as(const PyObject *obj)
+template<> const PyBytes *py::as(const PyObject *obj)
 {
 	if (obj->type() == bytes()) { return static_cast<const PyBytes *>(obj); }
 	return nullptr;

@@ -15,6 +15,7 @@
 #include <filesystem>
 
 namespace fs = std::filesystem;
+using namespace py;
 
 namespace {
 std::optional<std::string> resolve_path(std::string module_name)
@@ -138,14 +139,14 @@ std::unique_ptr<TypePrototype> PyModule::register_type()
 	return std::move(type);
 }
 
-template<> PyModule *as(PyObject *obj)
+template<> PyModule *py::as(PyObject *obj)
 {
 	if (obj->type() == module()) { return static_cast<PyModule *>(obj); }
 	return nullptr;
 }
 
 
-template<> const PyModule *as(const PyObject *obj)
+template<> const PyModule *py::as(const PyObject *obj)
 {
 	if (obj->type() == module()) { return static_cast<const PyModule *>(obj); }
 	return nullptr;

@@ -5,9 +5,11 @@
 
 #include <optional>
 
+namespace py {
+
 class PyString : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	std::string m_value;
 
   public:
@@ -61,3 +63,5 @@ class PyString : public PyBaseObject
 
 	size_t get_position_from_slice(int64_t) const;
 };
+
+}// namespace py

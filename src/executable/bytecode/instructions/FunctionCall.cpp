@@ -3,6 +3,7 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTuple.hpp"
 
+using namespace py;
 
 void FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 {

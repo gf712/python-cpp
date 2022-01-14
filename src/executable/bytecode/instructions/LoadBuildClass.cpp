@@ -3,6 +3,7 @@
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
 
+using namespace py;
 
 void LoadBuildClass::execute(VirtualMachine &vm, Interpreter &intepreter) const
 {

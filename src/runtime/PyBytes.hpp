@@ -2,10 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 
 class PyBytes : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	Bytes m_value;
 
@@ -24,3 +25,5 @@ class PyBytes : public PyBaseObject
   private:
 	PyBytes(const Bytes &number);
 };
+
+}// namespace py

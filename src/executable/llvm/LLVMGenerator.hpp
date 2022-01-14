@@ -12,6 +12,8 @@ class Value;
 namespace codegen {
 class LLVMGenerator : public ast::CodeGenerator
 {
+	class LLVMValue;
+
 	struct Context;
 
 	std::unique_ptr<Context> m_ctx;
@@ -24,9 +26,11 @@ class LLVMGenerator : public ast::CodeGenerator
 		compiler::OptimizationLevel lvl);
 
   private:
-	llvm::Value *generate(const ast::ASTNode *node);
+	LLVMValue *generate(const ast::ASTNode *node);
 
-#define __AST_NODE_TYPE(NodeType) void visit(const ast::NodeType *node) override;
+	ast::Value *create_value(llvm::Value *);
+
+#define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
@@ -43,5 +47,7 @@ class LLVMFunction : public ::Function
 	LLVMFunction(const llvm::Function &f);
 
 	std::string to_string() const override;
+
+	const llvm::Function &impl() const { return m_function; }
 };
 }// namespace codegen

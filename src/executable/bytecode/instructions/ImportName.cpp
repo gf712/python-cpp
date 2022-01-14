@@ -3,6 +3,7 @@
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
 
+using namespace py;
 
 void ImportName::execute(VirtualMachine &vm, Interpreter &) const
 {
@@ -11,6 +12,6 @@ void ImportName::execute(VirtualMachine &vm, Interpreter &) const
 			return std::move(rhs) + "." + lhs;
 		});
 
-	auto module_name = vm.heap().allocate<PyString>(name);
+	auto module_name = PyString::create(name);
 	if (auto *module = PyModule::create(module_name)) { vm.reg(m_destination) = module; }
 }

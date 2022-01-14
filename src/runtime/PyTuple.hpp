@@ -2,12 +2,13 @@
 
 #include "PyObject.hpp"
 
+namespace py {
 
 class PyTupleIterator;
 
 class PyTuple : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend class PyTupleIterator;
 
 	const std::vector<Value> m_elements;
@@ -52,7 +53,7 @@ class PyTuple : public PyBaseObject
 
 class PyTupleIterator : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 	friend PyTuple;
 
 	const PyTuple &m_pytuple;
@@ -84,3 +85,5 @@ class PyTupleIterator : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

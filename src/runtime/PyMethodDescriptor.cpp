@@ -7,6 +7,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 PyMethodDescriptor::PyMethodDescriptor(PyString *name,
 	PyType *underlying_type,
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function,
@@ -92,13 +94,13 @@ std::unique_ptr<TypePrototype> PyMethodDescriptor::register_type()
 	return std::move(type);
 }
 
-template<> PyMethodDescriptor *as(PyObject *obj)
+template<> PyMethodDescriptor *py::as(PyObject *obj)
 {
 	if (obj->type() == method_wrapper()) { return static_cast<PyMethodDescriptor *>(obj); }
 	return nullptr;
 }
 
-template<> const PyMethodDescriptor *as(const PyObject *obj)
+template<> const PyMethodDescriptor *py::as(const PyObject *obj)
 {
 	if (obj->type() == method_wrapper()) { return static_cast<const PyMethodDescriptor *>(obj); }
 	return nullptr;

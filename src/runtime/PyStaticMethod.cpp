@@ -7,6 +7,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 std::string PyStaticMethod::to_string() const
 {
 	if (m_underlying_type) {
@@ -74,13 +76,13 @@ std::unique_ptr<TypePrototype> PyStaticMethod::register_type()
 	return std::move(type);
 }
 
-template<> PyStaticMethod *as(PyObject *obj)
+template<> PyStaticMethod *py::as(PyObject *obj)
 {
 	if (obj->type() == static_method()) { return static_cast<PyStaticMethod *>(obj); }
 	return nullptr;
 }
 
-template<> const PyStaticMethod *as(const PyObject *obj)
+template<> const PyStaticMethod *py::as(const PyObject *obj)
 {
 	if (obj->type() == static_method()) { return static_cast<const PyStaticMethod *>(obj); }
 	return nullptr;

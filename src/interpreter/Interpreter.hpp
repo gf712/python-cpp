@@ -21,8 +21,8 @@ class Interpreter
   private:
 	ExecutionFrame *m_current_frame{ nullptr };
 	ExecutionFrame *m_global_frame{ nullptr };
-	std::vector<PyModule *> m_available_modules;
-	PyModule *m_module;
+	std::vector<py::PyModule *> m_available_modules;
+	py::PyModule *m_module;
 	Status m_status{ Status::OK };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
@@ -34,7 +34,7 @@ class Interpreter
 	void set_status(Status status) { m_status = status; }
 	Status status() const { return m_status; }
 
-	template<typename... Ts> void raise_exception(PyObject *exception)
+	template<typename... Ts> void raise_exception(py::PyObject *exception)
 	{
 		m_status = Status::EXCEPTION;
 		m_current_frame->set_exception(std::move(exception));
@@ -49,20 +49,22 @@ class Interpreter
 	{
 		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
 			name,
-			std::visit([](const auto &val) {
-				std::ostringstream os;
-				os << val;
-				return os.str();
-			}, value),
+			std::visit(
+				[](const auto &val) {
+					std::ostringstream os;
+					os << val;
+					return os.str();
+				},
+				value),
 			(void *)m_current_frame);
 		m_current_frame->put_local(name, value);
 		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, value); }
 	}
 
-	std::optional<Value> get_object(const std::string &name);
+	std::optional<py::Value> get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
-	PyObject *allocate_object(const std::string &name, Args &&... args)
+	py::PyObject *allocate_object(const std::string &name, Args &&... args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {
@@ -73,10 +75,10 @@ class Interpreter
 		}
 	}
 
-	PyModule *get_imported_module(PyString *) const;
-	const std::vector<PyModule *> &get_available_modules() const { return m_available_modules; }
+	py::PyModule *get_imported_module(py::PyString *) const;
+	const std::vector<py::PyModule *> &get_available_modules() const { return m_available_modules; }
 
-	PyModule *module() const { return m_module; }
+	py::PyModule *module() const { return m_module; }
 
 	void unwind();
 
@@ -86,11 +88,17 @@ class Interpreter
 	const std::string &entry_script() const { return m_entry_script; }
 	const std::vector<std::string> &argv() const { return m_argv; }
 
-	const std::shared_ptr<Function> &function(const std::string &) const;
+	py::PyObject *make_function(const std::string &function_name,
+		const std::vector<std::string> &argnames,
+		const std::vector<py::Value>& default_values,
+		const std::vector<py::Value>& kw_default_values,
+		size_t positional_args_count,
+		size_t kwonly_args_count,
+		const py::PyCode::CodeFlags &flags) const;
 
-	PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
+	py::PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 
-	PyObject *call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs);
+	py::PyObject *call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
   private:
 	void internal_setup(const std::string &name,

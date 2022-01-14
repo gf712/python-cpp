@@ -3,6 +3,8 @@
 #include "PyObject.hpp"
 #include "vm/VM.hpp"
 
+namespace py {
+
 class PyMethodDescriptor : public PyBaseObject
 {
 	PyString *m_name;
@@ -10,7 +12,7 @@ class PyMethodDescriptor : public PyBaseObject
 	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> m_method_descriptor;
 	std::vector<PyObject *> m_captures;
 
-	friend class Heap;
+	friend class ::Heap;
 
 	PyMethodDescriptor(PyString *name,
 		PyType *underlying_type,
@@ -45,3 +47,5 @@ class PyMethodDescriptor : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

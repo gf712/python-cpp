@@ -2,13 +2,15 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyBuiltInMethod : public PyBaseObject
 {
 	const std::string m_name;
 	std::function<PyObject *(PyTuple *, PyDict *)> m_builtin_method;
 	PyObject *m_self;
 
-	friend class Heap;
+	friend class ::Heap;
 
 	PyBuiltInMethod(std::string name,
 		std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
@@ -35,3 +37,5 @@ class PyBuiltInMethod : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

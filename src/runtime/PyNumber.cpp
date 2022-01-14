@@ -7,6 +7,8 @@
 
 #include "interpreter/Interpreter.hpp"
 
+using namespace py;
+
 std::string PyNumber::to_string() const
 {
 	return std::visit(overloaded{
@@ -15,7 +17,6 @@ std::string PyNumber::to_string() const
 					  },
 		m_value.value);
 }
-
 
 PyObject *PyNumber::__repr__() const { return PyString::create(to_string()); }
 

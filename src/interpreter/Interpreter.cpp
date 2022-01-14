@@ -19,6 +19,7 @@
 #include <iostream>
 
 namespace fs = std::filesystem;
+using namespace py;
 
 static PyString *s_main__ = nullptr;
 static PyString *s_sys__ = nullptr;
@@ -100,9 +101,23 @@ PyModule *Interpreter::get_imported_module(PyString *name) const
 	return nullptr;
 }
 
-const std::shared_ptr<Function> &Interpreter::function(const std::string &name) const
+PyObject *Interpreter::make_function(const std::string &function_name,
+	const std::vector<std::string> &argnames,
+	const std::vector<py::Value> &default_values,
+	const std::vector<py::Value> &kw_default_values,
+	size_t positional_args_count,
+	size_t kwonly_args_count,
+	const py::PyCode::CodeFlags &flags) const
 {
-	return m_program->function(name);
+	auto *f = m_program->as_pyfunction(function_name,
+		argnames,
+		default_values,
+		kw_default_values,
+		positional_args_count,
+		kwonly_args_count,
+		flags);
+	ASSERT(f)
+	return f;
 }
 
 PyObject *Interpreter::call(const std::shared_ptr<Function> &func, ExecutionFrame *function_frame)

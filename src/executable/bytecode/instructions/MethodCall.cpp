@@ -9,6 +9,7 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
+using namespace py;
 
 void MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 {

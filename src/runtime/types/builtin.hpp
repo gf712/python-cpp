@@ -3,6 +3,7 @@
 #include "runtime/forward.hpp"
 #include <memory>
 
+namespace py {
 class BuiltinTypes
 {
 	std::unique_ptr<TypePrototype> m_type;
@@ -114,3 +115,5 @@ PyType *slot_wrapper();
 PyType *bound_method();
 PyType *method_wrapper();
 PyType *static_method();
+
+}// namespace py

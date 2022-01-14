@@ -30,29 +30,31 @@
 
 #include <iostream>
 
+using namespace py;
+
 static PyModule *s_builtin_module = nullptr;
 
 namespace {
-PyFunction *make_function(const std::string &function_name,
-	int64_t function_id,
-	const std::vector<std::string> &argnames,
-	size_t argcount,
-	PyModule *module,
-	PyDict *globals)
-{
-	auto &vm = VirtualMachine::the();
-	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().function(function_name));
-	PyCode *code = vm.heap().allocate<PyCode>(function,
-		function_id,
-		argnames,
-		std::vector<Value>{},
-		std::vector<Value>{},
-		argcount,
-		0,
-		PyCode::CodeFlags::create(),
-		module);
-	return vm.heap().allocate<PyFunction>(function_name, code, globals);
-}
+// PyFunction *make_function(const std::string &function_name,
+// 	int64_t function_id,
+// 	const std::vector<std::string> &argnames,
+// 	size_t argcount,
+// 	PyModule *module,
+// 	PyDict *globals)
+// {
+// 	auto &vm = VirtualMachine::the();
+// 	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().function(function_name));
+// 	PyCode *code = vm.heap().allocate<PyCode>(function,
+// 		function_id,
+// 		argnames,
+// 		std::vector<Value>{},
+// 		std::vector<Value>{},
+// 		argcount,
+// 		0,
+// 		PyCode::CodeFlags::create(),
+// 		module);
+// 	return vm.heap().allocate<PyFunction>(function_name, code, globals);
+// }
 
 
 PyObject *print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
@@ -160,16 +162,13 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	const auto &mangled_class_name_as_string = as<PyString>(mangled_class_name)->value();
 
 	PyFunction *callable = [&]() -> PyFunction * {
-		if (auto *pynumber = as<PyInteger>(maybe_function_location)) {
-			auto function_id = std::get<int64_t>(pynumber->value().value);
+		if (as<PyInteger>(maybe_function_location)) {
+			// auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
 			// FIXME: what should be the module for this?
-			return make_function(mangled_class_name_as_string,
-				function_id,
-				std::vector<std::string>{},
-				0,
-				nullptr,
-				interpreter.execution_frame()->globals());
+			auto *f = interpreter.make_function(mangled_class_name_as_string, {});
+			ASSERT(as<PyFunction>(f))
+			return as<PyFunction>(f);
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {
 			return pyfunc;
 		} else {
@@ -177,6 +176,8 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 			return nullptr;
 		}
 	}();
+
+	ASSERT(callable)
 
 	if (!callable) { return nullptr; }
 
@@ -448,9 +449,6 @@ PyObject *issubclass(const PyTuple *args, const PyDict *kwargs, Interpreter &int
 	}
 }
 
-
-}// namespace
-
 auto initialize_types()
 {
 	type();
@@ -509,6 +507,10 @@ auto initialize_exceptions(PyModule *blt)
 	ValueError::register_type(blt);
 	NameError::register_type(blt);
 }
+
+}// namespace
+
+namespace py {
 
 PyModule *builtins_module(Interpreter &interpreter)
 {
@@ -617,3 +619,5 @@ PyModule *builtins_module(Interpreter &interpreter)
 
 	return s_builtin_module;
 }
+
+}// namespace py

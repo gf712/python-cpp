@@ -6,6 +6,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 template<> PyInteger *as(PyObject *obj)
 {
 	if (obj->type() == integer()) { return static_cast<PyInteger *>(obj); }

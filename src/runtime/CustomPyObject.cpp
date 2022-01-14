@@ -10,6 +10,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 CustomPyObject::CustomPyObject(const PyType *type)
 	: PyBaseObject(type->underlying_type()), m_type_obj(type)
 {}

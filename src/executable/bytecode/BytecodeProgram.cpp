@@ -2,6 +2,7 @@
 #include "Bytecode.hpp"
 #include "executable/Function.hpp"
 #include "interpreter/InterpreterSession.hpp"
+#include "runtime/PyFunction.hpp"
 
 #include <numeric>
 

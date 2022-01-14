@@ -3,6 +3,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 static PyType *s_value_error = nullptr;
 
 ValueError::ValueError(PyTuple *args) : Exception(s_value_error->underlying_type(), args) {}

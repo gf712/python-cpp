@@ -15,13 +15,15 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-template<> PyType *as(PyObject *obj)
+using namespace py;
+
+template<> PyType *py::as(PyObject *obj)
 {
 	if (obj->type() == type()) { return static_cast<PyType *>(obj); }
 	return nullptr;
 }
 
-template<> const PyType *as(const PyObject *obj)
+template<> const PyType *py::as(const PyObject *obj)
 {
 	if (obj->type() == type()) { return static_cast<const PyType *>(obj); }
 	return nullptr;

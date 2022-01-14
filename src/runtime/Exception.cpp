@@ -3,6 +3,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 PyType *Exception::s_exception_type = nullptr;
 
 Exception::Exception(PyTuple *args) : BaseException(s_exception_type->underlying_type(), args) {}

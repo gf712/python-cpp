@@ -1,6 +1,8 @@
 #include "JumpIfTrueOrPop.hpp"
 #include "runtime/PyBool.hpp"
 
+using namespace py;
+
 void JumpIfTrueOrPop::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);

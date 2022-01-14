@@ -12,17 +12,18 @@
 #include "types/api.hpp"
 
 #include <mutex>
-
 #include <numeric>
 
-template<> PyString *as(PyObject *obj)
+using namespace py;
+
+template<> PyString *py::as(PyObject *obj)
 {
 	if (obj->type() == str()) { return static_cast<PyString *>(obj); }
 	return nullptr;
 }
 
 
-template<> const PyString *as(const PyObject *obj)
+template<> const PyString *py::as(const PyObject *obj)
 {
 	if (obj->type() == str()) { return static_cast<const PyString *>(obj); }
 	return nullptr;

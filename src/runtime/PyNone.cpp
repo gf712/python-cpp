@@ -4,6 +4,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
 
 PyNone::PyNone() : PyBaseObject(BuiltinTypes::the().none()) {}
 
@@ -35,7 +36,7 @@ std::unique_ptr<TypePrototype> PyNone::register_type()
 	return std::move(type);
 }
 
-PyObject *py_none()
+PyObject *py::py_none()
 {
 	static PyObject *value = nullptr;
 

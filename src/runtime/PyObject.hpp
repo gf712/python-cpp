@@ -16,6 +16,8 @@
 
 #include <spdlog/fmt/fmt.h>
 
+namespace py {
+
 enum class RichCompare {
 	Py_LT = 0,// <
 	Py_LE = 1,// <=
@@ -120,19 +122,19 @@ struct TypePrototype
 };
 
 namespace {
-template<typename T, typename... U>
-size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
-{
-	// adapted from https://stackoverflow.com/a/35920804
-	if (std::holds_alternative<std::function<T(U...)>>(f)) {
-		using FunctionType = T (*)(U...);
-		auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
-		return bit_cast<size_t>(*fn_ptr);
-	} else {
-		// FIXME: is it valid to take this path? Is there use case?
-		return bit_cast<size_t>(std::get<PyObject *>(f));
+	template<typename T, typename... U>
+	size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
+	{
+		// adapted from https://stackoverflow.com/a/35920804
+		if (std::holds_alternative<std::function<T(U...)>>(f)) {
+			using FunctionType = T (*)(U...);
+			auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
+			return bit_cast<size_t>(*fn_ptr);
+		} else {
+			// FIXME: is it valid to take this path? Is there use case?
+			return bit_cast<size_t>(std::get<PyObject *>(f));
+		}
 	}
-}
 }// namespace
 
 class PyObject : public Cell
@@ -141,7 +143,7 @@ class PyObject : public Cell
 	{
 	};
 
-	friend class Heap;
+	friend class ::Heap;
 
   protected:
 	const TypePrototype &m_type_prototype;
@@ -223,6 +225,8 @@ class PyObject : public Cell
 
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
 {
+	using namespace concepts;
+
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
 	if constexpr (HasRepr<Type>) {
@@ -393,3 +397,5 @@ struct ValueEqual
 
 template<typename T> T *as(PyObject *node);
 template<typename T> const T *as(const PyObject *node);
+
+}// namespace py

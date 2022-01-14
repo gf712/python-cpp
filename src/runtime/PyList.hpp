@@ -2,9 +2,11 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyList : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	std::vector<Value> m_elements;
 
@@ -40,7 +42,7 @@ class PyList : public PyBaseObject
 
 class PyListIterator : public PyBaseObject
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	const PyList &m_pylist;
 	size_t m_current_index{ 0 };
@@ -58,3 +60,5 @@ class PyListIterator : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

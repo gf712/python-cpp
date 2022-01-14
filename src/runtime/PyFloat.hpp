@@ -1,8 +1,10 @@
 #include "PyNumber.hpp"
 
-class PyFloat final: public PyNumber
+namespace py {
+
+class PyFloat final : public PyNumber
 {
-	friend class Heap;
+	friend class ::Heap;
 
 	PyFloat(double);
 
@@ -14,3 +16,5 @@ class PyFloat final: public PyNumber
 
 	static std::unique_ptr<TypePrototype> register_type();
 };
+
+}// namespace py

@@ -9,6 +9,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 template<> PyDict *as(PyObject *obj)
 {
 	if (obj->type() == dict()) { return static_cast<PyDict *>(obj); }

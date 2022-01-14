@@ -1,5 +1,7 @@
 #pragma once
 
+namespace py {
+
 class PyDict;
 class PyFloat;
 class PyFunction;
@@ -14,3 +16,5 @@ class PyString;
 class PyTuple;
 class PyType;
 struct TypePrototype;
+
+}// namespace py

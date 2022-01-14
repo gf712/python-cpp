@@ -13,13 +13,15 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-template<> PyList *as(PyObject *obj)
+using namespace py;
+
+template<> PyList *py::as(PyObject *obj)
 {
 	if (obj->type() == list()) { return static_cast<PyList *>(obj); }
 	return nullptr;
 }
 
-template<> const PyList *as(const PyObject *obj)
+template<> const PyList *py::as(const PyObject *obj)
 {
 	if (obj->type() == list()) { return static_cast<const PyList *>(obj); }
 	return nullptr;

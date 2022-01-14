@@ -2,6 +2,8 @@
 #include "interpreter/Interpreter.hpp"
 #include "runtime/PyType.hpp"
 
+using namespace py;
+
 namespace {
 bool has_stashed_exception(Interpreter &interpreter)
 {

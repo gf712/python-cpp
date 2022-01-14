@@ -2,6 +2,8 @@
 #include "GarbageCollector.hpp"
 #include "runtime/PyType.hpp"
 
+using namespace py;
+
 bool Block::Chunk::has_address(uint8_t *memory) const
 {
 	auto address = bit_cast<uintptr_t>(memory);

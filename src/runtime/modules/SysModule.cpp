@@ -7,6 +7,8 @@
 
 #include <filesystem>
 
+using namespace py;
+
 static PyModule *s_sys_module = nullptr;
 
 namespace {
@@ -35,6 +37,8 @@ PyList *create_sys_argv(Interpreter &interpreter)
 
 }// namespace
 
+namespace py {
+
 PyModule *sys_module(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
@@ -50,3 +54,5 @@ PyModule *sys_module(Interpreter &interpreter)
 
 	return s_sys_module;
 }
+
+}// namespace py

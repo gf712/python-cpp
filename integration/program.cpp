@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+using namespace py;
+
 void run(std::string_view program)
 {
 	auto &vm = VirtualMachine::the();

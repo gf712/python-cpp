@@ -8,6 +8,8 @@
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
 
+using namespace py;
+
 void UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &source = vm.reg(m_source);

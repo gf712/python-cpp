@@ -4,6 +4,7 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 
+using namespace py;
 
 void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {

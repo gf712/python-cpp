@@ -3,6 +3,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
+using namespace py;
+
 static PyType *s_attribute_error = nullptr;
 
 AttributeError::AttributeError(PyTuple *args)

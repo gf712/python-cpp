@@ -24,10 +24,10 @@ class Instruction : NonCopyable
 class LoadConst final : public Instruction
 {
 	Register m_destination;
-	Value m_source;
+	py::Value m_source;
 
   public:
-	LoadConst(Register destination, Value source)
+	LoadConst(Register destination, py::Value source)
 		: m_destination(destination), m_source(std::move(source))
 	{}
 	~LoadConst() override {}
@@ -86,7 +86,7 @@ class Add : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = add(lhs, rhs, interpreter)) {
+		if (auto result = py::add(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -115,7 +115,7 @@ class Subtract : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = subtract(lhs, rhs, interpreter)) {
+		if (auto result = py::subtract(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -143,7 +143,7 @@ class Multiply : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = multiply(lhs, rhs, interpreter)) {
+		if (auto result = py::multiply(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -170,7 +170,7 @@ class Exp : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = exp(lhs, rhs, interpreter)) {
+		if (auto result = py::exp(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -197,7 +197,7 @@ class Modulo : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = modulo(lhs, rhs, interpreter)) {
+		if (auto result = py::modulo(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -226,7 +226,7 @@ class LeftShift : public Instruction
 	{
 		const auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);
-		if (auto result = lshift(lhs, rhs, interpreter)) {
+		if (auto result = py::lshift(lhs, rhs, interpreter)) {
 			ASSERT(vm.registers().has_value())
 			ASSERT(vm.registers()->get().size() > m_destination)
 			vm.reg(m_destination) = *result;
@@ -298,7 +298,6 @@ class StoreFast final : public Instruction
 
 class MakeFunction : public Instruction
 {
-	size_t m_function_id;
 	std::string m_function_name;
 	std::vector<std::string> m_args;
 	std::vector<Register> m_defaults;
@@ -309,8 +308,7 @@ class MakeFunction : public Instruction
 	bool m_has_varkeywords;
 
   public:
-	MakeFunction(size_t function_id,
-		std::string function_name,
+	MakeFunction(std::string function_name,
 		std::vector<std::string> args,
 		std::vector<Register> defaults,
 		std::vector<Register> kw_defaults,
@@ -318,7 +316,7 @@ class MakeFunction : public Instruction
 		size_t kwonly_arg_count,
 		bool has_varargs,
 		bool has_keywords)
-		: m_function_id(function_id), m_function_name(std::move(function_name)),
+		: m_function_name(std::move(function_name)),
 		  m_args(std::move(args)), m_defaults(std::move(defaults)),
 		  m_kw_defaults(std::move(kw_defaults)), m_arg_count(arg_count),
 		  m_kwonly_arg_count(kwonly_arg_count), m_has_varargs(has_varargs),

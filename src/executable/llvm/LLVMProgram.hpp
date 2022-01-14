@@ -26,5 +26,11 @@ class LLVMProgram : public Program
 
 	int execute(VirtualMachine *) override;
 
-	const std::shared_ptr<Function> &function(const std::string &) const override;
+	py::PyObject *as_pyfunction(const std::string &function_name,
+		const std::vector<std::string> &argnames,
+		const std::vector<py::Value> &default_values,
+		const std::vector<py::Value> &kw_default_values,
+		size_t positional_args_count,
+		size_t kwonly_args_count,
+		const py::PyCode::CodeFlags &flags) const override;
 };

@@ -2,13 +2,15 @@
 
 #include "PyObject.hpp"
 
+namespace py {
+
 class PyStaticMethod : public PyBaseObject
 {
 	PyString *m_name;
 	PyType *m_underlying_type{ nullptr };
 	PyObject *m_static_method;
 
-	friend class Heap;
+	friend class ::Heap;
 
 	PyStaticMethod(PyString *name, PyType *underlying_type, PyObject *function);
 
@@ -29,3 +31,5 @@ class PyStaticMethod : public PyBaseObject
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 };
+
+}// namespace py

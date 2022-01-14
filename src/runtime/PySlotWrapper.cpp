@@ -8,6 +8,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+using namespace py;
+
 std::string PySlotWrapper::to_string() const
 {
 	return fmt::format(
@@ -102,13 +104,13 @@ std::unique_ptr<TypePrototype> PySlotWrapper::register_type()
 	return std::move(type);
 }
 
-template<> PySlotWrapper *as(PyObject *obj)
+template<> PySlotWrapper *py::as(PyObject *obj)
 {
 	if (obj->type() == slot_wrapper()) { return static_cast<PySlotWrapper *>(obj); }
 	return nullptr;
 }
 
-template<> const PySlotWrapper *as(const PyObject *obj)
+template<> const PySlotWrapper *py::as(const PyObject *obj)
 {
 	if (obj->type() == slot_wrapper()) { return static_cast<const PySlotWrapper *>(obj); }
 	return nullptr;
