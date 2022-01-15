@@ -141,13 +141,50 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 	return EXIT_SUCCESS;
 }
 
-const std::shared_ptr<Function> &BytecodeProgram::function(const std::string &name) const
+py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
+	const std::vector<std::string> &argnames,
+	const std::vector<py::Value> &default_values,
+	const std::vector<py::Value> &kw_default_values,
+	size_t positional_args_count,
+	size_t kwonly_args_count,
+	const py::PyCode::CodeFlags &flags) const const
 {
-	for (const auto &f : m_functions) {
-		if (f->function_name() == name) { return f; }
+	for (const auto &backend : m_backends) {
+		if (auto *f = backend->as_pyfunction(function_name,
+				argnames,
+				default_value,
+				kw_default_values,
+				positional_args_count,
+				kwonly_args_count,
+				flags)) {
+			return f;
+		}
 	}
+	if (auto it = std::find_if(m_functions.begin(),
+			m_functions.end(),
+			[&function_name](const auto &f) { return f->function_name() == function_name; });
+		it != m_functions.end()) {
+		auto function = *it;
+		auto *code = VirtualMachine::the().heap().allocate<py::PyCode>(function,
+			argnames,
+			default_value,
+			kw_default_values,
+			positional_args_count,
+			kwonly_args_count,
+			flags,
+			VirtualMachine::the().interpreter().module());
 
-	ASSERT(false);
+		const auto start = function_name.find_last_of('.') + 1;
+		const std::string demangled_name{ function_name.begin() + start, function_name.end() };
+		return VirtualMachine::the().heap().allocate<py::PyFunction>(
+			demangled_name, code, VirtualMachine::the().interpreter().execution_frame()->globals());
+	}
+	return nullptr;
+}
+
+void BytecodeProgram::add_backend(std::shared_ptr<Program> other)
+{
+	m_backends.push_back(std::move(other));
 }
 
 std::string FunctionBlock::to_string() const

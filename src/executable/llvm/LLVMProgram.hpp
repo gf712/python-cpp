@@ -2,25 +2,29 @@
 
 #include "executable/Program.hpp"
 
+class Function;
+class PyFunction;
+
 namespace llvm {
 class LLVMContext;
 class Module;
 }// namespace llvm
 
-class Function;
-
 class LLVMProgram : public Program
 {
-	// order matters here, since the destructor of LLVMContext relies on Module
-	std::unique_ptr<llvm::LLVMContext> m_ctx;
-	std::unique_ptr<llvm::Module> m_module;
+	struct InternalConfig;
+	struct InteropFunctions;
 	std::vector<std::shared_ptr<Function>> m_functions;
+	InternalConfig *m_config;
+	std::unique_ptr<InteropFunctions> m_interop_functions;
 
   public:
 	LLVMProgram(std::unique_ptr<llvm::Module> &&module,
 		std::unique_ptr<llvm::LLVMContext> &&ctx,
 		std::string filename,
 		std::vector<std::string> argv);
+
+	~LLVMProgram();
 
 	std::string to_string() const override;
 
@@ -33,4 +37,8 @@ class LLVMProgram : public Program
 		size_t positional_args_count,
 		size_t kwonly_args_count,
 		const py::PyCode::CodeFlags &flags) const override;
+
+  private:
+	void create_interop_function(const std::shared_ptr<Function> &,
+		const std::string &mangled_name) const;
 };

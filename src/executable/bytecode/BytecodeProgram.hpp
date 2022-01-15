@@ -10,6 +10,7 @@ class BytecodeProgram : public Program
 	InstructionVector m_instructions;
 	std::vector<std::shared_ptr<Function>> m_functions;
 	std::shared_ptr<Function> m_main_function;
+	std::vector<std::shared_ptr<Program>> m_backends;
 
   public:
 	BytecodeProgram(FunctionBlocks &&func_blocks,
@@ -32,11 +33,19 @@ class BytecodeProgram : public Program
 
 	size_t main_stack_size() const;
 
-	const std::shared_ptr<Function> &function(const std::string &name) const override;
+	py::PyObject *as_pyfunction(const std::string &function_name,
+		const std::vector<std::string> &argnames,
+		const std::vector<py::Value> &default_values,
+		const std::vector<py::Value> &kw_default_values,
+		size_t positional_args_count,
+		size_t kwonly_args_count,
+		const py::PyCode::CodeFlags &flags) const override;
 
 	std::string to_string() const override;
 
 	int execute(VirtualMachine *) override;
 
-	const std::vector<std::shared_ptr<Function>> &functions() const { return m_functions; }
+	const auto &functions() const { return m_functions; }
+
+	void add_backend(std::shared_ptr<Program>);
 };

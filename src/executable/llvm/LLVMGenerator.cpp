@@ -108,6 +108,7 @@ LLVMGenerator::LLVMValue *LLVMGenerator::generate(const ast::ASTNode *node)
 {
 	if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return nullptr; }
 	auto *value = node->codegen(this);
+	if (!value) return nullptr;
 	ASSERT(value);
 	return static_cast<LLVMGenerator::LLVMValue *>(value);
 }
@@ -126,6 +127,7 @@ ast::Value *LLVMGenerator::visit(const ast::Attribute *node) { TODO(); }
 ast::Value *LLVMGenerator::visit(const ast::Assign *node)
 {
 	auto *value_to_store = generate(node->value().get());
+	if (!value_to_store) { return nullptr; }
 	for (const auto &target : node->targets()) {
 		if (auto ast_name = ast::as<ast::Name>(target)) {
 			ASSERT(ast_name->ids().size() == 1)
@@ -236,13 +238,13 @@ ast::Value *LLVMGenerator::visit(const ast::ClassDefinition *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Compare *node) { TODO(); }
 
-ast::Value *LLVMGenerator::visit(const ast::Constant *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Constant *node) { return nullptr; }
 
 ast::Value *LLVMGenerator::visit(const ast::Dict *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::ExceptHandler *node) { TODO(); }
 
-ast::Value *LLVMGenerator::visit(const ast::For *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::For *node) { return nullptr; }
 
 llvm::Type *LLVMGenerator::arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation)
 {
@@ -388,7 +390,8 @@ ast::Value *LLVMGenerator::visit(const ast::Module *node)
 
 	for (const auto &statement : node->body()) {
 		statement->codegen(this);
-		// if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return nullptr; }
+		// if (m_ctx->state.status == LLVMGenerator::Context::State::Status::ERROR) { return
+		// nullptr; }
 	}
 
 	std::string repr;

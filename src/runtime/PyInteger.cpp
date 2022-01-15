@@ -29,7 +29,6 @@ PyInteger *PyInteger::create(int64_t value)
 	return heap.allocate<PyInteger>(value);
 }
 
-
 PyInteger *PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == integer());
@@ -64,6 +63,11 @@ PyInteger *PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 	return nullptr;
 }
 
+size_t PyInteger::as_i64() const
+{
+	ASSERT(std::holds_alternative<int64_t>(m_value.value))
+	return std::get<int64_t>(m_value.value);
+}
 
 size_t PyInteger::as_size_t() const
 {

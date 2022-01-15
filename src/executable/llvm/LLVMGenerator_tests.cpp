@@ -32,6 +32,22 @@ TEST(LLVMBackend, CompilesTypeAnnotatedFunction)
 	ASSERT_TRUE(llvm_module);
 }
 
+// TEST(LLVMBackend, CompilesTypeAnnotatedFunction)
+// {
+// 	constexpr std::string_view program =
+// 		"def add(a: int, b: int) -> int:\n"
+// 		"  result = a + b\n"
+// 		"  return result\n"
+// 		"print(add(1, 2))\n";
+
+// 	auto llvm_module = generate_llvm_module(program);
+// 	ASSERT_TRUE(llvm_module);
+
+// 	const auto &func =
+// 		std::static_pointer_cast<codegen::LLVMFunction>(llvm_module->as_pyfunction("add"));
+// 	const auto &llvm_func = func->impl();
+// }
+
 // TEST(LLVMBackend, CompilesTypeAnnotatedFibonacci)
 // {
 // 	constexpr std::string_view program =

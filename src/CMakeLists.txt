@@ -157,6 +157,7 @@ if (LLVM_FOUND)
 
   add_library(llvm-interface INTERFACE)
   target_include_directories(llvm-interface INTERFACE . ${LLVM_INCLUDE_DIRS})
+  target_link_libraries(llvm-interface INTERFACE spdlog_header_only)
   separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
   target_compile_definitions(llvm-interface INTERFACE ${LLVM_DEFINITIONS_LIST})
 
