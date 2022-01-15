@@ -470,7 +470,8 @@ Value *BytecodeGenerator::visit(const For *node)
 	auto target_name = target_ids[0];
 
 	bind(*forloop_start_label);
-	emit<ForIter>(iter_variable_register, iterator_register, target_name, forloop_end_label);
+	emit<ForIter>(iter_variable_register, iterator_register, forloop_end_label);
+	emit<StoreName>(target_name, iter_variable_register);
 
 	generate(node->target().get(), m_function_id);
 

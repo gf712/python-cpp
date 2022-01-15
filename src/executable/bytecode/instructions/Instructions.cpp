@@ -190,7 +190,7 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			}
 			return;
 		}
-		interpreter.store_object(m_next_value_name, next_value);
+		vm.reg(m_dst) = next_value;
 	} else {
 		// this is probably always going to be something that went wrong
 		TODO();

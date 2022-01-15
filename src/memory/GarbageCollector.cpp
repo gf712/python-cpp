@@ -46,11 +46,15 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 		}
 	}
 
-	const auto &registers = VirtualMachine::the().registers();
-	if (registers.has_value()) {
-		for (const auto &reg : registers->get()) {
-			if (std::holds_alternative<PyObject *>(reg)) {
-				if (auto *obj = std::get<PyObject *>(reg)) roots.insert(obj);
+	spdlog::trace("adding objects in VM stack to roots");
+	for (const auto &s : VirtualMachine::the().stack_objects()) {
+		for (const auto &val : s) {
+			if (std::holds_alternative<PyObject *>(*val)) {
+				auto *obj = std::get<PyObject *>(*val);
+				if (obj) {
+					spdlog::trace("adding root {}@{}", obj->type()->name(), (void *)obj);
+					roots.insert(obj);
+				}
 			}
 		}
 	}
@@ -58,7 +62,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	for (const auto &interpreter : VirtualMachine::the().interpreter_session()->interpreters()) {
 		auto *execution_frame = interpreter->execution_frame();
 		if (execution_frame) { roots.insert(execution_frame); }
-		for (const auto &module: interpreter->get_available_modules()) {
+		for (const auto &module : interpreter->get_available_modules()) {
 			ASSERT(module)
 			roots.insert(module);
 		}

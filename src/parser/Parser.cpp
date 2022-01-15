@@ -13,7 +13,7 @@ using namespace py;
 #ifndef NDEBUG
 #define DEBUG_LOG(...)              \
 	do {                            \
-		spdlog::debug(__VA_ARGS__); \
+		spdlog::trace(__VA_ARGS__); \
 	} while (0);
 #else
 #define DEBUG_LOG(MSG, ...)

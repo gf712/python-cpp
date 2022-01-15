@@ -186,6 +186,12 @@ void VirtualMachine::push_frame(size_t frame_size)
 	}
 	// set a new state for this stack frame
 	m_state = m_stack.top().state.get();
+
+	const auto &r = registers();
+	auto &stack_objects = m_stack_objects.emplace_back();
+	if (r.has_value()) {
+		for (const auto &v : r->get()) { stack_objects.push_back(&v); }
+	}
 }
 
 void VirtualMachine::pop_frame()
@@ -198,6 +204,7 @@ void VirtualMachine::pop_frame()
 		m_stack.top().registers[0] = std::move(return_value);
 		// restore stack frame state
 		m_state = m_stack.top().state.get();
+		m_stack_objects.pop_back();
 	} else {
 		// FIXME: this is an ugly way to keep the state of the interpreter
 		// m_stack.pop();

@@ -503,16 +503,11 @@ class ForIter final : public Instruction
 {
 	Register m_dst;
 	Register m_src;
-	std::string m_next_value_name;
 	std::shared_ptr<Label> m_exit_label;
 
   public:
-	ForIter(Register dst,
-		Register src,
-		std::string next_value_name,
-		std::shared_ptr<Label> exit_label)
-		: m_dst(dst), m_src(src), m_next_value_name(std::move(next_value_name)),
-		  m_exit_label(std::move(exit_label))
+	ForIter(Register dst, Register src, std::shared_ptr<Label> exit_label)
+		: m_dst(dst), m_src(src), m_exit_label(std::move(exit_label))
 	{}
 
 	std::string to_string() const final

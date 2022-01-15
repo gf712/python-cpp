@@ -37,6 +37,8 @@ class VirtualMachine
 	, NonMoveable
 {
 	std::stack<StackFrame> m_stack;
+	std::deque<std::vector<const py::Value *>> m_stack_objects;
+
 	InstructionBlock::const_iterator m_instruction_pointer;
 	Heap &m_heap;
 	std::unique_ptr<InterpreterSession> m_interpreter_session;
@@ -118,6 +120,8 @@ class VirtualMachine
 	void push_frame(size_t frame_size);
 
 	void pop_frame();
+
+	const std::deque<std::vector<const py::Value *>> &stack_objects() const { return m_stack_objects; }
 
   private:
 	VirtualMachine();

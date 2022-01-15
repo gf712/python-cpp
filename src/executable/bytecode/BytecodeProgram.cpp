@@ -110,7 +110,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 			instruction->execute(*vm, vm->interpreter());
 			// we left the current stack frame in the previous instruction
 			if (vm->stack().size() != stack_size) { break; }
-			// dump();
+			// vm->dump();
 			if (vm->interpreter().execution_frame()->exception_info().has_value()) {
 				if (!vm->state().catch_exception) {
 					vm->interpreter().unwind();
