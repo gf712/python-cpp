@@ -163,7 +163,11 @@ ast::Value *LLVMGenerator::visit(const ast::Assign *node)
 	return nullptr;
 }
 
-ast::Value *LLVMGenerator::visit(const ast::Assert *node) { TODO(); }
+ast::Value *LLVMGenerator::visit(const ast::Assert *node)
+{
+	set_error_state("ast::Assert node not implemented");
+	return nullptr;
+}
 
 ast::Value *LLVMGenerator::visit(const ast::AugAssign *node) { TODO(); }
 
