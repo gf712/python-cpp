@@ -22,8 +22,10 @@ std::optional<std::string> resolve_path(std::string module_name)
 {
 	auto *sysmodule = sys_module(VirtualMachine::the().interpreter());
 
-	auto *search_paths =
-		std::get<PyObject *>(sysmodule->symbol_table().at(PyString::create("path")));
+	ASSERT(sysmodule)
+
+	auto *path_pystr = PyString::create("path");
+	auto *search_paths = std::get<PyObject *>(sysmodule->symbol_table().at(path_pystr));
 
 	auto *search_path_list = as<PyList>(search_paths);
 

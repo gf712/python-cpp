@@ -105,6 +105,12 @@ PyObject *PyRangeIterator::__next__()
 
 PyType *PyRangeIterator::type() const { return range_iterator(); }
 
+void PyRangeIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	visitor.visit(const_cast<PyRange &>(m_pyrange));
+}
+
 namespace {
 
 std::once_flag range_iterator_flag;

@@ -49,6 +49,9 @@ class PyRangeIterator : public PyBaseObject
 	PyObject *__next__();
 
 	static std::unique_ptr<TypePrototype> register_type();
+
+	void visit_graph(Visitor &) override;
+
 	PyType *type() const override;
 };
 
