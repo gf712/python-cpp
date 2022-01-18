@@ -113,6 +113,20 @@ PyObject *PyNumber::__eq__(const PyObject *obj) const
 }
 
 
+PyObject *PyNumber::__ne__(const PyObject *obj) const
+{
+	if (auto *pynum = as_number(obj)) {
+		const bool comparisson = m_value != pynum->value();
+		return PyObject::from(NameConstant{ comparisson });
+	}
+	VirtualMachine::the().interpreter().raise_exception(
+		type_error("'!=' not supported between instances of '{}' and '{}'",
+			type()->name(),
+			obj->type()->name()));
+	return nullptr;
+}
+
+
 PyObject *PyNumber::__lt__(const PyObject *other) const
 {
 	if (auto *pynum = as_number(other)) {
