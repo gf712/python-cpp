@@ -15,6 +15,9 @@ assert a < b, "Less than number comparisson failed"
 assert type(1) == int, "A literal integer should be of type int"
 assert type(1.0) == float, "A literal float should be of type float"
 
+assert int(1) == 1, "Create a int from a literal int"
+assert int(1.0) == 1, "Create a int from a literal float"
+
 assert -a == -1, "Failed to turn positive integer to negative integer"
 assert -c == -10.0, "Failed to turn positive float to negative float"
 

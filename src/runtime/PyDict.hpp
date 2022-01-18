@@ -22,7 +22,7 @@ class PyDict : public PyBaseObject
 	PyDict(const MapType &map);
 	PyDict();
 
-	static PyDict* create();
+	static PyDict *create();
 
 	PyDictItems *items() const;
 
@@ -35,6 +35,8 @@ class PyDict : public PyBaseObject
 
 	void insert(const Value &key, const Value &value);
 	Value operator[](Value key) const;
+
+	PyObject *get(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &) override;
 

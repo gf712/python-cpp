@@ -1,6 +1,7 @@
 #include "PyObject.hpp"
 
 #include "AttributeError.hpp"
+#include "CustomPyObject.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"
 #include "PyBuiltInMethod.hpp"
@@ -19,6 +20,7 @@
 #include "PyType.hpp"
 #include "StopIteration.hpp"
 #include "TypeError.hpp"
+#include "types/api.hpp"
 #include "types/builtin.hpp"
 
 #include "executable/bytecode/instructions/FunctionCall.hpp"
@@ -204,6 +206,8 @@ PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args
 		} else if constexpr (std::is_same_v<std::optional<int>, ResultType>) {
 			ASSERT(result.has_value())
 			return PyInteger::create(static_cast<int64_t>(*result));
+		} else if constexpr (std::is_same_v<bool, ResultType>) {
+			return result ? py_true() : py_false();
 		} else if constexpr (std::is_same_v<size_t, ResultType>) {
 			return PyInteger::create(result);
 		} else {
@@ -313,12 +317,29 @@ PyObject *PyObject::getattribute(PyObject *attribute) const
 	TODO();
 }
 
-PyObject *PyObject::setattribute(PyObject *attribute, PyObject *value)
+bool PyObject::setattribute(PyObject *attribute, PyObject *value)
 {
-	if (m_type_prototype.__getattribute__.has_value()) {
-		return call_slot(*m_type_prototype.__setattribute__, this, attribute, value);
+	if (!as<PyString>(attribute)) {
+		VirtualMachine::the().interpreter().raise_exception(
+			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
+		return false;
 	}
-	TODO();
+
+	auto *descriptor = type()->lookup(attribute);
+
+	if (descriptor) {
+		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
+		if (descriptor_set.has_value()) {
+			TODO();
+			return call_slot(*descriptor_set, this, attribute, value) == py_true();
+		}
+	}
+
+	if (!m_attributes) { m_attributes = PyDict::create(); }
+
+	m_attributes->insert(attribute, value);
+
+	return true;
 }
 
 PyObject *PyObject::repr() const
@@ -622,7 +643,7 @@ PyObject *PyObject::get_method(PyObject *name) const
 		const auto &getattribute_ = type()->underlying_type().__getattribute__;
 		if (getattribute_.has_value()
 			&& get_address(*getattribute_)
-				   != get_address(*custom_object()->underlying_type().__getattribute__)) {
+				   != get_address(*object()->underlying_type().__getattribute__)) {
 			return get_attribute(name);
 		}
 	}
@@ -656,7 +677,6 @@ PyObject *PyObject::get_method(PyObject *name) const
 	return nullptr;
 }
 
-
 PyObject *PyObject::__setattribute__(PyObject *attribute, PyObject *value)
 {
 	if (as<PyString>(attribute)) {
@@ -675,3 +695,101 @@ size_t PyObject::__hash__() const { return bit_cast<size_t>(this) >> 4; }
 bool PyObject::is_callable() const { return m_type_prototype.__call__.has_value(); }
 
 const std::string &PyObject::name() const { return m_type_prototype.__name__; }
+
+PyObject *PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
+
+		if (!type->underlying_type().__dict__->map().contains(String{ "__new__" })) {
+			ASSERT(type->underlying_type().__new__)
+			const auto new_fn = get_address(*type->underlying_type().__new__);
+			ASSERT(new_fn)
+
+			ASSERT(object()->underlying_type().__new__)
+			const auto custom_new_fn = get_address(*object()->underlying_type().__new__);
+			ASSERT(custom_new_fn)
+
+			if (new_fn != custom_new_fn) {
+				VirtualMachine::the().interpreter().raise_exception(type_error(
+					"object.__new__() takes exactly one argument (the type to instantiate)"));
+				return nullptr;
+			}
+		}
+
+		if (!type->underlying_type().__dict__->map().contains(String{ "__init__" })) {
+			ASSERT(type->underlying_type().__init__)
+			const auto init_fn = get_address(*type->underlying_type().__init__);
+			ASSERT(init_fn)
+
+			ASSERT(object()->underlying_type().__init__)
+			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
+			ASSERT(object)
+			if (init_fn == custom_init_fn) {
+				VirtualMachine::the().interpreter().raise_exception(
+					type_error("object() takes no arguments"));
+				return nullptr;
+			}
+		}
+	}
+	// FIXME: if custom allocators are ever added, should call the type's allocator here
+	return VirtualMachine::the().heap().allocate<CustomPyObject>(type);
+}
+
+std::optional<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
+{
+	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
+		if (!type()->underlying_type().__dict__->map().contains(String{ "__new__" })) {
+			ASSERT(type()->underlying_type().__new__)
+			const auto new_fn = get_address(*type()->underlying_type().__new__);
+			ASSERT(new_fn)
+
+			ASSERT(object()->underlying_type().__new__)
+			const auto custom_new_fn = get_address(*object()->underlying_type().__new__);
+			ASSERT(custom_new_fn)
+
+			if (new_fn == custom_new_fn) {
+				VirtualMachine::the().interpreter().raise_exception(type_error(
+					"object.__new__() takes exactly one argument (the type to instantiate)"));
+				return -1;
+			}
+		}
+
+		if (!type()->underlying_type().__dict__->map().contains(String{ "__init__" })) {
+			ASSERT(type()->underlying_type().__init__)
+			const auto init_fn = get_address(*type()->underlying_type().__init__);
+			ASSERT(init_fn)
+
+			ASSERT(object()->underlying_type().__init__)
+			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
+			ASSERT(custom_init_fn)
+
+			if (init_fn != custom_init_fn) {
+				VirtualMachine::the().interpreter().raise_exception(
+					type_error("object() takes no arguments"));
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+std::string PyObject::to_string() const
+{
+	return fmt::format("PyObject at {}", static_cast<const void *>(this));
+}
+
+PyType *PyObject::type() const { return object(); }
+
+namespace {
+
+std::once_flag object_type_flag;
+
+std::unique_ptr<TypePrototype> register_type() { return std::move(klass<PyObject>("object").type); }
+}// namespace
+
+std::unique_ptr<TypePrototype> PyObject::register_type()
+{
+	static std::unique_ptr<TypePrototype> type = nullptr;
+	std::call_once(object_type_flag, []() { type = ::register_type(); });
+	return std::move(type);
+}

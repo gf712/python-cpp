@@ -9,6 +9,8 @@ class PyInteger final : public PyNumber
   public:
 	static PyInteger *create(int64_t);
 
+	static PyInteger *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 	size_t as_size_t() const;

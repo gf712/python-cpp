@@ -52,4 +52,6 @@ class PyType : public PyBaseObject
 	void initialize(PyDict *ns);
 	void update_methods_and_class_attributes(PyDict *ns);
 	bool update_if_special(const std::string &name, const Value &value);
+
+	static PyType *build_type(PyString *type_name, PyTuple *bases, PyDict *ns);
 };

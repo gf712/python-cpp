@@ -10,5 +10,7 @@ class PyFloat final: public PyNumber
 	static PyFloat *create(double);
 	PyType *type() const override;
 
+	double as_f64() const;
+
 	static std::unique_ptr<TypePrototype> register_type();
 };

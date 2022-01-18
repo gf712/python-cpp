@@ -1,6 +1,5 @@
 #include "builtin.hpp"
 
-#include "runtime/CustomPyObject.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
@@ -26,7 +25,7 @@ BuiltinTypes::BuiltinTypes()
 	  m_bool(PyBool::register_type()), m_bytes(PyBytes::register_type()),
 	  m_ellipsis(PyEllipsis::register_type()), m_float(PyFloat::register_type()),
 	  m_integer(PyInteger::register_type()), m_none(PyNone::register_type()),
-	  m_module(PyModule::register_type()), m_custom_object(CustomPyObject::register_type()),
+	  m_module(PyModule::register_type()), m_object(PyObject::register_type()),
 	  m_function(PyFunction::register_type()), m_native_function(PyNativeFunction::register_type()),
 	  m_code(PyCode::register_type()), m_dict(PyDict::register_type()),
 	  m_dict_items(PyDictItems::register_type()),
@@ -61,7 +60,7 @@ INITIALIZE_TYPE(float_)
 INITIALIZE_TYPE(integer)
 INITIALIZE_TYPE(none)
 INITIALIZE_TYPE(module)
-INITIALIZE_TYPE(custom_object)
+INITIALIZE_TYPE(object)
 
 INITIALIZE_TYPE(dict)
 INITIALIZE_TYPE(dict_items)

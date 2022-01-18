@@ -1,5 +1,4 @@
 #include "PyType.hpp"
-#include "CustomPyObject.hpp"
 #include "PyBoundMethod.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
@@ -28,52 +27,12 @@ template<> const PyType *as(const PyObject *obj)
 	return nullptr;
 }
 
-namespace {
-
-TypePrototype clone(std::string name, const TypePrototype &prototype)
-{
-	TypePrototype type_prototype;
-	type_prototype.__name__ = std::move(name);
-#define COPY_SLOT(NAME) type_prototype.NAME = prototype.NAME;
-	COPY_SLOT(__repr__)
-	COPY_SLOT(__call__)
-	COPY_SLOT(__new__)
-	COPY_SLOT(__init__)
-	COPY_SLOT(__hash__)
-	COPY_SLOT(__lt__)
-	COPY_SLOT(__le__)
-	COPY_SLOT(__eq__)
-	COPY_SLOT(__ne__)
-	COPY_SLOT(__gt__)
-	COPY_SLOT(__ge__)
-	COPY_SLOT(__iter__)
-	COPY_SLOT(__next__)
-	COPY_SLOT(__len__)
-	COPY_SLOT(__add__)
-	COPY_SLOT(__sub__)
-	COPY_SLOT(__mul__)
-	COPY_SLOT(__exp__)
-	COPY_SLOT(__lshift__)
-	COPY_SLOT(__mod__)
-	COPY_SLOT(__abs__)
-	COPY_SLOT(__neg__)
-	COPY_SLOT(__pos__)
-	COPY_SLOT(__invert__)
-	COPY_SLOT(__bool__)
-	COPY_SLOT(__getattribute__)
-	COPY_SLOT(__setattribute__)
-	COPY_SLOT(__get__)
-	COPY_SLOT(traverse)
-#undef COPY_SLOT
-	return type_prototype;
-}
-
 // FIXME: copied from PyObject.cpp.
 // Ideally this would live somewhere where all classes could see it, but this would require
 // reorganising the project structure, since some of the functions used here, are not known
 // when PyObject is declared in PyObject.hpp
 template<typename SlotFunctionType, typename... Args>
-static PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
+static PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&... args_)
 {
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		auto result = std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -152,7 +111,7 @@ std::vector<PyObject *> merge(const std::vector<std::vector<PyObject *>> &mros)
 
 std::vector<PyObject *> mro_(PyType *type)
 {
-	if (type == custom_object()) { return { type }; }
+	if (type == object()) { return { type }; }
 
 	std::vector<PyObject *> mro_types;
 	mro_types.push_back(type);
@@ -178,7 +137,6 @@ std::vector<PyObject *> mro_(PyType *type)
 
 	return mro_types;
 }
-}// namespace
 
 
 PyType::PyType(TypePrototype type_prototype)
@@ -319,9 +277,18 @@ namespace {
 template<typename SlotFunctionType, typename FunctorType>
 std::pair<String, PyObject *> wrap_slot(PyType *type,
 	std::string_view name_,
-	const std::variant<SlotFunctionType, PyObject *> &slot,
+	PyDict *ns,
+	std::variant<SlotFunctionType, PyObject *> &slot,
 	FunctorType &&f)
 {
+	String name_str{ std::string(name_) };
+	if (ns) {
+		if (auto it = ns->map().find(name_str); it != ns->map().end()) {
+			slot = PyObject::from(it->second);
+			return { name_str, std::get<PyObject *>(slot) };
+		}
+	}
+
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		// FIXME: should PyString have a std::string_view constructor and not worry about the
 		// 		  lifetime of the string_view?
@@ -329,9 +296,9 @@ std::pair<String, PyObject *> wrap_slot(PyType *type,
 		// the lifetime of the type is extended by the slot wrapper
 		auto *func = PySlotWrapper::create(name, type, f);
 		// FIXME: String should handle string_view, no need create a std::string here
-		return { String{ std::string(name_) }, func };
+		return { name_str, func };
 	} else {
-		return { String{ std::string(name_) }, std::get<PyObject *>(slot) };
+		return { name_str, std::get<PyObject *>(slot) };
 	}
 }
 }// namespace
@@ -347,6 +314,7 @@ void PyType::initialize(PyDict *ns)
 	if (m_underlying_type.__add__.has_value()) {
 		auto [name, add_func] = wrap_slot(this,
 			"__add__",
+			ns,
 			*m_underlying_type.__add__,
 			[this](PyObject *self, PyTuple *args, PyDict *kwargs) {
 				ASSERT(args && args->size() == 1)
@@ -356,9 +324,26 @@ void PyType::initialize(PyDict *ns)
 			});
 		m_underlying_type.__dict__->insert(name, add_func);
 	}
+	if (m_underlying_type.__repr__.has_value()) {
+		auto [name, repr_func] = wrap_slot(this,
+			"__repr__",
+			ns,
+			*m_underlying_type.__repr__,
+			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyObject * {
+				if (args && args->size() > 0) {
+					VirtualMachine::the().interpreter().raise_exception(
+						type_error("expected 0 arguments, got {}", args->size()));
+					return nullptr;
+				}
+				ASSERT(!kwargs || kwargs->map().empty())
+				return std::get<ReprSlotFunctionType>(*m_underlying_type.__repr__)(self);
+			});
+		m_underlying_type.__dict__->insert(name, repr_func);
+	}
 	if (m_underlying_type.__call__.has_value()) {
 		auto [name, call_func] = wrap_slot(this,
 			"__call__",
+			ns,
 			*m_underlying_type.__call__,
 			[this](PyObject *self, PyTuple *args, PyDict *kwargs) {
 				return std::get<CallSlotFunctionType>(*m_underlying_type.__call__)(
@@ -369,6 +354,7 @@ void PyType::initialize(PyDict *ns)
 	if (m_underlying_type.__init__.has_value()) {
 		auto [name, init_func] = wrap_slot(this,
 			"__init__",
+			ns,
 			*m_underlying_type.__init__,
 			[this](PyObject *self, PyTuple *args, PyDict *kwargs) {
 				auto result =
@@ -411,15 +397,15 @@ void PyType::initialize(PyDict *ns)
 	}
 
 	if (!m_underlying_type.__bases__) {
-		// not ideal, but avoids recursively calling custom_object()
+		// not ideal, but avoids recursively calling object()
 		if (m_underlying_type.__name__ == "object") {
 			m_underlying_type.__bases__ = PyTuple::create();
 		} else {
-			m_underlying_type.__bases__ = PyTuple::create(custom_object());
+			m_underlying_type.__bases__ = PyTuple::create(object());
 		}
 	}
 	m_underlying_type.__dict__->insert(String{ "__bases__" }, m_underlying_type.__bases__);
-	// not ideal, but avoids recursively calling custom_object()
+	// not ideal, but avoids recursively calling object()
 	if (m_underlying_type.__name__ == "object") {
 		m_underlying_type.__mro__ = PyTuple::create(this);
 	} else {
@@ -474,19 +460,36 @@ PyObject *PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 			}
 			bases_set.insert(std::get<PyObject *>(b));
 		}
+	} else {
+		// by default set object as a base if none provided
+		bases = PyTuple::create(object());
 	}
 
-	auto *type = VirtualMachine::the().heap().allocate<PyType>(
-		clone(name->value(), custom_object()->underlying_type()));
+	return PyType::build_type(name, bases, ns);
+}
+
+PyType *PyType::build_type(PyString *type_name, PyTuple *bases, PyDict *ns)
+{
+	for (const auto &[key, value] : ns->map()) {
+		const auto key_str = PyObject::from(key);
+		if (!as<PyString>(key_str)) {
+			VirtualMachine::the().interpreter().raise_exception(type_error(""));
+		}
+	}
 
 	if (bases->elements().empty()) {
 		// all objects inherit from object by default
-		bases = PyTuple::create(custom_object());
+		bases = PyTuple::create(object());
 	}
-	type->m_underlying_type.__bases__ = bases;
-	type->initialize(ns);
 
-	// if (bases->size() > 0) { TODO(); }
+	auto *base = PyObject::from(bases->elements()[0]);
+	ASSERT(as<PyType>(base))
+
+	auto *type = VirtualMachine::the().heap().allocate<PyType>(as<PyType>(base)->underlying_type());
+	type->m_underlying_type.__name__ = type_name->value();
+	type->m_underlying_type.__bases__ = bases;
+	type->m_underlying_type.__mro__ = nullptr;
+	type->initialize(ns);
 
 	return type;
 }
@@ -552,7 +555,7 @@ bool PyType::issubclass(const PyType *other)
 	if (this == other) { return true; }
 
 	// every type is a subclass of object
-	if (other == custom_object()) { return true; }
+	if (other == object()) { return true; }
 
 	auto *this_mro = mro_internal();
 	for (const auto &el : this_mro->elements()) {

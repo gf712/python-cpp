@@ -93,11 +93,37 @@ void PyDict::visit_graph(Visitor &visitor)
 
 PyType *PyDict::type() const { return ::dict(); }
 
+PyObject *PyDict::get(PyObject *key, PyObject *default_value) const
+{
+	if (auto it = m_map.find(key); it != m_map.end()) {
+		return PyObject::from(it->second);
+	} else if (default_value) {
+		return default_value;
+	}
+	return py_none();
+}
+
 namespace {
 
 std::once_flag dict_flag;
 
-std::unique_ptr<TypePrototype> register_dict() { return std::move(klass<PyDict>("dict").type); }
+std::unique_ptr<TypePrototype> register_dict()
+{
+	return std::move(klass<PyDict>("dict")
+						 .def("get",
+							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
+								 ASSERT(args)
+								 ASSERT(!kwargs || kwargs->size() == 0)
+								 PyObject *key = nullptr;
+								 PyObject *default_value = nullptr;
+								 key = PyObject::from(args->elements()[0]);
+								 if (args->elements().size() == 2) {
+									 default_value = PyObject::from(args->elements()[1]);
+								 }
+								 return self->get(key, default_value);
+							 })
+						 .type);
+}
 }// namespace
 
 std::unique_ptr<TypePrototype> PyDict::register_type()

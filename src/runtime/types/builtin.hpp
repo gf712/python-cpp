@@ -14,7 +14,7 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_integer;
 	std::unique_ptr<TypePrototype> m_none;
 	std::unique_ptr<TypePrototype> m_module;
-	std::unique_ptr<TypePrototype> m_custom_object;
+	std::unique_ptr<TypePrototype> m_object;
 
 	std::unique_ptr<TypePrototype> m_function;
 	std::unique_ptr<TypePrototype> m_native_function;
@@ -59,7 +59,7 @@ class BuiltinTypes
 	TypePrototype &integer() const { return *m_integer; }
 	TypePrototype &none() const { return *m_none; }
 	TypePrototype &module() const { return *m_module; }
-	TypePrototype &custom_object() const { return *m_custom_object; }
+	TypePrototype &object() const { return *m_object; }
 
 	TypePrototype &dict() const { return *m_dict; }
 	TypePrototype &dict_items() const { return *m_dict_items; }
@@ -96,7 +96,7 @@ PyType *float_();
 PyType *integer();
 PyType *none();
 PyType *module();
-PyType *custom_object();
+PyType *object();
 PyType *dict();
 PyType *dict_items();
 PyType *dict_items_iterator();

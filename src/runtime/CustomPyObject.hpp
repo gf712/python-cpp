@@ -8,13 +8,8 @@ class CustomPyObject : public PyBaseObject
 
   public:
 	CustomPyObject(const PyType *type);
-
-	std::string to_string() const override { return fmt::format("object"); }
-
-	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
-	std::optional<int32_t> __init__(PyTuple *args, PyDict *kwargs);
-	PyObject *__repr__() const;
-
-	static std::unique_ptr<TypePrototype> register_type();
+	
+	std::string to_string() const override;
+	
 	PyType *type() const override;
 };

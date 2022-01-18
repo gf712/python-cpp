@@ -30,6 +30,7 @@ class PyNumber : public PyBaseObject
 
 	PyObject *__repr__() const;
 	PyObject *__eq__(const PyObject *obj) const;
+	PyObject *__ne__(const PyObject *obj) const;
 	PyObject *__lt__(const PyObject *obj) const;
 	PyObject *__le__(const PyObject *obj) const;
 	PyObject *__gt__(const PyObject *obj) const;

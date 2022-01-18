@@ -14,6 +14,12 @@ PyFloat *PyFloat::create(double value)
 
 PyType *PyFloat::type() const { return float_(); }
 
+double PyFloat::as_f64() const
+{
+	ASSERT(std::holds_alternative<double>(m_value.value));
+	return std::get<double>(m_value.value);
+}
+
 namespace {
 
 std::once_flag float_flag;

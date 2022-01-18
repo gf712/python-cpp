@@ -245,10 +245,27 @@ std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &)
 
 std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	(void)lhs;
-	(void)rhs;
-	TODO();
-	return {};
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+					   return NameConstant{ lhs_value != rhs_value };
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value != rhs_value };
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value != rhs_value };
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (auto result = py_lhs->richcompare(py_rhs, RichCompare::Py_NE)) {
+					return result;
+				} else {
+					return {};
+				}
+			} },
+		lhs,
+		rhs);
 }
 
 std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter)
