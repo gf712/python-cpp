@@ -135,7 +135,7 @@ void Arguments::print_this_node(const std::string &indent) const
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &arg : m_args) { arg->print_node(new_indent); }
 	spdlog::debug("{}  - kwargs:", indent);
-	for (const auto &arg : m_kwargs) { arg->print_node(new_indent); }
+	for (const auto &kwarg : m_kwargs) { kwarg->print_node(new_indent); }
 }
 
 void FunctionDefinition::print_this_node(const std::string &indent) const
@@ -318,9 +318,11 @@ void Subscript::print_this_node(const std::string &indent) const
 	spdlog::debug("{}Subscript", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - value:", indent);
-	m_value->print_node(new_indent);
+	if (m_value) { m_value->print_node(new_indent); }
 	spdlog::debug("{}  - slice:", indent);
-	std::visit([&new_indent](const auto &val) { val.print(new_indent); }, m_slice);
+	if (m_slice) {
+		std::visit([&new_indent](const auto &val) { val.print(new_indent); }, *m_slice);
+	}
 	spdlog::debug("{}  - ctx: {}", indent, m_ctx);
 }
 

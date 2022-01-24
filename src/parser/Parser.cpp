@@ -2886,6 +2886,67 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 };
 
 
+struct DefaultPattern : Pattern<DefaultPattern>
+{
+	// default: '=' expression
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		DEBUG_LOG("default")
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::EQUAL>, ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'=' expression");
+			ASSERT(p.stack().size() == 1)
+			scope.parent().push_back(p.pop_back());
+			return true;
+		}
+		return false;
+	}
+};
+
+struct ParamWithDefaultPattern : Pattern<ParamWithDefaultPattern>
+{
+	// param_with_default:
+	//     | param default ',' TYPE_COMMENT?
+	//     | param default TYPE_COMMENT? &')'
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatch<ParamPattern, DefaultPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
+		// param default ',' TYPE_COMMENT?
+		if (pattern1::match(p)) {
+			DEBUG_LOG("param ',' TYPE_COMMENT?");
+			auto default_ = p.pop_back();
+			auto arg = p.pop_back();
+			auto args = p.stack().back();
+			ASSERT(as<Arguments>(args));
+			ASSERT(as<Argument>(arg));
+			as<Arguments>(args)->push_kwarg(
+				std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			return true;
+		}
+
+		using pattern2 = PatternMatch<ParamPattern,
+			DefaultPattern,
+			LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
+		// param default TYPE_COMMENT? &')'
+		if (pattern2::match(p)) {
+			DEBUG_LOG("param ',' TYPE_COMMENT?");
+			auto default_ = p.pop_back();
+			auto arg = p.pop_back();
+			auto args = p.stack().back();
+			ASSERT(as<Arguments>(args));
+			ASSERT(as<Argument>(arg));
+			as<Arguments>(args)->push_kwarg(
+				std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			return true;
+		}
+		return false;
+	}
+};
+
+
 struct ParametersPattern : Pattern<ParametersPattern>
 {
 	// parameters:
@@ -2897,7 +2958,8 @@ struct ParametersPattern : Pattern<ParametersPattern>
 	static bool matches_impl(Parser &p)
 	{
 		p.push_to_stack(std::make_shared<Arguments>());
-		using pattern3 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>>;
+		using pattern3 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>,
+			ZeroOrMorePattern<ParamWithDefaultPattern>>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("param_no_default+ param_with_default* [star_etc]");
 			// p.push_to_stack();

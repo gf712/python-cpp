@@ -33,7 +33,7 @@ namespace ast {
 	__AST_NODE_TYPE(ExceptHandler)      \
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
-	__AST_NODE_TYPE(Global) \
+	__AST_NODE_TYPE(Global)             \
 	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(Import)             \
 	__AST_NODE_TYPE(Keyword)            \
@@ -455,9 +455,9 @@ class Arguments : public ASTNode
 {
 	std::vector<std::shared_ptr<Argument>> m_posonlyargs;
 	std::vector<std::shared_ptr<Argument>> m_args;
-	std::vector<std::shared_ptr<Argument>> m_kwargs;
+	std::vector<std::shared_ptr<Keyword>> m_kwargs;
 	std::shared_ptr<Argument> m_vararg;
-	std::shared_ptr<Argument> m_kwarg;
+	std::shared_ptr<Keyword> m_kwarg;
 	std::vector<std::shared_ptr<Constant>> m_kw_defaults;
 	std::vector<std::shared_ptr<Constant>> m_defaults;
 
@@ -468,13 +468,12 @@ class Arguments : public ASTNode
 		m_args = std::move(args);
 	}
 
-
 	void print_this_node(const std::string &indent) const final;
 
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
 
-	void push_kwarg(std::shared_ptr<Argument> arg) { m_kwargs.push_back(std::move(arg)); }
+	void push_kwarg(std::shared_ptr<Keyword> kwarg) { m_kwargs.push_back(std::move(kwarg)); }
 	std::vector<std::string> keyword_argument_names() const;
 
 	const std::vector<std::shared_ptr<Argument>> &args() const { return m_args; }
@@ -836,7 +835,7 @@ class Subscript : public ASTNode
 
   private:
 	std::shared_ptr<ASTNode> m_value;
-	SliceType m_slice;
+	std::optional<SliceType> m_slice;
 	ContextType m_ctx;
 
   public:
@@ -848,7 +847,11 @@ class Subscript : public ASTNode
 	{}
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
-	const SliceType &slice() const { return m_slice; }
+	const SliceType &slice() const
+	{
+		ASSERT(m_slice)
+		return *m_slice;
+	}
 	ContextType context() const { return m_ctx; }
 
 	void set_value(std::shared_ptr<ASTNode> value) { m_value = std::move(value); }
@@ -1024,7 +1027,8 @@ class Global : public ASTNode
 	std::vector<std::string> m_names;
 
   public:
-	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names)) {}
+	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names))
+	{}
 
 	void codegen(CodeGenerator *) const override;
 
