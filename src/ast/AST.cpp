@@ -413,4 +413,13 @@ void Global::print_this_node(const std::string &indent) const
 	for (const auto &name : m_names) { spdlog::debug("{} {}", new_indent, name); }
 }
 
+void Delete::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Delete", indent);
+	spdlog::debug("{}  - targets", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	for (const auto &target : m_targets) { target->print_node(new_indent); }
+}
+
+
 }// namespace ast

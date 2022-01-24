@@ -29,6 +29,7 @@ namespace ast {
 	__AST_NODE_TYPE(ClassDefinition)    \
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
+	__AST_NODE_TYPE(Delete)             \
 	__AST_NODE_TYPE(Dict)               \
 	__AST_NODE_TYPE(ExceptHandler)      \
 	__AST_NODE_TYPE(For)                \
@@ -1030,6 +1031,22 @@ class Global : public ASTNode
 	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names))
 	{}
 
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class Delete : public ASTNode
+{
+	std::vector<std::shared_ptr<ASTNode>> m_targets;
+
+  public:
+	Delete(std::vector<std::shared_ptr<ASTNode>> targets)
+		: ASTNode(ASTNodeType::Delete), m_targets(std::move(targets))
+	{}
+
+	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
 	void codegen(CodeGenerator *) const override;
 
   private:

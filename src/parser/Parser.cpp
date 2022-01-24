@@ -390,6 +390,11 @@ struct ContinueKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "continue"; }
 };
 
+struct DeleteKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "del"; }
+};
+
 struct ExceptKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
@@ -2664,6 +2669,92 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 	}
 };
 
+struct DeleteAtomPattern : Pattern<DeleteAtomPattern>
+{
+	// del_t_atom:
+	//     | NAME
+	//     | '(' del_target ')'
+	//     | '(' [del_targets] ')'
+	//     | '[' [del_targets] ']'
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
+		if (pattern1::match(p)) {
+			auto token = p.lexer().peek_token(p.token_position() - 1);
+			std::string name_str{ token->start().pointer_to_program,
+				token->end().pointer_to_program };
+			p.push_to_stack(std::make_shared<Name>(name_str, ContextType::DELETE));
+			return true;
+		}
+		return false;
+	}
+};
+
+struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
+{
+	// del_target:
+	//     | t_primary '.' NAME !t_lookahead
+	//     | t_primary '[' slices ']' !t_lookahead
+	//     | del_t_atom
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		using pattern1 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern1::match(p)) {
+			TODO();
+			return true;
+		}
+
+		using pattern2 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::LSQB>,
+			SlicesPattern,
+			SingleTokenPattern<Token::TokenType::RSQB>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern2::match(p)) {
+			auto slices = p.pop_back();
+			auto value = p.pop_back();
+			ASSERT(as<Subscript>(slices))
+			as<Subscript>(slices)->set_value(value);
+			scope.parent().push_back(
+				std::make_shared<Delete>(std::vector<std::shared_ptr<ASTNode>>{ slices }));
+			return true;
+		}
+
+		using pattern3 = PatternMatch<DeleteAtomPattern>;
+		if (pattern3::match(p)) {
+			std::vector<std::shared_ptr<ASTNode>> to_delete;
+			to_delete.reserve(p.stack().size());
+			while (!p.stack().empty()) { to_delete.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<Delete>(to_delete));
+			return true;
+		}
+		return false;
+	}
+};
+
+struct DeleteStatementPattern : Pattern<DeleteStatementPattern>
+{
+	// del_stmt:
+	// 	| 'del' del_targets &(';' | NEWLINE)
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("'del_stmt'");
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, DeleteKeywordPattern>,
+			DeleteTargetsPattern,
+			LookAhead<OrPattern<SingleTokenPattern<Token::TokenType::SEMI>,
+				SingleTokenPattern<Token::TokenType::NEWLINE>>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'del' del_targets &(';' | NEWLINE)");
+			return true;
+		}
+		return false;
+	}
+};
+
 struct AssertStatementPattern : Pattern<AssertStatementPattern>
 {
 	// assert_stmt: 'assert' expression [',' expression ]
@@ -2763,6 +2854,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		if (pattern6::match(p)) {
 			DEBUG_LOG("pass");
 			p.push_to_stack(std::make_shared<Pass>());
+			return true;
+		}
+		using pattern7 = PatternMatch<DeleteStatementPattern>;
+		if (pattern7::match(p)) {
+			DEBUG_LOG("del_stmt");
 			return true;
 		}
 		using pattern9 = PatternMatch<AssertStatementPattern>;
