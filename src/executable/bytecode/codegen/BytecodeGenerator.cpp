@@ -634,6 +634,8 @@ void BytecodeGenerator::visit(const Try *node)
 
 void BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
+void BytecodeGenerator::visit(const Global *) { TODO(); }
+
 void BytecodeGenerator::visit(const UnaryExpr *node)
 {
 	const auto source_register = generate(node->operand().get(), m_function_id);

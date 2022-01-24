@@ -404,4 +404,11 @@ void BoolOp::print_this_node(const std::string &indent) const
 
 void Pass::print_this_node(const std::string &indent) const { spdlog::debug("{}Pass", indent); }
 
+void Global::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Globals", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	for (const auto &name : m_names) { spdlog::debug("{} {}", new_indent, name); }
+}
+
 }// namespace ast

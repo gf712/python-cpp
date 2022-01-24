@@ -388,6 +388,11 @@ struct FromKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "from"; }
 };
 
+struct GlobalKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "global"; }
+};
+
 struct IsKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "is"; }
@@ -920,8 +925,9 @@ struct AtomPattern : Pattern<AtomPattern>
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>;
@@ -1293,11 +1299,12 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::RSQB,
 												 Token::TokenType::RBRACE>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
-				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>>;
 		if (pattern5::match(p)) {
 			DEBUG_LOG("ϵ");
@@ -2558,6 +2565,25 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 	}
 };
 
+struct GlobalStatementPattern : Pattern<GlobalStatementPattern>
+{
+	// global_stmt: 'global' ','.NAME+
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("GlobalStatementPattern");
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
+			OneOrMorePattern<ApplyInBetweenPattern<SingleTokenPattern<Token::TokenType::NAME>,
+				SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("global_stmt: 'global' ','.NAME+");
+			p.push_to_stack(std::make_shared<Global>(std::vector<std::string>{}));
+			return true;
+		}
+		return false;
+	}
+};
+
 struct SmallStatementPattern : Pattern<SmallStatementPattern>
 {
 	// small_stmt:
@@ -2611,6 +2637,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern9 = PatternMatch<AssertStatementPattern>;
 		if (pattern9::match(p)) {
 			DEBUG_LOG("assert_stmt");
+			return true;
+		}
+		using pattern12 = PatternMatch<GlobalStatementPattern>;
+		if (pattern12::match(p)) {
+			DEBUG_LOG("global_stmt");
 			return true;
 		}
 		return false;

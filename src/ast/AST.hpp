@@ -33,6 +33,7 @@ namespace ast {
 	__AST_NODE_TYPE(ExceptHandler)      \
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FunctionDefinition) \
+	__AST_NODE_TYPE(Global) \
 	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(Import)             \
 	__AST_NODE_TYPE(Keyword)            \
@@ -1011,6 +1012,19 @@ class Pass : public ASTNode
 {
   public:
 	Pass() : ASTNode(ASTNodeType::Pass) {}
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class Global : public ASTNode
+{
+	std::vector<std::string> m_names;
+
+  public:
+	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names)) {}
 
 	void codegen(CodeGenerator *) const override;
 
