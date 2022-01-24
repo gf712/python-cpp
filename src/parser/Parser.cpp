@@ -368,6 +368,16 @@ struct AssertKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "assert"; }
 };
 
+struct BreakKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "break"; }
+};
+
+struct ContinueKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "continue"; }
+};
+
 struct ExceptKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
@@ -2693,6 +2703,22 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern9 = PatternMatch<AssertStatementPattern>;
 		if (pattern9::match(p)) {
 			DEBUG_LOG("assert_stmt");
+			return true;
+		}
+		using pattern10 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, BreakKeywordPattern>>;
+		if (pattern10::match(p)) {
+			DEBUG_LOG("break");
+			spdlog::error("'break' not implemented");
+			TODO();
+			return true;
+		}
+		using pattern11 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ContinueKeywordPattern>>;
+		if (pattern11::match(p)) {
+			DEBUG_LOG("continue");
+			spdlog::error("'continue' not implemented");
+			TODO();
 			return true;
 		}
 		using pattern12 = PatternMatch<GlobalStatementPattern>;
