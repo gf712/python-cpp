@@ -59,7 +59,13 @@ template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
 		using CurrentType = typename std::tuple_element<TypeIdx, PatternTuple>::type;
 		const size_t original_token_position = p.token_position();
 		if (CurrentType::matches(p)) {
-			// std::cout << "match:    " << *p.lexer().peek_token(original_token_position) << '\n';
+			std::string str;
+			for (size_t i = original_token_position; i < p.token_position(); ++i) {
+				str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
+					p.lexer().peek_token(i)->end().pointer_to_program);
+				str += ' ';
+			}
+			DEBUG_LOG("match: " + str + '\n');
 			if constexpr (has_advance_by<CurrentType>::value) {
 				p.token_position() += CurrentType::advance_by;
 			}
@@ -69,7 +75,13 @@ template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
 				return PatternMatch_<TypeIdx + 1, PatternTuple>::match(p);
 			}
 		} else {
-			// std::cout << "no match: " << *p.lexer().peek_token(original_token_position) << '\n';
+			std::string str;
+			for (size_t i = original_token_position; i < p.token_position(); ++i) {
+				str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
+					p.lexer().peek_token(i)->end().pointer_to_program);
+				str += ' ';
+			}
+			DEBUG_LOG("no match: " + str + '\n');
 			p.token_position() = original_token_position;
 			return false;
 		}
@@ -1238,11 +1250,11 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			primary_scope.parent().pop_back();
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
-			using pattern1a = PatternMatch<PrimaryPattern_>;
 			p.push_to_stack(std::make_shared<Attribute>(value, name, ContextType::LOAD));
+			using pattern1a = PatternMatch<PrimaryPattern_>;
 			if (pattern1a::match(p)) {
 				DEBUG_LOG("'.' NAME primary'");
-				primary_scope.parent().push_back(p.pop_back());
+				while (!p.stack().empty()) { primary_scope.parent().push_back(p.pop_front()); }
 				return true;
 			}
 			return false;
@@ -1251,15 +1263,15 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 		// '(' [arguments] ')' primary'
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrOnePattern<ArgumentsPattern>,
-			SingleTokenPattern<Token::TokenType::RPAREN>,
-			PrimaryPattern_>;
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
 		if (pattern3::match(p)) {
-			DEBUG_LOG("'(' [arguments] ')' primary'");
+			DEBUG_LOG("'(' [arguments] ')'=");
 			PRINT_STACK();
 			DEBUG_LOG("--------------");
 			std::vector<std::shared_ptr<ASTNode>> args;
 			std::vector<std::shared_ptr<Keyword>> kwargs;
-			for (const auto &node : p.stack()) {
+			while (!p.stack().empty()) {
+				auto node = p.pop_front();
 				if (auto keyword_node = as<Keyword>(node)) {
 					kwargs.push_back(keyword_node);
 				} else {
@@ -1268,9 +1280,15 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			}
 			auto function = primary_scope.parent().back();
 			primary_scope.parent().pop_back();
-			primary_scope.parent().push_back(std::make_shared<Call>(function, args, kwargs));
+			p.push_to_stack(std::make_shared<Call>(function, args, kwargs));
 			PRINT_STACK();
-			return true;
+			using pattern3a = PatternMatch<PrimaryPattern_>;
+			if (pattern3a::match(p)) {
+				DEBUG_LOG("'(' [arguments] ')' primary'");
+				while (!p.stack().empty()) { primary_scope.parent().push_back(p.pop_front()); }
+				return true;
+			}
+			return false;
 		}
 
 		// '[' slices ']' primary'
@@ -1278,10 +1296,16 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			SlicesPattern,
 			SingleTokenPattern<Token::TokenType::RSQB>>;
 		if (pattern4::match(p)) {
-			DEBUG_LOG("'[' slices ']' primary'");
+			DEBUG_LOG("'[' slices ']'");
 			ASSERT(as<Subscript>(p.stack().back()))
-			primary_scope.parent().push_back(p.pop_back());
-			return true;
+			p.push_to_stack(p.pop_back());
+			using pattern4a = PatternMatch<PrimaryPattern_>;
+			if (pattern4a::match(p)) {
+				DEBUG_LOG("'[' slices ']' primary'");
+				while (!p.stack().empty()) { primary_scope.parent().push_back(p.pop_front()); }
+				return true;
+			}
+			return false;
 		}
 
 		// ϵ
@@ -1341,14 +1365,15 @@ struct PrimaryPattern : Pattern<PrimaryPattern>
 	static bool matches_impl(Parser &p)
 	{
 		//  primary' 		| atom primary'
+		DEBUG_LOG("PrimaryPattern");
 		using pattern2 = PatternMatch<AtomPattern, PrimaryPattern_>;
 		if (pattern2::match(p)) {
+			DEBUG_LOG("atom primary'")
 			if (as<Subscript>(p.stack().back())) {
 				auto subscript = p.pop_back();
 				auto value = p.pop_back();
 				ASSERT(as<Subscript>(subscript))
-				ASSERT(as<Name>(value))
-				as<Subscript>(subscript)->set_value(as<Name>(value));
+				as<Subscript>(subscript)->set_value(value);
 				as<Subscript>(subscript)->set_context(ContextType::LOAD);
 				p.push_to_stack(subscript);
 			}
@@ -1367,9 +1392,13 @@ struct AwaitPrimaryPattern : Pattern<AwaitPrimaryPattern>
 	//     | primary
 	static bool matches_impl(Parser &p)
 	{
+		DEBUG_LOG("AwaitPrimaryPattern");
 		// primary
 		using pattern2 = PatternMatch<PrimaryPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			DEBUG_LOG("primary")
+			return true;
+		}
 
 		return false;
 	}
@@ -1384,11 +1413,13 @@ struct PowerPattern : Pattern<PowerPattern>
 	//     | await_primary
 	static bool matches_impl(Parser &p)
 	{
+		DEBUG_LOG("PowerPattern");
 		// await_primary '**' factor
 		using pattern1 = PatternMatch<AwaitPrimaryPattern,
 			SingleTokenPattern<Token::TokenType::DOUBLESTAR>,
 			FactorPattern>;
 		if (pattern1::match(p)) {
+			DEBUG_LOG("await_primary '**' factor")
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::EXP, lhs, rhs);
@@ -1398,7 +1429,10 @@ struct PowerPattern : Pattern<PowerPattern>
 
 		// await_primary
 		using pattern2 = PatternMatch<AwaitPrimaryPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			DEBUG_LOG("await_primary")
+			return true;
+		}
 
 		return false;
 	}
@@ -1414,7 +1448,7 @@ struct FactorPattern : Pattern<FactorPattern>
 	//     | power
 	static bool matches_impl(Parser &p)
 	{
-		DEBUG_LOG("factor");
+		DEBUG_LOG("FactorPattern");
 		// '+' factor
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, FactorPattern>;
 		if (pattern1::match(p)) {
@@ -1468,6 +1502,7 @@ struct TermPattern_ : Pattern<TermPattern_>
 	//     | ϵ
 	static bool matches_impl(Parser &p)
 	{
+		DEBUG_LOG("TermPattern_");
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
 		if (pattern1::match(p)) {
@@ -1528,6 +1563,7 @@ struct TermPattern : Pattern<TermPattern>
 	// term: factor term'
 	static bool matches_impl(Parser &p)
 	{
+		DEBUG_LOG("TermPattern");
 		using pattern1 = PatternMatch<FactorPattern, TermPattern_>;
 		if (pattern1::match(p)) { return true; }
 
@@ -2097,13 +2133,17 @@ struct InversionPattern : Pattern<InversionPattern>
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				ComparissonPattern>;
 		if (pattern1::match(p)) {
+			DEBUG_LOG("'not' inversion")
 			const auto &node = p.pop_back();
 			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::NOT, node));
 			return true;
 		}
 		// comparison
 		using pattern2 = PatternMatch<ComparissonPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			DEBUG_LOG("comparison")
+			return true;
+		}
 
 		return false;
 	}
@@ -2125,6 +2165,7 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
 				InversionPattern>>;
 		if (pattern1::match(p)) {
+			DEBUG_LOG("inversion ('and' inversion )+")
 			std::vector<std::shared_ptr<ASTNode>> values;
 			values.reserve(p.stack().size());
 			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
@@ -2135,6 +2176,7 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 		// inversion
 		using pattern2 = PatternMatch<InversionPattern>;
 		if (pattern2::match(p)) {
+			DEBUG_LOG("inversion")
 			while (!p.stack().empty()) { scope.parent().push_back(p.pop_front()); }
 			return true;
 		}
@@ -2159,6 +2201,7 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 				ConjunctionPattern>>;
 		if (pattern1::match(p)) {
+			DEBUG_LOG("conjunction ('or' conjunction )+")
 			std::vector<std::shared_ptr<ASTNode>> values;
 			values.reserve(p.stack().size());
 			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
@@ -2169,6 +2212,7 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 		// conjunction
 		using pattern2 = PatternMatch<ConjunctionPattern>;
 		if (pattern2::match(p)) {
+			DEBUG_LOG("conjunction")
 			while (!p.stack().empty()) { scope.parent().push_back(p.pop_front()); }
 			return true;
 		}
@@ -2189,7 +2233,10 @@ struct ExpressionPattern : Pattern<ExpressionPattern>
 		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 		// disjunction
 		using pattern2 = PatternMatch<DisjunctionPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			DEBUG_LOG("disjunction")
+			return true;
+		}
 
 		return false;
 	}
@@ -2205,7 +2252,10 @@ struct StarExpressionPattern : Pattern<StarExpressionPattern>
 	{
 		// expression
 		using pattern2 = PatternMatch<ExpressionPattern>;
-		if (pattern2::match(p)) { return true; }
+		if (pattern2::match(p)) {
+			DEBUG_LOG("expression")
+			return true;
+		}
 		return false;
 	}
 };
@@ -3546,6 +3596,16 @@ struct FilePattern : Pattern<FilePattern>
 			for (auto &&node : p.stack()) { p.module()->emplace(std::move(node)); }
 			return true;
 		}
+		size_t idx = 0;
+		auto t = *p.lexer().peek_token(idx);
+		const size_t row = t.start().row;
+		std::string line = "";
+		while (row == t.start().row) {
+			line += std::string(t.start().pointer_to_program, t.end().pointer_to_program);
+			idx++;
+			t = *p.lexer().peek_token(idx);
+		}
+		spdlog::error("Syntax error on line {}: '{}'", row + 1, line);
 		PARSER_ERROR();
 	}
 };
