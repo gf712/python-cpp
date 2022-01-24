@@ -175,6 +175,7 @@ class Lexer
 	bool m_ignore_comments{ false };
 	const std::string m_filename;
 	std::vector<Token> m_current_line_tokens;
+	size_t m_parenthesis_level{ 0 };
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -259,7 +260,7 @@ class Lexer
 
 	bool try_read_string();
 
-	std::optional<Token::TokenType> try_read_operation_with_one_character() const;
+	std::optional<Token::TokenType> try_read_operation_with_one_character();
 
 	std::optional<Token::TokenType> try_read_operation_with_two_characters() const;
 

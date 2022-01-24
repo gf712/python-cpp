@@ -92,7 +92,11 @@ void Lexer::push_new_line()
 {
 	const auto original_position = m_position;
 	increment_column_position(1);
-	push_token(Token::TokenType::NEWLINE, original_position, m_position);
+	if (m_parenthesis_level > 0) {
+		push_token(Token::TokenType::NL, original_position, m_position);
+	} else {
+		push_token(Token::TokenType::NEWLINE, original_position, m_position);
+	}
 	increment_row_position();
 }
 
@@ -181,7 +185,8 @@ bool Lexer::try_empty_line()
 bool Lexer::try_read_indent()
 {
 	// if we are the start of a new line we need to check indent/dedent
-	if (m_position.column == 0) {
+	// and we are not inside of parenthesis
+	if (m_position.column == 0 && m_parenthesis_level == 0) {
 		const Position original_position = m_position;
 		const auto [indent_value, position_increment] = compute_indent_level();
 		increment_column_position(position_increment);
@@ -430,32 +435,70 @@ bool Lexer::try_read_string()
 {
 	const Position original_position = m_position;
 
-	if (!(peek(0) == '\"' || peek(0) == '\'')) { return false; }
+	auto is_triple_quote = [this]() {
+		return (peek(0) == '\"' || peek(0) == '\'') && (peek(1) == '\"' || peek(1) == '\'')
+			   && (peek(2) == '\"' || peek(2) == '\'');
+	};
 
-	const bool double_quote = peek(0) == '\"';
-
-	size_t position = 1;
-
-	if (double_quote) {
-		while (!(peek(position) == '\"')) { position++; }
+	if (is_triple_quote()) {
+		advance(3);
+		while (!is_triple_quote()) {
+			if (peek(0) == '\n') {
+				advance(1);
+				increment_row_position();
+			} else {
+				advance(1);
+			}
+		}
+		advance(3);
+		push_token(Token::TokenType::STRING, original_position, m_position);
+	} else if (!(peek(0) == '\"' || peek(0) == '\'')) {
+		return false;
 	} else {
-		while (!(peek(position) == '\'')) { position++; }
+		const bool double_quote = peek(0) == '\"';
+
+		size_t position = 1;
+
+		if (double_quote) {
+			while (!(peek(position) == '\"')) { position++; }
+		} else {
+			while (!(peek(position) == '\'')) { position++; }
+		}
+		advance(position + 1);
+
+		push_token(Token::TokenType::STRING, original_position, m_position);
 	}
-	advance(position + 1);
-
-	push_token(Token::TokenType::STRING, original_position, m_position);
-
 	return true;
 }
 
-std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character() const
+std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 {
 	if (std::isalnum(peek(0))) return {};
 
-	if (peek(0) == '(') return Token::TokenType::LPAREN;
-	if (peek(0) == ')') return Token::TokenType::RPAREN;
-	if (peek(0) == '[') return Token::TokenType::LSQB;
-	if (peek(0) == ']') return Token::TokenType::RSQB;
+	if (peek(0) == '(') {
+		m_parenthesis_level++;
+		return Token::TokenType::LPAREN;
+	}
+	if (peek(0) == ')') {
+		m_parenthesis_level--;
+		return Token::TokenType::RPAREN;
+	}
+	if (peek(0) == '[') {
+		m_parenthesis_level++;
+		return Token::TokenType::LSQB;
+	}
+	if (peek(0) == ']') {
+		m_parenthesis_level--;
+		return Token::TokenType::RSQB;
+	}
+	if (peek(0) == '{') {
+		m_parenthesis_level++;
+		return Token::TokenType::LBRACE;
+	}
+	if (peek(0) == '}') {
+		m_parenthesis_level--;
+		return Token::TokenType::RBRACE;
+	}
 	if (peek(0) == ':') return Token::TokenType::COLON;
 	if (peek(0) == ',') return Token::TokenType::COMMA;
 	if (peek(0) == ';') return Token::TokenType::SEMI;
@@ -470,8 +513,6 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character() c
 	if (peek(0) == '=') return Token::TokenType::EQUAL;
 	if (peek(0) == '.') return Token::TokenType::DOT;
 	if (peek(0) == '%') return Token::TokenType::PERCENT;
-	if (peek(0) == '{') return Token::TokenType::LBRACE;
-	if (peek(0) == '}') return Token::TokenType::RBRACE;
 	if (peek(0) == '~') return Token::TokenType::TILDE;
 	if (peek(0) == '^') return Token::TokenType::CIRCUMFLEX;
 	if (peek(0) == '@') return Token::TokenType::AT;

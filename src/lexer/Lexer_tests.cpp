@@ -615,3 +615,64 @@ TEST(Lexer, Ellipsis)
 	};
 	assert_generates_tokens(program, expected_tokens);
 }
+
+TEST(Lexer, TripleQuoteString)
+{
+	constexpr std::string_view program =
+		"def test():\n"
+		"    \"\"\"My\n"
+		"       doc\n"
+		"    str\"\"\"\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::RPAREN,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::STRING,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::ENDMARKER,
+	};
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, MultiLineStrings)
+{
+	constexpr std::string_view program =
+		"def foo(a):\n"
+		"	print(a)\n"
+		"foo(\"a\"\n"
+		"\n"
+		"		\"b\")\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::NAME,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NAME,
+		Token::TokenType::RPAREN,
+		Token::TokenType::COLON,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::INDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::NAME,
+		Token::TokenType::RPAREN,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::DEDENT,
+		Token::TokenType::NAME,
+		Token::TokenType::LPAREN,
+		Token::TokenType::STRING,
+		Token::TokenType::NL,
+		Token::TokenType::NL,
+		Token::TokenType::STRING,
+		Token::TokenType::RPAREN,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER,
+	};
+	assert_generates_tokens(program, expected_tokens);
+}

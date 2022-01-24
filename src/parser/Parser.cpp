@@ -638,16 +638,31 @@ struct StringPattern : Pattern<StringPattern>
 	// strings: STRING+
 	static bool matches_impl(Parser &p)
 	{
-		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::STRING>>;
+		const auto initial_token_position = p.token_position();
+		using pattern1 =
+			PatternMatch<OneOrMorePattern<SingleTokenPattern<Token::TokenType::STRING>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("strings: STRING+");
-			// auto token = tokens.begin() - 1;
-			auto token = p.lexer().peek_token(p.token_position() - 1);
-			// FIXME: this assumes that STRING is surrounded by a single/double quotes
-			// 		  could this be """?
-			std::string value{ token->start().pointer_to_program + 1,
-				token->end().pointer_to_program - 1 };
-			p.push_to_stack(std::make_shared<Constant>(value));
+			std::string complete_string;
+			for (size_t idx = initial_token_position; idx < p.token_position(); ++idx) {
+				auto token = p.lexer().peek_token(idx);
+				auto is_triple_quote = [token]() {
+					const char *ptr = token->start().pointer_to_program;
+					return (ptr[0] == '\"' || ptr[0] == '\'') && (ptr[1] == '\"' || ptr[1] == '\'')
+						   && (ptr[2] == '\"' || ptr[2] == '\'');
+				};
+				const auto value = [&token, &is_triple_quote]() {
+					if (is_triple_quote()) {
+						return std::string{ token->start().pointer_to_program + 3,
+							token->end().pointer_to_program - 3 };
+					} else {
+						return std::string{ token->start().pointer_to_program + 1,
+							token->end().pointer_to_program - 1 };
+					}
+				}();
+				complete_string += value;
+			}
+			p.push_to_stack(std::make_shared<Constant>(complete_string));
 			return true;
 		}
 		return false;
