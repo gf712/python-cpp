@@ -431,5 +431,16 @@ void With::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - type_comment: ", indent, m_type_comment);
 }
 
+void IfExpr::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}IfExpr", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - test", indent);
+	m_test->print_node(new_indent);
+	spdlog::debug("{}  - body", indent);
+	m_body->print_node(new_indent);
+	spdlog::debug("{}  - orelse", indent);
+	m_orelse->print_node(new_indent);
+}
 
 }// namespace ast

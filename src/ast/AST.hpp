@@ -36,6 +36,7 @@ namespace ast {
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(Global)             \
 	__AST_NODE_TYPE(If)                 \
+	__AST_NODE_TYPE(IfExpr)             \
 	__AST_NODE_TYPE(Import)             \
 	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
@@ -1071,6 +1072,29 @@ class With : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &items() const { return m_items; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::string &type_comment() const { return m_type_comment; }
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class IfExpr : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_test;
+	std::shared_ptr<ASTNode> m_body;
+	std::shared_ptr<ASTNode> m_orelse;
+
+  public:
+	IfExpr(std::shared_ptr<ASTNode> test,
+		std::shared_ptr<ASTNode> body,
+		std::shared_ptr<ASTNode> orelse)
+		: ASTNode(ASTNodeType::IfExpr), m_test(std::move(test)), m_body(std::move(body)),
+		  m_orelse(std::move(orelse))
+	{}
+
+	const std::shared_ptr<ASTNode> &test() const { return m_test; }
+	const std::shared_ptr<ASTNode> &body() const { return m_body; }
+	const std::shared_ptr<ASTNode> &orelse() const { return m_orelse; }
 	void codegen(CodeGenerator *) const override;
 
   private:

@@ -646,6 +646,24 @@ void compare_with_statement(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_type_comment, expected_type_comment);
 }
 
+void compare_if_expression(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::IfExpr);
+
+	const auto result_test = as<IfExpr>(result)->test();
+	const auto expected_test = as<IfExpr>(expected)->test();
+	dispatch(result_test, expected_test);
+
+	const auto result_body = as<IfExpr>(result)->body();
+	const auto expected_body = as<IfExpr>(expected)->body();
+	dispatch(result_body, expected_body);
+
+	const auto result_orelse = as<IfExpr>(result)->orelse();
+	const auto expected_orelse = as<IfExpr>(expected)->orelse();
+	dispatch(result_orelse, expected_orelse);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -771,6 +789,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::With: {
 		compare_with_statement(result, expected);
+		break;
+	}
+	case ASTNodeType::IfExpr: {
+		compare_if_expression(result, expected);
 		break;
 	}
 	default: {
@@ -1800,6 +1822,21 @@ TEST(Parser, WithStatement)
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("lock", ContextType::LOAD) },
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Call>(std::make_shared<Name>("work", ContextType::LOAD)) },
+		""));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, IfExpression)
+{
+	constexpr std::string_view program = "a = 42 if magic() else 21\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE) },
+		std::make_shared<IfExpr>(
+			std::make_shared<Call>(std::make_shared<Name>("magic", ContextType::LOAD)),
+			std::make_shared<Constant>(int64_t{ 42 }),
+			std::make_shared<Constant>(int64_t{ 21 })),
 		""));
 	assert_generates_ast(program, expected_ast);
 }

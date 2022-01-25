@@ -395,6 +395,17 @@ struct DeleteKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "del"; }
 };
 
+
+struct ElifKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "elif"; }
+};
+
+struct ElseKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "else"; }
+};
+
 struct ExceptKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "except"; }
@@ -418,6 +429,11 @@ struct FromKeywordPattern
 struct GlobalKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "global"; }
+};
+
+struct IfKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "if"; }
 };
 
 struct IsKeywordPattern
@@ -1361,6 +1377,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElseKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, InKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
@@ -2256,6 +2274,20 @@ struct ExpressionPattern : Pattern<ExpressionPattern>
 	{
 		DEBUG_LOG("ExpressionPattern");
 		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		using pattern1 = PatternMatch<DisjunctionPattern,
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfKeywordPattern>,
+			DisjunctionPattern,
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElseKeywordPattern>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("disjunction 'if' disjunction 'else' expression")
+			auto orelse = p.pop_back();
+			auto test = p.pop_back();
+			auto body = p.pop_back();
+			p.push_to_stack(std::make_shared<IfExpr>(test, body, orelse));
+			return true;
+		}
+
 		// disjunction
 		using pattern2 = PatternMatch<DisjunctionPattern>;
 		if (pattern2::match(p)) {
@@ -3248,23 +3280,6 @@ struct FunctionDefinitionStatementPattern : Pattern<FunctionDefinitionStatementP
 	}
 };
 
-struct IfPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "if"; }
-};
-
-
-struct ElifPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "elif"; }
-};
-
-struct ElsePattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "else"; }
-};
-
-
 struct ElseBlockStatementPattern : Pattern<ElseBlockStatementPattern>
 {
 	// else_block: 'else' ':' block
@@ -3272,7 +3287,7 @@ struct ElseBlockStatementPattern : Pattern<ElseBlockStatementPattern>
 	{
 		// else_block: 'else' ':' block
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElsePattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElseKeywordPattern>,
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
@@ -3294,7 +3309,7 @@ struct ElifStatementPattern : Pattern<ElifStatementPattern>
 		BlockScope scope{ p };
 		// 'elif' named_expression ':' block
 		using pattern0 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElifPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ElifKeywordPattern>,
 				NamedExpressionPattern,
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
@@ -3332,7 +3347,7 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 
 		// 'if' named_expression ':' block
 		using pattern0 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfKeywordPattern>,
 				NamedExpressionPattern,
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
