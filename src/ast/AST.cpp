@@ -421,5 +421,15 @@ void Delete::print_this_node(const std::string &indent) const
 	for (const auto &target : m_targets) { target->print_node(new_indent); }
 }
 
+void With::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}With", indent);
+	spdlog::debug("{}  - items", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	for (const auto &item : m_items) { item->print_node(new_indent); }
+	for (const auto &statement : m_body) { statement->print_node(new_indent); }
+	spdlog::debug("{}  - type_comment: ", indent, m_type_comment);
+}
+
 
 }// namespace ast

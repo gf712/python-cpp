@@ -465,6 +465,11 @@ struct WhileKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "while"; }
 };
 
+struct WithKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "with"; }
+};
+
 struct StarAtomPattern : Pattern<StarAtomPattern>
 {
 	// star_atom:
@@ -3662,6 +3667,83 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 	}
 };
 
+struct WithItemPattern : Pattern<WithItemPattern>
+{
+	// with_item:
+	//     | expression 'as' star_target &(',' | ')' | ':')
+	//     | expression
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("WithItemPattern")
+		using pattern2 = PatternMatch<ExpressionPattern>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("expression")
+			return true;
+		}
+
+		return false;
+	}
+};
+
+struct WithStatementPattern : Pattern<WithStatementPattern>
+{
+	// with_stmt:
+	//     | 'with' '(' ','.with_item+ ','? ')' ':' block
+	//     | 'with' ','.with_item+ ':' [TYPE_COMMENT] block
+	//     | ASYNC 'with' '(' ','.with_item+ ','? ')' ':' block
+	//     | ASYNC 'with' ','.with_item+ ':' [TYPE_COMMENT] block
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("WithStatementPattern")
+
+		BlockScope with_scope{ p };
+
+		// 'with' '(' ','.with_item+ ','? ')' ':' block
+		using pattern1 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, WithKeywordPattern>,
+				SingleTokenPattern<Token::TokenType::LPAREN>,
+				OneOrMorePattern<ApplyInBetweenPattern<WithItemPattern,
+					SingleTokenPattern<Token::TokenType::COMMA>>>,
+				ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>,
+				SingleTokenPattern<Token::TokenType::RPAREN>,
+				SingleTokenPattern<Token::TokenType::COLON>,
+				BlockPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'with' '(' ','.with_item+ ','? ')' ':' block")
+			TODO();
+			return true;
+		}
+
+		// 'with' ','.with_item+ ':' [TYPE_COMMENT] block
+		using pattern2 =
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, WithKeywordPattern>,
+				OneOrMorePattern<ApplyInBetweenPattern<WithItemPattern,
+					SingleTokenPattern<Token::TokenType::COMMA>>>,
+				SingleTokenPattern<Token::TokenType::COLON>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("'with' ','.with_item+ ':' [TYPE_COMMENT]")
+			std::vector<std::shared_ptr<ASTNode>> with_items;
+			with_items.reserve(p.stack().size());
+			while (!p.stack().empty()) { with_items.push_back(p.pop_front()); }
+
+			BlockScope block_scope{ p };
+
+			using pattern2a = PatternMatch<BlockPattern>;
+			if (pattern2a::match(p)) {
+				DEBUG_LOG("block")
+
+				std::vector<std::shared_ptr<ASTNode>> body;
+				body.reserve(p.stack().size());
+				while (!p.stack().empty()) { body.push_back(p.pop_front()); }
+
+				with_scope.parent().push_back(std::make_shared<With>(with_items, body, ""));
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+};
 
 struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 {
@@ -3690,9 +3772,18 @@ struct CompoundStatementPattern : Pattern<CompoundStatementPattern>
 			return true;
 		}
 
+		// class_def
 		using pattern3 = PatternMatch<ClassDefinitionPattern>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("class_def");
+			PRINT_STACK();
+			return true;
+		}
+
+		// class_def
+		using pattern4 = PatternMatch<WithStatementPattern>;
+		if (pattern4::match(p)) {
+			DEBUG_LOG("with_stmt");
 			PRINT_STACK();
 			return true;
 		}

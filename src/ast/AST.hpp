@@ -48,7 +48,8 @@ namespace ast {
 	__AST_NODE_TYPE(Try)                \
 	__AST_NODE_TYPE(Tuple)              \
 	__AST_NODE_TYPE(UnaryExpr)          \
-	__AST_NODE_TYPE(While)
+	__AST_NODE_TYPE(While)              \
+	__AST_NODE_TYPE(With)
 
 
 enum class ASTNodeType {
@@ -1047,6 +1048,29 @@ class Delete : public ASTNode
 	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class With : public ASTNode
+{
+	std::vector<std::shared_ptr<ASTNode>> m_items;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	const std::string m_type_comment;
+
+  public:
+	With(std::vector<std::shared_ptr<ASTNode>> items,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::string type_comment)
+		: ASTNode(ASTNodeType::With), m_items(std::move(items)), m_body(std::move(body)),
+		  m_type_comment(std::move(type_comment))
+	{}
+
+	const std::vector<std::shared_ptr<ASTNode>> &items() const { return m_items; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	const std::string &type_comment() const { return m_type_comment; }
 	void codegen(CodeGenerator *) const override;
 
   private:

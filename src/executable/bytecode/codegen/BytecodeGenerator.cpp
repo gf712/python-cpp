@@ -569,6 +569,8 @@ void BytecodeGenerator::visit(const Subscript *) { TODO(); }
 
 void BytecodeGenerator::visit(const Raise *) { TODO(); }
 
+void BytecodeGenerator::visit(const With *) { TODO(); }
+
 namespace {
 	size_t list_node_distance(const std::list<InstructionBlock> &block_list,
 		InstructionBlock *start,

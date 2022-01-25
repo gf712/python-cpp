@@ -619,6 +619,33 @@ void compare_argument(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_annotation, expected_annotation);
 }
 
+
+void compare_with_statement(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::With);
+
+	const auto result_items = as<With>(result)->items();
+	const auto expected_items = as<With>(expected)->items();
+
+	ASSERT_EQ(result_items.size(), expected_items.size());
+
+	for (size_t i = 0; i < result_items.size(); ++i) {
+		dispatch(result_items[i], expected_items[i]);
+	}
+
+	const auto result_body = as<With>(result)->body();
+	const auto expected_body = as<With>(expected)->body();
+
+	ASSERT_EQ(result_body.size(), expected_body.size());
+
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+
+	const auto result_type_comment = as<With>(result)->type_comment();
+	const auto expected_type_comment = as<With>(expected)->type_comment();
+	ASSERT_EQ(result_type_comment, expected_type_comment);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -740,6 +767,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Argument: {
 		compare_argument(result, expected);
+		break;
+	}
+	case ASTNodeType::With: {
+		compare_with_statement(result, expected);
 		break;
 	}
 	default: {
@@ -1755,5 +1786,20 @@ TEST(Parser, BoolOpOr)
 	expected_ast->emplace(std::make_shared<BoolOp>(BoolOp::OpType::Or,
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::LOAD),
 			std::make_shared<Name>("b", ContextType::LOAD) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, WithStatement)
+{
+	constexpr std::string_view program =
+		"with lock:\n"
+		"  work()\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<With>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("lock", ContextType::LOAD) },
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Call>(std::make_shared<Name>("work", ContextType::LOAD)) },
+		""));
 	assert_generates_ast(program, expected_ast);
 }
