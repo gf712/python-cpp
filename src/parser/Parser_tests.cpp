@@ -378,7 +378,8 @@ void compare_keyword(const std::shared_ptr<ASTNode> &result,
 
 	const auto result_arg = as<Keyword>(result)->arg();
 	const auto expected_arg = as<Keyword>(expected)->arg();
-	ASSERT_EQ(result_arg, expected_arg);
+	ASSERT_EQ(result_arg.has_value(), expected_arg.has_value());
+	if (expected_arg.has_value()) { ASSERT_EQ(*result_arg, *expected_arg); }
 
 	const auto result_value = as<Keyword>(result)->value();
 	const auto expected_value = as<Keyword>(expected)->value();
@@ -597,10 +598,23 @@ void compare_arguments(const std::shared_ptr<ASTNode> &result,
 
 	const auto result_args = as<Arguments>(result)->args();
 	const auto expected_args = as<Arguments>(expected)->args();
-
 	ASSERT_EQ(result_args.size(), expected_args.size());
-
 	for (size_t i = 0; i < result_args.size(); ++i) { dispatch(result_args[i], expected_args[i]); }
+
+	const auto result_kwargs = as<Arguments>(result)->kwargs();
+	const auto expected_kwargs = as<Arguments>(expected)->kwargs();
+	ASSERT_EQ(result_kwargs.size(), expected_kwargs.size());
+	for (size_t i = 0; i < result_kwargs.size(); ++i) {
+		dispatch(result_kwargs[i], expected_kwargs[i]);
+	}
+
+	const auto result_vararg = as<Arguments>(result)->vararg();
+	const auto expected_vararg = as<Arguments>(expected)->vararg();
+	dispatch(result_vararg, expected_vararg);
+
+	const auto result_kwarg = as<Arguments>(result)->kwarg();
+	const auto expected_kwarg = as<Arguments>(expected)->kwarg();
+	dispatch(result_kwarg, expected_kwarg);
 }
 
 void compare_argument(const std::shared_ptr<ASTNode> &result,
@@ -662,6 +676,20 @@ void compare_if_expression(const std::shared_ptr<ASTNode> &result,
 	const auto result_orelse = as<IfExpr>(result)->orelse();
 	const auto expected_orelse = as<IfExpr>(expected)->orelse();
 	dispatch(result_orelse, expected_orelse);
+}
+
+void compare_starred(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Starred);
+
+	const auto result_value = as<Starred>(result)->value();
+	const auto expected_value = as<Starred>(expected)->value();
+	dispatch(result_value, expected_value);
+
+	const auto result_ctx = as<Starred>(result)->ctx();
+	const auto expected_ctx = as<Starred>(expected)->ctx();
+	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
@@ -793,6 +821,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::IfExpr: {
 		compare_if_expression(result, expected);
+		break;
+	}
+	case ASTNodeType::Starred: {
+		compare_starred(result, expected);
 		break;
 	}
 	default: {
@@ -1223,7 +1255,7 @@ TEST(Parser, ClassDefinition)
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Name>("Base", ContextType::LOAD) },// bases
 		std::vector{ std::make_shared<Keyword>(
-			"metaclass", std::make_shared<Name>("MyMetaClass", ContextType::LOAD)) },// keywords
+			"metaclass", std::make_shared<Name>("MyMetaClass", ContextType::LOAD)) },// Keywords
 		std::vector<std::shared_ptr<ast::ASTNode>>{
 			std::make_shared<FunctionDefinition>("__init__",// function_name
 				std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
@@ -1838,5 +1870,85 @@ TEST(Parser, IfExpression)
 			std::make_shared<Constant>(int64_t{ 42 }),
 			std::make_shared<Constant>(int64_t{ 21 })),
 		""));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ArgsKwargsFunctionDef)
+{
+	constexpr std::string_view program =
+		"def foo(*args, **kwargs):\n"
+		"  return 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("foo",
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
+			std::vector<std::shared_ptr<Keyword>>{},
+			std::make_shared<Argument>("args", nullptr, ""),
+			std::make_shared<Argument>("kwargs", nullptr, "")),
+		std::vector<std::shared_ptr<ast::ASTNode>>{
+			std::make_shared<Return>(std::make_shared<Constant>(int64_t{ 1 })) },
+		std::vector<std::shared_ptr<ast::ASTNode>>{},
+		nullptr,
+		""));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ArgsKwargsFunctionCall)
+{
+	constexpr std::string_view program = "foo(*args, **kwargs)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Starred>(
+			std::make_shared<Name>("args", ContextType::LOAD), ContextType::LOAD) },
+		std::vector<std::shared_ptr<Keyword>>{
+			std::make_shared<Keyword>(std::make_shared<Name>("kwargs", ContextType::LOAD)) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ArgKwargsFunctionCall)
+{
+	constexpr std::string_view program = "foo(arg, **kwargs)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("arg", ContextType::LOAD) },
+		std::vector<std::shared_ptr<Keyword>>{
+			std::make_shared<Keyword>(std::make_shared<Name>("kwargs", ContextType::LOAD)) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ArgsKwargsArgFunctionCall)
+{
+	constexpr std::string_view program = "foo(*args, **kwargs, a=1)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Starred>(
+			std::make_shared<Name>("args", ContextType::LOAD), ContextType::LOAD) },
+		std::vector<std::shared_ptr<Keyword>>{
+			std::make_shared<Keyword>(std::make_shared<Name>("kwargs", ContextType::LOAD)),
+			std::make_shared<Keyword>("a", std::make_shared<Constant>(int64_t{ 1 })) }));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ComplexArgsKwargsFunctionCall)
+{
+	constexpr std::string_view program =
+		"foo(*args, *more_args, bar, b=2, **kwargs, **more_kwargs, a=1)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD),
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Starred>(
+				std::make_shared<Name>("args", ContextType::LOAD), ContextType::LOAD),
+			std::make_shared<Starred>(
+				std::make_shared<Name>("more_args", ContextType::LOAD), ContextType::LOAD),
+			std::make_shared<Name>("bar", ContextType::LOAD) },
+		std::vector<std::shared_ptr<Keyword>>{
+			std::make_shared<Keyword>("b", std::make_shared<Constant>(int64_t{ 2 })),
+			std::make_shared<Keyword>(std::make_shared<Name>("kwargs", ContextType::LOAD)),
+			std::make_shared<Keyword>(std::make_shared<Name>("more_kwargs", ContextType::LOAD)),
+			std::make_shared<Keyword>("a", std::make_shared<Constant>(int64_t{ 1 })) }));
 	assert_generates_ast(program, expected_ast);
 }

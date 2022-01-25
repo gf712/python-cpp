@@ -45,6 +45,7 @@ namespace ast {
 	__AST_NODE_TYPE(Pass)               \
 	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
+	__AST_NODE_TYPE(Starred)            \
 	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Try)                \
 	__AST_NODE_TYPE(Tuple)              \
@@ -460,7 +461,7 @@ class Arguments : public ASTNode
 	std::vector<std::shared_ptr<Argument>> m_args;
 	std::vector<std::shared_ptr<Keyword>> m_kwargs;
 	std::shared_ptr<Argument> m_vararg;
-	std::shared_ptr<Keyword> m_kwarg;
+	std::shared_ptr<Argument> m_kwarg;
 	std::vector<std::shared_ptr<Constant>> m_kw_defaults;
 	std::vector<std::shared_ptr<Constant>> m_defaults;
 
@@ -471,6 +472,18 @@ class Arguments : public ASTNode
 		m_args = std::move(args);
 	}
 
+	Arguments(std::vector<std::shared_ptr<Argument>> args,
+		std::vector<std::shared_ptr<Keyword>> kwargs,
+		std::shared_ptr<Argument> vararg,
+		std::shared_ptr<Argument> kwarg)
+		: Arguments()
+	{
+		m_args = std::move(args);
+		m_kwargs = std::move(kwargs);
+		m_vararg = std::move(vararg);
+		m_kwarg = std::move(kwarg);
+	}
+
 	void print_this_node(const std::string &indent) const final;
 
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
@@ -479,7 +492,13 @@ class Arguments : public ASTNode
 	void push_kwarg(std::shared_ptr<Keyword> kwarg) { m_kwargs.push_back(std::move(kwarg)); }
 	std::vector<std::string> keyword_argument_names() const;
 
+	void set_arg(std::shared_ptr<Argument> arg) { m_vararg = std::move(arg); }
+	void set_kwarg(std::shared_ptr<Argument> arg) { m_kwarg = std::move(arg); }
+
 	const std::vector<std::shared_ptr<Argument>> &args() const { return m_args; }
+	const std::vector<std::shared_ptr<Keyword>> &kwargs() const { return m_kwargs; }
+	const std::shared_ptr<Argument> &vararg() const { return m_vararg; }
+	const std::shared_ptr<Argument> &kwarg() const { return m_kwarg; }
 
 	void codegen(CodeGenerator *) const override;
 };
@@ -521,19 +540,21 @@ class FunctionDefinition final : public ASTNode
 
 class Keyword : public ASTNode
 {
-	const std::string m_arg;
+	std::optional<std::string> m_arg;
 	std::shared_ptr<ASTNode> m_value;
 
   public:
+	Keyword(std::shared_ptr<ASTNode> value)
+		: ASTNode(ASTNodeType::Keyword), m_value(std::move(value))
+	{}
+
 	Keyword(std::string arg, std::shared_ptr<ASTNode> value)
-		: ASTNode(ASTNodeType::Keyword), m_arg(std::move(arg))
-	{
-		m_value = std::move(value);
-	}
+		: ASTNode(ASTNodeType::Keyword), m_arg(std::move(arg)), m_value(std::move(value))
+	{}
 
 	void print_this_node(const std::string &indent) const final;
 
-	const std::string &arg() const { return m_arg; }
+	const std::optional<std::string> &arg() const { return m_arg; }
 	std::shared_ptr<ASTNode> value() const { return m_value; }
 
 	void codegen(CodeGenerator *) const override;
@@ -1095,6 +1116,24 @@ class IfExpr : public ASTNode
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::shared_ptr<ASTNode> &body() const { return m_body; }
 	const std::shared_ptr<ASTNode> &orelse() const { return m_orelse; }
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class Starred : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_value;
+	ContextType m_ctx;
+
+  public:
+	Starred(std::shared_ptr<ASTNode> value, ContextType ctx)
+		: ASTNode(ASTNodeType::Starred), m_value(std::move(value)), m_ctx(ctx)
+	{}
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	ContextType ctx() const { return m_ctx; }
 	void codegen(CodeGenerator *) const override;
 
   private:

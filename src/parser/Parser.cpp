@@ -1092,7 +1092,7 @@ struct KwargsOrStarredPattern : Pattern<KwargsOrStarredPattern>
 	{
 		const auto token = p.lexer().peek_token(p.token_position());
 		std::string maybe_name{ p.lexer().get(token->start(), token->end()) };
-		DEBUG_LOG("kwarg_or_starred");
+		DEBUG_LOG("KwargsOrStarredPattern");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
 			SingleTokenPattern<Token::TokenType::EQUAL>,
 			ExpressionPattern>;
@@ -1105,6 +1105,61 @@ struct KwargsOrStarredPattern : Pattern<KwargsOrStarredPattern>
 	}
 };
 
+struct StarredExpressionPattern : Pattern<StarredExpressionPattern>
+{
+	// starred_expression:
+	//     | '*' expression
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("StarredExpressionPattern");
+
+		// '*' expression
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'*' expression");
+			const auto &arg = p.pop_back();
+			p.push_to_stack(std::make_shared<Starred>(arg, ContextType::LOAD));
+			return true;
+		}
+		return false;
+	}
+};
+
+struct KwargsOrDoubleStarredPattern : Pattern<KwargsOrDoubleStarredPattern>
+{
+	// kwarg_or_double_starred:
+	//     | NAME '=' expression
+	//     | '**' expression
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("KwargsOrDoubleStarredPattern")
+		auto token = p.lexer().peek_token(p.token_position());
+		std::string_view maybe_name{ token->start().pointer_to_program,
+			token->end().pointer_to_program };
+
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
+			SingleTokenPattern<Token::TokenType::EQUAL>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("NAME '=' expression")
+			auto expression = p.pop_back();
+			p.push_to_stack(std::make_shared<Keyword>(std::string(maybe_name), expression));
+			return true;
+		}
+
+		using pattern2 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESTAR>, ExpressionPattern>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("'**' expression")
+			auto expression = p.pop_back();
+			p.push_to_stack(std::make_shared<Keyword>(expression));
+			return true;
+		}
+
+		return false;
+	}
+};
 
 struct KwargsPattern : Pattern<KwargsPattern>
 {
@@ -1114,28 +1169,38 @@ struct KwargsPattern : Pattern<KwargsPattern>
 	//     | ','.kwarg_or_double_starred+
 	static bool matches_impl(Parser &p)
 	{
-		DEBUG_LOG("kwargs");
+		DEBUG_LOG("KwargsPattern")
+
+		// ','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+
+		using pattern1 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<KwargsOrStarredPattern,
+										  SingleTokenPattern<Token::TokenType::COMMA>>>,
+			SingleTokenPattern<Token::TokenType::COMMA>,
+			OneOrMorePattern<ApplyInBetweenPattern<KwargsOrDoubleStarredPattern,
+				SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+")
+			return true;
+		}
+
+		// ','.kwarg_or_starred+
 		using pattern2 = PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<KwargsOrStarredPattern,
 			SingleTokenPattern<Token::TokenType::COMMA>>>>;
 		if (pattern2::match(p)) {
-			DEBUG_LOG("','.kwarg_or_starred+");
+			DEBUG_LOG("','.kwarg_or_starred+")
+			return true;
+		}
+
+		// ','.kwarg_or_double_starred+
+		using pattern3 =
+			PatternMatch<OneOrMorePattern<ApplyInBetweenPattern<KwargsOrDoubleStarredPattern,
+				SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern3::match(p)) {
+			DEBUG_LOG("','.kwarg_or_double_starred+")
 			return true;
 		}
 		return false;
 	}
 };
-
-struct StarredExpressionPattern : Pattern<StarredExpressionPattern>
-{
-	// starred_expression:
-	//     | '*' expression
-	static bool matches_impl(Parser &)
-	{
-		DEBUG_LOG("StarredExpressionPattern");
-		return false;
-	}
-};
-
 
 struct ArgsPattern : Pattern<ArgsPattern>
 {
@@ -3008,11 +3073,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 		using pattern1 = PatternMatch<ParamPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("param ',' TYPE_COMMENT?");
-			auto arg = p.pop_back();
-			auto args = p.stack().back();
-			ASSERT(as<Arguments>(args));
-			ASSERT(as<Argument>(arg));
-			as<Arguments>(args)->push_arg(as<Argument>(arg));
+			ASSERT(as<Argument>(p.stack().back()));
 			return true;
 		}
 
@@ -3022,11 +3083,7 @@ struct ParamNoDefaultPattern : Pattern<ParamNoDefaultPattern>
 			PatternMatch<ParamPattern, LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("param TYPE_COMMENT? &')'");
-			auto arg = p.pop_back();
-			auto args = p.stack().back();
-			ASSERT(as<Arguments>(args));
-			ASSERT(as<Argument>(arg));
-			as<Arguments>(args)->push_arg(as<Argument>(arg));
+			ASSERT(as<Argument>(p.stack().back()));
 			return true;
 		}
 		return false;
@@ -3064,14 +3121,11 @@ struct ParamWithDefaultPattern : Pattern<ParamWithDefaultPattern>
 			PatternMatch<ParamPattern, DefaultPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		// param default ',' TYPE_COMMENT?
 		if (pattern1::match(p)) {
-			DEBUG_LOG("param ',' TYPE_COMMENT?");
+			DEBUG_LOG("param default ',' TYPE_COMMENT?");
 			auto default_ = p.pop_back();
 			auto arg = p.pop_back();
-			auto args = p.stack().back();
-			ASSERT(as<Arguments>(args));
 			ASSERT(as<Argument>(arg));
-			as<Arguments>(args)->push_kwarg(
-				std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
 			return true;
 		}
 
@@ -3080,20 +3134,181 @@ struct ParamWithDefaultPattern : Pattern<ParamWithDefaultPattern>
 			LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
 		// param default TYPE_COMMENT? &')'
 		if (pattern2::match(p)) {
-			DEBUG_LOG("param ',' TYPE_COMMENT?");
+			DEBUG_LOG("param default TYPE_COMMENT? &')'");
 			auto default_ = p.pop_back();
 			auto arg = p.pop_back();
-			auto args = p.stack().back();
-			ASSERT(as<Arguments>(args));
 			ASSERT(as<Argument>(arg));
-			as<Arguments>(args)->push_kwarg(
-				std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
 			return true;
 		}
 		return false;
 	}
 };
 
+struct ParamMaybeDefaultPattern : Pattern<ParamMaybeDefaultPattern>
+{
+	// param_maybe_default:
+	//     | param default? ',' TYPE_COMMENT?
+	//     | param default? TYPE_COMMENT? &')'
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		using pattern1 = PatternMatch<ParamPattern,
+			ZeroOrOnePattern<DefaultPattern>,
+			SingleTokenPattern<Token::TokenType::COMMA>>;
+		// param default? ',' TYPE_COMMENT?
+		if (pattern1::match(p)) {
+			DEBUG_LOG("param default? ',' TYPE_COMMENT?");
+			const bool has_default = p.stack().size() == 2;
+			auto default_ = [&]() -> std::shared_ptr<ASTNode> {
+				if (has_default) {
+					return p.pop_back();
+				} else {
+					return nullptr;
+				}
+			}();
+			auto arg = p.pop_back();
+			ASSERT(as<Argument>(arg));
+			if (has_default) {
+				scope.parent().push_back(
+					std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			} else {
+				scope.parent().push_back(arg);
+			}
+			return true;
+		}
+
+		using pattern2 = PatternMatch<ParamPattern,
+			ZeroOrOnePattern<DefaultPattern>,
+			LookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
+		// param default? TYPE_COMMENT? &')'
+		if (pattern2::match(p)) {
+			DEBUG_LOG("param default? TYPE_COMMENT? &')'");
+			const bool has_default = p.stack().size() == 2;
+			auto default_ = [&]() -> std::shared_ptr<ASTNode> {
+				if (has_default) {
+					return p.pop_back();
+				} else {
+					return nullptr;
+				}
+			}();
+			auto arg = p.pop_back();
+			ASSERT(as<Argument>(arg));
+			if (has_default) {
+				scope.parent().push_back(
+					std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			} else {
+				scope.parent().push_back(arg);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+
+struct KeywordsPattern : Pattern<KeywordsPattern>
+{
+	// kwds: '**' param_no_default
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("KeywordsPattern")
+		// '**' param_no_default
+		using pattern1 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESTAR>, ParamNoDefaultPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'**' param_no_default")
+			return true;
+		}
+		return false;
+	}
+};
+
+struct StarEtcPattern : Pattern<StarEtcPattern>
+{
+	// star_etc:
+	//     | '*' param_no_default param_maybe_default* [kwds]
+	//     | '*' ',' param_maybe_default+ [kwds]
+	//     | kwds
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		DEBUG_LOG("StarEtcPattern")
+		// '*' param_no_default param_maybe_default* [kwds]
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::STAR>,
+			ParamNoDefaultPattern,
+			ZeroOrMorePattern<ParamMaybeDefaultPattern>>;
+		if (pattern1::match(p)) {
+
+			DEBUG_LOG("'*' param_no_default param_maybe_default*")
+			auto &args = scope.parent().back();
+			ASSERT(as<Arguments>(args))
+			auto param_no_default = p.pop_front();
+			ASSERT(as<Argument>(param_no_default))
+			as<Arguments>(args)->set_arg(as<Argument>(param_no_default));
+			while (!p.stack().empty()) {
+				auto node = p.pop_front();
+				if (as<Argument>(node)) {
+					as<Arguments>(args)->push_arg(as<Argument>(node));
+				} else if (as<Keyword>(node)) {
+					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+				} else {
+					PARSER_ERROR();
+				}
+			}
+			using pattern1a = PatternMatch<KeywordsPattern>;
+			if (pattern1a::match(p)) {
+				DEBUG_LOG("'*' param_no_default param_maybe_default* [kwds]")
+				auto arg = p.pop_back();
+				ASSERT(as<Argument>(arg));
+				as<Arguments>(args)->set_kwarg(as<Argument>(arg));
+			}
+			return true;
+		}
+
+		// '*' ',' param_maybe_default+ [kwds]
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::STAR>,
+			SingleTokenPattern<Token::TokenType::COMMA>,
+			ZeroOrMorePattern<ParamMaybeDefaultPattern>,
+			ZeroOrOnePattern<KeywordsPattern>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("'*' ',' param_maybe_default+")
+			auto &args = scope.parent().back();
+			ASSERT(as<Arguments>(args))
+			while (!p.stack().empty()) {
+				auto node = p.pop_front();
+				if (as<Argument>(node)) {
+					as<Arguments>(args)->push_arg(as<Argument>(node));
+				} else if (as<Keyword>(node)) {
+					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+				} else {
+					PARSER_ERROR();
+				}
+			}
+			using pattern2a = PatternMatch<KeywordsPattern>;
+			if (pattern2a::match(p)) {
+				DEBUG_LOG("'*' ',' param_maybe_default+ [kwds]")
+				auto arg = p.pop_back();
+				ASSERT(as<Argument>(arg));
+				as<Arguments>(args)->set_kwarg(as<Argument>(arg));
+			}
+			return true;
+		}
+
+		// kwds
+		using pattern3 = PatternMatch<KeywordsPattern>;
+		if (pattern3::match(p)) {
+			DEBUG_LOG("kwds")
+			auto &args = scope.parent().back();
+			ASSERT(as<Arguments>(args))
+			auto arg = p.pop_back();
+			ASSERT(as<Argument>(arg));
+			as<Arguments>(args)->set_kwarg(as<Argument>(arg));
+			return true;
+		}
+
+		return false;
+	}
+};
 
 struct ParametersPattern : Pattern<ParametersPattern>
 {
@@ -3106,11 +3321,38 @@ struct ParametersPattern : Pattern<ParametersPattern>
 	static bool matches_impl(Parser &p)
 	{
 		p.push_to_stack(std::make_shared<Arguments>());
+		size_t stack_size = p.stack().size();
+		auto &args = p.stack().back();
+
+		// param_no_default+ param_with_default* [star_etc]
 		using pattern3 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>,
 			ZeroOrMorePattern<ParamWithDefaultPattern>>;
 		if (pattern3::match(p)) {
-			DEBUG_LOG("param_no_default+ param_with_default* [star_etc]");
-			// p.push_to_stack();
+			DEBUG_LOG("param_no_default+ param_with_default*");
+			PRINT_STACK();
+			for (size_t idx = stack_size; idx < p.stack().size(); ++idx) {
+				auto node = p.stack()[idx];
+				if (as<Argument>(node)) {
+					as<Arguments>(args)->push_arg(as<Argument>(node));
+				} else if (as<Keyword>(node)) {
+					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+				} else {
+					PARSER_ERROR();
+				}
+			}
+			while (p.stack().size() > stack_size) { p.pop_back(); }
+			using pattern3a = PatternMatch<StarEtcPattern>;
+			if (pattern3a::match(p)) {
+				DEBUG_LOG("param_no_default+ param_with_default* [star_etc]");
+			}
+			PRINT_STACK();
+			return true;
+		}
+
+		// star_etc
+		using pattern5 = PatternMatch<StarEtcPattern>;
+		if (pattern5::match(p)) {
+			DEBUG_LOG("star_etc");
 			PRINT_STACK();
 			return true;
 		}

@@ -129,12 +129,18 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 
 void BytecodeGenerator::visit(const Arguments *node)
 {
+	if (!node->kwargs().empty()) { TODO(); }
+	if (node->vararg()) { TODO(); }
+	if (node->kwarg()) { TODO(); }
+
 	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
 
 	m_last_register = Register{};
 }
 
 void BytecodeGenerator::visit(const Argument *) { m_last_register = Register{}; }
+
+void BytecodeGenerator::visit(const Starred *) { TODO(); }
 
 void BytecodeGenerator::visit(const Return *node)
 {
@@ -202,7 +208,9 @@ void BytecodeGenerator::visit(const Call *node)
 
 	for (const auto &keyword : node->keywords()) {
 		keyword_registers.push_back(generate(keyword.get(), m_function_id));
-		keywords.push_back(keyword->arg());
+		auto keyword_argname = keyword->arg();
+		if (!keyword_argname.has_value()) { TODO(); }
+		keywords.push_back(*keyword_argname);
 	}
 
 	if (node->function()->node_type() == ASTNodeType::Attribute) {
@@ -434,7 +442,9 @@ void BytecodeGenerator::visit(const ClassDefinition *node)
 	}
 	for (const auto &keyword : node->keywords()) {
 		kwarg_registers.push_back(generate(keyword.get(), m_function_id));
-		keyword_names.push_back(keyword->arg());
+		auto keyword_argname = keyword->arg();
+		if (!keyword_argname.has_value()) { TODO(); }
+		keyword_names.push_back(*keyword_argname);
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);
