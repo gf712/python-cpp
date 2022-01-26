@@ -2546,6 +2546,9 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 	//     | '//='
 	static bool matches_impl(Parser &p)
 	{
+		DEBUG_LOG("AugAssignPattern")
+
+		// '+='
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUSEQUAL>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'+='");
@@ -2553,6 +2556,17 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 			// defer rhs assignment to caller. Am I shooting myself in the foot?
 			// at least a null dereference goes with a bang...
 			p.push_to_stack(std::make_shared<AugAssign>(lhs, BinaryOpType::PLUS, nullptr));
+			return true;
+		}
+
+		// '-='
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::MINEQUAL>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("'-='");
+			const auto &lhs = p.pop_back();
+			// defer rhs assignment to caller. Am I shooting myself in the foot?
+			// at least a null dereference goes with a bang...
+			p.push_to_stack(std::make_shared<AugAssign>(lhs, BinaryOpType::MINUS, nullptr));
 			return true;
 		}
 
