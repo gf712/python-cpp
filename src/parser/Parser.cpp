@@ -2423,6 +2423,55 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 	}
 };
 
+struct SingleSubscriptAttributeTargetPattern : Pattern<SingleSubscriptAttributeTargetPattern>
+{
+	// single_subscript_attribute_target:
+	//     | t_primary '.' NAME !t_lookahead
+	//     | t_primary '[' slices ']' !t_lookahead
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("SingleSubscriptAttributeTargetPattern");
+
+		// t_primary '.' NAME !t_lookahead
+		using pattern1 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("t_primary '.' NAME !t_lookahead");
+			const auto token = p.lexer().peek_token(p.token_position() - 1);
+			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
+			const auto primary = p.pop_back();
+			DEBUG_LOG("{}", name);
+			primary->print_node("");
+			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
+			p.push_to_stack(attribute);
+			return true;
+		}
+
+		// t_primary '[' slices ']' !t_lookahead
+		using pattern2 = PatternMatch<TPrimaryPattern,
+			SingleTokenPattern<Token::TokenType::LSQB>,
+			SlicesPattern,
+			SingleTokenPattern<Token::TokenType::RSQB>,
+			NegativeLookAhead<TLookahead>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
+			auto subscript = p.pop_back();
+			auto name = p.pop_back();
+			ASSERT(as<Subscript>(subscript))
+			ASSERT(as<Name>(name))
+			as<Name>(name)->set_context(ContextType::LOAD);
+			as<Subscript>(subscript)->set_value(name);
+			as<Subscript>(subscript)->set_context(ContextType::STORE);
+			p.push_to_stack(subscript);
+			return true;
+		}
+
+		return false;
+	}
+};
+
 
 struct SingleTargetPattern : Pattern<SingleTargetPattern>
 {
@@ -2433,6 +2482,12 @@ struct SingleTargetPattern : Pattern<SingleTargetPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("SingleTargetPattern");
+		using pattern1 = PatternMatch<SingleSubscriptAttributeTargetPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("single_subscript_attribute_target");
+			return true;
+		}
+
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("NAME");

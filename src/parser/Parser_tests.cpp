@@ -1952,3 +1952,30 @@ TEST(Parser, ComplexArgsKwargsFunctionCall)
 			std::make_shared<Keyword>("a", std::make_shared<Constant>(int64_t{ 1 })) }));
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, AugAssignAttribute)
+{
+	constexpr std::string_view program = "a.b += 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<AugAssign>(
+		std::make_shared<Attribute>(
+			std::make_shared<Name>("a", ContextType::LOAD), "b", ContextType::STORE),
+		BinaryOpType::PLUS,
+		std::make_shared<Constant>(int64_t{ 1 })));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, AugAssignSlices)
+{
+	constexpr std::string_view program = "a['b'] += 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<AugAssign>(
+		std::make_shared<Subscript>(std::make_shared<Name>("a", ContextType::LOAD),
+			Subscript::Index{ .value = std::make_shared<Constant>("b") },
+			ContextType::STORE),
+		BinaryOpType::PLUS,
+		std::make_shared<Constant>(int64_t{ 1 })));
+	assert_generates_ast(program, expected_ast);
+}
