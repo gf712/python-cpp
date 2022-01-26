@@ -508,7 +508,7 @@ class FunctionDefinition final : public ASTNode
 	const std::string m_function_name;
 	const std::shared_ptr<Arguments> m_args;
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
-	const std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
+	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 	const std::shared_ptr<ASTNode> m_returns;
 	std::string m_type_comment;
 
@@ -533,6 +533,11 @@ class FunctionDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
+
+	void add_decorator(std::shared_ptr<ASTNode> decorator)
+	{
+		m_decorator_list.push_back(std::move(decorator));
+	}
 
 	void codegen(CodeGenerator *) const override;
 };
@@ -567,7 +572,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> m_bases;
 	const std::vector<std::shared_ptr<Keyword>> m_keywords;
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
-	const std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
+	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 
 	void print_this_node(const std::string &indent) const final;
 
@@ -587,6 +592,11 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
+
+	void add_decorator(std::shared_ptr<ASTNode> decorator)
+	{
+		m_decorator_list.push_back(std::move(decorator));
+	}
 
 	void codegen(CodeGenerator *) const override;
 };

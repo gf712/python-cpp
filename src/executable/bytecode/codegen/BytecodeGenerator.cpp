@@ -99,6 +99,7 @@ void BytecodeGenerator::visit(const BinaryExpr *node)
 
 void BytecodeGenerator::visit(const FunctionDefinition *node)
 {
+	if (!node->decorator_list().empty()) { TODO(); }
 	m_ctx.push_local_args(node->args());
 	auto this_function_info = allocate_function();
 
@@ -397,6 +398,8 @@ void BytecodeGenerator::visit(const Tuple *node)
 
 void BytecodeGenerator::visit(const ClassDefinition *node)
 {
+	if (!node->decorator_list().empty()) { TODO(); }
+
 	size_t class_id;
 	{
 		auto this_class_info = allocate_function();

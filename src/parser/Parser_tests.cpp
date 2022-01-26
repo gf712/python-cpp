@@ -39,6 +39,8 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 				if (auto *bool_result = std::get_if<bool>(&name_constant_value.value)) {
 					ASSERT_EQ(
 						*bool_result, std::get<bool>(std::get<NameConstant>(expected_value).value));
+				} else if (std::holds_alternative<NoneType>(name_constant_value.value)) {
+					ASSERT_TRUE(std::holds_alternative<NoneType>(name_constant_value.value));
 				} else {
 					TODO();
 				}
@@ -692,6 +694,11 @@ void compare_starred(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
+void compare_pass(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Pass);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -825,6 +832,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Starred: {
 		compare_starred(result, expected);
+		break;
+	}
+	case ASTNodeType::Pass: {
+		compare_pass(result, expected);
 		break;
 	}
 	default: {
@@ -1977,5 +1988,52 @@ TEST(Parser, AugAssignSlices)
 			ContextType::STORE),
 		BinaryOpType::PLUS,
 		std::make_shared<Constant>(int64_t{ 1 })));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithDecoratorList)
+{
+	constexpr std::string_view program =
+		"@classmethod\n"
+		"@_require_frozen\n"
+		"def get_source(cls):\n"
+		"  return None\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("get_source",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{
+			std::make_shared<Argument>("cls", nullptr, ""),
+		}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Return>(std::make_shared<Constant>(NoneType{})),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("classmethod", ContextType::LOAD),
+			std::make_shared<Name>("_require_frozen", ContextType::LOAD),
+		},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ClassDefinitionWithDecoratorList)
+{
+	constexpr std::string_view program =
+		"@my_decorator\n"
+		"class Derived(Base):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<ClassDefinition>("Derived",// class_name
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("Base", ContextType::LOAD),
+		},// bases
+		std::vector<std::shared_ptr<Keyword>>{},// keyword
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>() },// body
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("my_decorator", ContextType::LOAD),
+		}// decorator_list
+		));
 	assert_generates_ast(program, expected_ast);
 }

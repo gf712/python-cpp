@@ -3559,6 +3559,25 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 	}
 };
 
+struct DecoratorsPattern : Pattern<DecoratorsPattern>
+{
+	// decorators: ('@' named_expression NEWLINE )+
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("DecoratorsPattern")
+
+		// ('@' named_expression NEWLINE )+
+		using pattern1 = PatternMatch<OneOrMorePattern<SingleTokenPattern<Token::TokenType::AT>,
+			NamedExpressionPattern,
+			SingleTokenPattern<Token::TokenType::NEWLINE>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("('@' named_expression NEWLINE )+")
+			return true;
+		}
+
+		return false;
+	}
+};
 
 struct FunctionDefinitionStatementPattern : Pattern<FunctionDefinitionStatementPattern>
 {
@@ -3567,10 +3586,27 @@ struct FunctionDefinitionStatementPattern : Pattern<FunctionDefinitionStatementP
 	//     | function_def_raw
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
+		// decorators function_def_raw
+		using pattern1 = PatternMatch<DecoratorsPattern, FunctionDefinitionRawStatement>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("decorators function_def_raw");
+			ASSERT(p.stack().size() > 1)
+			auto function = p.pop_back();
+			ASSERT(as<FunctionDefinition>(function))
+			while (!p.stack().empty()) {
+				as<FunctionDefinition>(function)->add_decorator(p.pop_front());
+			}
+			scope.parent().push_back(function);
+			return true;
+		}
+
 		// function_def_raw
 		using pattern2 = PatternMatch<FunctionDefinitionRawStatement>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("function_def_raw");
+			ASSERT(p.stack().size() == 1)
+			scope.parent().push_back(p.pop_back());
 			return true;
 		}
 		return false;
@@ -3744,10 +3780,27 @@ struct ClassDefinitionPattern : Pattern<ClassDefinitionPattern>
 	//     | class_def_raw
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
+		// decorators class_def_raw
+		using pattern1 = PatternMatch<DecoratorsPattern, ClassDefinitionRawPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("decorators class_def_raw");
+			ASSERT(p.stack().size() > 1)
+			auto class_definition = p.pop_back();
+			ASSERT(as<ClassDefinition>(class_definition))
+			while (!p.stack().empty()) {
+				as<ClassDefinition>(class_definition)->add_decorator(p.pop_front());
+			}
+			scope.parent().push_back(class_definition);
+			return true;
+		}
+
 		// class_def_raw
 		using pattern2 = PatternMatch<ClassDefinitionRawPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("class_def_raw");
+			ASSERT(p.stack().size() == 1)
+			scope.parent().push_back(p.pop_back());
 			return true;
 		}
 		return false;
