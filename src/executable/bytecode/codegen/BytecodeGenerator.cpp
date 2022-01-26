@@ -130,7 +130,7 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 
 void BytecodeGenerator::visit(const Arguments *node)
 {
-	if (!node->kwargs().empty()) { TODO(); }
+	if (!node->kwonlyargs().empty()) { TODO(); }
 	if (node->vararg()) { TODO(); }
 	if (node->kwarg()) { TODO(); }
 

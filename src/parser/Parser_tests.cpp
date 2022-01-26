@@ -598,16 +598,23 @@ void compare_arguments(const std::shared_ptr<ASTNode> &result,
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Arguments);
 
+	const auto result_posonlyargs = as<Arguments>(result)->posonlyargs();
+	const auto expected_posonlyargs = as<Arguments>(expected)->posonlyargs();
+	ASSERT_EQ(result_posonlyargs.size(), expected_posonlyargs.size());
+	for (size_t i = 0; i < result_posonlyargs.size(); ++i) {
+		dispatch(result_posonlyargs[i], expected_posonlyargs[i]);
+	}
+
 	const auto result_args = as<Arguments>(result)->args();
 	const auto expected_args = as<Arguments>(expected)->args();
 	ASSERT_EQ(result_args.size(), expected_args.size());
 	for (size_t i = 0; i < result_args.size(); ++i) { dispatch(result_args[i], expected_args[i]); }
 
-	const auto result_kwargs = as<Arguments>(result)->kwargs();
-	const auto expected_kwargs = as<Arguments>(expected)->kwargs();
-	ASSERT_EQ(result_kwargs.size(), expected_kwargs.size());
-	for (size_t i = 0; i < result_kwargs.size(); ++i) {
-		dispatch(result_kwargs[i], expected_kwargs[i]);
+	const auto result_kwonlyargs = as<Arguments>(result)->kwonlyargs();
+	const auto expected_kwonlyargs = as<Arguments>(expected)->kwonlyargs();
+	ASSERT_EQ(result_kwonlyargs.size(), expected_kwonlyargs.size());
+	for (size_t i = 0; i < result_kwonlyargs.size(); ++i) {
+		dispatch(result_kwonlyargs[i], expected_kwonlyargs[i]);
 	}
 
 	const auto result_vararg = as<Arguments>(result)->vararg();
@@ -617,6 +624,20 @@ void compare_arguments(const std::shared_ptr<ASTNode> &result,
 	const auto result_kwarg = as<Arguments>(result)->kwarg();
 	const auto expected_kwarg = as<Arguments>(expected)->kwarg();
 	dispatch(result_kwarg, expected_kwarg);
+
+	const auto result_kw_defaults = as<Arguments>(result)->kw_defaults();
+	const auto expected_kw_defaults = as<Arguments>(expected)->kw_defaults();
+	ASSERT_EQ(result_kw_defaults.size(), expected_kw_defaults.size());
+	for (size_t i = 0; i < result_kw_defaults.size(); ++i) {
+		dispatch(result_kw_defaults[i], expected_kw_defaults[i]);
+	}
+
+	const auto result_defaults = as<Arguments>(result)->defaults();
+	const auto expected_defaults = as<Arguments>(expected)->defaults();
+	ASSERT_EQ(result_defaults.size(), expected_defaults.size());
+	for (size_t i = 0; i < result_defaults.size(); ++i) {
+		dispatch(result_defaults[i], expected_defaults[i]);
+	}
 }
 
 void compare_argument(const std::shared_ptr<ASTNode> &result,
@@ -1911,9 +1932,12 @@ TEST(Parser, ArgsKwargsFunctionDef)
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("foo",
 		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<Keyword>>{},
+			std::vector<std::shared_ptr<Argument>>{},
 			std::make_shared<Argument>("args", nullptr, ""),
-			std::make_shared<Argument>("kwargs", nullptr, "")),
+			std::vector<std::shared_ptr<Argument>>{},
+			std::vector<std::shared_ptr<ast::ASTNode>>{},
+			std::make_shared<Argument>("kwargs", nullptr, ""),
+			std::vector<std::shared_ptr<ast::ASTNode>>{}),
 		std::vector<std::shared_ptr<ast::ASTNode>>{
 			std::make_shared<Return>(std::make_shared<Constant>(int64_t{ 1 })) },
 		std::vector<std::shared_ptr<ast::ASTNode>>{},
@@ -2068,5 +2092,121 @@ TEST(Parser, NamedExpression)
 			std::make_shared<Constant>(int64_t{ 1 })),
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>() },
 		std::vector<std::shared_ptr<ASTNode>>{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithDefaultKeyword)
+{
+	constexpr std::string_view program =
+		"def f(a, b=1):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, ""),
+				std::make_shared<Argument>("b", nullptr, ""),
+			},
+			nullptr,
+			std::vector<std::shared_ptr<ast::Argument>>{},
+			std::vector<std::shared_ptr<ASTNode>>{},
+			nullptr,
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }) }),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithKeywordOnlyArg)
+{
+	constexpr std::string_view program =
+		"def f(a, *, b=1):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, ""),
+			},
+			nullptr,
+			std::vector{ std::make_shared<ast::Argument>("b", nullptr, "") },
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 1 }) },
+			nullptr,
+			std::vector<std::shared_ptr<ASTNode>>{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArg)
+{
+	constexpr std::string_view program =
+		"def f(a, b=1, *, c=2, **kwargs):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, ""),
+				std::make_shared<Argument>("b", nullptr, ""),
+			},
+			nullptr,
+			std::vector{ std::make_shared<ast::Argument>("c", nullptr, "") },
+			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(int64_t{ 2 }) },
+			std::make_shared<Argument>("kwargs", nullptr, ""),
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }) }),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
+{
+	constexpr std::string_view program =
+		"def f(a, b=1, *, c, d, **kwargs):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, ""),
+				std::make_shared<Argument>("b", nullptr, ""),
+			},
+			nullptr,
+			std::vector{ std::make_shared<ast::Argument>("c", nullptr, ""),
+				std::make_shared<ast::Argument>("d", nullptr, "") },
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(NoneType{}), std::make_shared<Constant>(NoneType{}) },
+			std::make_shared<Argument>("kwargs", nullptr, ""),
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(int64_t{ 1 }) }),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		""// type_comment
+		));
 	assert_generates_ast(program, expected_ast);
 }

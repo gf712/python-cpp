@@ -131,16 +131,22 @@ std::vector<std::string> Arguments::argument_names() const
 void Arguments::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Arguments", indent);
-	spdlog::debug("{}  - args:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
-	for (const auto &arg : m_args) { arg->print_node(new_indent); }
-	spdlog::debug("{}  - kwargs:", indent);
-	for (const auto &kwarg : m_kwargs) { kwarg->print_node(new_indent); }
 
+	spdlog::debug("{}  - posonlyarg:", indent);
+	for (const auto &arg : m_posonlyargs) { arg->print_node(new_indent); }
+	spdlog::debug("{}  - args:", indent);
+	for (const auto &arg : m_args) { arg->print_node(new_indent); }
 	spdlog::debug("{}  - vararg:", indent);
 	if (m_vararg) { m_vararg->print_node(new_indent); }
+	spdlog::debug("{}  - kwonlyargs:", indent);
+	for (const auto &kwarg : m_kwonlyargs) { kwarg->print_node(new_indent); }
+	spdlog::debug("{}  - kw_defaults:", indent);
+	for (const auto &arg : m_kw_defaults) { arg->print_node(new_indent); }
 	spdlog::debug("{}  - kwarg:", indent);
 	if (m_kwarg) { m_kwarg->print_node(new_indent); }
+	spdlog::debug("{}  - defaults:", indent);
+	for (const auto &arg : m_defaults) { arg->print_node(new_indent); }
 }
 
 void FunctionDefinition::print_this_node(const std::string &indent) const

@@ -1084,7 +1084,7 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 			DEBUG_LOG("NAME ':=' ~ expression");
 			const std::string name{ maybe_name };
 			auto target = std::make_shared<Name>(name, ContextType::STORE);
-			const auto& value = p.pop_back();
+			const auto &value = p.pop_back();
 			p.push_to_stack(std::make_shared<NamedExpr>(target, value));
 			return true;
 		}
@@ -3321,9 +3321,12 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 			while (!p.stack().empty()) {
 				auto node = p.pop_front();
 				if (as<Argument>(node)) {
-					as<Arguments>(args)->push_arg(as<Argument>(node));
+					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
+					as<Arguments>(args)->push_kwarg_default(std::make_shared<Constant>(NoneType{}));
 				} else if (as<Keyword>(node)) {
-					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					as<Arguments>(args)->push_kwonlyarg(arg);
+					as<Arguments>(args)->push_kwarg_default(as<Keyword>(node)->value());
 				} else {
 					PARSER_ERROR();
 				}
@@ -3341,8 +3344,7 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 		// '*' ',' param_maybe_default+ [kwds]
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::STAR>,
 			SingleTokenPattern<Token::TokenType::COMMA>,
-			ZeroOrMorePattern<ParamMaybeDefaultPattern>,
-			ZeroOrOnePattern<KeywordsPattern>>;
+			ZeroOrMorePattern<ParamMaybeDefaultPattern>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'*' ',' param_maybe_default+")
 			auto &args = scope.parent().back();
@@ -3350,9 +3352,12 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 			while (!p.stack().empty()) {
 				auto node = p.pop_front();
 				if (as<Argument>(node)) {
-					as<Arguments>(args)->push_arg(as<Argument>(node));
+					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
+					as<Arguments>(args)->push_kwarg_default(std::make_shared<Constant>(NoneType{}));
 				} else if (as<Keyword>(node)) {
-					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					as<Arguments>(args)->push_kwonlyarg(arg);
+					as<Arguments>(args)->push_kwarg_default(as<Keyword>(node)->value());
 				} else {
 					PARSER_ERROR();
 				}
@@ -3408,7 +3413,9 @@ struct ParametersPattern : Pattern<ParametersPattern>
 				if (as<Argument>(node)) {
 					as<Arguments>(args)->push_arg(as<Argument>(node));
 				} else if (as<Keyword>(node)) {
-					as<Arguments>(args)->push_kwarg(as<Keyword>(node));
+					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					as<Arguments>(args)->push_arg(arg);
+					as<Arguments>(args)->push_default(as<Keyword>(node)->value());
 				} else {
 					PARSER_ERROR();
 				}

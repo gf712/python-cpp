@@ -460,11 +460,11 @@ class Arguments : public ASTNode
 {
 	std::vector<std::shared_ptr<Argument>> m_posonlyargs;
 	std::vector<std::shared_ptr<Argument>> m_args;
-	std::vector<std::shared_ptr<Keyword>> m_kwargs;
 	std::shared_ptr<Argument> m_vararg;
+	std::vector<std::shared_ptr<Argument>> m_kwonlyargs;
+	std::vector<std::shared_ptr<ASTNode>> m_kw_defaults;
 	std::shared_ptr<Argument> m_kwarg;
-	std::vector<std::shared_ptr<Constant>> m_kw_defaults;
-	std::vector<std::shared_ptr<Constant>> m_defaults;
+	std::vector<std::shared_ptr<ASTNode>> m_defaults;
 
   public:
 	Arguments() : ASTNode(ASTNodeType::Arguments) {}
@@ -473,16 +473,22 @@ class Arguments : public ASTNode
 		m_args = std::move(args);
 	}
 
-	Arguments(std::vector<std::shared_ptr<Argument>> args,
-		std::vector<std::shared_ptr<Keyword>> kwargs,
+	Arguments(std::vector<std::shared_ptr<Argument>> posonlyargs,
+		std::vector<std::shared_ptr<Argument>> args,
 		std::shared_ptr<Argument> vararg,
-		std::shared_ptr<Argument> kwarg)
+		std::vector<std::shared_ptr<Argument>> kwonlyargs,
+		std::vector<std::shared_ptr<ASTNode>> kw_defaults,
+		std::shared_ptr<Argument> kwarg,
+		std::vector<std::shared_ptr<ASTNode>> defaults)
 		: Arguments()
 	{
+		m_posonlyargs = std::move(posonlyargs);
 		m_args = std::move(args);
-		m_kwargs = std::move(kwargs);
 		m_vararg = std::move(vararg);
+		m_kwonlyargs = std::move(kwonlyargs);
+		m_kw_defaults = std::move(kw_defaults);
 		m_kwarg = std::move(kwarg);
+		m_defaults = std::move(defaults);
 	}
 
 	void print_this_node(const std::string &indent) const final;
@@ -490,16 +496,29 @@ class Arguments : public ASTNode
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
 
-	void push_kwarg(std::shared_ptr<Keyword> kwarg) { m_kwargs.push_back(std::move(kwarg)); }
+	void push_kwonlyarg(std::shared_ptr<Argument> kwarg) { m_kwonlyargs.push_back(std::move(kwarg)); }
 	std::vector<std::string> keyword_argument_names() const;
+
+	void push_default(std::shared_ptr<ASTNode> default_value)
+	{
+		m_defaults.push_back(std::move(default_value));
+	}
+
+	void push_kwarg_default(std::shared_ptr<ASTNode> default_value)
+	{
+		m_kw_defaults.push_back(std::move(default_value));
+	}
 
 	void set_arg(std::shared_ptr<Argument> arg) { m_vararg = std::move(arg); }
 	void set_kwarg(std::shared_ptr<Argument> arg) { m_kwarg = std::move(arg); }
 
+	const std::vector<std::shared_ptr<Argument>> &posonlyargs() const { return m_posonlyargs; }
 	const std::vector<std::shared_ptr<Argument>> &args() const { return m_args; }
-	const std::vector<std::shared_ptr<Keyword>> &kwargs() const { return m_kwargs; }
 	const std::shared_ptr<Argument> &vararg() const { return m_vararg; }
+	const std::vector<std::shared_ptr<Argument>> &kwonlyargs() const { return m_kwonlyargs; }
+	const std::vector<std::shared_ptr<ASTNode>> &kw_defaults() const { return m_kw_defaults; }
 	const std::shared_ptr<Argument> &kwarg() const { return m_kwarg; }
+	const std::vector<std::shared_ptr<ASTNode>> &defaults() const { return m_defaults; }
 
 	void codegen(CodeGenerator *) const override;
 };
