@@ -1071,7 +1071,25 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("NamedExpressionPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		const auto token = p.lexer().peek_token(p.token_position());
+		DEBUG_LOG("{}", token->to_string());
+		std::string_view maybe_name{ token->start().pointer_to_program,
+			token->end().pointer_to_program };
+
+		// NAME ':=' ~ expression
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
+			SingleTokenPattern<Token::TokenType::COLONEQUAL>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("NAME ':=' ~ expression");
+			const std::string name{ maybe_name };
+			auto target = std::make_shared<Name>(name, ContextType::STORE);
+			const auto& value = p.pop_back();
+			p.push_to_stack(std::make_shared<NamedExpr>(target, value));
+			return true;
+		}
+
+		// expression !':='
 		using pattern2 = PatternMatch<ExpressionPattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COLONEQUAL>>>;
 		if (pattern2::match(p)) {
@@ -3824,7 +3842,7 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>,
 				BlockPattern>;
 		if (pattern1::match(p)) {
-			DEBUG_LOG("for_stmt");
+			DEBUG_LOG("'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block");
 			std::vector<std::shared_ptr<ASTNode>> orelse;
 			{
 				BlockScope else_scope{ p };

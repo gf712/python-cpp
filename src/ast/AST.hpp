@@ -41,6 +41,7 @@ namespace ast {
 	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
+	__AST_NODE_TYPE(NamedExpr)          \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Pass)               \
 	__AST_NODE_TYPE(Raise)              \
@@ -1144,6 +1145,24 @@ class Starred : public ASTNode
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	ContextType ctx() const { return m_ctx; }
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class NamedExpr : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_target;
+	std::shared_ptr<ASTNode> m_value;
+
+  public:
+	NamedExpr(std::shared_ptr<ASTNode> target, std::shared_ptr<ASTNode> value)
+		: ASTNode(ASTNodeType::NamedExpr), m_target(std::move(target)), m_value(std::move(value))
+	{}
+
+	const std::shared_ptr<ASTNode> &target() const { return m_target; }
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	void codegen(CodeGenerator *) const override;
 
   private:

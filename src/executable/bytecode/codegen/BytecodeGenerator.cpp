@@ -744,6 +744,8 @@ void BytecodeGenerator::visit(const Assert *node)
 
 void BytecodeGenerator::visit(const Pass *) { m_last_register = Register{}; }
 
+void BytecodeGenerator::visit(const NamedExpr *) { TODO(); }
+
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)
 	: function_id(function_id_), function(f), generator(generator_)
 {

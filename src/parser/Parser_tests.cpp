@@ -699,6 +699,20 @@ void compare_pass(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	ASSERT_EQ(result->node_type(), ASTNodeType::Pass);
 }
 
+void compare_named_expression(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::NamedExpr);
+
+	const auto result_target = as<NamedExpr>(result)->target();
+	const auto expected_target = as<NamedExpr>(expected)->target();
+	dispatch(result_target, expected_target);
+
+	const auto result_value = as<NamedExpr>(result)->value();
+	const auto expected_value = as<NamedExpr>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -836,6 +850,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Pass: {
 		compare_pass(result, expected);
+		break;
+	}
+	case ASTNodeType::NamedExpr: {
+		compare_named_expression(result, expected);
 		break;
 	}
 	default: {
@@ -2035,5 +2053,20 @@ TEST(Parser, ClassDefinitionWithDecoratorList)
 			std::make_shared<Name>("my_decorator", ContextType::LOAD),
 		}// decorator_list
 		));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, NamedExpression)
+{
+	constexpr std::string_view program =
+		"if a:=1:\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<If>(
+		std::make_shared<NamedExpr>(std::make_shared<Name>("a", ContextType::STORE),
+			std::make_shared<Constant>(int64_t{ 1 })),
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>() },
+		std::vector<std::shared_ptr<ASTNode>>{}));
 	assert_generates_ast(program, expected_ast);
 }

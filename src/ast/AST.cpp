@@ -461,4 +461,14 @@ void Starred::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - context: ", indent, m_ctx);
 }
 
+void NamedExpr::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}NamedExpr", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - target", indent);
+	m_target->print_node(new_indent);
+	spdlog::debug("{}  - value: ", indent);
+	m_value->print_node(new_indent);
+}
+
 }// namespace ast
