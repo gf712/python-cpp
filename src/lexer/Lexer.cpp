@@ -59,8 +59,8 @@ bool Lexer::read_more_tokens_loop()
 	if (try_read_indent()) { return true; }
 	if (try_read_newline()) { return true; }
 	try_read_space();
-	if (try_read_name()) { return true; }
 	if (try_read_string()) { return true; }
+	if (try_read_name()) { return true; }
 	if (try_read_operation()) { return true; }
 	if (try_read_number()) { return true; }
 	return false;
@@ -434,6 +434,8 @@ bool Lexer::try_read_number()
 bool Lexer::try_read_string()
 {
 	const Position original_position = m_position;
+
+	if ((peek(0) == 'f' || peek(0) == 'F') && (peek(1) == '\'' || peek(1) == '\"')) { advance(1); }
 
 	auto is_triple_quote = [this]() {
 		return (peek(0) == '\"' || peek(0) == '\'') && (peek(1) == '\"' || peek(1) == '\'')

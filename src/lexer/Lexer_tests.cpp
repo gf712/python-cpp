@@ -676,3 +676,23 @@ TEST(Lexer, MultiLineStrings)
 	};
 	assert_generates_tokens(program, expected_tokens);
 }
+
+TEST(Lexer, FString)
+{
+	constexpr std::string_view program =
+		"a = 1\n"
+		"b = f\"a={a}\"\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::STRING,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER,
+	};
+	assert_generates_tokens(program, expected_tokens);
+}
