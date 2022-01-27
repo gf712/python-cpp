@@ -446,6 +446,16 @@ void With::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - type_comment: ", indent, m_type_comment);
 }
 
+void WithItem::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}WithItem", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - context_expr", indent);
+	m_context_expr->print_node(new_indent);
+	spdlog::debug("{}  - optional_vars: ", indent);
+	if (m_optional_vars) { m_optional_vars->print_node(new_indent); }
+}
+
 void IfExpr::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}IfExpr", indent);

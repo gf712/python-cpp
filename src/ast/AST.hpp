@@ -52,7 +52,8 @@ namespace ast {
 	__AST_NODE_TYPE(Tuple)              \
 	__AST_NODE_TYPE(UnaryExpr)          \
 	__AST_NODE_TYPE(While)              \
-	__AST_NODE_TYPE(With)
+	__AST_NODE_TYPE(With)               \
+	__AST_NODE_TYPE(WithItem)
 
 
 enum class ASTNodeType {
@@ -1106,21 +1107,41 @@ class Delete : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 };
 
+class WithItem : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_context_expr;
+	std::shared_ptr<ASTNode> m_optional_vars;
+
+  public:
+	WithItem(std::shared_ptr<ASTNode> context_expr, std::shared_ptr<ASTNode> optional_vars)
+		: ASTNode(ASTNodeType::WithItem), m_context_expr(std::move(context_expr)),
+		  m_optional_vars(std::move(optional_vars))
+	{}
+
+	const std::shared_ptr<ASTNode> &context_expr() const { return m_context_expr; }
+	const std::shared_ptr<ASTNode> &optional_vars() const { return m_optional_vars; }
+
+	void codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
 class With : public ASTNode
 {
-	std::vector<std::shared_ptr<ASTNode>> m_items;
+	std::vector<std::shared_ptr<WithItem>> m_items;
 	std::vector<std::shared_ptr<ASTNode>> m_body;
 	const std::string m_type_comment;
 
   public:
-	With(std::vector<std::shared_ptr<ASTNode>> items,
+	With(std::vector<std::shared_ptr<WithItem>> items,
 		std::vector<std::shared_ptr<ASTNode>> body,
 		std::string type_comment)
 		: ASTNode(ASTNodeType::With), m_items(std::move(items)), m_body(std::move(body)),
 		  m_type_comment(std::move(type_comment))
 	{}
 
-	const std::vector<std::shared_ptr<ASTNode>> &items() const { return m_items; }
+	const std::vector<std::shared_ptr<WithItem>> &items() const { return m_items; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::string &type_comment() const { return m_type_comment; }
 	void codegen(CodeGenerator *) const override;

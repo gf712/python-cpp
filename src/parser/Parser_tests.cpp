@@ -734,6 +734,20 @@ void compare_named_expression(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
+void compare_with_item(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::WithItem);
+
+	const auto result_context_expr = as<WithItem>(result)->context_expr();
+	const auto expected_context_expr = as<WithItem>(expected)->context_expr();
+	dispatch(result_context_expr, expected_context_expr);
+
+	const auto result_optional_vars = as<WithItem>(result)->optional_vars();
+	const auto expected_optional_vars = as<WithItem>(expected)->optional_vars();
+	dispatch(result_optional_vars, expected_optional_vars);
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -875,6 +889,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::NamedExpr: {
 		compare_named_expression(result, expected);
+		break;
+	}
+	case ASTNodeType::WithItem: {
+		compare_with_item(result, expected);
 		break;
 	}
 	default: {
@@ -1900,11 +1918,12 @@ TEST(Parser, WithStatement)
 		"  work()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<With>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("lock", ContextType::LOAD) },
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Call>(std::make_shared<Name>("work", ContextType::LOAD)) },
-		""));
+	expected_ast->emplace(
+		std::make_shared<With>(std::vector{ std::make_shared<WithItem>(
+								   std::make_shared<Name>("lock", ContextType::LOAD), nullptr) },
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Call>(std::make_shared<Name>("work", ContextType::LOAD)) },
+			""));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2256,8 +2275,26 @@ TEST(Parser, CallAttributeSubscript)
 						ContextType::LOAD),
 					"bar",
 					ContextType::LOAD) },
-			ContextType::LOAD)	,
+			ContextType::LOAD),
 		std::vector<std::shared_ptr<ASTNode>>{},
 		std::vector<std::shared_ptr<Keyword>>{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, WithItemVar)
+{
+	constexpr std::string_view program =
+		"with open(\"file.txt\") as f:\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<With>(
+		std::vector{ std::make_shared<WithItem>(
+			std::make_shared<Call>(std::make_shared<Name>("open", ContextType::LOAD),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>("file.txt") },
+				std::vector<std::shared_ptr<Keyword>>{}),
+			std::make_shared<Name>("f", ContextType::STORE)) },
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>() },
+		""));
 	assert_generates_ast(program, expected_ast);
 }

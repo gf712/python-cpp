@@ -4172,9 +4172,24 @@ struct WithItemPattern : Pattern<WithItemPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("WithItemPattern")
+		using pattern1 = PatternMatch<ExpressionPattern,
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+			StarTargetPattern,
+			LookAhead<OrPattern<SingleTokenPattern<Token::TokenType::COMMA>,
+				SingleTokenPattern<Token::TokenType::RPAREN>,
+				SingleTokenPattern<Token::TokenType::COLON>>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("expression 'as' star_target &(',' | ')' | ':')")
+			auto var = p.pop_back();
+			auto context_expr = p.pop_back();
+			p.push_to_stack(std::make_shared<WithItem>(context_expr, var));
+			return true;
+		}
+
 		using pattern2 = PatternMatch<ExpressionPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("expression")
+			p.push_to_stack(std::make_shared<WithItem>(p.pop_back(), nullptr));
 			return true;
 		}
 
@@ -4219,9 +4234,13 @@ struct WithStatementPattern : Pattern<WithStatementPattern>
 				SingleTokenPattern<Token::TokenType::COLON>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'with' ','.with_item+ ':' [TYPE_COMMENT]")
-			std::vector<std::shared_ptr<ASTNode>> with_items;
+			std::vector<std::shared_ptr<WithItem>> with_items;
 			with_items.reserve(p.stack().size());
-			while (!p.stack().empty()) { with_items.push_back(p.pop_front()); }
+			while (!p.stack().empty()) {
+				auto node = p.pop_front();
+				ASSERT(as<WithItem>(node))
+				with_items.push_back(as<WithItem>(node));
+			}
 
 			BlockScope block_scope{ p };
 

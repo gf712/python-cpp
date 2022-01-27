@@ -584,6 +584,17 @@ void BytecodeGenerator::visit(const Raise *) { TODO(); }
 
 void BytecodeGenerator::visit(const With *) { TODO(); }
 
+void BytecodeGenerator::visit(const WithItem *node)
+{
+	const auto ctx_expr = generate(node->context_expr().get(), m_function_id);
+
+	if (node->optional_vars()) {
+		ASSERT(as<Name>(node->context_expr()))
+		ASSERT(as<Name>(node->context_expr())->ids().size() == 1)
+		emit<StoreName>(as<Name>(node->context_expr())->ids()[0], ctx_expr);
+	}
+}
+
 void BytecodeGenerator::visit(const IfExpr *) { TODO(); }
 
 namespace {
