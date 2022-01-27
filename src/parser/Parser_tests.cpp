@@ -2210,3 +2210,29 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
 		));
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, AssignToAttributeSubscript)
+{
+	constexpr std::string_view program = "sys.modules.foo[spec.name.bar] = my.module\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
+			std::make_shared<Attribute>(
+				std::make_shared<Attribute>(
+					std::make_shared<Name>("sys", ContextType::LOAD), "modules", ContextType::LOAD),
+				"foo",
+				ContextType::LOAD),
+			Subscript::Index{
+				.value = std::make_shared<Attribute>(
+					std::make_shared<Attribute>(std::make_shared<Name>("spec", ContextType::LOAD),
+						"name",
+						ContextType::LOAD),
+					"bar",
+					ContextType::LOAD) },
+			ContextType::STORE) },
+		std::make_shared<Attribute>(
+			std::make_shared<Name>("my", ContextType::LOAD), "module", ContextType::LOAD),
+		""));
+	assert_generates_ast(program, expected_ast);
+}

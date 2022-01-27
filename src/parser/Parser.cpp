@@ -323,8 +323,14 @@ template<typename PatternType> struct LookAhead : Pattern<LookAhead<PatternType>
 	{
 		// FIXME: this should be done automagically
 		const size_t start_position = p.token_position();
-		const bool is_match = PatternType::matches(p);
+		const auto initial_position = p.stack().size();
+		bool is_match = false;
+		{
+			BlockScope scope{ p };
+			is_match = PatternType::matches(p);
+		}
 		p.token_position() = start_position;
+		while (initial_position > p.stack().size()) { p.pop_back(); }
 		return is_match;
 	}
 };
@@ -529,6 +535,66 @@ struct TLookahead : Pattern<TLookahead>
 };
 
 struct AtomPattern;
+struct SlicesPattern;
+struct ArgumentsPattern;
+
+struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
+{
+	// t_primary' | '.' NAME &t_lookahead t_primary'
+	//            | '[' slices ']' &t_lookahead t_primary'
+	//            | genexp &t_lookahead t_primary'
+	//            | '(' [arguments] ')' &t_lookahead t_primary'
+	//            | ϵ
+	static bool matches_impl(Parser &p)
+	{
+		auto token = p.lexer().peek_token(p.token_position() + 1);
+		DEBUG_LOG("TPrimaryPattern_")
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
+			SingleTokenPattern<Token::TokenType::NAME>,
+			LookAhead<TLookahead>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'.' NAME &t_lookahead")
+			std::string_view name{ token->start().pointer_to_program,
+				token->end().pointer_to_program };
+			auto value = p.pop_back();
+			p.push_to_stack(
+				std::make_shared<Attribute>(value, std::string(name), ContextType::LOAD));
+			if (PatternMatch<TPrimaryPattern_>::match(p)) {
+				DEBUG_LOG("'.' NAME &t_lookahead t_primary'")
+				return true;
+			}
+		}
+
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
+			SlicesPattern,
+			SingleTokenPattern<Token::TokenType::RSQB>,
+			LookAhead<TLookahead>,
+			TPrimaryPattern_>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("'[' slices ']' &t_lookahead t_primary'")
+			TODO();
+			return true;
+		}
+
+		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+			ZeroOrOnePattern<ArgumentsPattern>,
+			SingleTokenPattern<Token::TokenType::RPAREN>,
+			LookAhead<TLookahead>,
+			TPrimaryPattern_>;
+		if (pattern4::match(p)) {
+			DEBUG_LOG("'(' [arguments] ')' &t_lookahead t_primary'")
+			TODO();
+			return true;
+		}
+
+		using pattern5 = PatternMatch<LookAhead<OrPattern<AtomPattern, TLookahead>>>;
+		if (pattern5::match(p)) {
+			DEBUG_LOG("t_primary' | ϵ")
+			return true;
+		}
+		return false;
+	}
+};
 
 struct TPrimaryPattern : Pattern<TPrimaryPattern>
 {
@@ -538,15 +604,21 @@ struct TPrimaryPattern : Pattern<TPrimaryPattern>
 	// 	| t_primary genexp &t_lookahead
 	// 	| t_primary '(' [arguments] ')' &t_lookahead
 	// 	| atom &t_lookahead
+
+	// t_primary | atom &t_lookahead t_primary'
+
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("t_primary");
 		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
-		using pattern5 = PatternMatch<AtomPattern, LookAhead<TLookahead>>;
-		if (pattern5::match(p)) {
-			DEBUG_LOG("atom &t_lookahead");
-			return true;
+		using pattern1 = PatternMatch<AtomPattern, LookAhead<TLookahead>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("atom &t_lookahead'");
+			if (PatternMatch<TPrimaryPattern_>::match(p)) {
+				DEBUG_LOG("atom &t_lookahead t_primary'");
+				return true;
+			}
 		}
 		return false;
 	}
@@ -590,11 +662,9 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 		if (pattern2::match(p)) {
 			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
 			auto subscript = p.pop_back();
-			auto name = p.pop_back();
+			auto value = p.pop_back();
 			ASSERT(as<Subscript>(subscript))
-			ASSERT(as<Name>(name))
-			as<Name>(name)->set_context(ContextType::LOAD);
-			as<Subscript>(subscript)->set_value(name);
+			as<Subscript>(subscript)->set_value(value);
 			as<Subscript>(subscript)->set_context(ContextType::STORE);
 			p.push_to_stack(subscript);
 			return true;

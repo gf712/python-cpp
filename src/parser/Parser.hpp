@@ -91,7 +91,10 @@ class BlockScope
   public:
 	BlockScope(Parser &p) : m_p(p), m_level(m_p.m_stack.size() - 1) { m_p.m_stack.emplace_back(); }
 
-	~BlockScope() { m_p.m_stack.pop_back(); }
+	~BlockScope()
+	{
+		while (m_p.m_stack.size() > (m_level + 1)) { m_p.m_stack.pop_back(); }
+	}
 
 	std::deque<std::shared_ptr<ast::ASTNode>> &parent()
 	{
