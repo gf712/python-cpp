@@ -892,6 +892,11 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 	p.parse();
 	// spdlog::set_level(spdlog::level::info);
 
+	spdlog::set_level(spdlog::level::debug);
+	p.module()->print_node("");
+	expected_module->print_node("");
+	spdlog::set_level(spdlog::level::info);
+
 	ASSERT_EQ(p.module()->body().size(), expected_module->body().size());
 
 	size_t i = 0;
@@ -899,11 +904,6 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 		dispatch(node, expected_module->body()[i]);
 		i++;
 	}
-
-	spdlog::set_level(spdlog::level::debug);
-	p.module()->print_node("");
-	expected_module->print_node("");
-	spdlog::set_level(spdlog::level::info);
 }
 
 std::shared_ptr<Module> create_test_module()
@@ -2234,5 +2234,30 @@ TEST(Parser, AssignToAttributeSubscript)
 		std::make_shared<Attribute>(
 			std::make_shared<Name>("my", ContextType::LOAD), "module", ContextType::LOAD),
 		""));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, CallAttributeSubscript)
+{
+	constexpr std::string_view program = "sys.modules.foo[spec.name.bar]()\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(
+		std::make_shared<Subscript>(
+			std::make_shared<Attribute>(
+				std::make_shared<Attribute>(
+					std::make_shared<Name>("sys", ContextType::LOAD), "modules", ContextType::LOAD),
+				"foo",
+				ContextType::LOAD),
+			Subscript::Index{
+				.value = std::make_shared<Attribute>(
+					std::make_shared<Attribute>(std::make_shared<Name>("spec", ContextType::LOAD),
+						"name",
+						ContextType::LOAD),
+					"bar",
+					ContextType::LOAD) },
+			ContextType::LOAD)	,
+		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<std::shared_ptr<Keyword>>{}));
 	assert_generates_ast(program, expected_ast);
 }

@@ -568,25 +568,50 @@ struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
 			SlicesPattern,
 			SingleTokenPattern<Token::TokenType::RSQB>,
-			LookAhead<TLookahead>,
-			TPrimaryPattern_>;
+			LookAhead<TLookahead>>;
 		if (pattern2::match(p)) {
-			DEBUG_LOG("'[' slices ']' &t_lookahead t_primary'")
-			TODO();
-			return true;
+			DEBUG_LOG("'[' slices ']' &t_lookahead")
+			auto subscript = p.pop_back();
+			auto value = p.pop_back();
+
+			ASSERT(as<Subscript>(subscript))
+			as<Subscript>(subscript)->set_value(value);
+			as<Subscript>(subscript)->set_context(ContextType::LOAD);
+			p.push_to_stack(subscript);
+			if (PatternMatch<TPrimaryPattern_>::match(p)) {
+				DEBUG_LOG("'[' slices ']' &t_lookahead t_primary'")
+				return true;
+			}
 		}
 
-		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
-			ZeroOrOnePattern<ArgumentsPattern>,
-			SingleTokenPattern<Token::TokenType::RPAREN>,
-			LookAhead<TLookahead>,
-			TPrimaryPattern_>;
-		if (pattern4::match(p)) {
-			DEBUG_LOG("'(' [arguments] ')' &t_lookahead t_primary'")
-			TODO();
-			return true;
+		{
+			BlockScope scope{ p };
+			using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+				ZeroOrOnePattern<ArgumentsPattern>,
+				SingleTokenPattern<Token::TokenType::RPAREN>,
+				LookAhead<TLookahead>>;
+			if (pattern4::match(p)) {
+				DEBUG_LOG("'(' [arguments] ')' &t_lookahead")
+				const auto &caller = scope.parent().back();
+				scope.parent().pop_back();
+				std::vector<std::shared_ptr<ASTNode>> args;
+				std::vector<std::shared_ptr<Keyword>> kwargs;
+				while (!p.stack().empty()) {
+					auto node = p.pop_front();
+					if (auto keyword_node = as<Keyword>(node)) {
+						kwargs.push_back(keyword_node);
+					} else {
+						args.push_back(node);
+					}
+				}
+				p.push_to_stack(std::make_shared<Call>(caller, args, kwargs));
+				if (PatternMatch<TPrimaryPattern_>::match(p)) {
+					DEBUG_LOG("'(' [arguments] ')' &t_lookahead t_primary'")
+					scope.parent().push_back(p.pop_back());
+					return true;
+				}
+			}
 		}
-
 		using pattern5 = PatternMatch<LookAhead<OrPattern<AtomPattern, TLookahead>>>;
 		if (pattern5::match(p)) {
 			DEBUG_LOG("t_primary' | ϵ")
@@ -1425,7 +1450,8 @@ struct SlicesPattern : Pattern<SlicesPattern>
 
 struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 {
-	// primary' -> '.' NAME primary'
+	// primary'
+	//		| '.' NAME primary'
 	// 		| genexp primary'
 	// 		| '(' [arguments] ')' primary'
 	// 		| '[' slices ']' primary'
@@ -1491,8 +1517,13 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			SingleTokenPattern<Token::TokenType::RSQB>>;
 		if (pattern4::match(p)) {
 			DEBUG_LOG("'[' slices ']'");
-			ASSERT(as<Subscript>(p.stack().back()))
-			p.push_to_stack(p.pop_back());
+			auto subscript = p.pop_back();
+			auto value = primary_scope.parent().back();
+			primary_scope.parent().pop_back();
+			ASSERT(as<Subscript>(subscript))
+			as<Subscript>(subscript)->set_value(value);
+			as<Subscript>(subscript)->set_context(ContextType::LOAD);
+			p.push_to_stack(subscript);
 			using pattern4a = PatternMatch<PrimaryPattern_>;
 			if (pattern4a::match(p)) {
 				DEBUG_LOG("'[' slices ']' primary'");
@@ -1565,14 +1596,6 @@ struct PrimaryPattern : Pattern<PrimaryPattern>
 		using pattern2 = PatternMatch<AtomPattern, PrimaryPattern_>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("atom primary'")
-			if (as<Subscript>(p.stack().back())) {
-				auto subscript = p.pop_back();
-				auto value = p.pop_back();
-				ASSERT(as<Subscript>(subscript))
-				as<Subscript>(subscript)->set_value(value);
-				as<Subscript>(subscript)->set_context(ContextType::LOAD);
-				p.push_to_stack(subscript);
-			}
 			return true;
 		}
 
