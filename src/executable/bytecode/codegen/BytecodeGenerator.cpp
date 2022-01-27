@@ -507,6 +507,10 @@ void BytecodeGenerator::visit(const Attribute *node)
 		auto attribute_value_register = allocate_register();
 		emit<LoadAttr>(attribute_value_register, this_value_register, node->attr());
 		m_last_register = attribute_value_register;
+	} else if (node->context() == ContextType::STORE) {
+		auto attribute_value_register = allocate_register();
+		emit<LoadAttr>(attribute_value_register, this_value_register, node->attr());
+		m_last_register = attribute_value_register;
 	} else {
 		TODO();
 	}
@@ -551,6 +555,9 @@ void BytecodeGenerator::visit(const AugAssign *node)
 	if (auto named_target = as<Name>(node->target())) {
 		if (named_target->ids().size() != 1) { TODO(); }
 		emit<StoreName>(named_target->ids()[0], lhs_register);
+	} else if (auto attr = as<Attribute>(node->target())) {
+		auto obj_reg = generate(attr->value().get(), m_function_id);
+		emit<StoreAttr>(obj_reg, lhs_register, attr->attr());
 	} else {
 		TODO();
 	}
