@@ -738,23 +738,15 @@ void BytecodeGenerator::visit(const Assert *node)
 
 	emit<JumpIfTrue>(test_result_register, end_label);
 
-	const auto assertion_function_register = allocate_register();
-	emit<LoadAssertionError>(assertion_function_register);
+	const auto assertion_type_register = allocate_register();
+	emit<LoadAssertionError>(assertion_type_register);
 
-	const auto msg_register = [this, &node]() -> std::optional<Register> {
-		if (node->msg()) {
-			const auto msg_register = generate(node->msg().get(), m_function_id);
-			return msg_register;
-		} else {
-			return {};
-		}
-	}();
+	std::vector<Register> args;
+	if (node->msg()) { args.push_back(generate(node->msg().get(), m_function_id)); }
 
-	if (msg_register.has_value()) {
-		emit<RaiseVarargs>(assertion_function_register, *msg_register);
-	} else {
-		emit<RaiseVarargs>(assertion_function_register);
-	}
+	emit<FunctionCall>(assertion_type_register, std::move(args));
+	const Register result_register{ 0 };
+	emit<RaiseVarargs>(result_register);
 	bind(*end_label);
 
 	m_last_register = Register{};

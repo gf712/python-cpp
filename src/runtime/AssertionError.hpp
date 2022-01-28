@@ -23,7 +23,13 @@ class AssertionError : public Exception
   public:
 	static PyType *register_type(PyModule *);
 
+	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	PyType *type() const override;
+
+	static PyType *this_type();
+
+	std::string to_string() const override;
 };
 
 template<typename... Args>

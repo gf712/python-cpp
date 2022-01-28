@@ -39,7 +39,7 @@ PyType *BaseException::type() const
 	return s_base_exception_type;
 }
 
-std::string BaseException::what() const { return to_string(); }
+std::string BaseException::what() const { return BaseException::to_string(); }
 
 void BaseException::visit_graph(Visitor &visitor)
 {
@@ -48,19 +48,16 @@ void BaseException::visit_graph(Visitor &visitor)
 
 std::string BaseException::to_string() const
 {
-	// const auto &exception_name = m_type_prototype.__name__;
-	// if (m_args) {
-	// 	const auto args = m_args->to_string();
-	// 	std::string_view msg{ args.begin() + 1, args.end() - 1 };
-	// 	return fmt::format("{}({})", exception_name, msg);
-	// } else {
-	// 	return fmt::format("{}()", exception_name);
-	// }
-	ASSERT(m_args->size() == 1)
-	const auto &error_msg = PyObject::from(m_args->elements()[0])->to_string();
+	if (m_args->size() == 1) {
+		return PyObject::from(m_args->elements()[0])->to_string();
+	} else {
+		return m_args->to_string();
+	}
+}
 
-	const auto &exception_name = m_type_prototype.__name__;
-	return fmt::format("{}: {}", exception_name, error_msg);
+PyObject *BaseException::__repr__() const
+{
+	return PyString::create(fmt::format("{}({})", m_type_prototype.__name__, what()));
 }
 
 PyType *BaseException::register_type(PyModule *module)

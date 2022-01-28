@@ -3,24 +3,23 @@
 
 class RaiseVarargs final : public Instruction
 {
-	Register m_assertion;
-	std::vector<Register> m_args;
+	std::optional<Register> m_exception;
+	std::optional<Register> m_cause;
 
   public:
-	RaiseVarargs(Register assertion) : m_assertion(assertion) {}
-
-	template<typename... Args>
-	RaiseVarargs(Register assertion, Args &&... args)
-		: m_assertion(assertion), m_args{std::forward<Args>(args)...}
-	{}
+	RaiseVarargs() {}
+	RaiseVarargs(Register exception) : m_exception(exception) {}
+	RaiseVarargs(Register exception, Register cause) : m_exception(exception), m_cause(cause) {}
 
 	std::string to_string() const final
 	{
-		if (m_args.empty()) {
-			return fmt::format("RAISE_VARARGS   r{:<3}", m_assertion);
+		if (m_cause.has_value()) {
+			ASSERT(m_exception.has_value())
+			return fmt::format("RAISE_VARARGS   r{:<3} r{:<3}", *m_exception, *m_cause);
+		} else if (m_exception.has_value()) {
+			return fmt::format("RAISE_VARARGS   r{:<3}", *m_exception);
 		} else {
-			// FIXME: should print out all registers, not just the first
-			return fmt::format("RAISE_VARARGS   r{:<3} r{:<3}", m_assertion, m_args[0]);
+			return fmt::format("RAISE_VARARGS");
 		}
 	}
 

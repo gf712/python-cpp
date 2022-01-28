@@ -2,16 +2,16 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTuple.hpp"
 
-void RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
+void RaiseVarargs::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	const auto &assertion_function = vm.reg(m_assertion);
-	ASSERT(std::holds_alternative<PyObject *>(assertion_function))
-	auto *obj = std::get<PyObject *>(assertion_function);
-	ASSERT(as<PyNativeFunction>(obj))
-
-	std::vector<Value> args;
-	args.reserve(m_args.size());
-	for (const auto &arg : m_args) { args.push_back(vm.reg(arg)); }
-
-	as<PyNativeFunction>(obj)->operator()(PyTuple::create(args), nullptr);
+	if (m_cause.has_value()) {
+		ASSERT(m_exception.has_value())
+		TODO();
+	} else if (m_exception.has_value()) {
+		const auto &exception = vm.reg(*m_exception);
+		ASSERT(std::holds_alternative<PyObject *>(exception))
+		interpreter.raise_exception(std::get<PyObject *>(exception));
+	} else {
+		TODO();
+	}
 }
