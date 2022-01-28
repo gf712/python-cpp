@@ -428,22 +428,13 @@ void compare_import(const std::shared_ptr<ASTNode> &result,
 }
 
 
-void compare_subscript(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_slices(const Subscript::SliceType &result, const Subscript::SliceType &expected)
 {
-	ASSERT_EQ(result->node_type(), ASTNodeType::Subscript);
+	ASSERT_EQ(result.index(), expected.index());
 
-	const auto result_value = as<Subscript>(result)->value();
-	const auto expected_value = as<Subscript>(expected)->value();
-	dispatch(result_value, expected_value);
-
-	const auto result_slice = as<Subscript>(result)->slice();
-	const auto expected_slice = as<Subscript>(expected)->slice();
-
-	ASSERT_EQ(result_slice.index(), expected_slice.index());
-	if (std::holds_alternative<Subscript::Slice>(expected_slice)) {
-		auto result_s = std::get<Subscript::Slice>(result_slice);
-		auto expected_s = std::get<Subscript::Slice>(expected_slice);
+	if (std::holds_alternative<Subscript::Slice>(result)) {
+		auto result_s = std::get<Subscript::Slice>(result);
+		auto expected_s = std::get<Subscript::Slice>(expected);
 
 		if (expected_s.lower) {
 			ASSERT_TRUE(result_s.lower);
@@ -463,9 +454,9 @@ void compare_subscript(const std::shared_ptr<ASTNode> &result,
 		} else {
 			ASSERT_FALSE(result_s.step);
 		}
-	} else if (std::holds_alternative<Subscript::Index>(expected_slice)) {
-		auto result_i = std::get<Subscript::Index>(result_slice);
-		auto expected_i = std::get<Subscript::Index>(expected_slice);
+	} else if (std::holds_alternative<Subscript::Index>(expected)) {
+		auto result_i = std::get<Subscript::Index>(result);
+		auto expected_i = std::get<Subscript::Index>(expected);
 
 		if (expected_i.value) {
 			ASSERT_TRUE(result_i.value);
@@ -475,8 +466,31 @@ void compare_subscript(const std::shared_ptr<ASTNode> &result,
 		}
 
 	} else {
-		TODO();
+		auto result_e = std::get<Subscript::ExtSlice>(result);
+		auto expected_e = std::get<Subscript::ExtSlice>(expected);
+
+		ASSERT_EQ(result_e.dims.size(), expected_e.dims.size());
+		for (size_t i = 0; i < result_e.dims.size(); ++i) {
+			std::visit([](const auto &lhs, const auto &rhs) { compare_slices(lhs, rhs); },
+				result_e.dims[i],
+				expected_e.dims[i]);
+		}
 	}
+}
+
+void compare_subscript(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Subscript);
+
+	const auto result_value = as<Subscript>(result)->value();
+	const auto expected_value = as<Subscript>(expected)->value();
+	dispatch(result_value, expected_value);
+
+	const auto result_slice = as<Subscript>(result)->slice();
+	const auto expected_slice = as<Subscript>(expected)->slice();
+
+	compare_slices(result_slice, expected_slice);
 
 	const auto result_ctx = as<Subscript>(result)->context();
 	const auto expected_ctx = as<Subscript>(expected)->context();
@@ -1525,6 +1539,24 @@ TEST(Parser, SubscriptIndexAssignment)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, SubscriptMultiIndexAssignment)
+{
+	constexpr std::string_view program = "a[0, 1, 2] = 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Subscript>(std::make_shared<Name>("a", ContextType::LOAD),
+				Subscript::ExtSlice{
+					.dims = { Subscript::Index{ .value = std::make_shared<Constant>(int64_t{ 0 }) },
+						Subscript::Index{ .value = std::make_shared<Constant>(int64_t{ 1 }) },
+						Subscript::Index{ .value = std::make_shared<Constant>(int64_t{ 2 }) } } },
+				ContextType::STORE) },
+		std::make_shared<Constant>(int64_t{ 1 }),
+		""));
+
+	assert_generates_ast(program, expected_ast);
+}
 
 TEST(Parser, SubscriptSliceExpression)
 {

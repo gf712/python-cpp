@@ -1402,6 +1402,7 @@ struct SlicePattern : Pattern<SlicePattern>
 			} else {
 				PARSER_ERROR()
 			}
+			p.push_to_stack(std::make_shared<Subscript>());
 			as<ast::Subscript>(p.stack().back())->set_slice(slice);
 			return true;
 		}
@@ -1410,6 +1411,7 @@ struct SlicePattern : Pattern<SlicePattern>
 		if (pattern2::match(p)) {
 			DEBUG_LOG("named_expression");
 			Subscript::SliceType slice = Subscript::Index{ p.pop_back() };
+			p.push_to_stack(std::make_shared<Subscript>());
 			as<ast::Subscript>(p.stack().back())->set_slice(slice);
 			return true;
 		}
@@ -1426,20 +1428,38 @@ struct SlicesPattern : Pattern<SlicesPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("SlicesPattern");
-		p.push_to_stack(std::make_shared<Subscript>());
+
+		BlockScope scope{ p };
 
 		using pattern1 = PatternMatch<SlicePattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("slice !','");
+			scope.parent().push_back(p.pop_back());
 			return true;
 		}
 
 		using pattern2 = PatternMatch<
-			ApplyInBetweenPattern<SlicePattern, SingleTokenPattern<Token::TokenType::DOT>>,
+			ApplyInBetweenPattern<SlicePattern, SingleTokenPattern<Token::TokenType::COMMA>>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("','.slice+ [',']");
+			std::vector<std::variant<Subscript::Index, Subscript::Slice>> dims;
+			while (!p.stack().empty()) {
+				auto node = p.pop_front();
+				ASSERT(as<Subscript>(node))
+				auto slice = as<Subscript>(node)->slice();
+				if (std::holds_alternative<Subscript::Index>(slice)) {
+					dims.push_back(std::get<Subscript::Index>(slice));
+				} else if (std::holds_alternative<Subscript::Slice>(slice)) {
+					dims.push_back(std::get<Subscript::Slice>(slice));
+				} else {
+					PARSER_ERROR()
+				}
+			}
+			auto subscript = std::make_shared<Subscript>();
+			subscript->set_slice(Subscript::ExtSlice{ .dims = dims });
+			scope.parent().push_back(subscript);
 			return true;
 		}
 
