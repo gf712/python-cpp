@@ -3,6 +3,7 @@
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
+#include "executable/bytecode/instructions/GreaterThan.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
@@ -345,7 +346,7 @@ void BytecodeGenerator::visit(const Compare *node)
 		emit<LessThanEquals>(result_reg, lhs_reg, rhs_reg);
 	} break;
 	case Compare::OpType::Gt: {
-		TODO();
+		emit<GreaterThan>(result_reg, lhs_reg, rhs_reg);
 	} break;
 	case Compare::OpType::GtE: {
 		TODO();

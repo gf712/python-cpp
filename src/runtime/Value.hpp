@@ -218,7 +218,10 @@ std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &int
 std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 bool is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+bool in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 bool truthy(const Value &lhs, Interpreter &interpreter);

@@ -327,6 +327,65 @@ std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &
 		rhs);
 }
 
+std::optional<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter)
+{
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+					   return NameConstant{ lhs_value > rhs_value };
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value > rhs_value };
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value > rhs_value };
+			},
+			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (auto result = py_lhs->richcompare(py_rhs, RichCompare::Py_GT)) {
+					return result;
+				} else {
+					interpreter.raise_exception(
+						type_error("unsupported operand type(s) for >: \'{}\' and \'{}\'",
+							py_lhs->type()->name(),
+							py_rhs->type()->name()));
+					return {};
+				}
+			} },
+		lhs,
+		rhs);
+}
+
+std::optional<Value>
+	greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter)
+{
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+					   return NameConstant{ lhs_value >= rhs_value };
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value >= rhs_value };
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
+				return NameConstant{ lhs_value >= rhs_value };
+			},
+			[&interpreter](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (auto result = py_lhs->richcompare(py_rhs, RichCompare::Py_GE)) {
+					return result;
+				} else {
+					interpreter.raise_exception(
+						type_error("unsupported operand type(s) for >=: \'{}\' and \'{}\'",
+							py_lhs->type()->name(),
+							py_rhs->type()->name()));
+					return {};
+				}
+			} },
+		lhs,
+		rhs);
+}
+
 bool is(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	// TODO: Could probably be more efficient, but at least guarantees that Python singletons

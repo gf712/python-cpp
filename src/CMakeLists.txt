@@ -8,6 +8,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
+    executable/bytecode/instructions/GreaterThan.cpp
     executable/bytecode/instructions/IsOp.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Instructions.cpp
