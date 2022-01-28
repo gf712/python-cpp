@@ -51,6 +51,10 @@ void BytecodeGenerator::visit(const Name *node)
 			const size_t arg_index = std::distance(arg_names.begin(), it);
 			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
 			return;
+		} else if (local_args->vararg() && local_args->vararg()->name() == node->ids()[0]) {
+			const size_t arg_index = local_args->args().size() + local_args->kwonlyargs().size();
+			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
+			return;
 		}
 	}
 	emit<LoadName>(m_last_register, node->ids()[0]);
@@ -125,7 +129,14 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 
 	set_insert_point(old_block);
 
-	emit<MakeFunction>(this_function_info.function_id, node->name(), arg_names);
+	size_t arg_count = node->args()->args().size() + node->args()->kwonlyargs().size();
+
+	emit<MakeFunction>(this_function_info.function_id,
+		node->name(),
+		arg_names,
+		arg_count,
+		node->args()->vararg() != nullptr,
+		node->args()->kwarg() != nullptr);
 
 	m_ctx.pop_local_args();
 	m_last_register = Register{};
@@ -134,10 +145,10 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 void BytecodeGenerator::visit(const Arguments *node)
 {
 	if (!node->kwonlyargs().empty()) { TODO(); }
-	if (node->vararg()) { TODO(); }
 	if (node->kwarg()) { TODO(); }
 
 	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
+	if (node->vararg()) { generate(node->vararg().get(), m_function_id); }
 
 	m_last_register = Register{};
 }

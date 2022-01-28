@@ -21,7 +21,13 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	ASSERT(interpreter.functions(m_function_id)->backend() == FunctionExecutionBackend::BYTECODE)
 	auto function = std::static_pointer_cast<Bytecode>(interpreter.functions(m_function_id));
-	auto *code = vm.heap().allocate<PyCode>(function, m_function_id, m_args, interpreter.module());
+
+	auto flags = PyCode::CodeFlags::create();
+	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
+	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
+
+	auto *code = vm.heap().allocate<PyCode>(
+		function, m_function_id, m_args, m_arg_count, flags, interpreter.module());
 	interpreter.allocate_object<PyFunction>(
 		m_function_name, m_function_name, code, interpreter.execution_frame()->globals());
 }

@@ -6,16 +6,52 @@
 
 class PyCode : public PyBaseObject
 {
+  public:
+	class CodeFlags
+	{
+	  public:
+		enum class Flag {
+			OPTIMIZED = 0,
+			NEWLOCALS = 1,
+			VARARGS = 2,
+			VARKEYWORDS = 3,
+			NESTED = 4,
+			GENERATOR = 5,
+		};
+
+	  private:
+		std::bitset<6> m_flags;
+
+		CodeFlags() = default;
+
+	  public:
+		template<typename... Args>
+		requires std::conjunction_v<std::is_same<Flag, Args>...> static CodeFlags create(
+			Args... args)
+		{
+			CodeFlags f;
+			(f.m_flags.set(static_cast<uint8_t>(args)), ...);
+			return f;
+		}
+		void set(Flag f) { m_flags.set(static_cast<uint8_t>(f)); }
+		void reset(Flag f) { m_flags.reset(static_cast<uint8_t>(f)); }
+		bool is_set(Flag f) { return m_flags[static_cast<uint8_t>(f)]; }
+	};
+
 	const std::shared_ptr<Function> m_function;
 	const size_t m_function_id;
 	const size_t m_register_count;
 	const std::vector<std::string> m_args;
+	const size_t m_arg_count;
+	CodeFlags m_flags;
 	PyModule *m_module;
 
   public:
 	PyCode(std::shared_ptr<Function> function,
 		size_t function_id,
 		std::vector<std::string> args,
+		size_t arg_count,
+		CodeFlags flags,
 		PyModule *m_module);
 
 	PyObject *call(PyTuple *args, PyDict *kwargs);
@@ -24,6 +60,8 @@ class PyCode : public PyBaseObject
 	std::string to_string() const override { return fmt::format("PyCode"); }
 
 	size_t register_count() const;
+	size_t arg_count() const;
+	CodeFlags flags() const;
 
 	const std::shared_ptr<Function> &function() const { return m_function; }
 

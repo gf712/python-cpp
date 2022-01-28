@@ -36,13 +36,15 @@ namespace {
 PyFunction *make_function(const std::string &function_name,
 	int64_t function_id,
 	const std::vector<std::string> &argnames,
+	size_t argcount,
 	PyModule *module,
 	PyDict *globals)
 {
 	auto &vm = VirtualMachine::the();
 	ASSERT(vm.interpreter().functions(function_id)->backend() == FunctionExecutionBackend::BYTECODE)
 	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().functions(function_id));
-	PyCode *code = vm.heap().allocate<PyCode>(function, function_id, argnames, module);
+	PyCode *code = vm.heap().allocate<PyCode>(
+		function, function_id, argnames, argcount, PyCode::CodeFlags::create(), module);
 	return vm.heap().allocate<PyFunction>(function_name, code, globals);
 }
 
@@ -157,6 +159,7 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 			return make_function(class_name_as_string,
 				function_id,
 				std::vector<std::string>{},
+				0,
 				nullptr,
 				interpreter.execution_frame()->globals());
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {

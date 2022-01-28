@@ -15,12 +15,19 @@
 PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t function_id,
 	std::vector<std::string> args,
+	size_t arg_count,
+	CodeFlags flags,
 	PyModule *module)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function), m_function_id(function_id),
-	  m_register_count(function->registers_needed()), m_args(std::move(args)), m_module(module)
+	  m_register_count(function->registers_needed()), m_args(std::move(args)),
+	  m_arg_count(arg_count), m_flags(flags), m_module(module)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
+
+size_t PyCode::arg_count() const { return m_arg_count; }
+
+PyCode::CodeFlags PyCode::flags() const { return m_flags; }
 
 void PyCode::visit_graph(Visitor &visitor)
 {
@@ -78,9 +85,14 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			m_globals,
 			locals);
 
-	size_t i = 0;
+	size_t args_count = 0;
+	size_t kwargs_count = 0;
 	if (args) {
-		for (const auto &arg : *args) { function_frame->parameter(i++) = arg; }
+		size_t max_args = std::min(args->size(), m_code->arg_count());
+		for (size_t idx = 0; idx < max_args; ++idx) {
+			function_frame->parameter(idx) = args->elements()[idx];
+		}
+		args_count = max_args;
 	}
 	if (kwargs) {
 		const auto &argnames = m_code->args();
@@ -98,7 +110,20 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				return nullptr;
 			}
 			arg = value;
+			kwargs_count++;
 		}
+	}
+
+	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
+		std::vector<Value> remaining_args;
+		for (size_t idx = args_count; idx < args->size(); ++idx) {
+			remaining_args.push_back(args->elements()[idx]);
+		}
+		function_frame->parameter(m_code->args().size()) = PyTuple::create(remaining_args);
+	} else if (args_count < args->size()) {
+		VirtualMachine::the().interpreter().raise_exception(type_error(
+			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
+		return nullptr;
 	}
 
 	spdlog::debug("Requesting stack frame with {} virtual registers", m_code->register_count());
