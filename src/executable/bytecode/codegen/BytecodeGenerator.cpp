@@ -5,6 +5,7 @@
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GreaterThan.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
+#include "executable/bytecode/instructions/InOp.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/InplaceSub.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
@@ -359,10 +360,10 @@ void BytecodeGenerator::visit(const Compare *node)
 		emit<IsOp>(result_reg, lhs_reg, rhs_reg, true);
 	} break;
 	case Compare::OpType::In: {
-		TODO();
+		emit<InOp>(result_reg, lhs_reg, rhs_reg, false);
 	} break;
 	case Compare::OpType::NotIn: {
-		TODO();
+		emit<InOp>(result_reg, lhs_reg, rhs_reg, true);
 	} break;
 	}
 	m_last_register = result_reg;

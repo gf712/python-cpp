@@ -393,6 +393,14 @@ bool is(const Value &lhs, const Value &rhs, Interpreter &)
 	return PyObject::from(lhs) == PyObject::from(rhs);
 }
 
+bool in(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	TODO();
+	(void)lhs;
+	(void)rhs;
+	return false;
+}
+
 bool truthy(const Value &value, Interpreter &)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
