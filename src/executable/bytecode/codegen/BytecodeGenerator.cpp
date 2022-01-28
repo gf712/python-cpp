@@ -6,6 +6,7 @@
 #include "executable/bytecode/instructions/GreaterThan.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
+#include "executable/bytecode/instructions/InplaceSub.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "executable/bytecode/instructions/IsOp.hpp"
 #include "executable/bytecode/instructions/JumpForward.hpp"
@@ -531,7 +532,7 @@ void BytecodeGenerator::visit(const AugAssign *node)
 		emit<InplaceAdd>(lhs_register, rhs_register);
 	} break;
 	case BinaryOpType::MINUS: {
-		TODO();
+		emit<InplaceSub>(lhs_register, rhs_register);
 	} break;
 	case BinaryOpType::MULTIPLY: {
 		TODO();
