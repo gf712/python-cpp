@@ -10,3 +10,11 @@ def f(a, b, *args):
 assert f(10, 20) == ()
 assert f(10, 20, 30) == (30,)
 assert f(10, 20, 30, 40) == (30, 40)
+
+
+def f(a, *args, **kwargs):
+    return kwargs
+
+assert f(10, 20) == {}
+assert f(10, 20, b=30) == {'b': 30}
+assert f(10, 20, b=30, c=40) == {'b': 30, 'c': 40}

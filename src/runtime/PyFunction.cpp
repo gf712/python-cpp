@@ -101,8 +101,12 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			auto key_str = std::get<String>(key);
 			auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
 			if (arg_iter == argnames.end()) {
-				type_error("{}() got an unexpected keyword argument '{}'", m_name, key_str.s);
-				return nullptr;
+				if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
+					continue;
+				} else {
+					type_error("{}() got an unexpected keyword argument '{}'", m_name, key_str.s);
+					return nullptr;
+				}
 			}
 			auto &arg = function_frame->parameter(std::distance(argnames.begin(), arg_iter));
 			if (arg.has_value()) {
@@ -116,14 +120,46 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 
 	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
 		std::vector<Value> remaining_args;
-		for (size_t idx = args_count; idx < args->size(); ++idx) {
-			remaining_args.push_back(args->elements()[idx]);
+		if (args) {
+			for (size_t idx = args_count; idx < args->size(); ++idx) {
+				remaining_args.push_back(args->elements()[idx]);
+			}
 		}
 		function_frame->parameter(m_code->args().size()) = PyTuple::create(remaining_args);
 	} else if (args_count < args->size()) {
 		VirtualMachine::the().interpreter().raise_exception(type_error(
 			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
 		return nullptr;
+	}
+
+	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
+		auto *remaining_kwargs = PyDict::create();
+		if (kwargs) {
+			const auto &argnames = m_code->args();
+			for (const auto &[key, value] : kwargs->map()) {
+				auto key_str = std::get<String>(key);
+				auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
+				if (arg_iter == argnames.end()) {
+					remaining_kwargs->insert(key, value);
+					kwargs_count++;
+					continue;
+				}
+
+				auto &arg = function_frame->parameter(std::distance(argnames.begin(), arg_iter));
+				if (!arg.has_value()) {
+					remaining_kwargs->insert(key, value);
+					kwargs_count++;
+				}
+			}
+		}
+		size_t kwargs_index = [&]() {
+			if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
+				return m_code->args().size() + 1;
+			} else {
+				return m_code->args().size();
+			}
+		}();
+		function_frame->parameter(kwargs_index) = remaining_kwargs;
 	}
 
 	spdlog::debug("Requesting stack frame with {} virtual registers", m_code->register_count());

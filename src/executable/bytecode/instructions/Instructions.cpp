@@ -24,7 +24,7 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 	auto flags = PyCode::CodeFlags::create();
 	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
-	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
+	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARKEYWORDS); }
 
 	auto *code = vm.heap().allocate<PyCode>(
 		function, m_function_id, m_args, m_arg_count, flags, interpreter.module());

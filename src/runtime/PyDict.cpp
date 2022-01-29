@@ -9,6 +9,18 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+template<> PyDict *as(PyObject *obj)
+{
+	if (obj->type() == dict()) { return static_cast<PyDict *>(obj); }
+	return nullptr;
+}
+
+template<> const PyDict *as(const PyObject *obj)
+{
+	if (obj->type() == dict()) { return static_cast<const PyDict *>(obj); }
+	return nullptr;
+}
+
 PyDict::PyDict(MapType &&map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(std::move(map)) {}
 PyDict::PyDict(const MapType &map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(map) {}
 PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
@@ -60,6 +72,13 @@ std::string PyDict::to_string() const
 
 PyObject *PyDict::__repr__() const { return PyString::from(String{ to_string() }); }
 
+PyObject *PyDict::__eq__(const PyObject *other) const
+{
+	if (!as<PyDict>(other)) { return py_false(); }
+
+	return m_map == as<PyDict>(other)->map() ? py_true() : py_false();
+}
+
 PyDictItems *PyDict::items() const
 {
 	return VirtualMachine::the().heap().allocate<PyDictItems>(*this);
@@ -110,7 +129,8 @@ std::once_flag dict_flag;
 std::unique_ptr<TypePrototype> register_dict()
 {
 	return std::move(klass<PyDict>("dict")
-						 .def("get",
+						 .def(
+							 "get",
 							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
 								 ASSERT(args)
 								 ASSERT(!kwargs || kwargs->size() == 0)
@@ -266,16 +286,4 @@ std::unique_ptr<TypePrototype> PyDictItemsIterator::register_type()
 	static std::unique_ptr<TypePrototype> type = nullptr;
 	std::call_once(dict_items_iterator_flag, []() { type = ::register_dict_items_iterator(); });
 	return std::move(type);
-}
-
-template<> PyDict *as(PyObject *obj)
-{
-	if (obj->type() == dict()) { return static_cast<PyDict *>(obj); }
-	return nullptr;
-}
-
-template<> const PyDict *as(const PyObject *obj)
-{
-	if (obj->type() == dict()) { return static_cast<const PyDict *>(obj); }
-	return nullptr;
 }

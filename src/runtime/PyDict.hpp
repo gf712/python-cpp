@@ -30,6 +30,7 @@ class PyDict : public PyBaseObject
 
 	std::string to_string() const override;
 	PyObject *__repr__() const;
+	PyObject *__eq__(const PyObject *other) const;
 
 	const MapType &map() const { return m_map; }
 
