@@ -44,6 +44,23 @@ PyObject *PyList::append(PyTuple *args, PyDict *kwargs)
 	return py_none();
 }
 
+PyObject *PyList::extend(PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(args && args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().size())
+
+	// FIXME: should check if object it iterable and the iterate
+	auto iterable = PyObject::from(args->elements()[0]);
+	if (as<PyTuple>(iterable)) {
+		for (const auto &el : as<PyTuple>(iterable)->elements()) { m_elements.push_back(el); }
+	} else if (as<PyList>(iterable)) {
+		for (const auto &el : as<PyList>(iterable)->elements()) { m_elements.push_back(el); }
+	} else {
+		TODO();
+	}
+	return py_none();
+}
+
 std::string PyList::to_string() const
 {
 	std::ostringstream os;
@@ -135,6 +152,7 @@ std::unique_ptr<TypePrototype> register_list()
 {
 	return std::move(klass<PyList>("list")
 						 .def("append", &PyList::append)
+						 .def("extend", &PyList::extend)
 						 //  .def(
 						 // 	 "sort",
 						 // 	 +[](PyObject *self) {

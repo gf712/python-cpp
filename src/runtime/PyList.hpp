@@ -25,6 +25,7 @@ class PyList : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	PyObject *append(PyTuple *args, PyDict *kwargs);
+	PyObject *extend(PyTuple *args, PyDict *kwargs);
 
 	void sort();
 

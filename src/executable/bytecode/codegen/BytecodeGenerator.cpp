@@ -2,6 +2,7 @@
 
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
+#include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GreaterThan.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
@@ -15,6 +16,8 @@
 #include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
 #include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
+#include "executable/bytecode/instructions/ListExtend.hpp"
+#include "executable/bytecode/instructions/ListToTuple.hpp"
 #include "executable/bytecode/instructions/LoadAssertionError.hpp"
 #include "executable/bytecode/instructions/LoadAttr.hpp"
 #include "executable/bytecode/instructions/LoadBuildClass.hpp"
@@ -160,7 +163,11 @@ void BytecodeGenerator::visit(const Arguments *node)
 
 void BytecodeGenerator::visit(const Argument *) { m_last_register = Register{}; }
 
-void BytecodeGenerator::visit(const Starred *) { TODO(); }
+void BytecodeGenerator::visit(const Starred *node)
+{
+	if (node->ctx() != ContextType::LOAD) { TODO(); }
+	m_last_register = generate(node->value().get(), m_function_id);
+}
 
 void BytecodeGenerator::visit(const Return *node)
 {
@@ -216,34 +223,97 @@ void BytecodeGenerator::visit(const Call *node)
 	std::vector<Register> keyword_registers;
 	std::vector<std::string> keywords;
 
-	arg_registers.reserve(node->args().size());
-	keyword_registers.reserve(node->keywords().size());
-	keywords.reserve(node->keywords().size());
-
 	auto func_register = generate(node->function().get(), m_function_id);
 
-	for (const auto &arg : node->args()) {
-		arg_registers.push_back(generate(arg.get(), m_function_id));
-	}
+	auto is_args_expansion = [](const std::shared_ptr<ASTNode> &node) {
+		if (node->node_type() == ASTNodeType::Starred) { return true; }
+		return false;
+	};
 
-	for (const auto &keyword : node->keywords()) {
-		keyword_registers.push_back(generate(keyword.get(), m_function_id));
-		auto keyword_argname = keyword->arg();
-		if (!keyword_argname.has_value()) { TODO(); }
-		keywords.push_back(*keyword_argname);
-	}
+	auto is_kwargs_expansion = [](const std::shared_ptr<Keyword> &node) {
+		if (!node->arg().has_value()) { return true; }
+		return false;
+	};
 
-	if (node->function()->node_type() == ASTNodeType::Attribute) {
-		auto attr_name = as<Attribute>(node->function())->attr();
-		emit<MethodCall>(func_register, attr_name, std::move(arg_registers));
+	bool requires_args_expansion =
+		std::any_of(node->args().begin(), node->args().end(), is_args_expansion);
+	bool requires_kwargs_expansion =
+		std::any_of(node->keywords().begin(), node->keywords().end(), is_kwargs_expansion);
+
+	if (requires_args_expansion || requires_kwargs_expansion) {
+		auto list_register = allocate_register();
+		bool first_args_expansion = true;
+		std::vector<Register> args_lhs;
+		for (const auto &arg : node->args()) {
+			if (is_args_expansion(arg)) {
+				if (first_args_expansion) {
+					emit<BuildList>(list_register, args_lhs);
+					args_lhs.clear();
+					first_args_expansion = false;
+				}
+				const auto arg_reg = generate(arg.get(), m_function_id);
+				emit<ListExtend>(list_register, arg_reg);
+			} else {
+				const auto arg_reg = generate(arg.get(), m_function_id);
+				if (first_args_expansion) {
+					args_lhs.push_back(arg_reg);
+				} else {
+					emit<ListExtend>(list_register, arg_reg);
+				}
+			}
+		}
+		// we didn't hit any *args, but we still want to build a list of args so that
+		// we can call FunctionCallEx
+		if (first_args_expansion) { emit<BuildList>(list_register, args_lhs); }
+		auto args_tuple = allocate_register();
+		emit<ListToTuple>(args_tuple, list_register);
+		arg_registers.push_back(args_tuple);
+
+		if (requires_kwargs_expansion) { TODO(); }
 	} else {
-		if (keyword_registers.empty()) {
-			emit<FunctionCall>(func_register, std::move(arg_registers));
+		arg_registers.reserve(node->args().size());
+		for (const auto &arg : node->args()) {
+			arg_registers.push_back(generate(arg.get(), m_function_id));
+		}
+		keyword_registers.reserve(node->keywords().size());
+		keywords.reserve(node->keywords().size());
+
+		for (const auto &keyword : node->keywords()) {
+			keyword_registers.push_back(generate(keyword.get(), m_function_id));
+			auto keyword_argname = keyword->arg();
+			if (!keyword_argname.has_value()) { TODO(); }
+			keywords.push_back(*keyword_argname);
+		}
+	}
+
+	if (requires_args_expansion || requires_kwargs_expansion) {
+		if (node->function()->node_type() == ASTNodeType::Attribute) {
+			TODO();
 		} else {
-			emit<FunctionCallWithKeywords>(func_register,
-				std::move(arg_registers),
-				std::move(keyword_registers),
-				std::move(keywords));
+			if (requires_kwargs_expansion) { TODO(); }
+			ASSERT(arg_registers.size() == 1)
+			// ASSERT(keyword_registers.size() == 1)
+
+			emit<FunctionCallEx>(func_register,
+				arg_registers[0],
+				// keyword_registers[0],
+				Register{ 0 },
+				requires_args_expansion,
+				requires_kwargs_expansion);
+		}
+	} else {
+		if (node->function()->node_type() == ASTNodeType::Attribute) {
+			auto attr_name = as<Attribute>(node->function())->attr();
+			emit<MethodCall>(func_register, attr_name, std::move(arg_registers));
+		} else {
+			if (keyword_registers.empty()) {
+				emit<FunctionCall>(func_register, std::move(arg_registers));
+			} else {
+				emit<FunctionCallWithKeywords>(func_register,
+					std::move(arg_registers),
+					std::move(keyword_registers),
+					std::move(keywords));
+			}
 		}
 	}
 

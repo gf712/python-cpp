@@ -7,6 +7,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/FunctionCall.cpp
+    executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/GreaterThan.cpp
     executable/bytecode/instructions/InOp.cpp
@@ -19,6 +20,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/JumpIfNotExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
     executable/bytecode/instructions/JumpIfTrueOrPop.cpp
+    executable/bytecode/instructions/ListExtend.cpp
+    executable/bytecode/instructions/ListToTuple.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
