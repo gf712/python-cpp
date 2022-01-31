@@ -95,6 +95,22 @@ Value PyDict::operator[](Value key) const
 
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
 
+void PyDict::merge(PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(args && args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().empty())
+
+	auto *other_dict = PyObject::from(args->elements()[0]);
+	ASSERT(as<PyDict>(other_dict))
+
+	auto map_copy = as<PyDict>(other_dict)->map();
+	m_map.merge(map_copy);
+	if (!map_copy.empty()) {
+		// should raise error if duplicates are not allowed
+		TODO();
+	}
+}
+
 
 void PyDict::visit_graph(Visitor &visitor)
 {

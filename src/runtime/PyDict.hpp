@@ -35,6 +35,8 @@ class PyDict : public PyBaseObject
 	const MapType &map() const { return m_map; }
 
 	void insert(const Value &key, const Value &value);
+	void merge(PyTuple *args, PyDict *kwargs);
+
 	Value operator[](Value key) const;
 
 	PyObject *get(PyObject *, PyObject *) const;

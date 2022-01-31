@@ -6,6 +6,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/Bytecode.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
+    executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp

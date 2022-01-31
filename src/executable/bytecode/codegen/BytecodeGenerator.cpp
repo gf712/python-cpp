@@ -1,6 +1,7 @@
 #include "BytecodeGenerator.hpp"
 
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
+#include "executable/bytecode/instructions/DictMerge.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
@@ -269,7 +270,45 @@ void BytecodeGenerator::visit(const Call *node)
 		emit<ListToTuple>(args_tuple, list_register);
 		arg_registers.push_back(args_tuple);
 
-		if (requires_kwargs_expansion) { TODO(); }
+		if (requires_kwargs_expansion) {
+			auto dict_register = allocate_register();
+			std::vector<Register> key_registers;
+			std::vector<Register> value_registers;
+			bool first_kwargs_expansion = true;
+
+			for (const auto &el : node->keywords()) {
+				if (is_kwargs_expansion(el)) {
+					if (first_kwargs_expansion) {
+						emit<BuildDict>(dict_register, key_registers, value_registers);
+						value_registers.clear();
+						key_registers.clear();
+						first_kwargs_expansion = false;
+					}
+					const auto kwargs_dict = generate(el->value().get(), m_function_id);
+					emit<DictMerge>(dict_register, kwargs_dict);
+				} else {
+					const auto &value_reg = generate(el.get(), m_function_id);
+					const auto &name = *el->arg();
+					const auto key_reg = allocate_register();
+					emit<LoadConst>(key_reg, String{ name });
+					if (first_kwargs_expansion) {
+						key_registers.push_back(key_reg);
+						value_registers.push_back(value_reg);
+					} else {
+						const auto new_dict_reg = allocate_register();
+						emit<BuildDict>(new_dict_reg,
+							std::vector<Register>{ key_reg },
+							std::vector<Register>{ value_reg });
+						emit<DictMerge>(dict_register, new_dict_reg);
+					}
+				}
+			}
+			ASSERT(first_kwargs_expansion == false)
+			keyword_registers.push_back(dict_register);
+		} else {
+			// dummy value that will be ignore at runtime, since requires_kwargs_expansion is false
+			keyword_registers.push_back(Register{ 0 });
+		}
 	} else {
 		arg_registers.reserve(node->args().size());
 		for (const auto &arg : node->args()) {
@@ -290,14 +329,12 @@ void BytecodeGenerator::visit(const Call *node)
 		if (node->function()->node_type() == ASTNodeType::Attribute) {
 			TODO();
 		} else {
-			if (requires_kwargs_expansion) { TODO(); }
 			ASSERT(arg_registers.size() == 1)
-			// ASSERT(keyword_registers.size() == 1)
+			ASSERT(keyword_registers.size() == 1)
 
 			emit<FunctionCallEx>(func_register,
 				arg_registers[0],
-				// keyword_registers[0],
-				Register{ 0 },
+				keyword_registers[0],
 				requires_args_expansion,
 				requires_kwargs_expansion);
 		}
