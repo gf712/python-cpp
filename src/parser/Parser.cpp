@@ -1723,12 +1723,6 @@ struct FactorPattern : Pattern<FactorPattern>
 	}
 };
 
-inline std::shared_ptr<ASTNode> &leftmost(std::shared_ptr<ASTNode> &node)
-{
-	if (auto binop = as<BinaryExpr>(node)) { return leftmost(binop->lhs()); }
-	return node;
-}
-
 
 struct TermPattern_ : Pattern<TermPattern_>
 {
@@ -1742,48 +1736,71 @@ struct TermPattern_ : Pattern<TermPattern_>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("TermPattern_");
-		using pattern1 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern, TermPattern_>;
+
+		BlockScope scope{ p };
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, FactorPattern>;
 		if (pattern1::match(p)) {
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MULTIPLY, lhs, rhs);
 			p.push_to_stack(binary_op);
-			return true;
+			if (TermPattern_::matches(p)) {
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
+			}
 		}
-		using pattern2 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::SLASH>, FactorPattern, TermPattern_>;
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::SLASH>, FactorPattern>;
 		if (pattern2::match(p)) {
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::SLASH, lhs, rhs);
 			p.push_to_stack(binary_op);
-			return true;
+			if (TermPattern_::matches(p)) {
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
+			}
 		}
 
-		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESLASH>,
-			FactorPattern,
-			TermPattern_>;
+		using pattern3 =
+			PatternMatch<SingleTokenPattern<Token::TokenType::DOUBLESLASH>, FactorPattern>;
 		if (pattern3::match(p)) {
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::FLOORDIV, lhs, rhs);
 			p.push_to_stack(binary_op);
-			return true;
+			if (TermPattern_::matches(p)) {
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
+			}
 		}
-		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>,
-			FactorPattern,
-			TermPattern_>;
+		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::PERCENT>, FactorPattern>;
 		if (pattern4::match(p)) {
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MODULO, lhs, rhs);
 			p.push_to_stack(binary_op);
-			return true;
+			if (TermPattern_::matches(p)) {
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
+			}
 		}
-		using pattern5 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::AT>, FactorPattern, TermPattern_>;
-		if (pattern5::match(p)) { TODO(); }
+		using pattern5 = PatternMatch<SingleTokenPattern<Token::TokenType::AT>, FactorPattern>;
+		if (pattern5::match(p)) {
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
+			TODO();
+			// auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::AT, lhs, rhs);
+			// p.push_to_stack(binary_op);
+			if (TermPattern_::matches(p)) {
+				// scope.parent().push_back(binary_op);
+				return true;
+			}
+		}
+
 		return true;
 	}
 };
@@ -1820,38 +1837,39 @@ struct SumPattern_ : Pattern<SumPattern_>
 	{
 		DEBUG_LOG("SumPattern_");
 		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		BlockScope scope{ p };
 		// '+' term sum'
-		using pattern1 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, TermPattern, SumPattern_>;
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, TermPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'+' term sum'");
 			PRINT_STACK();
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
 			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::PLUS, lhs, rhs);
 			p.push_to_stack(binary_op);
-			PRINT_STACK();
-			return true;
+			if (SumPattern_::matches(p)) {
+				PRINT_STACK();
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
+			}
 		}
 
 		// '-' term sum'
-		using pattern2 =
-			PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, TermPattern, SumPattern_>;
+		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, TermPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'-' term sum'");
-			auto rhs = p.pop_back();
-			auto lhs = p.pop_back();
-			if (auto rhs_binop = as<BinaryExpr>(rhs)) {
-				auto node = std::static_pointer_cast<ASTNode>(rhs_binop);
-				auto binary_op =
-					std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, leftmost(node));
-				leftmost(node) = binary_op;
-				p.push_to_stack(node);
-			} else {
-				auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, rhs);
-				p.push_to_stack(binary_op);
+			PRINT_STACK();
+			auto lhs = scope.parent().back();
+			auto rhs = p.pop_front();
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, rhs);
+			p.push_to_stack(binary_op);
+			if (SumPattern_::matches(p)) {
+				PRINT_STACK();
+				scope.parent().pop_back();
+				scope.parent().push_back(p.pop_back());
+				return true;
 			}
-			return true;
 		}
 
 		// ϵ
