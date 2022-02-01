@@ -35,6 +35,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/StoreAttr.cpp
     executable/bytecode/instructions/StoreName.cpp
+    executable/bytecode/instructions/TrueDivide.cpp
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp)
 

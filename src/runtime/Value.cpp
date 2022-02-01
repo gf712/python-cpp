@@ -13,6 +13,34 @@
 #include "vm/VM.hpp"
 
 
+Number Number::operator/(const Number &other) const
+{
+	return std::visit(
+		overloaded{ [](const auto &lhs, const auto &rhs) {
+					   return Number{ static_cast<double>(lhs) / static_cast<double>(rhs) };
+				   },
+			[](const int64_t &lhs, const int64_t &rhs) {
+				if (lhs % rhs == 0) {
+					return Number{ lhs / rhs };
+				} else {
+					return Number{ static_cast<double>(lhs) / static_cast<double>(rhs) };
+				}
+			} },
+		value,
+		other.value);
+}
+
+Number Number::operator*(const Number &other) const
+{
+	return std::visit(
+		overloaded{ [](const auto &lhs, const auto &rhs) {
+					   return Number{ static_cast<double>(lhs) * static_cast<double>(rhs) };
+				   },
+			[](const int64_t &lhs, const int64_t &rhs) { return Number{ lhs * rhs }; } },
+		value,
+		other.value);
+}
+
 bool Number::operator==(const PyObject *other) const
 {
 	if (auto other_pynumber = as<PyInteger>(other)) {
@@ -23,7 +51,6 @@ bool Number::operator==(const PyObject *other) const
 		return false;
 	}
 }
-
 
 bool Number::operator==(const NameConstant &other) const
 {
@@ -212,6 +239,25 @@ std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &)
 				const auto py_lhs = PyObject::from(lhs_value);
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (auto result = py_lhs->modulo(py_rhs)) { return result; }
+				return {};
+			} },
+		lhs,
+		rhs);
+}
+
+std::optional<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> std::optional<Value> {
+					   return lhs_value / rhs_value;
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> std::optional<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				(void)py_lhs;
+				(void)py_rhs;
+				// if (auto result = py_lhs->true_divide(py_rhs)) { return result; }
+				TODO();
 				return {};
 			} },
 		lhs,

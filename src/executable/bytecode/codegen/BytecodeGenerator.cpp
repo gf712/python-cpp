@@ -31,8 +31,10 @@
 #include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
+#include "executable/bytecode/instructions/TrueDivide.cpp"
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
+
 
 #include "ast/optimizers/ConstantFolding.hpp"
 #include "executable/FunctionBlock.hpp"
@@ -99,8 +101,9 @@ void BytecodeGenerator::visit(const BinaryExpr *node)
 	case BinaryOpType::MODULO: {
 		emit<Modulo>(dst_register, lhs_register, rhs_register);
 	} break;
-	case BinaryOpType::SLASH:
-		TODO();
+	case BinaryOpType::SLASH: {
+		emit<TrueDivide>(dst_register, lhs_register, rhs_register);
+	} break;
 	case BinaryOpType::FLOORDIV:
 		TODO();
 	case BinaryOpType::LEFTSHIFT: {

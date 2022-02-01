@@ -57,16 +57,7 @@ struct Number
 			rhs.value);
 	}
 
-	Number operator*(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				return Number{ static_cast<decltype(lhs_value)>(
-					static_cast<double>(lhs_value) * static_cast<double>(rhs_value)) };
-			},
-			value,
-			rhs.value);
-	}
+	Number operator*(const Number &rhs) const;
 
 	Number operator%(const Number &rhs) const
 	{
@@ -78,6 +69,7 @@ struct Number
 			value,
 			rhs.value);
 	}
+	Number operator/(const Number &rhs) const;
 	Number operator<<(const Number &rhs) const
 	{
 		return std::visit(
@@ -212,6 +204,7 @@ std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &i
 std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
