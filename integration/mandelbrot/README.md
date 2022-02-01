@@ -1,0 +1,1 @@
+The mandelbrot.py code was taken from https://github.com/RustPython/RustPython/blob/main/benches/benchmarks/mandelbrot.py. Eventually, it would be nice to have benchmarks that compare this Python implementation with CPython and others, in terms of runtime, memory usage, serialisation, parsing speed, etc.
