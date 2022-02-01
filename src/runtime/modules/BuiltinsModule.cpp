@@ -43,8 +43,13 @@ PyFunction *make_function(const std::string &function_name,
 	auto &vm = VirtualMachine::the();
 	ASSERT(vm.interpreter().functions(function_id)->backend() == FunctionExecutionBackend::BYTECODE)
 	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().functions(function_id));
-	PyCode *code = vm.heap().allocate<PyCode>(
-		function, function_id, argnames, argcount, PyCode::CodeFlags::create(), module);
+	PyCode *code = vm.heap().allocate<PyCode>(function,
+		function_id,
+		argnames,
+		std::vector<Value>{},
+		argcount,
+		PyCode::CodeFlags::create(),
+		module);
 	return vm.heap().allocate<PyFunction>(function_name, code, globals);
 }
 

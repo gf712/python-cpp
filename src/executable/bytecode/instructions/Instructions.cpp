@@ -26,8 +26,14 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
 	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARKEYWORDS); }
 
+	std::vector<Value> default_values;
+	default_values.reserve(m_defaults.size());
+	for (const auto &default_value : m_defaults) {
+		default_values.push_back(vm.reg(default_value));
+	}
+
 	auto *code = vm.heap().allocate<PyCode>(
-		function, m_function_id, m_args, m_arg_count, flags, interpreter.module());
+		function, m_function_id, m_args, default_values, m_arg_count, flags, interpreter.module());
 	interpreter.allocate_object<PyFunction>(
 		m_function_name, m_function_name, code, interpreter.execution_frame()->globals());
 }

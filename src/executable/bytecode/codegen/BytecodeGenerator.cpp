@@ -119,44 +119,62 @@ void BytecodeGenerator::visit(const BinaryExpr *node)
 void BytecodeGenerator::visit(const FunctionDefinition *node)
 {
 	if (!node->decorator_list().empty()) { TODO(); }
-	m_ctx.push_local_args(node->args());
-	auto this_function_info = allocate_function();
-
-	auto *block = allocate_block(this_function_info.function_id);
-	auto *old_block = m_current_block;
-	set_insert_point(block);
-
-	generate(node->args().get(), this_function_info.function_id);
-
-	for (const auto &node : node->body()) { generate(node.get(), this_function_info.function_id); }
-
-	// always return None
-	// this can be optimised away later on
-	auto none_value_register = allocate_register();
-	emit<LoadConst>(none_value_register, NameConstant{ NoneType{} });
-	emit<ReturnValue>(none_value_register);
 
 	std::vector<std::string> arg_names;
-	for (const auto &arg_name : node->args()->argument_names()) { arg_names.push_back(arg_name); }
+	std::optional<size_t> this_function_id;
+	{
+		m_ctx.push_local_args(node->args());
+		auto this_function_info = allocate_function();
+		this_function_id = this_function_info.function_id;
 
-	set_insert_point(old_block);
+		auto *block = allocate_block(this_function_info.function_id);
+		auto *old_block = m_current_block;
+		set_insert_point(block);
+
+		generate(node->args().get(), this_function_info.function_id);
+
+		for (const auto &node : node->body()) {
+			generate(node.get(), this_function_info.function_id);
+		}
+
+		// always return None
+		// this can be optimised away later on
+		auto none_value_register = allocate_register();
+		emit<LoadConst>(none_value_register, NameConstant{ NoneType{} });
+		emit<ReturnValue>(none_value_register);
+
+		for (const auto &arg_name : node->args()->argument_names()) {
+			arg_names.push_back(arg_name);
+		}
+
+		set_insert_point(old_block);
+		m_ctx.pop_local_args();
+	}
 
 	size_t arg_count = node->args()->args().size() + node->args()->kwonlyargs().size();
 
-	emit<MakeFunction>(this_function_info.function_id,
+	std::vector<Register> defaults;
+	defaults.reserve(node->args()->defaults().size());
+	for (const auto &default_node : node->args()->defaults()) {
+		defaults.push_back(generate(default_node.get(), m_function_id));
+	}
+
+	ASSERT(this_function_id)
+	emit<MakeFunction>(*this_function_id,
 		node->name(),
 		arg_names,
+		defaults,
 		arg_count,
 		node->args()->vararg() != nullptr,
 		node->args()->kwarg() != nullptr);
 
-	m_ctx.pop_local_args();
 	m_last_register = Register{};
 }
 
 void BytecodeGenerator::visit(const Arguments *node)
 {
 	if (!node->kwonlyargs().empty()) { TODO(); }
+	if (!node->kw_defaults().empty()) { TODO(); }
 
 	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
 	if (node->vararg()) { generate(node->vararg().get(), m_function_id); }

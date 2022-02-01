@@ -15,12 +15,13 @@
 PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t function_id,
 	std::vector<std::string> args,
+	std::vector<Value> defaults,
 	size_t arg_count,
 	CodeFlags flags,
 	PyModule *module)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function), m_function_id(function_id),
 	  m_register_count(function->registers_needed()), m_args(std::move(args)),
-	  m_arg_count(arg_count), m_flags(flags), m_module(module)
+	  m_defaults(std::move(defaults)), m_arg_count(arg_count), m_flags(flags), m_module(module)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
@@ -87,6 +88,16 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 
 	size_t args_count = 0;
 	size_t kwargs_count = 0;
+	{
+		const auto &defaults = m_code->defaults();
+		auto default_iter = defaults.rbegin();
+		for (size_t i = m_code->arg_count() - 1; i > (m_code->arg_count() - defaults.size() - 1);
+			 --i) {
+			function_frame->parameter(i) = *default_iter;
+			default_iter = std::next(default_iter);
+		}
+	}
+
 	if (args) {
 		size_t max_args = std::min(args->size(), m_code->arg_count());
 		for (size_t idx = 0; idx < max_args; ++idx) {
