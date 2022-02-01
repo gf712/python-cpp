@@ -76,9 +76,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 	// 	spdlog::debug(
 	// 		"Key: {}, Value: {}", PyObject::from(k)->to_string(), PyObject::from(v)->to_string());
 	// }
-	auto value = vm.interpreter().execution_frame()->locals()->map().at(String{ name });
-	ASSERT_TRUE(std::holds_alternative<PyObject *>(value));
-	auto obj = std::get<PyObject *>(value);
+	auto *obj = PyObject::from(vm.interpreter().execution_frame()->locals()->map().at(String{ name }));
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
 		ASSERT_EQ(obj->type(), list());

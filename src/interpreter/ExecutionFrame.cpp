@@ -62,16 +62,15 @@ bool ExecutionFrame::catch_exception(PyObject *exception) const
 		return false;
 }
 
-void ExecutionFrame::put_local(const std::string &name, PyObject *obj)
+void ExecutionFrame::put_local(const std::string &name, const Value &value)
 {
-	m_locals->insert(String{ name }, obj);
+	m_locals->insert(String{ name }, value);
 }
 
-void ExecutionFrame::put_global(const std::string &name, PyObject *obj)
+void ExecutionFrame::put_global(const std::string &name, const Value &value)
 {
-	m_globals->insert(String{ name }, obj);
+	m_globals->insert(String{ name }, value);
 }
-
 
 PyDict *ExecutionFrame::locals() const { return m_locals; }
 PyDict *ExecutionFrame::globals() const { return m_globals; }

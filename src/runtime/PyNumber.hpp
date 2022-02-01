@@ -12,11 +12,7 @@ class PyNumber : public PyBaseObject
 
   public:
 	static PyNumber *create(const Number &number);
-	std::string to_string() const override
-	{
-		return std::visit(
-			[](const auto &value) { return fmt::format("{}", value); }, m_value.value);
-	}
+	std::string to_string() const override;
 
 	PyObject *__add__(const PyObject *obj) const;
 	PyObject *__sub__(const PyObject *obj) const;

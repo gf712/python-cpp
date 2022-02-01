@@ -7,6 +7,16 @@
 
 #include "interpreter/Interpreter.hpp"
 
+std::string PyNumber::to_string() const
+{
+	return std::visit(overloaded{
+						  [](const double &value) { return fmt::format("{:f}", value); },
+						  [](const int64_t &value) { return fmt::format("{}", value); },
+					  },
+		m_value.value);
+}
+
+
 PyObject *PyNumber::__repr__() const { return PyString::create(to_string()); }
 
 const PyNumber *PyNumber::as_number(const PyObject *obj)

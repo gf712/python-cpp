@@ -43,20 +43,24 @@ class Interpreter
 
 	void set_execution_frame(ExecutionFrame *frame) { m_current_frame = frame; }
 
-	void store_object(const std::string &name, PyObject *obj)
+	void store_object(const std::string &name, const Value &value)
 	{
-		spdlog::debug("Interpreter::store_object(name={}, obj={}, current_frame={})",
+		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
 			name,
-			obj->to_string(),
+			std::visit([](const auto &val) {
+				std::ostringstream os;
+				os << val;
+				return os.str();
+			}, value),
 			(void *)m_current_frame);
-		m_current_frame->put_local(name, obj);
-		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, obj); }
+		m_current_frame->put_local(name, value);
+		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, value); }
 	}
 
 	std::optional<Value> get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
-	PyObject *allocate_object(const std::string &name, Args &&...args)
+	PyObject *allocate_object(const std::string &name, Args &&... args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {

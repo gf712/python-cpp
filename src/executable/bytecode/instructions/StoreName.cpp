@@ -8,18 +8,5 @@
 void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &value = vm.reg(m_source);
-	auto *obj =
-		std::visit(overloaded{ [](const Number &n) -> PyObject * { return PyNumber::create(n); },
-					   [](const String &s) -> PyObject * { return PyString::create(s.s); },
-					   [](const NameConstant &s) -> PyObject * { return PyObject::from(s); },
-					   [](PyObject *obj) -> PyObject * { return obj; },
-					   [](const auto &) -> PyObject * {
-						   TODO();
-						   return nullptr;
-					   } },
-			value);
-
-	ASSERT(obj)
-
-	interpreter.store_object(m_object_name, obj);
+	interpreter.store_object(m_object_name, value);
 }
