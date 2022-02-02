@@ -3467,7 +3467,7 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 				auto node = p.pop_front();
 				if (as<Argument>(node)) {
 					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
-					as<Arguments>(args)->push_kwarg_default(std::make_shared<Constant>(NoneType{}));
+					as<Arguments>(args)->push_kwarg_default(nullptr);
 				} else if (as<Keyword>(node)) {
 					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
 					as<Arguments>(args)->push_kwonlyarg(arg);
@@ -3498,7 +3498,7 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 				auto node = p.pop_front();
 				if (as<Argument>(node)) {
 					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
-					as<Arguments>(args)->push_kwarg_default(std::make_shared<Constant>(NoneType{}));
+					as<Arguments>(args)->push_kwarg_default(nullptr);
 				} else if (as<Keyword>(node)) {
 					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
 					as<Arguments>(args)->push_kwonlyarg(arg);

@@ -2247,8 +2247,7 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
 			nullptr,
 			std::vector{ std::make_shared<ast::Argument>("c", nullptr, ""),
 				std::make_shared<ast::Argument>("d", nullptr, "") },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(NoneType{}), std::make_shared<Constant>(NoneType{}) },
+			std::vector<std::shared_ptr<ASTNode>>{ nullptr, nullptr },
 			std::make_shared<Argument>("kwargs", nullptr, ""),
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Constant>(int64_t{ 1 }) }),// args

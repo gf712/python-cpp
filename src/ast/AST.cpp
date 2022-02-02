@@ -142,11 +142,21 @@ void Arguments::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - kwonlyargs:", indent);
 	for (const auto &kwarg : m_kwonlyargs) { kwarg->print_node(new_indent); }
 	spdlog::debug("{}  - kw_defaults:", indent);
-	for (const auto &arg : m_kw_defaults) { arg->print_node(new_indent); }
+	for (const auto &arg : m_kw_defaults) {
+		if (arg)
+			arg->print_node(new_indent);
+		else
+			spdlog::debug("{}  - null", new_indent);
+	}
 	spdlog::debug("{}  - kwarg:", indent);
 	if (m_kwarg) { m_kwarg->print_node(new_indent); }
 	spdlog::debug("{}  - defaults:", indent);
-	for (const auto &arg : m_defaults) { arg->print_node(new_indent); }
+	for (const auto &arg : m_defaults) {
+		if (arg)
+			arg->print_node(new_indent);
+		else
+			spdlog::debug("{}  - null", new_indent);
+	}
 }
 
 void FunctionDefinition::print_this_node(const std::string &indent) const
