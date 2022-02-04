@@ -118,6 +118,7 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 		std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() },
 		std::reference_wrapper{ heap.slab().block_2048() },
+		std::reference_wrapper{ heap.slab().block_4096() }
 	};
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
@@ -154,6 +155,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 		std::reference_wrapper{ heap.slab().block_512() },
 		std::reference_wrapper{ heap.slab().block_1024() },
 		std::reference_wrapper{ heap.slab().block_2048() },
+		std::reference_wrapper{ heap.slab().block_4096() }
 	};
 	// sweep all the dead objects
 	for (const auto &block : blocks) {

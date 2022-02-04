@@ -555,7 +555,8 @@ struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'.' NAME &t_lookahead")
 			std::string_view name{ token->start().pointer_to_program,
-				token->end().pointer_to_program };
+				static_cast<size_t>(
+					token->end().pointer_to_program - token->start().pointer_to_program)};
 			auto value = p.pop_back();
 			p.push_to_stack(
 				std::make_shared<Attribute>(value, std::string(name), ContextType::LOAD));
@@ -1169,7 +1170,8 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 		const auto token = p.lexer().peek_token(p.token_position());
 		DEBUG_LOG("{}", token->to_string());
 		std::string_view maybe_name{ token->start().pointer_to_program,
-			token->end().pointer_to_program };
+			static_cast<size_t>(
+				token->end().pointer_to_program - token->start().pointer_to_program)};
 
 		// NAME ':=' ~ expression
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
@@ -1249,7 +1251,8 @@ struct KwargsOrDoubleStarredPattern : Pattern<KwargsOrDoubleStarredPattern>
 		DEBUG_LOG("KwargsOrDoubleStarredPattern")
 		auto token = p.lexer().peek_token(p.token_position());
 		std::string_view maybe_name{ token->start().pointer_to_program,
-			token->end().pointer_to_program };
+			static_cast<size_t>(
+				token->end().pointer_to_program - token->start().pointer_to_program)};
 
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>,
 			SingleTokenPattern<Token::TokenType::EQUAL>,

@@ -164,6 +164,7 @@ class Slab
 		block512 = std::make_unique<Block>(512, 1000);
 		block1024 = std::make_unique<Block>(1024, 1000);
 		block2048 = std::make_unique<Block>(2048, 1000);
+		block4096 = std::make_unique<Block>(4096, 1000);
 	}
 
 	std::unique_ptr<Block> &block_16() { return block16; }
@@ -174,6 +175,7 @@ class Slab
 	std::unique_ptr<Block> &block_512() { return block512; }
 	std::unique_ptr<Block> &block_1024() { return block1024; }
 	std::unique_ptr<Block> &block_2048() { return block2048; }
+	std::unique_ptr<Block> &block_4096() { return block4096; }
 
 	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
 	{
@@ -186,13 +188,14 @@ class Slab
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 512) { return block512->allocate(); }
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) {
 			return block1024->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
+		} if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
 			return block2048->allocate();
+		} else if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 4096) {
+			return block4096->allocate();
 		} else {
 			[]<bool flag = false>()
 			{
-				static_assert(flag, "only object sizes <= 2048 bytes are currently supported");
+				static_assert(flag, "only object sizes <= 4096 bytes are currently supported");
 			}
 			();
 		}
@@ -239,6 +242,7 @@ class Slab
 		block512->reset();
 		block1024->reset();
 		block2048->reset();
+		block4096->reset();
 	}
 
   private:
@@ -250,6 +254,7 @@ class Slab
 	std::unique_ptr<Block> block512{ nullptr };
 	std::unique_ptr<Block> block1024{ nullptr };
 	std::unique_ptr<Block> block2048{ nullptr };
+	std::unique_ptr<Block> block4096{ nullptr };
 };
 
 class Heap
