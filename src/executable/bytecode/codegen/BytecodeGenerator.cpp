@@ -6,6 +6,7 @@
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GreaterThan.hpp"
+#include "executable/bytecode/instructions/GreaterThanEquals.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InOp.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
@@ -495,7 +496,7 @@ void BytecodeGenerator::visit(const Compare *node)
 		emit<GreaterThan>(result_reg, lhs_reg, rhs_reg);
 	} break;
 	case Compare::OpType::GtE: {
-		TODO();
+		emit<GreaterThanEquals>(result_reg, lhs_reg, rhs_reg);
 	} break;
 	case Compare::OpType::Is: {
 		emit<IsOp>(result_reg, lhs_reg, rhs_reg, false);

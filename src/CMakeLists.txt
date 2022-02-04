@@ -11,6 +11,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/GreaterThan.cpp
+    executable/bytecode/instructions/GreaterThanEquals.cpp
     executable/bytecode/instructions/InOp.cpp
     executable/bytecode/instructions/InplaceSub.cpp
     executable/bytecode/instructions/IsOp.cpp
