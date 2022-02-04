@@ -47,7 +47,9 @@ PyFunction *make_function(const std::string &function_name,
 		function_id,
 		argnames,
 		std::vector<Value>{},
+		std::vector<Value>{},
 		argcount,
+		0,
 		PyCode::CodeFlags::create(),
 		module);
 	return vm.heap().allocate<PyFunction>(function_name, code, globals);

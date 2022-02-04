@@ -41,29 +41,35 @@ class PyCode : public PyBaseObject
 	const std::shared_ptr<Function> m_function;
 	const size_t m_function_id;
 	const size_t m_register_count;
-	const std::vector<std::string> m_args;
+	const std::vector<std::string> m_varnames;
 	const std::vector<Value> m_defaults;
+	const std::vector<Value> m_kwonly_defaults;
 	const size_t m_arg_count;
+	const size_t m_kwonly_arg_count;
 	CodeFlags m_flags;
 	PyModule *m_module;
 
   public:
 	PyCode(std::shared_ptr<Function> function,
 		size_t function_id,
-		std::vector<std::string> args,
+		std::vector<std::string> varnames,
 		std::vector<Value> defaults,
+		std::vector<Value> kwonly_defaults,
 		size_t arg_count,
+		size_t kwonly_arg_count,
 		CodeFlags flags,
 		PyModule *m_module);
 
 	PyObject *call(PyTuple *args, PyDict *kwargs);
-	const std::vector<std::string> &args() const { return m_args; }
+	const std::vector<std::string> &varnames() const { return m_varnames; }
 	const std::vector<Value> &defaults() const { return m_defaults; }
+	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
 	std::string to_string() const override { return fmt::format("PyCode"); }
 
 	size_t register_count() const;
 	size_t arg_count() const;
+	size_t kwonly_arg_count() const;
 	CodeFlags flags() const;
 
 	const std::shared_ptr<Function> &function() const { return m_function; }

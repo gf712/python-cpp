@@ -32,8 +32,21 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		default_values.push_back(vm.reg(default_value));
 	}
 
-	auto *code = vm.heap().allocate<PyCode>(
-		function, m_function_id, m_args, default_values, m_arg_count, flags, interpreter.module());
+	std::vector<Value> kw_default_values;
+	default_values.reserve(m_kw_defaults.size());
+	for (const auto &default_value : m_kw_defaults) {
+		kw_default_values.push_back(vm.reg(default_value));
+	}
+
+	auto *code = vm.heap().allocate<PyCode>(function,
+		m_function_id,
+		m_args,
+		default_values,
+		kw_default_values,
+		m_arg_count,
+		m_kwonly_arg_count,
+		flags,
+		interpreter.module());
 	interpreter.allocate_object<PyFunction>(
 		m_function_name, m_function_name, code, interpreter.execution_frame()->globals());
 }

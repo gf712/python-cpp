@@ -24,5 +24,5 @@ void MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 	// FIXME: process kwargs
 	PyDict *kwargs = nullptr;
 
-	vm.reg(0) = obj->call(args_tuple, kwargs);
+	if (auto *result = obj->call(args_tuple, kwargs)) { vm.reg(0) = result; }
 }

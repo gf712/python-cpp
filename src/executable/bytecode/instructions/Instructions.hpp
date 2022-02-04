@@ -302,7 +302,9 @@ class MakeFunction : public Instruction
 	std::string m_function_name;
 	std::vector<std::string> m_args;
 	std::vector<Register> m_defaults;
+	std::vector<Register> m_kw_defaults;
 	size_t m_arg_count;
+	size_t m_kwonly_arg_count;
 	bool m_has_varargs;
 	bool m_has_varkeywords;
 
@@ -311,12 +313,16 @@ class MakeFunction : public Instruction
 		std::string function_name,
 		std::vector<std::string> args,
 		std::vector<Register> defaults,
+		std::vector<Register> kw_defaults,
 		size_t arg_count,
+		size_t kwonly_arg_count,
 		bool has_varargs,
 		bool has_keywords)
 		: m_function_id(function_id), m_function_name(std::move(function_name)),
-		  m_args(std::move(args)), m_defaults(std::move(defaults)), m_arg_count(arg_count),
-		  m_has_varargs(has_varargs), m_has_varkeywords(has_keywords)
+		  m_args(std::move(args)), m_defaults(std::move(defaults)),
+		  m_kw_defaults(std::move(kw_defaults)), m_arg_count(arg_count),
+		  m_kwonly_arg_count(kwonly_arg_count), m_has_varargs(has_varargs),
+		  m_has_varkeywords(has_keywords)
 	{}
 
 	~MakeFunction() override {}

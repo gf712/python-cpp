@@ -29,5 +29,5 @@ void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
 	auto kwargs_dict = vm.heap().allocate<PyDict>(map);
 	ASSERT(kwargs_dict);
 
-	vm.reg(0) = function_object->call(args_tuple, kwargs_dict);
+	if (auto *result = function_object->call(args_tuple, kwargs_dict)) { vm.reg(0) = result; }
 }

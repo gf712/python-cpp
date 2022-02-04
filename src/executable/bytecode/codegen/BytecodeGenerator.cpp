@@ -53,9 +53,17 @@ void BytecodeGenerator::visit(const Name *node)
 	if (m_ctx.has_local_args()) {
 		const auto &local_args = m_ctx.local_args();
 		const auto &arg_names = local_args->argument_names();
+		const auto &kw_only_arg_names = local_args->kw_only_argument_names();
 		if (auto it = std::find(arg_names.begin(), arg_names.end(), node->ids()[0]);
 			it != arg_names.end()) {
 			const size_t arg_index = std::distance(arg_names.begin(), it);
+			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
+			return;
+		} else if (auto it = std::find(
+					   kw_only_arg_names.begin(), kw_only_arg_names.end(), node->ids()[0]);
+				   it != kw_only_arg_names.end()) {
+			const size_t arg_index =
+				std::distance(kw_only_arg_names.begin(), it) + arg_names.size();
 			emit<LoadFast>(m_last_register, arg_index, node->ids()[0]);
 			return;
 		} else if (local_args->vararg() && local_args->vararg()->name() == node->ids()[0]) {
@@ -147,12 +155,16 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 		for (const auto &arg_name : node->args()->argument_names()) {
 			arg_names.push_back(arg_name);
 		}
+		for (const auto &arg_name : node->args()->kw_only_argument_names()) {
+			arg_names.push_back(arg_name);
+		}
 
 		set_insert_point(old_block);
 		m_ctx.pop_local_args();
 	}
 
-	size_t arg_count = node->args()->args().size() + node->args()->kwonlyargs().size();
+	size_t arg_count = node->args()->args().size();
+	size_t kwonly_arg_count = node->args()->kwonlyargs().size();
 
 	std::vector<Register> defaults;
 	defaults.reserve(node->args()->defaults().size());
@@ -160,12 +172,26 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 		defaults.push_back(generate(default_node.get(), m_function_id));
 	}
 
+	std::vector<Register> kw_defaults;
+	kw_defaults.reserve(node->args()->kw_defaults().size());
+	for (const auto &default_node : node->args()->kw_defaults()) {
+		if (default_node) {
+			kw_defaults.push_back(generate(default_node.get(), m_function_id));
+		} else {
+			const auto nullptr_reg = allocate_register();
+			emit<LoadConst>(nullptr_reg, nullptr);
+			kw_defaults.push_back(nullptr_reg);
+		}
+	}
+
 	ASSERT(this_function_id)
 	emit<MakeFunction>(*this_function_id,
 		node->name(),
 		arg_names,
 		defaults,
+		kw_defaults,
 		arg_count,
+		kwonly_arg_count,
 		node->args()->vararg() != nullptr,
 		node->args()->kwarg() != nullptr);
 
@@ -174,12 +200,12 @@ void BytecodeGenerator::visit(const FunctionDefinition *node)
 
 void BytecodeGenerator::visit(const Arguments *node)
 {
-	if (!node->kwonlyargs().empty()) { TODO(); }
-	if (!node->kw_defaults().empty()) { TODO(); }
+	// if (!node->kw_defaults().empty()) { TODO(); }
 
 	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
 	if (node->vararg()) { generate(node->vararg().get(), m_function_id); }
 	if (node->kwarg()) { generate(node->kwarg().get(), m_function_id); }
+	for (const auto &arg : node->kwonlyargs()) { generate(arg.get(), m_function_id); }
 
 	m_last_register = Register{};
 }
@@ -348,18 +374,14 @@ void BytecodeGenerator::visit(const Call *node)
 	}
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
-		if (node->function()->node_type() == ASTNodeType::Attribute) {
-			TODO();
-		} else {
-			ASSERT(arg_registers.size() == 1)
-			ASSERT(keyword_registers.size() == 1)
+		ASSERT(arg_registers.size() == 1)
+		ASSERT(keyword_registers.size() == 1)
 
-			emit<FunctionCallEx>(func_register,
-				arg_registers[0],
-				keyword_registers[0],
-				requires_args_expansion,
-				requires_kwargs_expansion);
-		}
+		emit<FunctionCallEx>(func_register,
+			arg_registers[0],
+			keyword_registers[0],
+			requires_args_expansion,
+			requires_kwargs_expansion);
 	} else {
 		if (node->function()->node_type() == ASTNodeType::Attribute) {
 			auto attr_name = as<Attribute>(node->function())->attr();

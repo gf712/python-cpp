@@ -497,7 +497,12 @@ class Arguments : public ASTNode
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
 	std::vector<std::string> argument_names() const;
 
-	void push_kwonlyarg(std::shared_ptr<Argument> kwarg) { m_kwonlyargs.push_back(std::move(kwarg)); }
+	std::vector<std::string> kw_only_argument_names() const;
+
+	void push_kwonlyarg(std::shared_ptr<Argument> kwarg)
+	{
+		m_kwonlyargs.push_back(std::move(kwarg));
+	}
 	std::vector<std::string> keyword_argument_names() const;
 
 	void push_default(std::shared_ptr<ASTNode> default_value)

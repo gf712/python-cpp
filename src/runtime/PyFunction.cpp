@@ -14,19 +14,24 @@
 
 PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t function_id,
-	std::vector<std::string> args,
+	std::vector<std::string> varnames,
 	std::vector<Value> defaults,
+	std::vector<Value> kwonly_defaults,
 	size_t arg_count,
+	size_t kwonly_arg_count,
 	CodeFlags flags,
 	PyModule *module)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function), m_function_id(function_id),
-	  m_register_count(function->registers_needed()), m_args(std::move(args)),
-	  m_defaults(std::move(defaults)), m_arg_count(arg_count), m_flags(flags), m_module(module)
+	  m_register_count(function->registers_needed()), m_varnames(std::move(varnames)),
+	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
+	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_flags(flags), m_module(module)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
 
 size_t PyCode::arg_count() const { return m_arg_count; }
+
+size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 
 PyCode::CodeFlags PyCode::flags() const { return m_flags; }
 
@@ -86,17 +91,14 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			m_globals,
 			locals);
 
+	const auto &varnames = m_code->varnames();
+	std::vector<std::string> positional_args{ varnames.begin(),
+		varnames.begin() + m_code->arg_count() };
+	std::vector<std::string> keyword_only_args{ varnames.begin() + m_code->arg_count(),
+		varnames.end() };
+
 	size_t args_count = 0;
 	size_t kwargs_count = 0;
-	{
-		const auto &defaults = m_code->defaults();
-		auto default_iter = defaults.rbegin();
-		for (size_t i = m_code->arg_count() - 1; i > (m_code->arg_count() - defaults.size() - 1);
-			 --i) {
-			function_frame->parameter(i) = *default_iter;
-			default_iter = std::next(default_iter);
-		}
-	}
 
 	if (args) {
 		size_t max_args = std::min(args->size(), m_code->arg_count());
@@ -106,7 +108,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		args_count = max_args;
 	}
 	if (kwargs) {
-		const auto &argnames = m_code->args();
+		const auto &argnames = m_code->varnames();
 		for (const auto &[key, value] : kwargs->map()) {
 			ASSERT(std::holds_alternative<String>(key))
 			auto key_str = std::get<String>(key);
@@ -115,17 +117,41 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
 					continue;
 				} else {
-					type_error("{}() got an unexpected keyword argument '{}'", m_name, key_str.s);
+					VirtualMachine::the().interpreter().raise_exception(type_error(
+						"{}() got an unexpected keyword argument '{}'", m_name, key_str.s));
 					return nullptr;
 				}
 			}
 			auto &arg = function_frame->parameter(std::distance(argnames.begin(), arg_iter));
 			if (arg.has_value()) {
-				type_error("{}() got multiple values for argument '{}'", m_name, key_str.s);
+				VirtualMachine::the().interpreter().raise_exception(
+					type_error("{}() got multiple values for argument '{}'", m_name, key_str.s));
 				return nullptr;
 			}
 			arg = value;
 			kwargs_count++;
+		}
+	}
+
+	{
+		const auto &defaults = m_code->defaults();
+		auto default_iter = defaults.rbegin();
+		for (size_t i = m_code->arg_count() - 1; i > (m_code->arg_count() - defaults.size() - 1);
+			 --i) {
+			if (!function_frame->parameter(i).has_value()) {
+				function_frame->parameter(i) = *default_iter;
+			}
+			default_iter = std::next(default_iter);
+		}
+
+		const auto &kw_defaults = m_code->kwonly_defaults();
+		auto kw_default_iter = kw_defaults.rbegin();
+		const size_t start = m_code->kwonly_arg_count() + m_code->arg_count() - 1;
+		for (size_t i = start; i > start - kw_defaults.size(); --i) {
+			if (!function_frame->parameter(i).has_value()) {
+				function_frame->parameter(i) = *kw_default_iter;
+			}
+			kw_default_iter = std::next(kw_default_iter);
 		}
 	}
 
@@ -136,7 +162,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				remaining_args.push_back(args->elements()[idx]);
 			}
 		}
-		function_frame->parameter(m_code->args().size()) = PyTuple::create(remaining_args);
+		function_frame->parameter(m_code->varnames().size()) = PyTuple::create(remaining_args);
 	} else if (args_count < args->size()) {
 		VirtualMachine::the().interpreter().raise_exception(type_error(
 			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
@@ -146,7 +172,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
 		auto *remaining_kwargs = PyDict::create();
 		if (kwargs) {
-			const auto &argnames = m_code->args();
+			const auto &argnames = m_code->varnames();
 			for (const auto &[key, value] : kwargs->map()) {
 				auto key_str = std::get<String>(key);
 				auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
@@ -165,9 +191,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		}
 		size_t kwargs_index = [&]() {
 			if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
-				return m_code->args().size() + 1;
+				return m_code->varnames().size() + 1;
 			} else {
-				return m_code->args().size();
+				return m_code->varnames().size();
 			}
 		}();
 		function_frame->parameter(kwargs_index) = remaining_kwargs;

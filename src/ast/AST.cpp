@@ -128,6 +128,14 @@ std::vector<std::string> Arguments::argument_names() const
 	return arg_names;
 }
 
+std::vector<std::string> Arguments::kw_only_argument_names() const
+{
+	std::vector<std::string> arg_names;
+	for (const auto &arg : m_kwonlyargs) { arg_names.push_back(arg->name()); }
+	return arg_names;
+}
+
+
 void Arguments::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Arguments", indent);
@@ -146,7 +154,7 @@ void Arguments::print_this_node(const std::string &indent) const
 		if (arg)
 			arg->print_node(new_indent);
 		else
-			spdlog::debug("{}  - null", new_indent);
+			spdlog::debug("{}null", new_indent);
 	}
 	spdlog::debug("{}  - kwarg:", indent);
 	if (m_kwarg) { m_kwarg->print_node(new_indent); }
@@ -155,7 +163,7 @@ void Arguments::print_this_node(const std::string &indent) const
 		if (arg)
 			arg->print_node(new_indent);
 		else
-			spdlog::debug("{}  - null", new_indent);
+			spdlog::debug("{}null", new_indent);
 	}
 }
 

@@ -25,3 +25,15 @@ def f(a, b=10, c=20):
 assert f(10) == 40
 assert f(10, 20) == 50
 assert f(10, 20, 30) == 60
+
+
+def f(a, b, *, c):
+    return a + b + c
+
+assert f(10, 20, c=30) == 60
+
+try:
+    result = f(10, 20, 30)
+    assert False, "Should not be able to call keyword only argument with positional parameter"
+except TypeError:
+    assert True, ""

@@ -17,5 +17,5 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 	spdlog::debug("args_tuple: {}", (void *)&args_tuple);
 	ASSERT(args_tuple);
 
-	vm.reg(0) = callable_object->call(args_tuple, nullptr);
+	if (auto *result = callable_object->call(args_tuple, nullptr)) { vm.reg(0) = result; }
 }
