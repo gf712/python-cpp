@@ -193,9 +193,6 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		node->args()->vararg() != nullptr,
 		node->args()->kwarg() != nullptr);
 
-	m_ctx.pop_local_args();
-	m_stack.pop();
-
 	exit_function(f->function_info().function_id);
 
 	return f;
@@ -335,8 +332,8 @@ Value *BytecodeGenerator::visit(const Call *node)
 						key_registers.clear();
 						first_kwargs_expansion = false;
 					}
-					const auto kwargs_dict = generate(el->value().get(), m_function_id);
-					emit<DictMerge>(dict_value->get_register(), kwargs_dict);
+					auto *kwargs_dict = generate(el->value().get(), m_function_id);
+					emit<DictMerge>(dict_value->get_register(), kwargs_dict->get_register());
 				} else {
 					auto *value = generate(el.get(), m_function_id);
 					const auto &name = *el->arg();
@@ -755,8 +752,8 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 		if (named_target->ids().size() != 1) { TODO(); }
 		emit<StoreName>(named_target->ids()[0], lhs->get_register());
 	} else if (auto attr = as<Attribute>(node->target())) {
-		auto obj_reg = generate(attr->value().get(), m_function_id);
-		emit<StoreAttr>(obj_reg, lhs->get_register(), attr->attr());
+		auto *obj = generate(attr->value().get(), m_function_id);
+		emit<StoreAttr>(obj->get_register(), lhs->get_register(), attr->attr());
 	} else {
 		TODO();
 	}

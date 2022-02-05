@@ -49,8 +49,8 @@ class ExecutionFrame : public Cell
 		return m_parameters[parameter_idx];
 	}
 
-	void put_local(const std::string &name, const Value &);
-	void put_global(const std::string &name, const Value &);
+	void put_local(const std::string &name, const py::Value &);
+	void put_global(const std::string &name, const py::Value &);
 
 	ExecutionFrame *parent() const { return m_parent; }
 

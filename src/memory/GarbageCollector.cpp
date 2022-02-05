@@ -30,7 +30,6 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	asm volatile("movq %%rsp, %0" : "=r"(rsp_));
 
 	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
-	spdlog::trace("rsp={}, stack_bottom={}", (void *)rsp, (void *)m_stack_bottom);
 	for (; rsp < m_stack_bottom; rsp += sizeof(uintptr_t)) {
 		uint8_t *address =
 			bit_cast<uint8_t *>(*bit_cast<uintptr_t *>(rsp)) - sizeof(GarbageCollected);
@@ -102,7 +101,7 @@ struct MarkGCVisitor : Cell::Visitor
 			}
 			if (cell.is_pyobject()) {
 				auto *obj = static_cast<PyObject *>(&cell);
-				spdlog::trace("Visiting {}@{}", obj->type_prototype().__name__, (void *)&obj);
+				spdlog::trace("Visiting {}@{}", obj->type_prototype().__name__, (void *)obj);
 			}
 			obj_header->mark(GarbageCollected::Color::BLACK);
 		}

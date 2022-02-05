@@ -1,5 +1,6 @@
 #include "Instructions.hpp"
 
+#include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 
 #include "runtime/PyBool.hpp"
@@ -20,9 +21,9 @@ void Move::execute(VirtualMachine &vm, Interpreter &) const
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	auto flags = PyCode::CodeFlags::create();
-	if (m_has_varargs) { flags.set(PyCode::CodeFlags::Flag::VARARGS); }
-	if (m_has_varkeywords) { flags.set(PyCode::CodeFlags::Flag::VARKEYWORDS); }
+	auto flags = CodeFlags::create();
+	if (m_has_varargs) { flags.set(CodeFlags::Flag::VARARGS); }
+	if (m_has_varkeywords) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
 
 	std::vector<Value> default_values;
 	default_values.reserve(m_defaults.size());
@@ -31,9 +32,13 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	}
 
 	std::vector<Value> kw_default_values;
-	default_values.reserve(m_kw_defaults.size());
+	kw_default_values.reserve(m_kw_defaults.size());
 	for (const auto &default_value : m_kw_defaults) {
-		kw_default_values.push_back(vm.reg(default_value));
+		if (default_value.has_value()) {
+			kw_default_values.push_back(vm.reg(*default_value));
+		} else {
+			ASSERT(m_has_varkeywords == false)
+		}
 	}
 
 	auto *func = interpreter.make_function(m_function_name,

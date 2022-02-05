@@ -1,6 +1,8 @@
 #include "InOp.hpp"
 #include "runtime/Value.hpp"
 
+using namespace py;
+
 void InOp::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &lhs = vm.reg(m_lhs);

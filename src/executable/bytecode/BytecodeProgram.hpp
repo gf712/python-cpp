@@ -39,7 +39,7 @@ class BytecodeProgram : public Program
 		const std::vector<py::Value> &kw_default_values,
 		size_t positional_args_count,
 		size_t kwonly_args_count,
-		const py::PyCode::CodeFlags &flags) const override;
+		const CodeFlags &flags) const override;
 
 	std::string to_string() const override;
 

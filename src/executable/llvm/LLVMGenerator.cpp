@@ -248,6 +248,20 @@ ast::Value *LLVMGenerator::visit(const ast::Dict *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::ExceptHandler *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::Delete *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Global *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::IfExpr *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::NamedExpr *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Starred *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::With *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::WithItem *node) { TODO(); }
+
 ast::Value *LLVMGenerator::visit(const ast::For *node) { return nullptr; }
 
 llvm::Type *LLVMGenerator::arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation)

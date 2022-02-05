@@ -301,7 +301,7 @@ class MakeFunction : public Instruction
 	std::string m_function_name;
 	std::vector<std::string> m_args;
 	std::vector<Register> m_defaults;
-	std::vector<Register> m_kw_defaults;
+	std::vector<std::optional<Register>> m_kw_defaults;
 	size_t m_arg_count;
 	size_t m_kwonly_arg_count;
 	bool m_has_varargs;
@@ -311,7 +311,7 @@ class MakeFunction : public Instruction
 	MakeFunction(std::string function_name,
 		std::vector<std::string> args,
 		std::vector<Register> defaults,
-		std::vector<Register> kw_defaults,
+		std::vector<std::optional<Register>> kw_defaults,
 		size_t arg_count,
 		size_t kwonly_arg_count,
 		bool has_varargs,

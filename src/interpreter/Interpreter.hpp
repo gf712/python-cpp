@@ -3,6 +3,7 @@
 #include "ExecutionFrame.hpp"
 
 #include "forward.hpp"
+#include "runtime/PyFunction.hpp"
 #include "runtime/forward.hpp"
 #include "vm/VM.hpp"
 
@@ -45,7 +46,7 @@ class Interpreter
 
 	void set_execution_frame(ExecutionFrame *frame) { m_current_frame = frame; }
 
-	void store_object(const std::string &name, const Value &value)
+	void store_object(const std::string &name, const py::Value &value)
 	{
 		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
 			name,
@@ -90,11 +91,11 @@ class Interpreter
 
 	py::PyObject *make_function(const std::string &function_name,
 		const std::vector<std::string> &argnames,
-		const std::vector<py::Value>& default_values,
-		const std::vector<py::Value>& kw_default_values,
+		const std::vector<py::Value> &default_values,
+		const std::vector<py::Value> &kw_default_values,
 		size_t positional_args_count,
 		size_t kwonly_args_count,
-		const py::PyCode::CodeFlags &flags) const;
+		const CodeFlags &flags) const;
 
 	py::PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 

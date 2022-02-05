@@ -10,20 +10,20 @@ using namespace py;
 		std::abort();                                            \
 	} while (0);
 
-#ifndef NDEBUG
-#define DEBUG_LOG(...)              \
-	do {                            \
-		spdlog::trace(__VA_ARGS__); \
-	} while (0);
-#else
+// #ifndef NDEBUG
+// #define DEBUG_LOG(...)              \
+// 	do {                            \
+// 		spdlog::trace(__VA_ARGS__); \
+// 	} while (0);
+// #else
 #define DEBUG_LOG(MSG, ...)
-#endif
+// #endif
 
-#ifndef NDEBUG
-#define PRINT_STACK() p.print_stack();
-#else
+// #ifndef NDEBUG
+// #define PRINT_STACK() p.print_stack();
+// #else
 #define PRINT_STACK()
-#endif
+// #endif
 
 using namespace ast;
 using namespace parser;
@@ -1104,7 +1104,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			} else if (name == "False") {
 				p.push_to_stack(std::make_shared<Constant>(false));
 			} else if (name == "None") {
-				p.push_to_stack(std::make_shared<Constant>(ast::NoneType{}));
+				p.push_to_stack(std::make_shared<Constant>(py::NameConstant{ py::NoneType{} }));
 			} else {
 				p.push_to_stack(std::make_shared<Name>(name, ContextType::LOAD));
 			}

@@ -1,6 +1,6 @@
 include(GoogleTest)
 
-add_executable(integration-tests_ program.cpp)
+add_executable(integration-tests_ program.cpp main.cpp)
 target_link_libraries(integration-tests_ PRIVATE python-cpp gtest gtest_main)
 gtest_add_tests(TARGET integration-tests_)
 

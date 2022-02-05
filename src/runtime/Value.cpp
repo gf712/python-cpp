@@ -148,6 +148,12 @@ bool NameConstant::operator==(const Number &other) const
 	}
 }
 
+bool NameConstant::operator==(const NameConstant &other) const
+{
+	return std::visit(
+		[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
+}
+
 namespace py {
 
 std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &)

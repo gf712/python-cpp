@@ -37,12 +37,11 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 			},
 			[&](const NameConstant &name_constant_value) {
 				if (auto *bool_result = std::get_if<bool>(&name_constant_value.value)) {
-					ASSERT_EQ(
-						*bool_result, std::get<bool>(std::get<NameConstant>(expected_value).value));
-				} else if (std::holds_alternative<NoneType>(std::get<NameConstant>(expected_value).value)) {
-					ASSERT_TRUE(std::holds_alternative<NoneType>(name_constant_value.value));
 					ASSERT_EQ(*bool_result,
 						std::get<bool>(std::get<NameConstant>(*expected_value).value));
+				} else if (std::holds_alternative<NoneType>(
+							   std::get<NameConstant>(*expected_value).value)) {
+					ASSERT_TRUE(std::holds_alternative<NoneType>(name_constant_value.value));
 				} else {
 					TODO();
 				}
@@ -1995,7 +1994,8 @@ TEST(Parser, ArgsKwargsFunctionDef)
 			std::make_shared<Return>(std::make_shared<Constant>(int64_t{ 1 })) },
 		std::vector<std::shared_ptr<ast::ASTNode>>{},
 		nullptr,
-		""));
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2100,15 +2100,16 @@ TEST(Parser, FunctionDefinitionWithDecoratorList)
 			std::make_shared<Argument>("cls", nullptr, ""),
 		}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Return>(std::make_shared<Constant>(NoneType{})),
+			std::make_shared<Return>(
+				std::make_shared<Constant>(py::NameConstant{ py::NoneType{} })),
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Name>("classmethod", ContextType::LOAD),
 			std::make_shared<Name>("_require_frozen", ContextType::LOAD),
 		},// decorator_list
 		nullptr,// returns
-		""// type_comment
-		));
+		"",// type_comment
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2172,8 +2173,8 @@ TEST(Parser, FunctionDefinitionWithDefaultKeyword)
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
-		""// type_comment
-		));
+		"",// type_comment
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2199,8 +2200,8 @@ TEST(Parser, FunctionDefinitionWithKeywordOnlyArg)
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
-		""// type_comment
-		));
+		"",// type_comment
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2228,8 +2229,8 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArg)
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
-		""// type_comment
-		));
+		"",// type_comment
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2258,8 +2259,8 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
-		""// type_comment
-		));
+		"",// type_comment
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 

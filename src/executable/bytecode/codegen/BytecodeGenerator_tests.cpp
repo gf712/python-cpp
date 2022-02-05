@@ -33,7 +33,7 @@ TEST(BytecodeGenerator, EmitsMainProgram)
 	ASSERT_EQ(bytecode_generator->functions().size(), 1);
 
 	const auto &main = bytecode_generator->function(0);
-	ASSERT_EQ(main.size(), 4);
+	ASSERT_EQ(main.size(), 1);
 }
 
 

@@ -163,7 +163,7 @@ struct NoneType
 
 	bool operator==(const NoneType &) const { return true; }
 
-	template<typename T> bool operator==(T &&) const { return false; }
+	template<typename T> bool operator==(const T &) const { return false; }
 
 	std::string to_string() const { return "None"; }
 	bool operator==(const PyObject *other) const;
@@ -178,18 +178,12 @@ struct NameConstant
 	}
 
 	bool operator==(const NoneType &) const { return false; }
-
-	bool operator==(const NameConstant &other) const
-	{
-		return std::visit(
-			[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
-	}
+	bool operator==(const NameConstant &other) const;
 	bool operator==(const PyObject *other) const;
 	bool operator==(const Ellipsis &) const { return false; }
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const String &) const { return false; }
 	bool operator==(const Number &) const;
-
 
 	std::string to_string() const
 	{
@@ -212,7 +206,8 @@ std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter 
 std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 std::optional<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+std::optional<Value>
+	greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 bool is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 bool in(const Value &lhs, const Value &rhs, Interpreter &interpreter);

@@ -2,6 +2,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyTuple.hpp"
 
+using namespace py;
 
 void DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 {

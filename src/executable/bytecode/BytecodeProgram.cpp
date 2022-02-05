@@ -147,12 +147,12 @@ py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 	const std::vector<py::Value> &kw_default_values,
 	size_t positional_args_count,
 	size_t kwonly_args_count,
-	const py::PyCode::CodeFlags &flags) const const
+	const CodeFlags &flags) const
 {
 	for (const auto &backend : m_backends) {
 		if (auto *f = backend->as_pyfunction(function_name,
 				argnames,
-				default_value,
+				default_values,
 				kw_default_values,
 				positional_args_count,
 				kwonly_args_count,
@@ -167,7 +167,7 @@ py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 		auto function = *it;
 		auto *code = VirtualMachine::the().heap().allocate<py::PyCode>(function,
 			argnames,
-			default_value,
+			default_values,
 			kw_default_values,
 			positional_args_count,
 			kwonly_args_count,

@@ -43,11 +43,6 @@ Constant::Constant(const char *value)
 	  m_value(std::make_unique<py::Value>(py::String{ std::string(value) }))
 {}
 
-Constant::Constant(ast::NoneType)
-	: ASTNode(ASTNodeType::Constant),
-	  m_value(std::make_unique<py::Value>(py::NameConstant{ py::NoneType{} }))
-{}
-
 Constant::Constant(const py::Value &value)
 	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(value))
 {}
@@ -395,7 +390,10 @@ void Subscript::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - ctx: {}", indent, m_ctx);
 }
 
-Raise::Raise() : ASTNode(ASTNodeType::Raise), m_cause(std::make_shared<Constant>(NoneType{})) {}
+Raise::Raise()
+	: ASTNode(ASTNodeType::Raise),
+	  m_cause(std::make_shared<Constant>(py::NameConstant{ py::NoneType{} }))
+{}
 
 void Raise::print_this_node(const std::string &indent) const
 {

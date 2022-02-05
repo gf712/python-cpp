@@ -2,6 +2,7 @@
 #include "runtime/PyList.hpp"
 #include "runtime/PyTuple.hpp"
 
+using namespace py;
 
 void ListExtend::execute(VirtualMachine &vm, Interpreter &) const
 {

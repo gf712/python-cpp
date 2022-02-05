@@ -43,15 +43,20 @@ std::string BaseException::what() const { return BaseException::to_string(); }
 
 void BaseException::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	if (m_args) visitor.visit(*m_args);
 }
 
 std::string BaseException::to_string() const
 {
-	if (m_args->size() == 1) {
-		return PyObject::from(m_args->elements()[0])->to_string();
+	if (m_args) {
+		if (m_args->size() == 1) {
+			return PyObject::from(m_args->elements()[0])->to_string();
+		} else {
+			return m_args->to_string();
+		}
 	} else {
-		return m_args->to_string();
+		return "";
 	}
 }
 

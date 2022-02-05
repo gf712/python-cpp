@@ -61,10 +61,6 @@ namespace ast {
 	__AST_NODE_TYPE(With)               \
 	__AST_NODE_TYPE(WithItem)
 
-struct NoneType
-{
-};
-
 class Value
 {
 	std::string m_name;
@@ -148,7 +144,6 @@ class Constant : public ASTNode
 	explicit Constant(double value);
 	explicit Constant(int64_t value);
 	explicit Constant(bool value);
-	explicit Constant(NoneType value);
 	explicit Constant(std::string value);
 	explicit Constant(const char *value);
 	explicit Constant(const py::Value &);

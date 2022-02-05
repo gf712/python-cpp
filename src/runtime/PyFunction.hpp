@@ -2,6 +2,7 @@
 
 #include "PyObject.hpp"
 #include "PyTuple.hpp"
+#include "executable/Program.hpp"
 #include "vm/VM.hpp"
 
 namespace py {
@@ -9,37 +10,6 @@ namespace py {
 class PyCode : public PyBaseObject
 {
   public:
-	class CodeFlags
-	{
-	  public:
-		enum class Flag {
-			OPTIMIZED = 0,
-			NEWLOCALS = 1,
-			VARARGS = 2,
-			VARKEYWORDS = 3,
-			NESTED = 4,
-			GENERATOR = 5,
-		};
-
-	  private:
-		std::bitset<6> m_flags;
-
-		CodeFlags() = default;
-
-	  public:
-		template<typename... Args>
-		requires std::conjunction_v<std::is_same<Flag, Args>...> static CodeFlags create(
-			Args... args)
-		{
-			CodeFlags f;
-			(f.m_flags.set(static_cast<uint8_t>(args)), ...);
-			return f;
-		}
-		void set(Flag f) { m_flags.set(static_cast<uint8_t>(f)); }
-		void reset(Flag f) { m_flags.reset(static_cast<uint8_t>(f)); }
-		bool is_set(Flag f) { return m_flags[static_cast<uint8_t>(f)]; }
-	};
-
 	const std::shared_ptr<Function> m_function;
 	const size_t m_register_count;
 	const std::vector<std::string> m_varnames;

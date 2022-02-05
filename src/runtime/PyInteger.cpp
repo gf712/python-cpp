@@ -8,13 +8,13 @@
 
 using namespace py;
 
-template<> PyInteger *as(PyObject *obj)
+template<> PyInteger *py::as(PyObject *obj)
 {
 	if (obj->type() == integer()) { return static_cast<PyInteger *>(obj); }
 	return nullptr;
 }
 
-template<> const PyInteger *as(const PyObject *obj)
+template<> const PyInteger *py::as(const PyObject *obj)
 {
 	if (obj->type() == integer()) { return static_cast<const PyInteger *>(obj); }
 	return nullptr;

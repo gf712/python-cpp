@@ -11,13 +11,13 @@
 
 using namespace py;
 
-template<> PyDict *as(PyObject *obj)
+template<> PyDict *py::as(PyObject *obj)
 {
 	if (obj->type() == dict()) { return static_cast<PyDict *>(obj); }
 	return nullptr;
 }
 
-template<> const PyDict *as(const PyObject *obj)
+template<> const PyDict *py::as(const PyObject *obj)
 {
 	if (obj->type() == dict()) { return static_cast<const PyDict *>(obj); }
 	return nullptr;

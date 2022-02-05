@@ -5,6 +5,7 @@
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "TypeError.hpp"
+#include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "types/api.hpp"
@@ -34,7 +35,7 @@ size_t PyCode::arg_count() const { return m_arg_count; }
 
 size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 
-PyCode::CodeFlags PyCode::flags() const { return m_flags; }
+CodeFlags PyCode::flags() const { return m_flags; }
 
 void PyCode::visit_graph(Visitor &visitor)
 {
@@ -115,7 +116,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			auto key_str = std::get<String>(key);
 			auto arg_iter = std::find(argnames.begin(), argnames.end(), key_str.s);
 			if (arg_iter == argnames.end()) {
-				if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
+				if (m_code->flags().is_set(CodeFlags::Flag::VARKEYWORDS)) {
 					continue;
 				} else {
 					VirtualMachine::the().interpreter().raise_exception(type_error(
@@ -156,7 +157,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		}
 	}
 
-	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
+	if (m_code->flags().is_set(CodeFlags::Flag::VARARGS)) {
 		std::vector<Value> remaining_args;
 		if (args) {
 			for (size_t idx = args_count; idx < args->size(); ++idx) {
@@ -170,7 +171,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		return nullptr;
 	}
 
-	if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARKEYWORDS)) {
+	if (m_code->flags().is_set(CodeFlags::Flag::VARKEYWORDS)) {
 		auto *remaining_kwargs = PyDict::create();
 		if (kwargs) {
 			const auto &argnames = m_code->varnames();
@@ -191,7 +192,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			}
 		}
 		size_t kwargs_index = [&]() {
-			if (m_code->flags().is_set(PyCode::CodeFlags::Flag::VARARGS)) {
+			if (m_code->flags().is_set(CodeFlags::Flag::VARARGS)) {
 				return m_code->varnames().size() + 1;
 			} else {
 				return m_code->varnames().size();

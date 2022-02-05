@@ -20,6 +20,7 @@
 #include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
 
+#include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -166,7 +167,8 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 			// auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
 			// FIXME: what should be the module for this?
-			auto *f = interpreter.make_function(mangled_class_name_as_string, {});
+			auto *f = interpreter.make_function(
+				mangled_class_name_as_string, {}, {}, {}, 0, 0, CodeFlags::create());
 			ASSERT(as<PyFunction>(f))
 			return as<PyFunction>(f);
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {

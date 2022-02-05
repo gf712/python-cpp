@@ -1,13 +1,44 @@
 #pragma once
 
+#include "forward.hpp"
+#include "runtime/forward.hpp"
 #include "utilities.hpp"
+
+#include <bitset>
 
 class Function;
 class VirtualMachine;
 
-namespace py {
-class PyObject;
-}
+class CodeFlags
+{
+  public:
+	enum class Flag {
+		OPTIMIZED = 0,
+		NEWLOCALS = 1,
+		VARARGS = 2,
+		VARKEYWORDS = 3,
+		NESTED = 4,
+		GENERATOR = 5,
+	};
+
+  private:
+	std::bitset<6> m_flags;
+
+	CodeFlags() = default;
+
+  public:
+	template<typename... Args>
+	// requires std::conjunction_v<std::is_same<Flag, Args>...>
+	static CodeFlags create(Args... args)
+	{
+		CodeFlags f;
+		(f.m_flags.set(static_cast<uint8_t>(args)), ...);
+		return f;
+	}
+	void set(Flag f) { m_flags.set(static_cast<uint8_t>(f)); }
+	void reset(Flag f) { m_flags.reset(static_cast<uint8_t>(f)); }
+	bool is_set(Flag f) { return m_flags[static_cast<uint8_t>(f)]; }
+};
 
 class Program : NonCopyable
 {
@@ -34,5 +65,5 @@ class Program : NonCopyable
 		const std::vector<py::Value> &kw_default_values,
 		size_t positional_args_count,
 		size_t kwonly_args_count,
-		const py::PyCode::CodeFlags &flags) const = 0;
+		const CodeFlags &flags) const = 0;
 };
