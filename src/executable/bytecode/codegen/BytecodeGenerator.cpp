@@ -39,6 +39,7 @@
 
 #include "ast/optimizers/ConstantFolding.hpp"
 #include "executable/FunctionBlock.hpp"
+#include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 
@@ -136,8 +137,8 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 
 	std::vector<std::string> arg_names;
 	m_ctx.push_local_args(node->args());
-	const std::string &function_name =
-		fmt::format("{}.{}", mangle_namespace(m_stack), node->name());
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		mangle_namespace(m_stack), node->name(), node->source_location());
 	auto *f = create_function(function_name);
 
 	m_stack.push(Scope{ .name = node->name() });
@@ -590,8 +591,9 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	std::string class_mangled_name;
 	size_t class_id;
 	{
-		class_mangled_name =
-			fmt::format("{}.__class__{}__", mangle_namespace(m_stack), node->name());
+		class_mangled_name = Mangler::default_mangler().class_mangle(
+			mangle_namespace(m_stack), node->name(), node->source_location());
+
 		auto *class_builder_func = create_function(class_mangled_name);
 		m_stack.push(Scope{ .name = node->name() });
 		class_id = class_builder_func->function_info().function_id;

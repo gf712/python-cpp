@@ -1356,8 +1356,8 @@ TEST(Parser, ClassDefinition)
 				nullptr,// returns
 				"",// type_comment
 				SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ast::ASTNode>>{}// decorator_list
-		));
+		std::vector<std::shared_ptr<ast::ASTNode>>{},// decorator_list
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -2129,8 +2129,8 @@ TEST(Parser, ClassDefinitionWithDecoratorList)
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>() },// body
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Name>("my_decorator", ContextType::LOAD),
-		}// decorator_list
-		));
+		},// decorator_list
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 

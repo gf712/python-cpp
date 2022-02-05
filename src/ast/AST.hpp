@@ -607,6 +607,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<Keyword>> m_keywords;
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
+	SourceLocation m_location;
 
 	void print_this_node(const std::string &indent) const final;
 
@@ -615,10 +616,11 @@ class ClassDefinition final : public ASTNode
 		std::vector<std::shared_ptr<ASTNode>> bases,
 		std::vector<std::shared_ptr<Keyword>> keywords,
 		std::vector<std::shared_ptr<ASTNode>> body,
-		std::vector<std::shared_ptr<ASTNode>> decorator_list)
+		std::vector<std::shared_ptr<ASTNode>> decorator_list,
+		SourceLocation location)
 		: ASTNode(ASTNodeType::ClassDefinition), m_class_name(std::move(class_name)),
 		  m_bases(std::move(bases)), m_keywords(std::move(keywords)), m_body(std::move(body)),
-		  m_decorator_list(std::move(decorator_list))
+		  m_decorator_list(std::move(decorator_list)), m_location(location)
 	{}
 
 	const std::string &name() const { return m_class_name; }
@@ -626,6 +628,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
+	SourceLocation source_location() const { return m_location; }
 
 	void add_decorator(std::shared_ptr<ASTNode> decorator)
 	{

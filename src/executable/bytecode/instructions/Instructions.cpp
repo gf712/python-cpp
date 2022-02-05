@@ -1,5 +1,6 @@
 #include "Instructions.hpp"
 
+#include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 
@@ -50,8 +51,8 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		flags);
 	ASSERT(func)
 	// FIXME: demangle should be a function visible in the whole project
-	const auto start = m_function_name.find_last_of('.') + 1;
-	const std::string demangled_name{ m_function_name.begin() + start, m_function_name.end() };
+	const std::string demangled_name =
+		Mangler::default_mangler().function_demangle(m_function_name);
 	interpreter.execution_frame()->put_local(demangled_name, func);
 }
 

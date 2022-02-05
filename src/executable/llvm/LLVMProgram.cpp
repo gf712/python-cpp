@@ -1,6 +1,7 @@
 #include "LLVMProgram.hpp"
 #include "LLVMPyUtils.hpp"
 #include "executable/Function.hpp"
+#include "executable/Mangler.hpp"
 #include "executable/llvm/LLVMGenerator.hpp"
 #include "runtime/Value.hpp"
 
@@ -239,8 +240,8 @@ py::PyObject *LLVMProgram::as_pyfunction(const std::string &function_name,
 	(void)kwonly_args_count;
 	(void)flags;
 
-	const auto start = function_name.find_last_of('.') + 1;
-	const std::string demangled_name{ function_name.begin() + start, function_name.end() };
+	const std::string demangled_name =
+		::Mangler::default_mangler().function_demangle(function_name);
 	const auto &function = [this, &demangled_name]() -> const std::shared_ptr<::Function> {
 		for (const auto &f : m_functions) {
 			if (f->function_name() == demangled_name) { return f; }

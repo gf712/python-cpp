@@ -41,7 +41,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/TrueDivide.cpp
     executable/bytecode/instructions/Unary.cpp
-    executable/bytecode/instructions/UnpackSequence.cpp)
+    executable/bytecode/instructions/UnpackSequence.cpp
+    executable/Mangler.cpp)
 
 set(EXECUTABLE_SOURCE_FILES # cmake-format: sortable
                             executable/Program.cpp)

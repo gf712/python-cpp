@@ -1,6 +1,7 @@
 #include "BytecodeProgram.hpp"
 #include "Bytecode.hpp"
 #include "executable/Function.hpp"
+#include "executable/Mangler.hpp"
 #include "interpreter/InterpreterSession.hpp"
 #include "runtime/PyFunction.hpp"
 
@@ -174,8 +175,7 @@ py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 			flags,
 			VirtualMachine::the().interpreter().module());
 
-		const auto start = function_name.find_last_of('.') + 1;
-		const std::string demangled_name{ function_name.begin() + start, function_name.end() };
+		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);
 		return VirtualMachine::the().heap().allocate<py::PyFunction>(
 			demangled_name, code, VirtualMachine::the().interpreter().execution_frame()->globals());
 	}

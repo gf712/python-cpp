@@ -20,6 +20,7 @@
 #include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
 
+#include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
@@ -160,7 +161,7 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 		return nullptr;
 	}
 
-	const auto &mangled_class_name_as_string = as<PyString>(mangled_class_name)->value();
+	const auto mangled_class_name_as_string = as<PyString>(mangled_class_name)->value();
 
 	PyFunction *callable = [&]() -> PyFunction * {
 		if (as<PyInteger>(maybe_function_location)) {
@@ -221,14 +222,9 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 	// i.e. {__module__: __name__, __qualname__: 'A', foo: <function A.foo>}
 	callable->call_with_frame(ns, PyTuple::create(), PyDict::create());
 
-	// namespace.__class__CLASSNAME__
-	static constexpr std::string_view prefix = ".__class__";
-	static constexpr std::string_view suffix = "__";
+	const std::string class_name_str =
+		Mangler::default_mangler().class_demangle(mangled_class_name_as_string);
 
-	const auto start = mangled_class_name_as_string.find_last_of('.') + prefix.size();
-
-	const std::string class_name_str{ mangled_class_name_as_string.begin() + start,
-		mangled_class_name_as_string.end() - suffix.size() };
 	auto *class_name = PyString::create(class_name_str);
 
 	auto *call_args = PyTuple::create(class_name, bases, ns);

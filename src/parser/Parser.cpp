@@ -3942,8 +3942,12 @@ struct ClassDefinitionRawPattern : Pattern<ClassDefinitionRawPattern>
 			}
 			std::vector<std::shared_ptr<ASTNode>> decorator_list;
 			// while (!p.stack().empty()) { arguments.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<ClassDefinition>(
-				class_name, bases, keywords, body, decorator_list));
+			scope.parent().push_back(std::make_shared<ClassDefinition>(class_name,
+				bases,
+				keywords,
+				body,
+				decorator_list,
+				SourceLocation{ maybe_name_token->start(), maybe_name_token->end() }));
 			return true;
 		}
 		return false;
