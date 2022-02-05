@@ -857,6 +857,10 @@ Value *BytecodeGenerator::visit(const Try *node)
 	for (size_t idx = 0; const auto &handler : node->handlers()) {
 		auto *exception_handler_block = exception_handler_blocks[idx];
 		set_insert_point(exception_handler_block);
+		if (!handler->type()) {
+			// TODO: implement exception handling that catches all exceptions
+			TODO();
+		}
 		auto *exception_type = generate(handler->type().get(), m_function_id);
 		emit<JumpIfNotExceptionMatch>(exception_type->get_register());
 		idx++;

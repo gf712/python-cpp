@@ -146,12 +146,29 @@ PyObject *Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict
 	return result;
 }
 
+void Interpreter::store_object(const std::string &name, const Value &value)
+{
+	if (spdlog::get_level() == spdlog::level::debug) {
+		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
+			name,
+			std::visit(
+				[](const auto &val) {
+					std::ostringstream os;
+					os << val;
+					return os.str();
+				},
+				value),
+			(void *)m_current_frame);
+	}
+	if (m_current_frame == m_global_frame) {
+		m_current_frame->put_global(name, value);
+	} else {
+		m_current_frame->put_local(name, value);
+	}
+}
+
 std::optional<Value> Interpreter::get_object(const std::string &name)
 {
-	Value obj;
-
-	const auto &name_value = String{ name };
-
 	ASSERT(execution_frame()->locals())
 	ASSERT(execution_frame()->globals())
 	ASSERT(execution_frame()->builtins())
@@ -160,19 +177,21 @@ std::optional<Value> Interpreter::get_object(const std::string &name)
 	const auto &globals = execution_frame()->globals()->map();
 	const auto &builtins = execution_frame()->builtins()->symbol_table();
 
-	if (auto it = locals.find(name_value); it != locals.end()) {
-		obj = it->second;
-	} else if (auto it = globals.find(name_value); it != globals.end()) {
-		obj = it->second;
-	} else {
-		auto pystr_name = PyString::create(name);
-		if (auto it = builtins.find(pystr_name); it != builtins.end()) {
-			obj = it->second;
-		} else {
-			raise_exception(name_error("name '{:s}' is not defined", name));
-			obj = py_none();
-		}
-	}
+	return [&]() -> Value {
+		const auto &name_value = String{ name };
 
-	return obj;
+		if (const auto &it = locals.find(name_value); it != locals.end()) {
+			return std::move(it->second);
+		} else if (const auto &it = globals.find(name_value); it != globals.end()) {
+			return std::move(it->second);
+		} else {
+			auto pystr_name = PyString::create(name);
+			if (const auto &it = builtins.find(pystr_name); it != builtins.end()) {
+				return std::move(it->second);
+			} else {
+				raise_exception(name_error("name '{:s}' is not defined", name));
+			}
+		}
+		return py_none();
+	}();
 }

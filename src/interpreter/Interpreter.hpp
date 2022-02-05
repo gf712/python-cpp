@@ -46,21 +46,7 @@ class Interpreter
 
 	void set_execution_frame(ExecutionFrame *frame) { m_current_frame = frame; }
 
-	void store_object(const std::string &name, const py::Value &value)
-	{
-		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
-			name,
-			std::visit(
-				[](const auto &val) {
-					std::ostringstream os;
-					os << val;
-					return os.str();
-				},
-				value),
-			(void *)m_current_frame);
-		m_current_frame->put_local(name, value);
-		if (m_current_frame == m_global_frame) { m_current_frame->put_global(name, value); }
-	}
+	void store_object(const std::string &name, const py::Value &value);
 
 	std::optional<py::Value> get_object(const std::string &name);
 
