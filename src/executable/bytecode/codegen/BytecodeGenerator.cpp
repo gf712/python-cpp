@@ -133,7 +133,13 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 
 Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 {
-	if (!node->decorator_list().empty()) { TODO(); }
+	std::vector<BytecodeValue *> decorator_functions;
+	decorator_functions.reserve(node->decorator_list().size());
+	for (const auto &decorator_function : node->decorator_list()) {
+		auto *f = generate(decorator_function.get(), m_function_id);
+		ASSERT(f)
+		decorator_functions.push_back(f);
+	}
 
 	std::vector<std::string> arg_names;
 	m_ctx.push_local_args(node->args());
@@ -195,6 +201,20 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		node->args()->kwarg() != nullptr);
 
 	exit_function(f->function_info().function_id);
+
+	if (!decorator_functions.empty()) {
+		std::vector<BytecodeValue *> args;
+		auto *function = create_value();
+		emit<LoadName>(function->get_register(), node->name());
+		args.push_back(function);
+		for (const auto &decorator_function : decorator_functions) {
+			emit<FunctionCall>(decorator_function->get_register(),
+				std::vector<Register>{ args.back()->get_register() });
+			args.clear();
+			args.push_back(create_return_value());
+		}
+		emit<StoreName>(node->name(), args.back()->get_register());
+	}
 
 	return f;
 }

@@ -37,3 +37,16 @@ try:
     assert False, "Should not be able to call keyword only argument with positional parameter"
 except TypeError:
     assert True, ""
+
+def new_bar():
+    return 21
+
+def foo(f):
+    return new_bar
+
+@foo
+def bar():
+    return 42
+
+assert bar() == 21
+assert bar == new_bar
