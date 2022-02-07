@@ -965,7 +965,19 @@ Value *BytecodeGenerator::visit(const Assert *node)
 
 Value *BytecodeGenerator::visit(const Pass *) { return nullptr; }
 
-Value *BytecodeGenerator::visit(const NamedExpr *) { TODO(); }
+Value *BytecodeGenerator::visit(const NamedExpr *node)
+{
+	ASSERT(as<Name>(node->target()))
+	ASSERT(as<Name>(node->target())->context_type() == ContextType::STORE)
+	ASSERT(as<Name>(node->target())->ids().size() == 1)
+
+	auto *dst = create_value();
+	auto *src = generate(node->value().get(), m_function_id);
+	emit<Move>(dst->get_register(), src->get_register());
+	emit<StoreName>(as<Name>(node->target())->ids()[0], src->get_register());
+
+	return dst;
+}
 
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)
 	: function_id(function_id_), function(f), generator(generator_)
