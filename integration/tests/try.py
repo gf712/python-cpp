@@ -58,3 +58,20 @@ finally:
 
 assert a == 3, "Integer and string addition should result in an exception that is derived from Exception"
 assert reaches_finally, "Finally should always be reached"
+
+reaches_finally = False
+def get_exception():
+    return TypeError
+try:
+    a = 1
+    b = "a"
+    c = a + b
+except ValueError:
+    a = 2
+except:
+    a = 3
+finally:
+    reaches_finally = True
+
+assert a == 3, "Default exception should catch all exceptions"
+assert reaches_finally, "Finally should always be reached"

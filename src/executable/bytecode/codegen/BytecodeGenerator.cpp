@@ -902,11 +902,15 @@ Value *BytecodeGenerator::visit(const Try *node)
 		auto *exception_handler_block = exception_handler_blocks[idx];
 		set_insert_point(exception_handler_block);
 		if (!handler->type()) {
-			// TODO: implement exception handling that catches all exceptions
-			TODO();
+			if ((idx / 2) != node->handlers().size() - 1) {
+				// FIXME: implement SyntaxError and error throwing when parsing source code
+				spdlog::error("SyntaxError: default 'except:' must be last");
+				std::abort();
+			}
+		} else {
+			auto *exception_type = generate(handler->type().get(), m_function_id);
+			emit<JumpIfNotExceptionMatch>(exception_type->get_register());
 		}
-		auto *exception_type = generate(handler->type().get(), m_function_id);
-		emit<JumpIfNotExceptionMatch>(exception_type->get_register());
 		idx++;
 		set_insert_point(exception_handler_blocks[idx]);
 		for (const auto &el : handler->body()) { generate(el.get(), m_function_id); }
