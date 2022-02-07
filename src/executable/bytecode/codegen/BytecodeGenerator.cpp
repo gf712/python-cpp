@@ -809,7 +809,31 @@ Value *BytecodeGenerator::visit(const WithItem *node)
 	return ctx_expr;
 }
 
-Value *BytecodeGenerator::visit(const IfExpr *) { TODO(); }
+Value *BytecodeGenerator::visit(const IfExpr *node)
+{
+	static size_t if_expr_count = 0;
+
+	auto orelse_start_label =
+		make_label(fmt::format("IF_EXPR_ORELSE_{}", if_expr_count), m_function_id);
+	auto end_label = make_label(fmt::format("IF_EXPR_END_{}", if_expr_count++), m_function_id);
+
+	auto return_value = create_value();
+	// if
+	auto *test_result = generate(node->test().get(), m_function_id);
+	emit<JumpIfFalse>(test_result->get_register(), orelse_start_label);
+	auto *if_result = generate(node->body().get(), m_function_id);
+	ASSERT(if_result)
+	emit<Move>(return_value->get_register(), if_result->get_register());
+	emit<Jump>(end_label);
+
+	// else
+	bind(*orelse_start_label);
+	auto *else_result = generate(node->orelse().get(), m_function_id);
+	emit<Move>(return_value->get_register(), else_result->get_register());
+	bind(*end_label);
+
+	return return_value;
+}
 
 namespace {
 	size_t list_node_distance(const std::list<InstructionBlock> &block_list,
