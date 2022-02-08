@@ -184,6 +184,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	set_insert_point(old_block);
 	m_ctx.pop_local_args();
 	m_stack.pop();
+	exit_function(f->function_info().function_id);
 
 	size_t arg_count = node->args()->args().size();
 	size_t kwonly_arg_count = node->args()->kwonlyargs().size();
@@ -213,8 +214,6 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		kwonly_arg_count,
 		node->args()->vararg() != nullptr,
 		node->args()->kwarg() != nullptr);
-
-	exit_function(f->function_info().function_id);
 
 	store_name(node->name(), f);
 	if (!decorator_functions.empty()) {
