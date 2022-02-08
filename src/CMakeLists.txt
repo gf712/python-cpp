@@ -96,6 +96,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyString.cpp
     runtime/PyTuple.cpp
     runtime/PyType.cpp
+    runtime/PyProperty.cpp
     runtime/PySlotWrapper.cpp
     runtime/PyStaticMethod.cpp
     runtime/RuntimeError.cpp

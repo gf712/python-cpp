@@ -13,6 +13,7 @@
 #include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNone.hpp"
+#include "runtime/PyProperty.hpp"
 #include "runtime/PyRange.hpp"
 #include "runtime/PySlotWrapper.hpp"
 #include "runtime/PyStaticMethod.hpp"
@@ -39,7 +40,7 @@ BuiltinTypes::BuiltinTypes()
 	  m_slot_wrapper(PySlotWrapper::register_type()),
 	  m_bound_method(PyBoundMethod::register_type()),
 	  m_method_wrapper(PyMethodDescriptor::register_type()),
-	  m_static_method(PyStaticMethod::register_type())
+	  m_static_method(PyStaticMethod::register_type()), m_property(PyProperty::register_type())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                             \
@@ -87,4 +88,5 @@ INITIALIZE_TYPE(slot_wrapper)
 INITIALIZE_TYPE(bound_method)
 INITIALIZE_TYPE(method_wrapper)
 INITIALIZE_TYPE(static_method)
+INITIALIZE_TYPE(property)
 }// namespace py

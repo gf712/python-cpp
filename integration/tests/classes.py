@@ -36,3 +36,13 @@ class C:
 
 c = C()
 assert c.a() == foo()
+
+class A:
+    def __init__(self, a):
+        self._a = a
+
+    @property
+    def a(self):
+        return self._a * 2
+
+assert A(10).a == 20
