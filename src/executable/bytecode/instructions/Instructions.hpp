@@ -298,6 +298,7 @@ class StoreFast final : public Instruction
 
 class MakeFunction : public Instruction
 {
+	Register m_dst;
 	std::string m_function_name;
 	std::vector<std::string> m_args;
 	std::vector<Register> m_defaults;
@@ -308,7 +309,8 @@ class MakeFunction : public Instruction
 	bool m_has_varkeywords;
 
   public:
-	MakeFunction(std::string function_name,
+	MakeFunction(Register dst,
+		std::string function_name,
 		std::vector<std::string> args,
 		std::vector<Register> defaults,
 		std::vector<std::optional<Register>> kw_defaults,
@@ -316,10 +318,9 @@ class MakeFunction : public Instruction
 		size_t kwonly_arg_count,
 		bool has_varargs,
 		bool has_keywords)
-		: m_function_name(std::move(function_name)),
-		  m_args(std::move(args)), m_defaults(std::move(defaults)),
-		  m_kw_defaults(std::move(kw_defaults)), m_arg_count(arg_count),
-		  m_kwonly_arg_count(kwonly_arg_count), m_has_varargs(has_varargs),
+		: m_dst(dst), m_function_name(std::move(function_name)), m_args(std::move(args)),
+		  m_defaults(std::move(defaults)), m_kw_defaults(std::move(kw_defaults)),
+		  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_has_varargs(has_varargs),
 		  m_has_varkeywords(has_keywords)
 	{}
 

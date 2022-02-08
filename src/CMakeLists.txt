@@ -30,6 +30,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
+    executable/bytecode/instructions/LoadGlobal.cpp
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
     executable/bytecode/instructions/MethodCall.cpp
@@ -38,6 +39,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/StoreAttr.cpp
+    executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/TrueDivide.cpp
     executable/bytecode/instructions/Unary.cpp

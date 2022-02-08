@@ -3113,17 +3113,39 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 
 struct GlobalStatementPattern : Pattern<GlobalStatementPattern>
 {
+	struct GlobalName : Pattern<GlobalName>
+	{
+		static bool matches_impl(Parser &p)
+		{
+			auto token = p.lexer().peek_token(p.token_position());
+			std::string_view maybe_name{ token->start().pointer_to_program,
+				token->end().pointer_to_program };
+			// global_name: NAME
+			using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
+
+			if (pattern1::match(p)) {
+				ASSERT(as<Global>(p.stack().back()))
+				as<Global>(p.stack().back())->add_name(std::string(maybe_name));
+				return true;
+			}
+			return false;
+		}
+	};
+
 	// global_stmt: 'global' ','.NAME+
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
+		p.push_to_stack(std::make_shared<Global>(std::vector<std::string>{}));
+
 		DEBUG_LOG("GlobalStatementPattern");
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
-			OneOrMorePattern<ApplyInBetweenPattern<SingleTokenPattern<Token::TokenType::NAME>,
-				SingleTokenPattern<Token::TokenType::COMMA>>>>;
+			OneOrMorePattern<
+				ApplyInBetweenPattern<GlobalName, SingleTokenPattern<Token::TokenType::COMMA>>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("global_stmt: 'global' ','.NAME+");
-			p.push_to_stack(std::make_shared<Global>(std::vector<std::string>{}));
+			scope.parent().push_back(p.pop_back());
 			return true;
 		}
 		return false;

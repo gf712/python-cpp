@@ -1101,6 +1101,9 @@ class Global : public ASTNode
 	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names))
 	{}
 
+	const std::vector<std::string> &names() const { return m_names; }
+	void add_name(const std::string &name) { m_names.push_back(name); }
+
 	Value *codegen(CodeGenerator *) const override;
 
   private:

@@ -53,7 +53,7 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	// FIXME: demangle should be a function visible in the whole project
 	const std::string demangled_name =
 		Mangler::default_mangler().function_demangle(m_function_name);
-	interpreter.execution_frame()->put_local(demangled_name, func);
+	vm.reg(m_dst) = func;
 }
 
 

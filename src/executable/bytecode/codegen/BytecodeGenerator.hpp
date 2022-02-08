@@ -37,13 +37,13 @@ class BytecodeValue : public ast::Value
 	Register get_register() const { return m_register; }
 };
 
-class BytecodeFunctionValue : public ast::Value
+class BytecodeFunctionValue : public BytecodeValue
 {
 	FunctionInfo m_info;
 
   public:
-	BytecodeFunctionValue(const std::string &name, FunctionInfo &&info)
-		: ast::Value(name), m_info(std::move(info))
+	BytecodeFunctionValue(const std::string &name, Register register_, FunctionInfo &&info)
+		: BytecodeValue(name, register_), m_info(std::move(info))
 	{}
 
 	const FunctionInfo &function_info() const { return m_info; }
@@ -55,6 +55,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	{
 		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
 		std::vector<const ast::ASTNode *> m_parent_nodes;
+		std::vector<std::vector<std::string>> m_local_globals;
 
 	  public:
 		void push_local_args(std::shared_ptr<ast::Arguments> args)
@@ -75,6 +76,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	struct Scope
 	{
 		std::string name;
+		std::vector<std::string> local_globals;
 	};
 
   public:
@@ -176,6 +178,9 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void enter_function() { m_frame_register_count.emplace_back(start_register); }
 
 	void exit_function(size_t function_id);
+
+	void store_name(const std::string &, BytecodeValue *);
+	BytecodeValue *load_name(const std::string &);
 
   private:
 #define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;
