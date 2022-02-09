@@ -15,6 +15,7 @@
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
+#include "runtime/RuntimeError.hpp"
 #include "runtime/StopIteration.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
@@ -504,6 +505,7 @@ auto initialize_exceptions(PyModule *blt)
 	StopIteration::register_type(blt);
 	ValueError::register_type(blt);
 	NameError::register_type(blt);
+	RuntimeError::register_type(blt);
 }
 
 }// namespace

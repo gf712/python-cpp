@@ -98,6 +98,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyType.cpp
     runtime/PySlotWrapper.cpp
     runtime/PyStaticMethod.cpp
+    runtime/RuntimeError.cpp
     runtime/StopIteration.cpp
     runtime/TypeError.cpp
     runtime/Value.cpp
