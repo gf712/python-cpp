@@ -16,7 +16,10 @@ class Bytecode : public Function
 	std::vector<View> m_block_views;
 
   public:
-	Bytecode(size_t registers_needed, std::string m_function_name, std::vector<View> block_views);
+	Bytecode(size_t register_count,
+		size_t stack_size,
+		std::string m_function_name,
+		std::vector<View> block_views);
 
 	auto begin() const { return m_block_views.begin(); }
 	auto end() const { return m_block_views.end(); }

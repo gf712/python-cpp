@@ -21,11 +21,14 @@ struct State
 struct StackFrame : NonCopyable
 {
 	Registers registers;
+	Registers locals;
 	InstructionBlock::const_iterator return_address;
 	VirtualMachine *vm{ nullptr };
 	std::unique_ptr<State> state;
 
-	StackFrame(size_t frame_size,
+	StackFrame() = delete;
+	StackFrame(size_t register_count,
+		size_t stack_size,
 		InstructionBlock::const_iterator return_address,
 		VirtualMachine *);
 	StackFrame(StackFrame &&);
@@ -71,6 +74,22 @@ class VirtualMachine
 		return r->get()[idx];
 	}
 
+	py::Value &stack_local(size_t idx)
+	{
+		auto local = stack_locals();
+		ASSERT(local.has_value())
+		ASSERT(idx < local->get().size())
+		return local->get()[idx];
+	}
+
+	const py::Value &stack_local(size_t idx) const
+	{
+		auto local = stack_locals();
+		ASSERT(local.has_value())
+		ASSERT(idx < local->get().size())
+		return local->get()[idx];
+	}
+
 	std::optional<std::reference_wrapper<Registers>> registers()
 	{
 		if (!m_stack.empty()) { return m_stack.top().registers; }
@@ -79,6 +98,18 @@ class VirtualMachine
 	std::optional<std::reference_wrapper<const Registers>> registers() const
 	{
 		if (!m_stack.empty()) { return m_stack.top().registers; }
+		return {};
+	}
+
+	std::optional<std::reference_wrapper<Registers>> stack_locals()
+	{
+		if (!m_stack.empty()) { return m_stack.top().locals; }
+		return {};
+	}
+
+	std::optional<std::reference_wrapper<const Registers>> stack_locals() const
+	{
+		if (!m_stack.empty()) { return m_stack.top().locals; }
 		return {};
 	}
 
@@ -105,7 +136,8 @@ class VirtualMachine
 
 	void dump() const;
 
-	int call(const std::shared_ptr<Function> &, size_t frame_size);
+	void setup_call_stack(size_t register_count, size_t stack_size);
+	int call(const std::shared_ptr<Function> &);
 	void ret();
 	void jump_blocks(size_t block_count);
 	void set_exception_handling();
@@ -117,7 +149,7 @@ class VirtualMachine
 		return m_interpreter_session;
 	}
 
-	void push_frame(size_t frame_size);
+	void push_frame(size_t register_count, size_t stack_size);
 
 	void pop_frame();
 

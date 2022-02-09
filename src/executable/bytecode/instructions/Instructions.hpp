@@ -240,31 +240,24 @@ class LeftShift : public Instruction
 class LoadFast final : public Instruction
 {
 	Register m_destination;
-	const size_t m_parameter_index;
+	Register m_stack_index;
 	const std::string m_object_name;
 
   public:
-	LoadFast(Register destination, size_t parameter_index, std::string object_name)
-		: m_destination(destination), m_parameter_index(parameter_index),
+	LoadFast(Register destination, Register stack_index, std::string object_name)
+		: m_destination(destination), m_stack_index(stack_index),
 		  m_object_name(std::move(object_name))
 	{}
 	~LoadFast() override {}
 	std::string to_string() const final
 	{
 		return fmt::format(
-			"LOAD_FAST       r{:<3} {} (\"{}\")", m_destination, m_parameter_index, m_object_name);
+			"LOAD_FAST       r{:<3} {} (\"{}\")", m_destination, m_stack_index, m_object_name);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	void execute(VirtualMachine &vm, Interpreter &) const final
 	{
-		// std::visit(
-		// 	[&](const auto &val) {
-		// 		std::cout << "Arg-" << m_parameter_index << ':' << val << '\n';
-		// 	},
-		// 	interpreter.execution_frame()->parameter(m_parameter_index));
-		auto maybe_value = interpreter.execution_frame()->parameter(m_parameter_index);
-		ASSERT(maybe_value)
-		vm.reg(m_destination) = *maybe_value;
+		vm.reg(m_destination) = vm.stack_local(m_stack_index);
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
@@ -272,24 +265,24 @@ class LoadFast final : public Instruction
 
 class StoreFast final : public Instruction
 {
-	const size_t m_parameter_index;
+	Register m_stack_index;
 	const std::string m_object_name;
 	Register m_src;
 
   public:
-	StoreFast(size_t parameter_index, std::string object_name, Register src)
-		: m_parameter_index(parameter_index), m_object_name(std::move(object_name)), m_src(src)
+	StoreFast(size_t stack_index, std::string object_name, Register src)
+		: m_stack_index(stack_index), m_object_name(std::move(object_name)), m_src(src)
 	{}
 	~StoreFast() override {}
 	std::string to_string() const final
 	{
 		return fmt::format(
-			"STORE_FAST       {} (\"{}\") r{:<3}", m_parameter_index, m_object_name, m_src);
+			"STORE_FAST       {} (\"{}\") r{:<3}", m_stack_index, m_object_name, m_src);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	void execute(VirtualMachine &vm, Interpreter &) const final
 	{
-		interpreter.execution_frame()->parameter(m_parameter_index) = vm.reg(m_src);
+		vm.stack_local(m_stack_index) = vm.reg(m_src);
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}

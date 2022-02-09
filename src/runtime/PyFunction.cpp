@@ -24,7 +24,7 @@ PyCode::PyCode(std::shared_ptr<Function> function,
 	CodeFlags flags,
 	PyModule *module)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function),
-	  m_register_count(function->registers_needed()), m_varnames(std::move(varnames)),
+	  m_register_count(function->register_count()), m_varnames(std::move(varnames)),
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
 	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_flags(flags), m_module(module)
 {}
@@ -92,6 +92,8 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			m_code->register_count(),
 			m_globals,
 			locals);
+	[[maybe_unused]] auto scoped_stack =
+		VirtualMachine::the().interpreter().setup_call_stack(m_code->function(), function_frame);
 
 	const auto &varnames = m_code->varnames();
 	std::vector<std::string> positional_args{ varnames.begin(),
@@ -105,7 +107,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 	if (args) {
 		size_t max_args = std::min(args->size(), m_code->arg_count());
 		for (size_t idx = 0; idx < max_args; ++idx) {
-			function_frame->parameter(idx) = args->elements()[idx];
+			VirtualMachine::the().stack_local(idx) = args->elements()[idx];
 		}
 		args_count = max_args;
 	}
@@ -124,11 +126,15 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 					return nullptr;
 				}
 			}
-			auto &arg = function_frame->parameter(std::distance(argnames.begin(), arg_iter));
-			if (arg.has_value()) {
-				VirtualMachine::the().interpreter().raise_exception(
-					type_error("{}() got multiple values for argument '{}'", m_name, key_str.s));
-				return nullptr;
+			auto &arg =
+				VirtualMachine::the().stack_local(std::distance(argnames.begin(), arg_iter));
+
+			if (std::holds_alternative<PyObject *>(arg)) {
+				if (std::get<PyObject *>(arg)) {
+					VirtualMachine::the().interpreter().raise_exception(type_error(
+						"{}() got multiple values for argument '{}'", m_name, key_str.s));
+					return nullptr;
+				}
 			}
 			arg = value;
 			kwargs_count++;
@@ -140,8 +146,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		auto default_iter = defaults.rbegin();
 		for (size_t i = m_code->arg_count() - 1; i > (m_code->arg_count() - defaults.size() - 1);
 			 --i) {
-			if (!function_frame->parameter(i).has_value()) {
-				function_frame->parameter(i) = *default_iter;
+			auto &arg = VirtualMachine::the().stack_local(i);
+			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
+				VirtualMachine::the().stack_local(i) = *default_iter;
 			}
 			default_iter = std::next(default_iter);
 		}
@@ -150,8 +157,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		auto kw_default_iter = kw_defaults.rbegin();
 		const size_t start = m_code->kwonly_arg_count() + m_code->arg_count() - 1;
 		for (size_t i = start; i > start - kw_defaults.size(); --i) {
-			if (!function_frame->parameter(i).has_value()) {
-				function_frame->parameter(i) = *kw_default_iter;
+			auto &arg = VirtualMachine::the().stack_local(i);
+			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
+				VirtualMachine::the().stack_local(i) = *kw_default_iter;
 			}
 			kw_default_iter = std::next(kw_default_iter);
 		}
@@ -164,7 +172,8 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				remaining_args.push_back(args->elements()[idx]);
 			}
 		}
-		function_frame->parameter(m_code->varnames().size()) = PyTuple::create(remaining_args);
+		VirtualMachine::the().stack_local(m_code->varnames().size()) =
+			PyTuple::create(remaining_args);
 	} else if (args_count < args->size()) {
 		VirtualMachine::the().interpreter().raise_exception(type_error(
 			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
@@ -184,8 +193,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 					continue;
 				}
 
-				auto &arg = function_frame->parameter(std::distance(argnames.begin(), arg_iter));
-				if (!arg.has_value()) {
+				auto &arg =
+					VirtualMachine::the().stack_local(std::distance(argnames.begin(), arg_iter));
+				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
 					remaining_kwargs->insert(key, value);
 					kwargs_count++;
 				}
@@ -198,7 +208,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				return m_code->varnames().size();
 			}
 		}();
-		function_frame->parameter(kwargs_index) = remaining_kwargs;
+		VirtualMachine::the().stack_local(kwargs_index) = remaining_kwargs;
 	}
 
 	spdlog::debug("Requesting stack frame with {} virtual registers", m_code->register_count());

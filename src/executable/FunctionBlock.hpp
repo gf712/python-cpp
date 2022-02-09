@@ -16,6 +16,7 @@ struct FunctionMetaData
 	InstructionBlock::const_iterator end_instruction;
 	std::string function_name;
 	size_t register_count{ 0 };
+	size_t stack_size{ 0 };
 };
 
 struct FunctionBlock

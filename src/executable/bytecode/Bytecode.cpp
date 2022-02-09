@@ -1,10 +1,11 @@
 #include "Bytecode.hpp"
 #include "instructions/Instructions.hpp"
 
-Bytecode::Bytecode(size_t registers_needed,
+Bytecode::Bytecode(size_t register_count,
+	size_t stack_size,
 	std::string m_function_name,
 	std::vector<View> block_views)
-	: Function(registers_needed, m_function_name, FunctionExecutionBackend::BYTECODE),
+	: Function(register_count, stack_size, m_function_name, FunctionExecutionBackend::BYTECODE),
 	  m_block_views(block_views)
 {}
 

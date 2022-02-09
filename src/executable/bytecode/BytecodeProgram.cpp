@@ -42,8 +42,10 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		start_idx = m_instructions.size();
 	}
 
-	m_main_function = std::make_shared<Bytecode>(
-		main_func.metadata.register_count, main_func.metadata.function_name, main_blocks);
+	m_main_function = std::make_shared<Bytecode>(main_func.metadata.register_count,
+		main_func.metadata.stack_size,
+		main_func.metadata.function_name,
+		main_blocks);
 
 	for (size_t i = 1; i < func_blocks.size(); ++i) {
 		auto &func = *std::next(func_blocks.begin(), i);
@@ -59,14 +61,16 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			start_idx = m_instructions.size();
 		}
 
-		auto bytecode = std::make_shared<Bytecode>(
-			func.metadata.register_count, func.metadata.function_name, func_blocks_view);
+		auto bytecode = std::make_shared<Bytecode>(func.metadata.register_count,
+			func.metadata.stack_size,
+			func.metadata.function_name,
+			func_blocks_view);
 
 		m_functions.emplace_back(std::move(bytecode));
 	}
 }
 
-size_t BytecodeProgram::main_stack_size() const { return m_main_function->registers_needed(); }
+size_t BytecodeProgram::main_stack_size() const { return m_main_function->register_count(); }
 
 std::string BytecodeProgram::to_string() const
 {
@@ -83,15 +87,19 @@ std::string BytecodeProgram::to_string() const
 
 int BytecodeProgram::execute(VirtualMachine *vm)
 {
-	const size_t frame_size = main_stack_size();
+	const size_t register_count = main_stack_size();
+	// stack size in main frame is always zero (since we don't know how much it can grow at compile
+	// time)
+	const size_t stack_size = 0;
+
 	// push frame BEFORE setting the ip, so that we can save the return address
-	vm->push_frame(frame_size);
+	vm->push_frame(register_count, stack_size);
 
 	const auto &begin_function_block = begin();
 	const auto &end_function_block = end();
 
 	vm->set_instruction_pointer(begin_function_block->begin());
-	const auto stack_size = vm->stack().size();
+	const auto stack_count = vm->stack().size();
 	// can only initialize interpreter after creating the initial stack frame
 	vm->interpreter_session()->start_new_interpreter(*this);
 	const auto initial_ip = vm->instruction_pointer();
@@ -110,7 +118,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 			// spdlog::info("{} {}", (void *)instruction.get(), instruction->to_string());
 			instruction->execute(*vm, vm->interpreter());
 			// we left the current stack frame in the previous instruction
-			if (vm->stack().size() != stack_size) { break; }
+			if (vm->stack().size() != stack_count) { break; }
 			// vm->dump();
 			if (vm->interpreter().execution_frame()->exception_info().has_value()) {
 				if (!vm->state().catch_exception) {

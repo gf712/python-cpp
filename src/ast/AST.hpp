@@ -67,6 +67,7 @@ class Value
 
   public:
 	Value(const std::string &name) : m_name(name) {}
+	virtual ~Value() = default;
 	const std::string &get_name() const { return m_name; }
 };
 

@@ -12,6 +12,12 @@
 
 class BytecodeProgram;
 
+struct ScopedStack
+{
+	const StackFrame& top_frame;
+	~ScopedStack();
+};
+
 class Interpreter
 	: NonCopyable
 	, NonMoveable
@@ -83,6 +89,7 @@ class Interpreter
 		size_t kwonly_args_count,
 		const CodeFlags &flags) const;
 
+	ScopedStack setup_call_stack(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 	py::PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 
 	py::PyObject *call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);

@@ -102,10 +102,5 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 	if (m_exception_to_catch) visitor.visit(*m_exception_to_catch);
 	if (m_exception.has_value()) visitor.visit(*m_exception->exception);
 	if (m_stashed_exception.has_value()) visitor.visit(*m_stashed_exception->exception);
-	for (const auto &val : m_parameters) {
-		if (val.has_value() && std::holds_alternative<PyObject *>(*val)) {
-			visitor.visit(*std::get<PyObject *>(*val));
-		}
-	}
 	if (m_parent) { visitor.visit(*m_parent); }
 }

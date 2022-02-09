@@ -13,18 +13,24 @@ using namespace py;
 
 #define DEBUG_VM 0
 
-StackFrame::StackFrame(size_t frame_size,
+StackFrame::StackFrame(size_t register_count,
+	size_t stack_size,
 	InstructionBlock::const_iterator return_address,
 	VirtualMachine *vm_)
-	: registers(frame_size, nullptr), return_address(return_address), vm(vm_)
+	: registers(register_count, nullptr), locals(stack_size, nullptr),
+	  return_address(return_address), vm(vm_)
 {
 	state = std::make_unique<State>();
-	spdlog::debug("Added frame of size {}. New stack size: {}", frame_size, vm->m_stack.size());
+	spdlog::debug("Added frame with {} registers and stack size {}. New stack count: {}",
+		registers.size(),
+		locals.size(),
+		vm->m_stack.size());
 }
 
 StackFrame::StackFrame(StackFrame &&other)
-	: registers(std::move(other.registers)), return_address(other.return_address),
-	  vm(std::exchange(other.vm, nullptr)), state(std::exchange(other.state, nullptr))
+	: registers(std::move(other.registers)), locals(std::move(other.locals)),
+	  return_address(other.return_address), vm(std::exchange(other.vm, nullptr)),
+	  state(std::exchange(other.state, nullptr))
 {}
 
 StackFrame::~StackFrame()
@@ -40,16 +46,19 @@ VirtualMachine::VirtualMachine()
 	m_heap.set_start_stack_pointer(rbp);
 }
 
+void VirtualMachine::setup_call_stack(size_t register_count, size_t stack_size)
+{
+	push_frame(register_count, stack_size);
+}
 
-int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame_size)
+int VirtualMachine::call(const std::shared_ptr<Function> &function)
 {
 	ASSERT(function->backend() == FunctionExecutionBackend::BYTECODE)
 	const auto &first_block = std::static_pointer_cast<Bytecode>(function)->begin();
 	const auto func_ip = first_block->begin();
 	int result = EXIT_SUCCESS;
 
-	push_frame(frame_size);
-	const auto stack_size = m_stack.size();
+	const auto stack_depth = m_stack.size();
 	auto block_view = std::static_pointer_cast<Bytecode>(function)->begin();
 	auto end_function_block = std::static_pointer_cast<Bytecode>(function)->end();
 
@@ -65,7 +74,7 @@ int VirtualMachine::call(const std::shared_ptr<Function> &function, size_t frame
 			instruction->execute(*this, interpreter());
 
 			// we left the current stack frame in the previous instruction
-			if (m_stack.size() != stack_size) { break; }
+			if (m_stack.size() != stack_depth) { break; }
 			// dump();
 			if (interpreter().execution_frame()->exception_info().has_value()) {
 				if (!m_state->catch_exception) {
@@ -173,16 +182,17 @@ void VirtualMachine::jump_blocks(size_t block_count) { m_state->jump_block_count
 
 void VirtualMachine::set_exception_handling() { m_state->catch_exception = true; }
 
-void VirtualMachine::push_frame(size_t frame_size)
+void VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 {
 	if (m_stack.empty()) {
 		// the stack of main doesn't need a return address, since once it is popped
 		// we shut down and there is nothing left to do
-		m_stack.push(StackFrame{ frame_size, InstructionBlock::const_iterator{}, this });
+		m_stack.push(
+			StackFrame{ register_count, stack_size, InstructionBlock::const_iterator{}, this });
 	} else {
 		// return address is the instruction after the current instruction
 		const auto return_address = m_instruction_pointer;
-		m_stack.push(StackFrame{ frame_size, return_address, this });
+		m_stack.push(StackFrame{ register_count, stack_size, return_address, this });
 	}
 	// set a new state for this stack frame
 	m_state = m_stack.top().state.get();
@@ -191,6 +201,11 @@ void VirtualMachine::push_frame(size_t frame_size)
 	auto &stack_objects = m_stack_objects.emplace_back();
 	if (r.has_value()) {
 		for (const auto &v : r->get()) { stack_objects.push_back(&v); }
+	}
+
+	const auto &l = stack_locals();
+	if (l.has_value()) {
+		for (const auto &v : l->get()) { stack_objects.push_back(&v); }
 	}
 }
 

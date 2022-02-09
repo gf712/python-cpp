@@ -120,12 +120,27 @@ PyObject *Interpreter::make_function(const std::string &function_name,
 	return f;
 }
 
+ScopedStack::~ScopedStack()
+{
+	auto &vm = VirtualMachine::the();
+	if (&vm.stack().top() == &top_frame) { vm.pop_frame(); }
+}
+
+ScopedStack Interpreter::setup_call_stack(const std::shared_ptr<Function> &func,
+	ExecutionFrame *function_frame)
+{
+	auto &vm = VirtualMachine::the();
+	vm.setup_call_stack(function_frame->m_register_count, func->stack_size());
+	return ScopedStack{ vm.stack().top() };
+}
+
 PyObject *Interpreter::call(const std::shared_ptr<Function> &func, ExecutionFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
 	function_frame->m_parent = m_current_frame;
 	m_current_frame = function_frame;
-	vm.call(func, function_frame->m_register_count);
+	auto result = vm.call(func);
+	(void)result;
 
 	// cleanup: the current_frame will be garbage collected
 	m_current_frame = m_current_frame->exit();

@@ -466,7 +466,7 @@ void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)
 }
 
 LLVMFunction::LLVMFunction(const llvm::Function &f)
-	: Function(0, f.getName().str(), FunctionExecutionBackend::LLVM), m_function(f)
+	: Function(0, 0, f.getName().str(), FunctionExecutionBackend::LLVM), m_function(f)
 {}
 
 std::string LLVMFunction::to_string() const

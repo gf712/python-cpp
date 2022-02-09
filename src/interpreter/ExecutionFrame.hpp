@@ -20,8 +20,6 @@ class ExecutionFrame : public Cell
 	};
 
   protected:
-	// parameters
-	std::array<std::optional<py::Value>, 16> m_parameters;
 	size_t m_register_count;
 	py::PyModule *m_builtins;
 	py::PyDict *m_globals;
@@ -36,18 +34,6 @@ class ExecutionFrame : public Cell
 		size_t register_count,
 		py::PyDict *globals,
 		py::PyDict *locals);
-
-	const std::optional<py::Value> &parameter(size_t parameter_idx) const
-	{
-		ASSERT(parameter_idx < m_parameters.size());
-		return m_parameters[parameter_idx];
-	}
-
-	std::optional<py::Value> &parameter(size_t parameter_idx)
-	{
-		ASSERT(parameter_idx < m_parameters.size());
-		return m_parameters[parameter_idx];
-	}
 
 	void put_local(const std::string &name, const py::Value &);
 	void put_global(const std::string &name, const py::Value &);

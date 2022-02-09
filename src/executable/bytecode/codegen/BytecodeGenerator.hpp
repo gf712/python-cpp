@@ -35,6 +35,22 @@ class BytecodeValue : public ast::Value
 	{}
 
 	Register get_register() const { return m_register; }
+
+	virtual bool is_function() const { return false; }
+};
+
+class BytecodeStackValue : public ast::Value
+{
+	Register m_stack_index;
+
+  public:
+	BytecodeStackValue(const std::string &name, Register stack_index)
+		: ast::Value(name), m_stack_index(stack_index)
+	{}
+
+	Register get_stack_index() const { return m_stack_index; }
+
+	virtual bool is_function() const { return false; }
 };
 
 class BytecodeFunctionValue : public BytecodeValue
@@ -47,6 +63,8 @@ class BytecodeFunctionValue : public BytecodeValue
 	{}
 
 	const FunctionInfo &function_info() const { return m_info; }
+
+	bool is_function() const final { return true; }
 };
 
 class BytecodeGenerator : public ast::CodeGenerator
@@ -55,7 +73,6 @@ class BytecodeGenerator : public ast::CodeGenerator
 	{
 		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
 		std::vector<const ast::ASTNode *> m_parent_nodes;
-		std::vector<std::vector<std::string>> m_local_globals;
 
 	  public:
 		void push_local_args(std::shared_ptr<ast::Arguments> args)
@@ -75,12 +92,18 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	struct Scope
 	{
+		enum class Type { MODULE = 0, FUNCTION = 1, CLASS = 2, CLOSURE = 3 };
+
 		std::string name;
-		std::vector<std::string> local_globals;
+		Type type;
+		std::set<std::string> globals;
+		std::unordered_map<std::string, std::variant<BytecodeValue *, BytecodeStackValue *>> locals;
+		std::unordered_map<std::string, BytecodeStackValue *> nonlocals;
 	};
 
   public:
 	static constexpr size_t start_register = 1;
+	static constexpr size_t start_stack_index = 0;
 
   private:
 	FunctionBlocks m_functions;
@@ -91,6 +114,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::vector<Label *> m_labels;
 
 	std::vector<size_t> m_frame_register_count;
+	std::vector<size_t> m_frame_stack_value_count;
 	size_t m_value_index{ 0 };
 	ASTContext m_ctx;
 	std::stack<Scope> m_stack;
@@ -165,17 +189,29 @@ class BytecodeGenerator : public ast::CodeGenerator
 	}
 
 	size_t register_count() const { return m_frame_register_count.back(); }
+	size_t stack_variable_count() const { return m_frame_stack_value_count.back(); }
 
 	Register allocate_register()
 	{
 		spdlog::debug("New register: {}", m_frame_register_count.back());
 		return m_frame_register_count.back()++;
 	}
+
+	Register allocate_stack_value()
+	{
+		spdlog::debug("New stack value: {}", m_frame_stack_value_count.back());
+		return m_frame_stack_value_count.back()++;
+	}
+
 	BytecodeFunctionValue *create_function(const std::string &);
 
 	InstructionBlock *allocate_block(size_t);
 
-	void enter_function() { m_frame_register_count.emplace_back(start_register); }
+	void enter_function()
+	{
+		m_frame_register_count.emplace_back(start_register);
+		m_frame_stack_value_count.emplace_back(start_stack_index);
+	}
 
 	void exit_function(size_t function_id);
 
@@ -217,6 +253,13 @@ class BytecodeGenerator : public ast::CodeGenerator
 		m_values.push_back(std::make_unique<BytecodeValue>(
 			"%" + std::to_string(m_value_index++), allocate_register()));
 		return static_cast<BytecodeValue *>(m_values.back().get());
+	}
+
+	BytecodeStackValue *create_stack_value()
+	{
+		m_values.push_back(std::make_unique<BytecodeStackValue>(
+			"%" + std::to_string(m_value_index++), allocate_stack_value()));
+		return static_cast<BytecodeStackValue *>(m_values.back().get());
 	}
 
 	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);

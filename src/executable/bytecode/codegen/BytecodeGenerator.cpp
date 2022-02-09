@@ -52,44 +52,65 @@ using namespace ast;
 
 namespace codegen {
 
+void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
+{
+	const auto &globals = m_stack.top().globals;
+	const auto &nonlocals = m_stack.top().nonlocals;
+	const auto &locals = m_stack.top().locals;
+
+	if (std::find(globals.begin(), globals.end(), name) != globals.end()) {
+		emit<StoreGlobal>(name, src->get_register());
+	} else if (nonlocals.contains(name)) {
+		TODO();
+	} else {
+		if (m_stack.top().type == Scope::Type::MODULE || m_stack.top().type == Scope::Type::CLASS) {
+			// module namespace
+			auto *value = create_value();
+			emit<StoreName>(name, src->get_register());
+			m_stack.top().locals.emplace(name, value);
+		} else if (m_stack.top().type == Scope::Type::CLOSURE) {
+			TODO();
+		} else {
+			auto *value = [&] {
+				if (auto it = locals.find(name); it != locals.end()) {
+					return std::get<BytecodeStackValue *>(it->second);
+				} else {
+					return create_stack_value();
+				}
+			}();
+			emit<StoreFast>(value->get_stack_index(), name, src->get_register());
+			m_stack.top().locals.emplace(name, value);
+		}
+	}
+}
+
 BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 {
 	auto *dst = create_value();
 
-	if (m_ctx.has_local_args()) {
-		const auto &local_args = m_ctx.local_args();
-		const auto &arg_names = local_args->argument_names();
-		const auto &kw_only_arg_names = local_args->kw_only_argument_names();
-		if (auto it = std::find(arg_names.begin(), arg_names.end(), name); it != arg_names.end()) {
-			const size_t arg_index = std::distance(arg_names.begin(), it);
-			emit<LoadFast>(dst->get_register(), arg_index, name);
-			return dst;
-		} else if (auto it = std::find(kw_only_arg_names.begin(), kw_only_arg_names.end(), name);
-				   it != kw_only_arg_names.end()) {
-			const size_t arg_index =
-				std::distance(kw_only_arg_names.begin(), it) + arg_names.size();
-			emit<LoadFast>(dst->get_register(), arg_index, name);
-			return dst;
-		} else if (local_args->vararg() && local_args->vararg()->name() == name) {
-			const size_t arg_index = local_args->args().size() + local_args->kwonlyargs().size();
-			emit<LoadFast>(dst->get_register(), arg_index, name);
-			return dst;
-		} else if (local_args->kwarg() && local_args->kwarg()->name() == name) {
-			size_t arg_index = local_args->args().size() + local_args->kwonlyargs().size();
-			if (local_args->vararg()) { arg_index++; }
-			emit<LoadFast>(dst->get_register(), arg_index, name);
-			return dst;
-		}
-	}
+	const auto &globals = m_stack.top().globals;
 
-	if (!m_stack.top().local_globals.empty()) {
-		const auto &local_globals = m_stack.top().local_globals;
-		if (std::find(local_globals.begin(), local_globals.end(), name) != local_globals.end()) {
-			emit<LoadGlobal>(dst->get_register(), name);
-			return dst;
+	if (std::find(globals.begin(), globals.end(), name) != globals.end()) {
+		emit<LoadGlobal>(dst->get_register(), name);
+	} else {
+		if (m_stack.top().type == Scope::Type::MODULE || m_stack.top().type == Scope::Type::CLASS) {
+			emit<LoadName>(dst->get_register(), name);
+		} else {
+			const auto &locals = m_stack.top().locals;
+			const auto &nonlocals = m_stack.top().nonlocals;
+
+			if (nonlocals.contains(name)) {
+				TODO();
+			} else if (auto it = locals.find(name); it != locals.end()) {
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				emit<LoadFast>(dst->get_register(),
+					std::get<BytecodeStackValue *>(it->second)->get_stack_index(),
+					name);
+			} else {
+				emit<LoadGlobal>(dst->get_register(), name);
+			}
 		}
 	}
-	emit<LoadName>(dst->get_register(), name);
 	return dst;
 }
 
@@ -160,7 +181,12 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		mangle_namespace(m_stack), node->name(), node->source_location());
 	auto *f = create_function(function_name);
 
-	m_stack.push(Scope{ .name = node->name() });
+	// if (m_stack.top().type == Scope::Type::FUNCTION) {
+	// 	// this function is a closure, has to potentially capture variables in the parent function
+	// 	// scope
+	// 	TODO();
+	// }
+	m_stack.push(Scope{ .name = node->name(), .type = Scope::Type::FUNCTION });
 
 	auto *block = allocate_block(f->function_info().function_id);
 	auto *old_block = m_current_block;
@@ -243,7 +269,12 @@ Value *BytecodeGenerator::visit(const Arguments *node)
 	return nullptr;
 }
 
-Value *BytecodeGenerator::visit(const Argument *) { return nullptr; }
+Value *BytecodeGenerator::visit(const Argument *node)
+{
+	auto *value = create_stack_value();
+	m_stack.top().locals.emplace(node->name(), value);
+	return nullptr;
+}
 
 Value *BytecodeGenerator::visit(const Starred *node)
 {
@@ -256,27 +287,6 @@ Value *BytecodeGenerator::visit(const Return *node)
 	auto *src = generate(node->value().get(), m_function_id);
 	emit<ReturnValue>(src->get_register());
 	return src;
-}
-
-void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
-{
-	if (m_ctx.has_local_args()) {
-		const auto &local_args = m_ctx.local_args();
-		const auto &arg_names = local_args->argument_names();
-		if (auto it = std::find(arg_names.begin(), arg_names.end(), name); it != arg_names.end()) {
-			const size_t arg_index = std::distance(arg_names.begin(), it);
-			emit<StoreFast>(arg_index, name, src->get_register());
-			return;
-		}
-	}
-	if (!m_stack.top().local_globals.empty()) {
-		const auto &global_args = m_stack.top().local_globals;
-		if (std::find(global_args.begin(), global_args.end(), name) != global_args.end()) {
-			emit<StoreGlobal>(name, src->get_register());
-			return;
-		}
-	}
-	emit<StoreName>(name, src->get_register());
 }
 
 Value *BytecodeGenerator::visit(const Assign *node)
@@ -637,7 +647,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 			mangle_namespace(m_stack), node->name(), node->source_location());
 
 		auto *class_builder_func = create_function(class_mangled_name);
-		m_stack.push(Scope{ .name = node->name() });
+		m_stack.push(Scope{ .name = node->name(), .type = Scope::Type::CLASS });
 		class_id = class_builder_func->function_info().function_id;
 
 		auto *block = allocate_block(class_id);
@@ -820,7 +830,7 @@ Value *BytecodeGenerator::visit(const Import *node)
 Value *BytecodeGenerator::visit(const Module *node)
 {
 	const auto &module_name = fs::path(node->filename()).stem();
-	m_stack.push(Scope{ .name = module_name });
+	m_stack.push(Scope{ .name = module_name, .type = Scope::Type::MODULE });
 	BytecodeValue *last = nullptr;
 	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
 
@@ -952,9 +962,22 @@ Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
 Value *BytecodeGenerator::visit(const Global *node)
 {
-	// TODO: check that the global names are not used in prior declarations
-	m_stack.top().local_globals.insert(
-		m_stack.top().local_globals.begin(), node->names().begin(), node->names().end());
+	const auto &locals = m_stack.top().locals;
+	const auto &nonlocals = m_stack.top().nonlocals;
+
+	for (const auto &name : node->names()) {
+		if (locals.contains(name)) {
+			// TODO: raise SyntaxError
+			spdlog::error("SyntaxError: name '{}' is assigned to before global declaration", name);
+			std::abort();
+		} else if (nonlocals.contains(name)) {
+			// TODO: raise SyntaxError
+			spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+			std::abort();
+		} else {
+			m_stack.top().globals.insert(name);
+		}
+	}
 	return nullptr;
 }
 
@@ -1064,6 +1087,7 @@ FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenera
 BytecodeGenerator::BytecodeGenerator()
 {
 	m_frame_register_count.push_back(0u);
+	m_frame_stack_value_count.push_back(0u);
 	(void)create_function("__main__entry__");
 	m_current_block = &m_functions.back().blocks.back();
 }
@@ -1075,7 +1099,9 @@ void BytecodeGenerator::exit_function(size_t function_id)
 	ASSERT(function_id < m_functions.size())
 	auto function = std::next(m_functions.begin(), function_id);
 	function->metadata.register_count = register_count();
+	function->metadata.stack_size = stack_variable_count();
 	m_frame_register_count.pop_back();
+	m_frame_stack_value_count.pop_back();
 }
 
 BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &name)
@@ -1112,6 +1138,7 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 	std::vector<std::string> argv)
 {
 	ASSERT(m_frame_register_count.size() == 2)
+	ASSERT(m_frame_stack_value_count.size() == 2)
 	relocate_labels(m_functions);
 	return std::make_shared<BytecodeProgram>(std::move(m_functions), filename, argv);
 }
@@ -1140,6 +1167,8 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 
 	// allocate registers for __main__
 	generator.m_functions.front().metadata.register_count = generator.register_count();
+	generator.m_functions.front().metadata.stack_size = 0;
+
 	auto executable = generator.generate_executable(module->filename(), argv);
 	return executable;
 }
