@@ -4,6 +4,7 @@
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
 #include "runtime/PyBytes.hpp"
+#include "runtime/PyClassMethod.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
 #include "runtime/PyFloat.hpp"
@@ -40,7 +41,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_slot_wrapper(PySlotWrapper::register_type()),
 	  m_bound_method(PyBoundMethod::register_type()),
 	  m_method_wrapper(PyMethodDescriptor::register_type()),
-	  m_static_method(PyStaticMethod::register_type()), m_property(PyProperty::register_type())
+	  m_static_method(PyStaticMethod::register_type()), m_property(PyProperty::register_type()),
+	  m_classmethod(PyClassMethod::register_type())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                             \
@@ -89,4 +91,5 @@ INITIALIZE_TYPE(bound_method)
 INITIALIZE_TYPE(method_wrapper)
 INITIALIZE_TYPE(static_method)
 INITIALIZE_TYPE(property)
+INITIALIZE_TYPE(classmethod)
 }// namespace py

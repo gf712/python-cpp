@@ -40,6 +40,7 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_method_wrapper;
 	std::unique_ptr<TypePrototype> m_static_method;
 	std::unique_ptr<TypePrototype> m_property;
+	std::unique_ptr<TypePrototype> m_classmethod;
 
 	std::unique_ptr<TypePrototype> m_base_exception;
 
@@ -86,6 +87,7 @@ class BuiltinTypes
 	TypePrototype &method_wrapper() const { return *m_method_wrapper; }
 	TypePrototype &static_method() const { return *m_static_method; }
 	TypePrototype &property() const { return *m_property; }
+	TypePrototype &classmethod() const { return *m_classmethod; }
 
 	TypePrototype &base_exception() const { return *m_base_exception; }
 };
@@ -118,5 +120,6 @@ PyType *bound_method();
 PyType *method_wrapper();
 PyType *static_method();
 PyType *property();
+PyType *classmethod();
 
 }// namespace py

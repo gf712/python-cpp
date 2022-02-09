@@ -478,6 +478,7 @@ auto initialize_types()
 	method_wrapper();
 	static_method();
 	property();
+	classmethod();
 
 	return std::array{
 		type(),
@@ -493,7 +494,8 @@ auto initialize_types()
 		list(),
 		tuple(),
 		range(),
-		property()
+		property(),
+		classmethod()
 	};
 }
 

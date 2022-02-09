@@ -81,6 +81,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
     runtime/PyBytes.cpp
+    runtime/PyClassMethod.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp

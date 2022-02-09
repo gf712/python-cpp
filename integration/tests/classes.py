@@ -41,8 +41,13 @@ class A:
     def __init__(self, a):
         self._a = a
 
+    @classmethod
+    def new(cls, value):
+        return cls(value)
+
     @property
     def a(self):
         return self._a * 2
 
 assert A(10).a == 20
+assert A.new(10).a == 20
