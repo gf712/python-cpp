@@ -512,7 +512,8 @@ struct StarAtomPattern : Pattern<StarAtomPattern>
 
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string id{ p.lexer().get(token->start(), token->end()) };
-			p.push_to_stack(std::make_shared<Name>(id, ContextType::STORE));
+			p.push_to_stack(std::make_shared<Name>(
+				id, ContextType::STORE, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 		return false;
@@ -561,8 +562,10 @@ struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
 			std::string_view name{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
 			auto value = p.pop_back();
-			p.push_to_stack(
-				std::make_shared<Attribute>(value, std::string(name), ContextType::LOAD));
+			p.push_to_stack(std::make_shared<Attribute>(value,
+				std::string(name),
+				ContextType::LOAD,
+				SourceLocation{ token->start(), token->end() }));
 			if (PatternMatch<TPrimaryPattern_>::match(p)) {
 				DEBUG_LOG("'.' NAME &t_lookahead t_primary'")
 				return true;
@@ -608,7 +611,9 @@ struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
 						args.push_back(node);
 					}
 				}
-				p.push_to_stack(std::make_shared<Call>(caller, args, kwargs));
+				auto end_token = p.lexer().peek_token(p.token_position() - 1);
+				p.push_to_stack(std::make_shared<Call>(
+					caller, args, kwargs, SourceLocation{ token->start(), end_token->end() }));
 				if (PatternMatch<TPrimaryPattern_>::match(p)) {
 					DEBUG_LOG("'(' [arguments] ')' &t_lookahead t_primary'")
 					scope.parent().push_back(p.pop_back());
@@ -678,7 +683,8 @@ struct TargetWithStarAtomPattern : Pattern<TargetWithStarAtomPattern>
 			const auto primary = p.pop_back();
 			DEBUG_LOG("{}", name);
 			primary->print_node("");
-			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
+			auto attribute = std::make_shared<Attribute>(
+				primary, name, ContextType::STORE, SourceLocation{ token->start(), token->end() });
 			p.push_to_stack(attribute);
 			return true;
 		}
@@ -769,6 +775,8 @@ struct StringPattern : Pattern<StringPattern>
 		if (pattern1::match(p)) {
 			DEBUG_LOG("strings: STRING+");
 			std::string complete_string;
+			auto start_token = p.lexer().peek_token(initial_token_position);
+			auto end_token = p.lexer().peek_token(initial_token_position);
 			for (size_t idx = initial_token_position; idx < p.token_position(); ++idx) {
 				auto token = p.lexer().peek_token(idx);
 				auto is_triple_quote = [token]() {
@@ -786,8 +794,10 @@ struct StringPattern : Pattern<StringPattern>
 					}
 				}();
 				complete_string += value;
+				end_token = token;
 			}
-			p.push_to_stack(std::make_shared<Constant>(complete_string));
+			p.push_to_stack(std::make_shared<Constant>(
+				complete_string, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -837,12 +847,20 @@ struct ListPattern : Pattern<ListPattern>
 	{
 		BlockScope list_scope{ p };
 		DEBUG_LOG("list");
+		auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
 			ZeroOrMorePattern<StarNamedExpressions>,
 			SingleTokenPattern<Token::TokenType::RSQB>>;
 		if (pattern1::match(p)) {
-			auto list = std::make_shared<List>(ContextType::LOAD);
-			while (!p.stack().empty()) { list->append(p.pop_front()); }
+			std::vector<std::shared_ptr<ASTNode>> elements;
+			elements.reserve(p.stack().size());
+			while (!p.stack().empty()) { elements.push_back(p.pop_front()); }
+
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			auto list = std::make_shared<List>(elements,
+				ContextType::LOAD,
+				SourceLocation{ start_token->start(), end_token->end() });
+
 			list_scope.parent().push_back(std::move(list));
 			return true;
 		}
@@ -865,14 +883,20 @@ struct TuplePattern : Pattern<TuplePattern>
 	{
 		BlockScope tuple_scope{ p };
 		DEBUG_LOG("tuple");
+		auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ZeroOrMorePattern<StarNamedExpression,
 				SingleTokenPattern<Token::TokenType::COMMA>,
 				ZeroOrMorePattern<StarNamedExpressions>>,
 			SingleTokenPattern<Token::TokenType::RPAREN>>;
 		if (pattern1::match(p)) {
-			auto tuple = std::make_shared<Tuple>(ContextType::LOAD);
-			while (!p.stack().empty()) { tuple->append(p.pop_front()); }
+			std::vector<std::shared_ptr<ASTNode>> elements;
+			elements.reserve(p.stack().size());
+			while (!p.stack().empty()) { elements.push_back(p.pop_front()); }
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			auto tuple = std::make_shared<Tuple>(elements,
+				ContextType::LOAD,
+				SourceLocation{ start_token->start(), end_token->end() });
 			tuple_scope.parent().push_back(std::move(tuple));
 			return true;
 		}
@@ -920,11 +944,6 @@ struct KVPairPattern : Pattern<KVPairPattern>
 			ExpressionPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("kvpair: expression ':' expression");
-			auto value = p.pop_back();
-			auto key = p.pop_back();
-			auto dict = p.stack().back();
-			ASSERT(as<Dict>(dict))
-			as<Dict>(dict)->insert(key, value);
 			return true;
 		}
 		return false;
@@ -981,15 +1000,31 @@ struct DictPattern : Pattern<DictPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope dict_scope{ p };
-		p.push_to_stack(std::make_shared<Dict>());
 		// '{' [double_starred_kvpairs] '}'
+
+		auto start_token = p.lexer().peek_token(p.token_position());
 		DEBUG_LOG("'{' [double_starred_kvpairs] '}'");
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LBRACE>,
 			ZeroOrOnePattern<DoubleStarredKVPairsPattern>,
 			SingleTokenPattern<Token::TokenType::RBRACE>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'{' [double_starred_kvpairs] '}'");
-			dict_scope.parent().push_back(p.pop_back());
+			std::vector<std::shared_ptr<ASTNode>> keys;
+			std::vector<std::shared_ptr<ASTNode>> values;
+
+			ASSERT(p.stack().size() % 2 == 0)
+			keys.reserve(p.stack().size() / 2);
+			values.reserve(p.stack().size() / 2);
+
+			while (!p.stack().empty()) {
+				keys.push_back(p.pop_front());
+				values.push_back(p.pop_front());
+			}
+
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			auto dict = std::make_shared<Dict>(
+				keys, values, SourceLocation{ start_token->start(), end_token->end() });
+			dict_scope.parent().push_back(std::move(dict));
 			return true;
 		}
 
@@ -1017,7 +1052,7 @@ struct SetCompPattern : Pattern<SetCompPattern>
 
 
 // this function assumes that we have a valid number
-std::shared_ptr<ASTNode> parse_number(std::string value)
+std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_location)
 {
 	std::erase_if(value, [](const char c) { return c == '_'; });
 
@@ -1028,16 +1063,16 @@ std::shared_ptr<ASTNode> parse_number(std::string value)
 		// octal
 		std::string oct_str{ value.begin() + 2, value.end() };
 		int64_t int_value = std::stoll(oct_str, nullptr, 8);
-		return std::make_shared<Constant>(int_value);
+		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value[1] == 'x' || value[1] == 'X') {
 		// hex
 		int64_t int_value = std::stoll(value, nullptr, 16);
-		return std::make_shared<Constant>(int_value);
+		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value[1] == 'b' || value[1] == 'B') {
 		// binary
 		std::string bin_str{ value.begin() + 2, value.end() };
 		int64_t int_value = std::stoll(bin_str, nullptr, 2);
-		return std::make_shared<Constant>(int_value);
+		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value.find_first_of("jJ") != std::string::npos) {
 		// imaginary number
 		TODO();
@@ -1047,15 +1082,15 @@ std::shared_ptr<ASTNode> parse_number(std::string value)
 		std::istringstream os(value);
 		double float_value;
 		os >> float_value;
-		return std::make_shared<Constant>(float_value);
+		return std::make_shared<Constant>(float_value, source_location);
 	} else if (value.find('.') != std::string::npos) {
 		// float
 		double float_value = std::stod(value);
-		return std::make_shared<Constant>(float_value);
+		return std::make_shared<Constant>(float_value, source_location);
 	} else {
 		// int
 		int64_t int_value = std::stoll(value);
-		return std::make_shared<Constant>(int_value);
+		return std::make_shared<Constant>(int_value, source_location);
 	}
 }
 
@@ -1100,13 +1135,17 @@ struct AtomPattern : Pattern<AtomPattern>
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
 			if (name == "True") {
-				p.push_to_stack(std::make_shared<Constant>(true));
+				p.push_to_stack(std::make_shared<Constant>(
+					true, SourceLocation{ token->start(), token->end() }));
 			} else if (name == "False") {
-				p.push_to_stack(std::make_shared<Constant>(false));
+				p.push_to_stack(std::make_shared<Constant>(
+					false, SourceLocation{ token->start(), token->end() }));
 			} else if (name == "None") {
-				p.push_to_stack(std::make_shared<Constant>(py::NameConstant{ py::NoneType{} }));
+				p.push_to_stack(std::make_shared<Constant>(py::NameConstant{ py::NoneType{} },
+					SourceLocation{ token->start(), token->end() }));
 			} else {
-				p.push_to_stack(std::make_shared<Name>(name, ContextType::LOAD));
+				p.push_to_stack(std::make_shared<Name>(
+					name, ContextType::LOAD, SourceLocation{ token->start(), token->end() }));
 			}
 			return true;
 		}
@@ -1124,7 +1163,7 @@ struct AtomPattern : Pattern<AtomPattern>
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string number{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
-			p.push_to_stack(parse_number(number));
+			p.push_to_stack(parse_number(number, SourceLocation{ token->start(), token->end() }));
 
 			return true;
 		}
@@ -1153,7 +1192,9 @@ struct AtomPattern : Pattern<AtomPattern>
 
 		using pattern11 = PatternMatch<SingleTokenPattern<Token::TokenType::ELLIPSIS>>;
 		if (pattern11::match(p)) {
-			p.push_to_stack(std::make_shared<Constant>(Ellipsis{}));
+			auto token = p.lexer().peek_token(p.token_position() - 1);
+			p.push_to_stack(std::make_shared<Constant>(
+				Ellipsis{}, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 
@@ -1182,9 +1223,12 @@ struct NamedExpressionPattern : Pattern<NamedExpressionPattern>
 		if (pattern1::match(p)) {
 			DEBUG_LOG("NAME ':=' ~ expression");
 			const std::string name{ maybe_name };
-			auto target = std::make_shared<Name>(name, ContextType::STORE);
+			auto target = std::make_shared<Name>(
+				name, ContextType::STORE, SourceLocation{ token->start(), token->end() });
 			const auto &value = p.pop_back();
-			p.push_to_stack(std::make_shared<NamedExpr>(target, value));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<NamedExpr>(
+				target, value, SourceLocation{ token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -1215,7 +1259,10 @@ struct KwargsOrStarredPattern : Pattern<KwargsOrStarredPattern>
 			ExpressionPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("NAME '=' expression");
-			p.push_to_stack(std::make_shared<Keyword>(maybe_name, p.pop_back()));
+			const auto &expression = p.pop_back();
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Keyword>(
+				maybe_name, expression, SourceLocation{ token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -1229,14 +1276,16 @@ struct StarredExpressionPattern : Pattern<StarredExpressionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("StarredExpressionPattern");
-
+		auto start_token = p.lexer().peek_token(p.token_position());
 		// '*' expression
 		using pattern1 =
 			PatternMatch<SingleTokenPattern<Token::TokenType::STAR>, ExpressionPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'*' expression");
 			const auto &arg = p.pop_back();
-			p.push_to_stack(std::make_shared<Starred>(arg, ContextType::LOAD));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Starred>(
+				arg, ContextType::LOAD, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -1261,7 +1310,10 @@ struct KwargsOrDoubleStarredPattern : Pattern<KwargsOrDoubleStarredPattern>
 		if (pattern1::match(p)) {
 			DEBUG_LOG("NAME '=' expression")
 			auto expression = p.pop_back();
-			p.push_to_stack(std::make_shared<Keyword>(std::string(maybe_name), expression));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Keyword>(std::string(maybe_name),
+				expression,
+				SourceLocation{ token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -1270,7 +1322,9 @@ struct KwargsOrDoubleStarredPattern : Pattern<KwargsOrDoubleStarredPattern>
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'**' expression")
 			auto expression = p.pop_back();
-			p.push_to_stack(std::make_shared<Keyword>(expression));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Keyword>(
+				expression, SourceLocation{ token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -1379,6 +1433,7 @@ struct SlicePattern : Pattern<SlicePattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("SlicePattern");
+		auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<ZeroOrOnePattern<ExpressionPattern>,
 			SingleTokenPattern<Token::TokenType::COLON>,
 			ZeroOrOnePattern<ExpressionPattern>,
@@ -1406,7 +1461,9 @@ struct SlicePattern : Pattern<SlicePattern>
 			} else {
 				PARSER_ERROR()
 			}
-			p.push_to_stack(std::make_shared<Subscript>());
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			p.push_to_stack(std::make_shared<Subscript>(
+				SourceLocation{ start_token->start(), end_token->end() }));
 			as<ast::Subscript>(p.stack().back())->set_slice(slice);
 			return true;
 		}
@@ -1415,7 +1472,9 @@ struct SlicePattern : Pattern<SlicePattern>
 		if (pattern2::match(p)) {
 			DEBUG_LOG("named_expression");
 			Subscript::SliceType slice = Subscript::Index{ p.pop_back() };
-			p.push_to_stack(std::make_shared<Subscript>());
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			p.push_to_stack(std::make_shared<Subscript>(
+				SourceLocation{ start_token->start(), end_token->end() }));
 			as<ast::Subscript>(p.stack().back())->set_slice(slice);
 			return true;
 		}
@@ -1434,6 +1493,8 @@ struct SlicesPattern : Pattern<SlicesPattern>
 		DEBUG_LOG("SlicesPattern");
 
 		BlockScope scope{ p };
+
+		auto start_token = p.lexer().peek_token(p.token_position());
 
 		using pattern1 = PatternMatch<SlicePattern,
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
@@ -1461,7 +1522,9 @@ struct SlicesPattern : Pattern<SlicesPattern>
 					PARSER_ERROR()
 				}
 			}
-			auto subscript = std::make_shared<Subscript>();
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			auto subscript = std::make_shared<Subscript>(
+				SourceLocation{ start_token->start(), end_token->end() });
 			subscript->set_slice(Subscript::ExtSlice{ .dims = dims });
 			scope.parent().push_back(subscript);
 			return true;
@@ -1483,7 +1546,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("PrimaryPattern_");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		auto start_token = p.lexer().peek_token(p.token_position());
+		DEBUG_LOG("{}", start_token->to_string());
 		BlockScope primary_scope{ p };
 		// '.' NAME primary'
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::DOT>,
@@ -1494,7 +1558,10 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			primary_scope.parent().pop_back();
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
-			p.push_to_stack(std::make_shared<Attribute>(value, name, ContextType::LOAD));
+			p.push_to_stack(std::make_shared<Attribute>(value,
+				name,
+				ContextType::LOAD,
+				SourceLocation{ start_token->start(), token->end() }));
 			using pattern1a = PatternMatch<PrimaryPattern_>;
 			if (pattern1a::match(p)) {
 				DEBUG_LOG("'.' NAME primary'");
@@ -1524,7 +1591,9 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 			}
 			auto function = primary_scope.parent().back();
 			primary_scope.parent().pop_back();
-			p.push_to_stack(std::make_shared<Call>(function, args, kwargs));
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			p.push_to_stack(std::make_shared<Call>(
+				function, args, kwargs, SourceLocation{ start_token->start(), end_token->end() }));
 			PRINT_STACK();
 			using pattern3a = PatternMatch<PrimaryPattern_>;
 			if (pattern3a::match(p)) {
@@ -1665,7 +1734,10 @@ struct PowerPattern : Pattern<PowerPattern>
 			DEBUG_LOG("await_primary '**' factor")
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::EXP, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::EXP,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1692,11 +1764,15 @@ struct FactorPattern : Pattern<FactorPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("FactorPattern");
+		auto start_token = p.lexer().peek_token(p.token_position());
 		// '+' factor
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::PLUS>, FactorPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'+' factor");
-			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::ADD, p.pop_back()));
+			const auto &arg = p.pop_back();
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::ADD,
+				arg,
+				SourceLocation{ start_token->start(), arg->source_location().end }));
 			return true;
 		}
 
@@ -1704,7 +1780,10 @@ struct FactorPattern : Pattern<FactorPattern>
 		using pattern2 = PatternMatch<SingleTokenPattern<Token::TokenType::MINUS>, FactorPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'-' factor");
-			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::SUB, p.pop_back()));
+			const auto &arg = p.pop_back();
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::SUB,
+				arg,
+				SourceLocation{ start_token->start(), arg->source_location().end }));
 			return true;
 		}
 
@@ -1712,7 +1791,10 @@ struct FactorPattern : Pattern<FactorPattern>
 		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::TILDE>, FactorPattern>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("'~' factor");
-			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::INVERT, p.pop_back()));
+			const auto &arg = p.pop_back();
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::INVERT,
+				arg,
+				SourceLocation{ start_token->start(), arg->source_location().end }));
 			return true;
 		}
 
@@ -1746,7 +1828,10 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern1::match(p)) {
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MULTIPLY, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MULTIPLY,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (TermPattern_::matches(p)) {
 				scope.parent().pop_back();
@@ -1758,7 +1843,10 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern2::match(p)) {
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::SLASH, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::SLASH,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (TermPattern_::matches(p)) {
 				scope.parent().pop_back();
@@ -1772,7 +1860,10 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern3::match(p)) {
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::FLOORDIV, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::FLOORDIV,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (TermPattern_::matches(p)) {
 				scope.parent().pop_back();
@@ -1784,7 +1875,10 @@ struct TermPattern_ : Pattern<TermPattern_>
 		if (pattern4::match(p)) {
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MODULO, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MODULO,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (TermPattern_::matches(p)) {
 				scope.parent().pop_back();
@@ -1849,7 +1943,10 @@ struct SumPattern_ : Pattern<SumPattern_>
 			PRINT_STACK();
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::PLUS, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (SumPattern_::matches(p)) {
 				PRINT_STACK();
@@ -1866,7 +1963,10 @@ struct SumPattern_ : Pattern<SumPattern_>
 			PRINT_STACK();
 			auto lhs = scope.parent().back();
 			auto rhs = p.pop_front();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MINUS, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::MINUS,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			if (SumPattern_::matches(p)) {
 				PRINT_STACK();
@@ -1943,7 +2043,10 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 		if (pattern1::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::LEFTSHIFT, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::LEFTSHIFT,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -1955,7 +2058,10 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 		if (pattern2::match(p)) {
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::RIGHTSHIFT, lhs, rhs);
+			auto binary_op = std::make_shared<BinaryExpr>(BinaryOpType::RIGHTSHIFT,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(binary_op);
 			return true;
 		}
@@ -2079,7 +2185,10 @@ struct EqBitwiseOrPattern : Pattern<EqBitwiseOrPattern>
 			DEBUG_LOG("'==' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Eq, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::Eq,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2100,7 +2209,10 @@ struct NotEqBitwiseOrPattern : Pattern<NotEqBitwiseOrPattern>
 			DEBUG_LOG("'!=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::NotEq, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::NotEq,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2120,7 +2232,10 @@ struct LtEqBitwiseOrPattern : Pattern<LtEqBitwiseOrPattern>
 			DEBUG_LOG("'<=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::LtE, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::LtE,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2139,7 +2254,10 @@ struct LtBitwiseOrPattern : Pattern<LtBitwiseOrPattern>
 			DEBUG_LOG("'<' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Lt, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::Lt,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2159,7 +2277,10 @@ struct GtEqBitwiseOrPattern : Pattern<GtEqBitwiseOrPattern>
 			DEBUG_LOG("'>=' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::GtE, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::GtE,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2179,7 +2300,10 @@ struct GtBitwiseOrPattern : Pattern<GtBitwiseOrPattern>
 			DEBUG_LOG("'>' bitwise_or");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Gt, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::Gt,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2200,7 +2324,10 @@ struct InBitwiseOrPattern : Pattern<InBitwiseOrPattern>
 			DEBUG_LOG("'in' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::In, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::In,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2222,7 +2349,10 @@ struct NotInBitwiseOrPattern : Pattern<NotInBitwiseOrPattern>
 			DEBUG_LOG("'not' 'in' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::NotIn, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::NotIn,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2244,7 +2374,10 @@ struct IsNotBitwiseOrPattern : Pattern<IsNotBitwiseOrPattern>
 			DEBUG_LOG("'is not' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::IsNot, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::IsNot,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2265,7 +2398,10 @@ struct IsBitwiseOrPattern : Pattern<IsBitwiseOrPattern>
 			DEBUG_LOG("'is' bitwise_or ");
 			auto rhs = p.pop_back();
 			auto lhs = p.pop_back();
-			auto comparisson = std::make_shared<Compare>(lhs, Compare::OpType::Is, rhs);
+			auto comparisson = std::make_shared<Compare>(lhs,
+				Compare::OpType::Is,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 			p.push_to_stack(comparisson);
 			return true;
 		}
@@ -2389,14 +2525,17 @@ struct InversionPattern : Pattern<InversionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("InversionPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		auto start_token = p.lexer().peek_token(p.token_position());
+		DEBUG_LOG("{}", start_token->to_string());
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				ComparissonPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'not' inversion")
 			const auto &node = p.pop_back();
-			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::NOT, node));
+			p.push_to_stack(std::make_shared<UnaryExpr>(UnaryOpType::NOT,
+				node,
+				SourceLocation{ start_token->start(), node->source_location().end }));
 			return true;
 		}
 		// comparison
@@ -2419,7 +2558,8 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 	{
 		BlockScope scope{ p };
 		DEBUG_LOG("ConjunctionPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
+		const auto start_token = p.lexer().peek_token(p.token_position());
+		DEBUG_LOG("{}", start_token->to_string());
 		// inversion ('and' inversion )+
 		using pattern1 = PatternMatch<InversionPattern,
 			OneOrMorePattern<
@@ -2430,7 +2570,10 @@ struct ConjunctionPattern : Pattern<ConjunctionPattern>
 			std::vector<std::shared_ptr<ASTNode>> values;
 			values.reserve(p.stack().size());
 			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::And, values));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::And,
+				values,
+				SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -2466,7 +2609,10 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 			std::vector<std::shared_ptr<ASTNode>> values;
 			values.reserve(p.stack().size());
 			while (!p.stack().empty()) { values.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::Or, values));
+			scope.parent().push_back(std::make_shared<BoolOp>(BoolOp::OpType::Or,
+				values,
+				SourceLocation{ values.front()->source_location().start,
+					values.front()->source_location().end }));
 			return true;
 		}
 
@@ -2502,7 +2648,10 @@ struct ExpressionPattern : Pattern<ExpressionPattern>
 			auto orelse = p.pop_back();
 			auto test = p.pop_back();
 			auto body = p.pop_back();
-			p.push_to_stack(std::make_shared<IfExpr>(test, body, orelse));
+			p.push_to_stack(std::make_shared<IfExpr>(test,
+				body,
+				orelse,
+				SourceLocation{ test->source_location().start, orelse->source_location().end }));
 			return true;
 		}
 
@@ -2543,20 +2692,21 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 	// 	| star_expression
 	static bool matches_impl(Parser &p)
 	{
-		size_t initial_stack_size = p.stack().size();
+		BlockScope scope{ p };
+		auto start_token = p.lexer().peek_token(p.token_position());
 		// star_expression (',' star_expression )+ [',']
 		using pattern1 = PatternMatch<StarExpressionPattern,
 			OneOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, StarExpressionPattern>,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("star_expression (',' star_expression )+ [',']");
-			auto result = std::make_shared<Tuple>(ContextType::LOAD);
 			std::vector<std::shared_ptr<ASTNode>> expressions;
-			while (p.stack().size() > initial_stack_size) { expressions.push_back(p.pop_back()); }
-			std::for_each(expressions.rbegin(), expressions.rend(), [&result](const auto &el) {
-				result->append(el);
-			});
-			p.push_to_stack(result);
+			while (!p.stack().empty()) { expressions.push_back(p.pop_front()); }
+			auto end_token = p.lexer().peek_token(p.token_position() - 1);
+			auto result = std::make_shared<Tuple>(expressions,
+				ContextType::LOAD,
+				SourceLocation{ start_token->start(), end_token->end() });
+			scope.parent().push_back(result);
 			return true;
 		}
 		// star_expression ','
@@ -2564,12 +2714,14 @@ struct StarExpressionsPattern : Pattern<StarExpressionsPattern>
 			PatternMatch<StarExpressionPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("star_expression ','");
+			while (!p.stack().empty()) { scope.parent().push_back(p.pop_back()); }
 			return true;
 		}
 		// star_expression
 		using pattern3 = PatternMatch<StarExpressionPattern>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("star_expression");
+			while (!p.stack().empty()) { scope.parent().push_back(p.pop_back()); }
 			return true;
 		}
 		return false;
@@ -2597,7 +2749,10 @@ struct SingleSubscriptAttributeTargetPattern : Pattern<SingleSubscriptAttributeT
 			const auto primary = p.pop_back();
 			DEBUG_LOG("{}", name);
 			primary->print_node("");
-			auto attribute = std::make_shared<Attribute>(primary, name, ContextType::STORE);
+			auto attribute = std::make_shared<Attribute>(primary,
+				name,
+				ContextType::STORE,
+				SourceLocation{ primary->source_location().start, token->end() });
 			p.push_to_stack(attribute);
 			return true;
 		}
@@ -2646,7 +2801,8 @@ struct SingleTargetPattern : Pattern<SingleTargetPattern>
 			DEBUG_LOG("NAME");
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name{ token->start().pointer_to_program, token->end().pointer_to_program };
-			p.push_to_stack(std::make_shared<Name>(name, ContextType::STORE));
+			p.push_to_stack(std::make_shared<Name>(
+				name, ContextType::STORE, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 
@@ -2690,7 +2846,10 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 			const auto &lhs = p.pop_back();
 			// defer rhs assignment to caller. Am I shooting myself in the foot?
 			// at least a null dereference goes with a bang...
-			p.push_to_stack(std::make_shared<AugAssign>(lhs, BinaryOpType::PLUS, nullptr));
+			p.push_to_stack(std::make_shared<AugAssign>(lhs,
+				BinaryOpType::PLUS,
+				nullptr,
+				SourceLocation{ lhs->source_location().start, lhs->source_location().end }));
 			return true;
 		}
 
@@ -2701,7 +2860,10 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 			const auto &lhs = p.pop_back();
 			// defer rhs assignment to caller. Am I shooting myself in the foot?
 			// at least a null dereference goes with a bang...
-			p.push_to_stack(std::make_shared<AugAssign>(lhs, BinaryOpType::MINUS, nullptr));
+			p.push_to_stack(std::make_shared<AugAssign>(lhs,
+				BinaryOpType::MINUS,
+				nullptr,
+				SourceLocation{ lhs->source_location().start, lhs->source_location().end }));
 			return true;
 		}
 
@@ -2726,16 +2888,26 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 	// 	| single_target augassign ~ (yield_expr | star_expressions)
 	static bool matches_impl(Parser &p)
 	{
+		auto start_token = p.lexer().peek_token(p.token_position());
 		using EqualMatch = SingleTokenPattern<Token::TokenType::EQUAL>;
 		using pattern3 =
 			PatternMatch<OneOrMorePattern<StarTargetsPattern, EqualMatch>, StarExpressionsPattern>;
 		size_t start_position = p.stack().size();
 		if (pattern3::match(p)) {
 			DEBUG_LOG("(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
-			auto targets = std::make_shared<Tuple>(ContextType::STORE);
+			std::vector<std::shared_ptr<ASTNode>> target_elements;
 			auto expressions = p.pop_back();
 			const auto &stack = p.stack();
-			for (size_t i = start_position; i < stack.size(); ++i) { targets->append(stack[i]); }
+			for (size_t i = start_position; i < stack.size(); ++i) {
+				target_elements.push_back(stack[i]);
+			}
+			auto end_token = p.lexer().peek_token(p.token_position());
+
+			auto targets = std::make_shared<Tuple>(target_elements,
+				ContextType::STORE,
+				SourceLocation{ target_elements.front()->source_location().start,
+					target_elements.back()->source_location().end });
+
 			while (p.stack().size() > start_position) { p.pop_back(); }
 			PRINT_STACK();
 			expressions->print_node("");
@@ -2745,10 +2917,14 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 					return std::make_shared<Assign>(
 						std::vector<std::shared_ptr<ASTNode>>{ targets->elements().back() },
 						expressions,
-						"");
+						"",
+						SourceLocation{ start_token->start(), end_token->end() });
 				} else {
 					return std::make_shared<Assign>(
-						std::vector<std::shared_ptr<ASTNode>>{ targets }, expressions, "");
+						std::vector<std::shared_ptr<ASTNode>>{ targets },
+						expressions,
+						"",
+						SourceLocation{ start_token->start(), end_token->end() });
 				}
 			}();
 			p.push_to_stack(assignment);
@@ -2783,12 +2959,14 @@ struct ReturnStatementPattern : Pattern<ReturnStatementPattern>
 	// 		| 'return' [star_expressions]
 	static bool matches_impl(Parser &p)
 	{
+		auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ReturnPattern>,
 				ZeroOrMorePattern<StarExpressionsPattern>>;
 		if (pattern1::match(p)) {
 			const auto &return_value = p.pop_back();
-			auto return_node = std::make_shared<Return>(return_value);
+			auto return_node = std::make_shared<Return>(return_value,
+				SourceLocation{ start_token->start(), return_value->source_location().end });
 			p.push_to_stack(return_node);
 			return true;
 		}
@@ -2812,7 +2990,8 @@ struct DottedNamePattern_ : Pattern<DottedNamePattern_>
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'.' NAME dotted_name'");
 			std::string name{ p.lexer().get(token->start(), token->end()) };
-			p.push_to_stack(std::make_shared<Constant>(name));
+			p.push_to_stack(
+				std::make_shared<Constant>(name, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 		using pattern2 = PatternMatch<
@@ -2900,13 +3079,18 @@ struct ImportNamePattern : Pattern<ImportNamePattern>
 	// import_name: 'import' dotted_as_names
 	static bool matches_impl(Parser &p)
 	{
-		p.push_to_stack(std::make_shared<Import>());
+		BlockScope import_scope{ p };
+		auto start_token = p.lexer().peek_token(p.token_position());
+		p.push_to_stack(
+			std::make_shared<Import>(SourceLocation{ start_token->start(), start_token->end() }));
 		DEBUG_LOG("import_name");
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ImportKeywordPattern>,
 			DottedAsNamesPattern>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'import' dotted_as_names");
+			import_scope.parent().push_back(p.pop_back());
+			ASSERT(p.stack().empty())
 			return true;
 		}
 		return false;
@@ -2959,6 +3143,7 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 	{
 		DEBUG_LOG("raise_stmt");
 		const auto initial_stack_size = p.stack().size();
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
 			ExpressionPattern,
@@ -2971,12 +3156,16 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 			ASSERT((p.stack().size() - initial_stack_size) < 3)
 			if ((p.stack().size() - initial_stack_size) == 1) {
 				const auto &exception = p.pop_back();
-				p.push_to_stack(std::make_shared<Raise>(exception, nullptr));
+				p.push_to_stack(std::make_shared<Raise>(exception,
+					nullptr,
+					SourceLocation{ start_token->start(), exception->source_location().end }));
 
 			} else {
 				const auto cause = p.pop_back();
 				const auto &exception = p.pop_back();
-				p.push_to_stack(std::make_shared<Raise>(exception, cause));
+				p.push_to_stack(std::make_shared<Raise>(exception,
+					cause,
+					SourceLocation{ start_token->start(), cause->source_location().end }));
 			}
 			return true;
 		}
@@ -2986,7 +3175,8 @@ struct RaiseStatementPattern : Pattern<RaiseStatementPattern>
 		if (pattern2::match(p)) {
 			DEBUG_LOG("'raise'");
 			ASSERT(p.stack().size() == initial_stack_size)
-			p.push_to_stack(std::make_shared<Raise>());
+			p.push_to_stack(std::make_shared<Raise>(
+				SourceLocation{ start_token->start(), start_token->end() }));
 			return true;
 		}
 		return false;
@@ -3007,7 +3197,8 @@ struct DeleteAtomPattern : Pattern<DeleteAtomPattern>
 			auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string name_str{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
-			p.push_to_stack(std::make_shared<Name>(name_str, ContextType::DELETE));
+			p.push_to_stack(std::make_shared<Name>(
+				name_str, ContextType::DELETE, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 		return false;
@@ -3023,6 +3214,7 @@ struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<TPrimaryPattern,
 			SingleTokenPattern<Token::TokenType::DOT>,
 			SingleTokenPattern<Token::TokenType::NAME>,
@@ -3040,10 +3232,12 @@ struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
 		if (pattern2::match(p)) {
 			auto slices = p.pop_back();
 			auto value = p.pop_back();
+			const auto end_token = p.lexer().peek_token(p.token_position());
 			ASSERT(as<Subscript>(slices))
 			as<Subscript>(slices)->set_value(value);
 			scope.parent().push_back(
-				std::make_shared<Delete>(std::vector<std::shared_ptr<ASTNode>>{ slices }));
+				std::make_shared<Delete>(std::vector<std::shared_ptr<ASTNode>>{ slices },
+					SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -3052,7 +3246,9 @@ struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
 			std::vector<std::shared_ptr<ASTNode>> to_delete;
 			to_delete.reserve(p.stack().size());
 			while (!p.stack().empty()) { to_delete.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<Delete>(to_delete));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<Delete>(
+				to_delete, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -3086,6 +3282,7 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 	{
 		DEBUG_LOG("AssertStatementPattern");
 		const auto initial_stack_size = p.stack().size();
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
 			ExpressionPattern,
@@ -3104,7 +3301,9 @@ struct AssertStatementPattern : Pattern<AssertStatementPattern>
 				msg = p.pop_back();
 				test = p.pop_back();
 			}
-			p.push_to_stack(std::make_shared<Assert>(test, msg));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Assert>(
+				test, msg, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -3136,7 +3335,9 @@ struct GlobalStatementPattern : Pattern<GlobalStatementPattern>
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
-		p.push_to_stack(std::make_shared<Global>(std::vector<std::string>{}));
+		const auto start_token = p.lexer().peek_token(p.token_position());
+		p.push_to_stack(std::make_shared<Global>(std::vector<std::string>{},
+			SourceLocation{ start_token->start(), start_token->end() }));
 
 		DEBUG_LOG("GlobalStatementPattern");
 		using pattern1 = PatternMatch<
@@ -3199,7 +3400,9 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>;
 		if (pattern6::match(p)) {
 			DEBUG_LOG("pass");
-			p.push_to_stack(std::make_shared<Pass>());
+			const auto start_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(
+				std::make_shared<Pass>(SourceLocation{ start_token->start(), start_token->end() }));
 			return true;
 		}
 		using pattern7 = PatternMatch<DeleteStatementPattern>;
@@ -3298,7 +3501,8 @@ struct ParamPattern : Pattern<ParamPattern>
 					return nullptr;
 				}
 			}();
-			p.push_to_stack(std::make_shared<Argument>(argname, annotation, ""));
+			p.push_to_stack(std::make_shared<Argument>(
+				argname, annotation, "", SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 		return false;
@@ -3369,7 +3573,9 @@ struct ParamWithDefaultPattern : Pattern<ParamWithDefaultPattern>
 			auto default_ = p.pop_back();
 			auto arg = p.pop_back();
 			ASSERT(as<Argument>(arg));
-			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(),
+				default_,
+				SourceLocation{ arg->source_location().start, default_->source_location().end }));
 			return true;
 		}
 
@@ -3382,7 +3588,9 @@ struct ParamWithDefaultPattern : Pattern<ParamWithDefaultPattern>
 			auto default_ = p.pop_back();
 			auto arg = p.pop_back();
 			ASSERT(as<Argument>(arg));
-			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+			p.push_to_stack(std::make_shared<Keyword>(as<Argument>(arg)->name(),
+				default_,
+				SourceLocation{ arg->source_location().start, default_->source_location().end }));
 			return true;
 		}
 		return false;
@@ -3414,8 +3622,10 @@ struct ParamMaybeDefaultPattern : Pattern<ParamMaybeDefaultPattern>
 			auto arg = p.pop_back();
 			ASSERT(as<Argument>(arg));
 			if (has_default) {
-				scope.parent().push_back(
-					std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+				scope.parent().push_back(std::make_shared<Keyword>(as<Argument>(arg)->name(),
+					default_,
+					SourceLocation{
+						arg->source_location().start, default_->source_location().end }));
 			} else {
 				scope.parent().push_back(arg);
 			}
@@ -3439,8 +3649,10 @@ struct ParamMaybeDefaultPattern : Pattern<ParamMaybeDefaultPattern>
 			auto arg = p.pop_back();
 			ASSERT(as<Argument>(arg));
 			if (has_default) {
-				scope.parent().push_back(
-					std::make_shared<Keyword>(as<Argument>(arg)->name(), default_));
+				scope.parent().push_back(std::make_shared<Keyword>(as<Argument>(arg)->name(),
+					default_,
+					SourceLocation{
+						arg->source_location().start, default_->source_location().end }));
 			} else {
 				scope.parent().push_back(arg);
 			}
@@ -3495,7 +3707,11 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
 					as<Arguments>(args)->push_kwarg_default(nullptr);
 				} else if (as<Keyword>(node)) {
-					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(),
+						nullptr,
+						"",
+						SourceLocation{
+							node->source_location().start, node->source_location().end });
 					as<Arguments>(args)->push_kwonlyarg(arg);
 					as<Arguments>(args)->push_kwarg_default(as<Keyword>(node)->value());
 				} else {
@@ -3526,7 +3742,11 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 					as<Arguments>(args)->push_kwonlyarg(as<Argument>(node));
 					as<Arguments>(args)->push_kwarg_default(nullptr);
 				} else if (as<Keyword>(node)) {
-					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(),
+						nullptr,
+						"",
+						SourceLocation{
+							node->source_location().start, node->source_location().end });
 					as<Arguments>(args)->push_kwonlyarg(arg);
 					as<Arguments>(args)->push_kwarg_default(as<Keyword>(node)->value());
 				} else {
@@ -3569,7 +3789,9 @@ struct ParametersPattern : Pattern<ParametersPattern>
 	//     | star_etc
 	static bool matches_impl(Parser &p)
 	{
-		p.push_to_stack(std::make_shared<Arguments>());
+		const auto start_token = p.lexer().peek_token(p.token_position());
+		p.push_to_stack(std::make_shared<Arguments>(
+			SourceLocation{ start_token->start(), start_token->end() }));
 		size_t stack_size = p.stack().size();
 		auto &args = p.stack().back();
 
@@ -3584,7 +3806,8 @@ struct ParametersPattern : Pattern<ParametersPattern>
 				if (as<Argument>(node)) {
 					as<Arguments>(args)->push_arg(as<Argument>(node));
 				} else if (as<Keyword>(node)) {
-					auto arg = std::make_shared<Argument>(*as<Keyword>(node)->arg(), nullptr, "");
+					auto arg = std::make_shared<Argument>(
+						*as<Keyword>(node)->arg(), nullptr, "", node->source_location());
 					as<Arguments>(args)->push_arg(arg);
 					as<Arguments>(args)->push_default(as<Keyword>(node)->value());
 				} else {
@@ -3668,7 +3891,8 @@ struct FunctionNamePattern : Pattern<FunctionNamePattern>
 			const auto token = p.lexer().peek_token(p.token_position() - 1);
 			std::string function_name{ token->start().pointer_to_program,
 				token->end().pointer_to_program };
-			p.push_to_stack(std::make_shared<Constant>(function_name));
+			p.push_to_stack(std::make_shared<Constant>(
+				function_name, SourceLocation{ token->start(), token->end() }));
 			return true;
 		}
 		return false;
@@ -3677,7 +3901,8 @@ struct FunctionNamePattern : Pattern<FunctionNamePattern>
 
 struct FunctionDefinitionPattern : Pattern<FunctionDefinitionPattern>
 {
-	// function_def: 'def' function_name '(' [params] ')' ['->' expression ] ':' [func_type_comment]
+	// function_def: 'def' function_name '(' [params] ')' ['->' expression ] ':'
+	// [func_type_comment]
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 =
@@ -3703,8 +3928,8 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 {
 	// function_def_raw:
 	//     | function_def block
-	//     | ASYNC 'def' function_name '(' [params] ')' ['->' expression ] ':' [func_type_comment]
-	//     block
+	//     | ASYNC 'def' function_name '(' [params] ')' ['->' expression ] ':'
+	//     [func_type_comment] block
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
@@ -3718,7 +3943,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 				if (!p.stack().empty()) {
 					return p.pop_front();
 				} else {
-					return std::make_shared<Arguments>();
+					return std::make_shared<Arguments>(SourceLocation{ name->source_location() });
 				}
 			}();
 			auto returns = [&]() -> std::shared_ptr<ast::ASTNode> {
@@ -3859,7 +4084,11 @@ struct ElifStatementPattern : Pattern<ElifStatementPattern>
 			}
 			auto test = p.pop_front();
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<If>(test, body, orelse));
+			scope.parent().push_back(std::make_shared<If>(test,
+				body,
+				orelse,
+				SourceLocation{
+					test->source_location().start, orelse.back()->source_location().end }));
 			return true;
 		}
 		return false;
@@ -3876,7 +4105,7 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 	{
 		DEBUG_LOG("IfStatementPattern");
 		BlockScope scope{ p };
-
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		// 'if' named_expression ':' block
 		using pattern0 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, IfKeywordPattern>,
@@ -3897,7 +4126,9 @@ struct IfStatementPattern : Pattern<IfStatementPattern>
 			}
 			auto test = p.pop_front();
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<If>(test, body, orelse));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<If>(
+				test, body, orelse, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -4014,11 +4245,13 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 {
 	// for_stmt:
 	//     | 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
-	//     | ASYNC 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
+	//     | ASYNC 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block
+	//     [else_block]
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("ForStatementPattern");
 		BlockScope scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForKeywordPattern>,
 				StarTargetsPattern,
@@ -4041,8 +4274,13 @@ struct ForStatementPattern : Pattern<ForStatementPattern>
 			auto iter = p.pop_front();
 			std::vector<std::shared_ptr<ASTNode>> body;
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(
-				std::make_shared<For>(target, iter, body, orelse, type_comment));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<For>(target,
+				iter,
+				body,
+				orelse,
+				type_comment,
+				SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -4058,6 +4296,7 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("ExceptBlockPattern");
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		{
 			BlockScope scope{ p };
 			using pattern1 = PatternMatch<
@@ -4083,7 +4322,11 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 					std::vector<std::shared_ptr<ASTNode>> body;
 					const auto type = p.pop_front();
 					while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-					scope.parent().push_front(std::make_shared<ExceptHandler>(type, name, body));
+					const auto end_token = p.lexer().peek_token(p.token_position());
+					scope.parent().push_front(std::make_shared<ExceptHandler>(type,
+						name,
+						body,
+						SourceLocation{ start_token->start(), end_token->end() }));
 					return true;
 				}
 			}
@@ -4098,7 +4341,9 @@ struct ExceptBlockPattern : Pattern<ExceptBlockPattern>
 				DEBUG_LOG("'except' ':' block");
 				std::vector<std::shared_ptr<ASTNode>> body;
 				while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-				scope.parent().push_front(std::make_shared<ExceptHandler>(nullptr, "", body));
+				const auto end_token = p.lexer().peek_token(p.token_position());
+				scope.parent().push_front(std::make_shared<ExceptHandler>(
+					nullptr, "", body, SourceLocation{ start_token->start(), end_token->end() }));
 				return true;
 			}
 		}
@@ -4134,6 +4379,7 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 	{
 		DEBUG_LOG("TryStatementPattern");
 		BlockScope scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		// 'try' ':' block
 		using pattern1 =
 			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, TryKeywordPattern>,
@@ -4192,7 +4438,12 @@ struct TryStatementPattern : Pattern<TryStatementPattern>
 			}
 			if (!match) { return false; }
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<Try>(body, handlers, orelse, finally));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<Try>(body,
+				handlers,
+				orelse,
+				finally,
+				SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 		return false;
@@ -4208,6 +4459,7 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 	{
 		DEBUG_LOG("WhileStatementPattern");
 		BlockScope scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
 
 		// 'while' named_expression ':' block
 		using pattern0 = PatternMatch<
@@ -4227,7 +4479,9 @@ struct WhileStatementPattern : Pattern<WhileStatementPattern>
 			}
 			auto test = p.pop_front();
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<While>(test, body, orelse));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			scope.parent().push_back(std::make_shared<While>(
+				test, body, orelse, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -4243,6 +4497,7 @@ struct WithItemPattern : Pattern<WithItemPattern>
 	static bool matches_impl(Parser &p)
 	{
 		DEBUG_LOG("WithItemPattern")
+		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<ExpressionPattern,
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
 			StarTargetPattern,
@@ -4253,14 +4508,18 @@ struct WithItemPattern : Pattern<WithItemPattern>
 			DEBUG_LOG("expression 'as' star_target &(',' | ')' | ':')")
 			auto var = p.pop_back();
 			auto context_expr = p.pop_back();
-			p.push_to_stack(std::make_shared<WithItem>(context_expr, var));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<WithItem>(
+				context_expr, var, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
 		using pattern2 = PatternMatch<ExpressionPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("expression")
-			p.push_to_stack(std::make_shared<WithItem>(p.pop_back(), nullptr));
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<WithItem>(
+				p.pop_back(), nullptr, SourceLocation{ start_token->start(), end_token->end() }));
 			return true;
 		}
 
@@ -4280,6 +4539,7 @@ struct WithStatementPattern : Pattern<WithStatementPattern>
 		DEBUG_LOG("WithStatementPattern")
 
 		BlockScope with_scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
 
 		// 'with' '(' ','.with_item+ ','? ')' ':' block
 		using pattern1 =
@@ -4323,7 +4583,11 @@ struct WithStatementPattern : Pattern<WithStatementPattern>
 				body.reserve(p.stack().size());
 				while (!p.stack().empty()) { body.push_back(p.pop_front()); }
 
-				with_scope.parent().push_back(std::make_shared<With>(with_items, body, ""));
+				const auto end_token = p.lexer().peek_token(p.token_position());
+				with_scope.parent().push_back(std::make_shared<With>(with_items,
+					body,
+					"",
+					SourceLocation{ start_token->start(), end_token->end() }));
 				return true;
 			}
 			return false;

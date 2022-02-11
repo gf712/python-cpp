@@ -60,7 +60,8 @@ namespace optimizer {
 			auto result = evaluate_binary_expr(as<BinaryExpr>(node));
 			if (std::holds_alternative<py::Value>(result)) {
 				spdlog::debug("Evaluated binary node - creating new constant node");
-				return std::make_shared<Constant>(std::get<py::Value>(result));
+				return std::make_shared<Constant>(
+					std::get<py::Value>(result), node->source_location());
 			}
 		} else if (node->node_type() == ASTNodeType::Constant) {
 		} else if (node->node_type() == ASTNodeType::Assign) {
