@@ -20,36 +20,43 @@ AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
 
-Constant::Constant(double value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(py::Number{ value }))
+Constant::Constant(double value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
+	  m_value(std::make_unique<py::Value>(py::Number{ value }))
 {}
 
-Constant::Constant(int64_t value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(py::Number{ value }))
+Constant::Constant(int64_t value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
+	  m_value(std::make_unique<py::Value>(py::Number{ value }))
 {}
 
-Constant::Constant(bool value)
-	: ASTNode(ASTNodeType::Constant),
+Constant::Constant(bool value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
 	  m_value(std::make_unique<py::Value>(py::NameConstant{ value }))
 {}
 
-Constant::Constant(std::string value)
-	: ASTNode(ASTNodeType::Constant),
+Constant::Constant(std::string value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
 	  m_value(std::make_unique<py::Value>(py::String{ std::move(value) }))
 {}
 
-Constant::Constant(const char *value)
-	: ASTNode(ASTNodeType::Constant),
+Constant::Constant(const char *value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
 	  m_value(std::make_unique<py::Value>(py::String{ std::string(value) }))
 {}
 
-Constant::Constant(const py::Value &value)
-	: ASTNode(ASTNodeType::Constant), m_value(std::make_unique<py::Value>(value))
+Constant::Constant(const py::Value &value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location), m_value(std::make_unique<py::Value>(value))
 {}
 
 void Constant::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Constant", indent);
+	spdlog::debug("{}Constant [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::visit(overloaded{ [&indent](const py::String &value) {
 							  spdlog::debug("{}  - value: \"{}\"", indent, value.to_string());
 						  },
@@ -64,7 +71,12 @@ void Constant::print_this_node(const std::string &indent) const
 
 void List::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}List", indent);
+	spdlog::debug("{}List [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
 	spdlog::debug("{}  elements:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
@@ -73,7 +85,12 @@ void List::print_this_node(const std::string &indent) const
 
 void Tuple::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Tuple", indent);
+	spdlog::debug("{}Tuple [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
 	spdlog::debug("{}  elements:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
@@ -82,7 +99,12 @@ void Tuple::print_this_node(const std::string &indent) const
 
 void Dict::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Tuple", indent);
+	spdlog::debug("{}Dict [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  keys:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &el : m_keys) { el->print_node(new_indent); }
@@ -92,14 +114,24 @@ void Dict::print_this_node(const std::string &indent) const
 
 void Name::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Name", indent);
+	spdlog::debug("{}Name [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - id: \"{}\"", indent, m_id[0]);
 	spdlog::debug("{}  - context_type: {}", indent, static_cast<int>(m_ctx));
 }
 
 void Assign::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Assign", indent);
+	spdlog::debug("{}Assign [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - targets:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &t : m_targets) { t->print_node(new_indent); }
@@ -110,7 +142,12 @@ void Assign::print_this_node(const std::string &indent) const
 
 void BinaryExpr::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}BinaryOp", indent);
+	spdlog::debug("{}BinaryOp [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - op_type: {}", indent, stringify_binary_op(m_op_type));
 	spdlog::debug("{}  - lhs:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
@@ -121,7 +158,12 @@ void BinaryExpr::print_this_node(const std::string &indent) const
 
 void AugAssign::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}AugAssign", indent);
+	spdlog::debug("{}AugAssign [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - target:", indent);
 	m_target->print_node(new_indent);
@@ -132,7 +174,12 @@ void AugAssign::print_this_node(const std::string &indent) const
 
 void Return::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Return", indent);
+	spdlog::debug("{}Return [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - value:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	m_value->print_node(new_indent);
@@ -140,7 +187,12 @@ void Return::print_this_node(const std::string &indent) const
 
 void Argument::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Argument", indent);
+	spdlog::debug("{}Argument [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - arg: {}", indent, m_arg);
 	if (m_annotation) {
 		spdlog::debug("{}  - annotation:", indent);
@@ -169,7 +221,12 @@ std::vector<std::string> Arguments::kw_only_argument_names() const
 
 void Arguments::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Arguments", indent);
+	spdlog::debug("{}Arguments [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 
 	spdlog::debug("{}  - posonlyarg:", indent);
@@ -200,7 +257,12 @@ void Arguments::print_this_node(const std::string &indent) const
 
 void FunctionDefinition::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}FunctionDefinition", indent);
+	spdlog::debug("{}FunctionDefinition [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - function_name: {}", indent, m_function_name);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - args:", indent);
@@ -216,7 +278,12 @@ void FunctionDefinition::print_this_node(const std::string &indent) const
 
 void Keyword::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Keyword", indent);
+	spdlog::debug("{}Keyword [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	if (m_arg.has_value()) {
 		spdlog::debug("{}  - arg: {}", indent, *m_arg);
 	} else {
@@ -229,7 +296,12 @@ void Keyword::print_this_node(const std::string &indent) const
 
 void ClassDefinition::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}ClassDefinition", indent);
+	spdlog::debug("{}ClassDefinition [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - function_name: {}", indent, m_class_name);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - bases:", indent);
@@ -245,7 +317,12 @@ void ClassDefinition::print_this_node(const std::string &indent) const
 void Call::print_this_node(const std::string &indent) const
 {
 	std::string new_indent = indent + std::string(6, ' ');
-	spdlog::debug("{}Call", indent);
+	spdlog::debug("{}Call [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - function:", indent);
 	m_function->print_node(new_indent);
 	spdlog::debug("{}  - args:", indent);
@@ -264,7 +341,12 @@ void Module::print_this_node(const std::string &indent) const
 
 void If::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}If", indent);
+	spdlog::debug("{}If [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - test:", indent);
 	m_test->print_node(new_indent);
@@ -276,7 +358,12 @@ void If::print_this_node(const std::string &indent) const
 
 void For::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}For", indent);
+	spdlog::debug("{}For [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - target:", indent);
 	m_target->print_node(new_indent);
@@ -291,7 +378,12 @@ void For::print_this_node(const std::string &indent) const
 
 void While::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}While", indent);
+	spdlog::debug("{}While [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - target:", indent);
 	m_test->print_node(new_indent);
@@ -302,7 +394,12 @@ void While::print_this_node(const std::string &indent) const
 
 void Compare::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Compare", indent);
+	spdlog::debug("{}Compare [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - lhs:", indent);
 	m_lhs->print_node(new_indent);
@@ -313,7 +410,12 @@ void Compare::print_this_node(const std::string &indent) const
 
 void Attribute::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Attribute", indent);
+	spdlog::debug("{}Attribute [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - value:", indent);
 	m_value->print_node(new_indent);
@@ -323,7 +425,12 @@ void Attribute::print_this_node(const std::string &indent) const
 
 void Import::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Import", indent);
+	spdlog::debug("{}Import [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	if (m_asname.has_value()) {
 		spdlog::debug("{}  - asname: \"{}\"", indent, *m_asname);
@@ -379,7 +486,12 @@ void Subscript::ExtSlice::print(const std::string &indent) const
 
 void Subscript::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Subscript", indent);
+	spdlog::debug("{}Subscript [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - value:", indent);
 	if (m_value) { m_value->print_node(new_indent); }
@@ -390,14 +502,14 @@ void Subscript::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - ctx: {}", indent, m_ctx);
 }
 
-Raise::Raise()
-	: ASTNode(ASTNodeType::Raise),
-	  m_cause(std::make_shared<Constant>(py::NameConstant{ py::NoneType{} }))
-{}
-
 void Raise::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Raise", indent);
+	spdlog::debug("{}Raise [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	if (m_exception) {
 		spdlog::debug("{}  - exception:", indent);
@@ -415,7 +527,12 @@ void Raise::print_this_node(const std::string &indent) const
 
 void ExceptHandler::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}ExceptHandler", indent);
+	spdlog::debug("{}ExceptHandler [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	if (m_type) {
 		spdlog::debug("{}  - type:", indent);
@@ -430,7 +547,12 @@ void ExceptHandler::print_this_node(const std::string &indent) const
 
 void Try::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Try", indent);
+	spdlog::debug("{}Try [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - body:", indent);
 	for (const auto &node : m_body) { node->print_node(new_indent); }
@@ -444,7 +566,12 @@ void Try::print_this_node(const std::string &indent) const
 
 void Assert::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Assert", indent);
+	spdlog::debug("{}Assert [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - test:", indent);
 	m_test->print_node(new_indent);
@@ -458,7 +585,12 @@ void Assert::print_this_node(const std::string &indent) const
 
 void UnaryExpr::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}UnaryExpr", indent);
+	spdlog::debug("{}UnaryExpr [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - op_type: {}", indent, stringify_unary_op(m_op_type));
 	m_operand->print_node(new_indent);
@@ -466,7 +598,12 @@ void UnaryExpr::print_this_node(const std::string &indent) const
 
 void BoolOp::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}BoolOp", indent);
+	spdlog::debug("{}BoolOp [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - op_type: {}", indent, op_type_to_string(m_op));
 	spdlog::debug("{}Values:", indent);
@@ -477,14 +614,24 @@ void Pass::print_this_node(const std::string &indent) const { spdlog::debug("{}P
 
 void Global::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Globals", indent);
+	spdlog::debug("{}Globals [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &name : m_names) { spdlog::debug("{} {}", new_indent, name); }
 }
 
 void Delete::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Delete", indent);
+	spdlog::debug("{}Delete [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - targets", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &target : m_targets) { target->print_node(new_indent); }
@@ -492,7 +639,12 @@ void Delete::print_this_node(const std::string &indent) const
 
 void With::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}With", indent);
+	spdlog::debug("{}With [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	spdlog::debug("{}  - items", indent);
 	std::string new_indent = indent + std::string(6, ' ');
 	for (const auto &item : m_items) { item->print_node(new_indent); }
@@ -502,7 +654,12 @@ void With::print_this_node(const std::string &indent) const
 
 void WithItem::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}WithItem", indent);
+	spdlog::debug("{}WithItem [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - context_expr", indent);
 	m_context_expr->print_node(new_indent);
@@ -512,7 +669,12 @@ void WithItem::print_this_node(const std::string &indent) const
 
 void IfExpr::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}IfExpr", indent);
+	spdlog::debug("{}IfExpr [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - test", indent);
 	m_test->print_node(new_indent);
@@ -524,7 +686,12 @@ void IfExpr::print_this_node(const std::string &indent) const
 
 void Starred::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Starred", indent);
+	spdlog::debug("{}Starred [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - value", indent);
 	m_value->print_node(new_indent);
@@ -533,7 +700,12 @@ void Starred::print_this_node(const std::string &indent) const
 
 void NamedExpr::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}NamedExpr", indent);
+	spdlog::debug("{}NamedExpr [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - target", indent);
 	m_target->print_node(new_indent);

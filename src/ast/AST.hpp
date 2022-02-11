@@ -118,16 +118,21 @@ class ASTContext
 class ASTNode
 {
 	const ASTNodeType m_node_type;
+	const SourceLocation m_source_location;
 
   private:
 	virtual void print_this_node(const std::string &indent) const = 0;
 	virtual void print_this_node() const { print_this_node(""); };
 
   public:
-	ASTNode(ASTNodeType node_type) : m_node_type(node_type) {}
+	ASTNode(ASTNodeType node_type, SourceLocation source_location)
+		: m_node_type(node_type), m_source_location(source_location)
+	{}
 	void print_node(const std::string &indent) { print_this_node(indent); }
 	ASTNodeType node_type() const { return m_node_type; }
 	virtual ~ASTNode() = default;
+
+	const SourceLocation &source_location() const { return m_source_location; }
 
 	virtual Value *codegen(CodeGenerator *) const = 0;
 };// namespace ast
@@ -142,12 +147,12 @@ class Constant : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	explicit Constant(double value);
-	explicit Constant(int64_t value);
-	explicit Constant(bool value);
-	explicit Constant(std::string value);
-	explicit Constant(const char *value);
-	explicit Constant(const py::Value &);
+	explicit Constant(double value, SourceLocation source_location);
+	explicit Constant(int64_t value, SourceLocation source_location);
+	explicit Constant(bool value, SourceLocation source_location);
+	explicit Constant(std::string value, SourceLocation source_location);
+	explicit Constant(const char *value, SourceLocation source_location);
+	explicit Constant(const py::Value &, SourceLocation source_location);
 
 	const py::Value *value() const { return m_value.get(); }
 
@@ -165,11 +170,15 @@ class List : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	List(std::vector<std::shared_ptr<ASTNode>> elements, ContextType ctx)
-		: ASTNode(ASTNodeType::List), m_elements(std::move(elements)), m_ctx(ctx)
+	List(std::vector<std::shared_ptr<ASTNode>> elements,
+		ContextType ctx,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::List, source_location), m_elements(std::move(elements)), m_ctx(ctx)
 	{}
 
-	List(ContextType ctx) : ASTNode(ASTNodeType::List), m_elements(), m_ctx(ctx) {}
+	List(ContextType ctx, SourceLocation source_location)
+		: ASTNode(ASTNodeType::List, source_location), m_elements(), m_ctx(ctx)
+	{}
 
 	void append(std::shared_ptr<ASTNode> element) { m_elements.push_back(std::move(element)); }
 
@@ -189,11 +198,15 @@ class Tuple : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	Tuple(std::vector<std::shared_ptr<ASTNode>> elements, ContextType ctx)
-		: ASTNode(ASTNodeType::Tuple), m_elements(std::move(elements)), m_ctx(ctx)
+	Tuple(std::vector<std::shared_ptr<ASTNode>> elements,
+		ContextType ctx,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Tuple, source_location), m_elements(std::move(elements)), m_ctx(ctx)
 	{}
 
-	Tuple(ContextType ctx) : ASTNode(ASTNodeType::Tuple), m_elements(), m_ctx(ctx) {}
+	Tuple(ContextType ctx, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Tuple, source_location), m_elements(), m_ctx(ctx)
+	{}
 
 	void append(std::shared_ptr<ASTNode> element) { m_elements.push_back(std::move(element)); }
 
@@ -215,17 +228,16 @@ class Dict : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	Dict(std::vector<std::shared_ptr<ASTNode>> keys, std::vector<std::shared_ptr<ASTNode>> values)
-		: ASTNode(ASTNodeType::Dict), m_keys(std::move(keys)), m_values(std::move(values))
+	Dict(std::vector<std::shared_ptr<ASTNode>> keys,
+		std::vector<std::shared_ptr<ASTNode>> values,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Dict, source_location), m_keys(std::move(keys)),
+		  m_values(std::move(values))
 	{}
 
-	Dict() : ASTNode(ASTNodeType::Dict), m_keys(), m_values() {}
-
-	void insert(std::shared_ptr<ASTNode> key, std::shared_ptr<ASTNode> value)
-	{
-		m_keys.push_back(std::move(key));
-		m_values.push_back(std::move(value));
-	}
+	Dict(SourceLocation source_location)
+		: ASTNode(ASTNodeType::Dict, source_location), m_keys(), m_values()
+	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
 	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
@@ -245,7 +257,9 @@ class Variable : public ASTNode
 	ContextType m_ctx;
 
   protected:
-	Variable(ASTNodeType node_type, ContextType ctx) : ASTNode(node_type), m_ctx(ctx) {}
+	Variable(ASTNodeType node_type, ContextType ctx, SourceLocation source_location)
+		: ASTNode(node_type, source_location), m_ctx(ctx)
+	{}
 };
 
 
@@ -257,8 +271,8 @@ class Name final : public Variable
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	Name(std::string id, ContextType ctx)
-		: Variable(ASTNodeType::Name, ctx), m_id({ std::move(id) })
+	Name(std::string id, ContextType ctx, SourceLocation source_location)
+		: Variable(ASTNodeType::Name, ctx, source_location), m_id({ std::move(id) })
 	{}
 
 	const std::vector<std::string> &ids() const final { return m_id; }
@@ -271,7 +285,9 @@ class Name final : public Variable
 class Statement : public ASTNode
 {
   public:
-	Statement(ASTNodeType node_type) : ASTNode(node_type) {}
+	Statement(ASTNodeType node_type, SourceLocation source_location)
+		: ASTNode(node_type, source_location)
+	{}
 };
 
 class Assign : public Statement
@@ -286,9 +302,10 @@ class Assign : public Statement
   public:
 	Assign(std::vector<std::shared_ptr<ASTNode>> targets,
 		std::shared_ptr<ASTNode> value,
-		std::string type_comment)
-		: Statement(ASTNodeType::Assign), m_targets(std::move(targets)), m_value(std::move(value)),
-		  m_type_comment(std::move(type_comment))
+		std::string type_comment,
+		SourceLocation source_location)
+		: Statement(ASTNodeType::Assign, source_location), m_targets(std::move(targets)),
+		  m_value(std::move(value)), m_type_comment(std::move(type_comment))
 	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
@@ -330,8 +347,9 @@ class UnaryExpr : public ASTNode
 	std::shared_ptr<ASTNode> m_operand;
 
   public:
-	UnaryExpr(UnaryOpType op_type, std::shared_ptr<ASTNode> operand)
-		: ASTNode(ASTNodeType::UnaryExpr), m_op_type(op_type), m_operand(std::move(operand))
+	UnaryExpr(UnaryOpType op_type, std::shared_ptr<ASTNode> operand, SourceLocation source_location)
+		: ASTNode(ASTNodeType::UnaryExpr, source_location), m_op_type(op_type),
+		  m_operand(std::move(operand))
 	{}
 
 	const std::shared_ptr<ASTNode> &operand() const { return m_operand; }
@@ -383,9 +401,12 @@ class BinaryExpr : public ASTNode
 	std::shared_ptr<ASTNode> m_rhs;
 
   public:
-	BinaryExpr(BinaryOpType op_type, std::shared_ptr<ASTNode> lhs, std::shared_ptr<ASTNode> rhs)
-		: ASTNode(ASTNodeType::BinaryExpr), m_op_type(op_type), m_lhs(std::move(lhs)),
-		  m_rhs(std::move(rhs))
+	BinaryExpr(BinaryOpType op_type,
+		std::shared_ptr<ASTNode> lhs,
+		std::shared_ptr<ASTNode> rhs,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::BinaryExpr, source_location), m_op_type(op_type),
+		  m_lhs(std::move(lhs)), m_rhs(std::move(rhs))
 	{}
 
 	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
@@ -413,8 +434,11 @@ class AugAssign : public Statement
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	AugAssign(std::shared_ptr<ASTNode> target, BinaryOpType op, std::shared_ptr<ASTNode> value)
-		: Statement(ASTNodeType::AugAssign), m_target(std::move(target)), m_op(op),
+	AugAssign(std::shared_ptr<ASTNode> target,
+		BinaryOpType op,
+		std::shared_ptr<ASTNode> value,
+		SourceLocation source_location)
+		: Statement(ASTNodeType::AugAssign, source_location), m_target(std::move(target)), m_op(op),
 		  m_value(std::move(value))
 	{}
 
@@ -431,7 +455,8 @@ class Return : public ASTNode
 	std::shared_ptr<ASTNode> m_value;
 
   public:
-	Return(std::shared_ptr<ASTNode> value) : ASTNode(ASTNodeType::Return), m_value(std::move(value))
+	Return(std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Return, source_location), m_value(std::move(value))
 	{}
 
 	std::shared_ptr<ASTNode> value() const { return m_value; }
@@ -449,8 +474,11 @@ class Argument final : public ASTNode
 	const std::string m_type_comment;
 
   public:
-	Argument(std::string arg, std::shared_ptr<ASTNode> annotation, std::string type_comment)
-		: ASTNode(ASTNodeType::Argument), m_arg(std::move(arg)),
+	Argument(std::string arg,
+		std::shared_ptr<ASTNode> annotation,
+		std::string type_comment,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Argument, source_location), m_arg(std::move(arg)),
 		  m_annotation(std::move(annotation)), m_type_comment(std::move(type_comment))
 	{}
 
@@ -474,8 +502,9 @@ class Arguments : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_defaults;
 
   public:
-	Arguments() : ASTNode(ASTNodeType::Arguments) {}
-	Arguments(std::vector<std::shared_ptr<Argument>> args) : Arguments()
+	Arguments(SourceLocation source_location) : ASTNode(ASTNodeType::Arguments, source_location) {}
+	Arguments(std::vector<std::shared_ptr<Argument>> args, SourceLocation source_location)
+		: Arguments(source_location)
 	{
 		m_args = std::move(args);
 	}
@@ -486,8 +515,9 @@ class Arguments : public ASTNode
 		std::vector<std::shared_ptr<Argument>> kwonlyargs,
 		std::vector<std::shared_ptr<ASTNode>> kw_defaults,
 		std::shared_ptr<Argument> kwarg,
-		std::vector<std::shared_ptr<ASTNode>> defaults)
-		: Arguments()
+		std::vector<std::shared_ptr<ASTNode>> defaults,
+		SourceLocation source_location)
+		: Arguments(source_location)
 	{
 		m_posonlyargs = std::move(posonlyargs);
 		m_args = std::move(args);
@@ -543,7 +573,6 @@ class FunctionDefinition final : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 	const std::shared_ptr<ASTNode> m_returns;
 	std::string m_type_comment;
-	SourceLocation m_location;
 
 	void print_this_node(const std::string &indent) const final;
 
@@ -555,10 +584,10 @@ class FunctionDefinition final : public ASTNode
 		std::shared_ptr<ASTNode> returns,
 		std::string type_comment,
 		SourceLocation location)
-		: ASTNode(ASTNodeType::FunctionDefinition), m_function_name(std::move(function_name)),
-		  m_args(std::move(args)), m_body(std::move(body)),
-		  m_decorator_list(std::move(decorator_list)), m_returns(std::move(returns)),
-		  m_type_comment(std::move(type_comment)), m_location(std::move(location))
+		: ASTNode(ASTNodeType::FunctionDefinition, location),
+		  m_function_name(std::move(function_name)), m_args(std::move(args)),
+		  m_body(std::move(body)), m_decorator_list(std::move(decorator_list)),
+		  m_returns(std::move(returns)), m_type_comment(std::move(type_comment))
 	{}
 
 	const std::string &name() const { return m_function_name; }
@@ -567,7 +596,6 @@ class FunctionDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
-	const SourceLocation &source_location() const { return m_location; }
 
 	void add_decorator(std::shared_ptr<ASTNode> decorator)
 	{
@@ -584,12 +612,13 @@ class Keyword : public ASTNode
 	std::shared_ptr<ASTNode> m_value;
 
   public:
-	Keyword(std::shared_ptr<ASTNode> value)
-		: ASTNode(ASTNodeType::Keyword), m_value(std::move(value))
+	Keyword(std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Keyword, source_location), m_value(std::move(value))
 	{}
 
-	Keyword(std::string arg, std::shared_ptr<ASTNode> value)
-		: ASTNode(ASTNodeType::Keyword), m_arg(std::move(arg)), m_value(std::move(value))
+	Keyword(std::string arg, std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Keyword, source_location), m_arg(std::move(arg)),
+		  m_value(std::move(value))
 	{}
 
 	void print_this_node(const std::string &indent) const final;
@@ -608,7 +637,6 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<Keyword>> m_keywords;
 	const std::vector<std::shared_ptr<ASTNode>> m_body;
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
-	SourceLocation m_location;
 
 	void print_this_node(const std::string &indent) const final;
 
@@ -619,9 +647,9 @@ class ClassDefinition final : public ASTNode
 		std::vector<std::shared_ptr<ASTNode>> body,
 		std::vector<std::shared_ptr<ASTNode>> decorator_list,
 		SourceLocation location)
-		: ASTNode(ASTNodeType::ClassDefinition), m_class_name(std::move(class_name)),
+		: ASTNode(ASTNodeType::ClassDefinition, location), m_class_name(std::move(class_name)),
 		  m_bases(std::move(bases)), m_keywords(std::move(keywords)), m_body(std::move(body)),
-		  m_decorator_list(std::move(decorator_list)), m_location(location)
+		  m_decorator_list(std::move(decorator_list))
 	{}
 
 	const std::string &name() const { return m_class_name; }
@@ -629,7 +657,6 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
-	SourceLocation source_location() const { return m_location; }
 
 	void add_decorator(std::shared_ptr<ASTNode> decorator)
 	{
@@ -651,12 +678,15 @@ class Call : public ASTNode
   public:
 	Call(std::shared_ptr<ASTNode> function,
 		std::vector<std::shared_ptr<ASTNode>> args,
-		std::vector<std::shared_ptr<Keyword>> keywords)
-		: ASTNode(ASTNodeType::Call), m_function(std::move(function)), m_args(std::move(args)),
-		  m_keywords(std::move(keywords))
+		std::vector<std::shared_ptr<Keyword>> keywords,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Call, source_location), m_function(std::move(function)),
+		  m_args(std::move(args)), m_keywords(std::move(keywords))
 	{}
 
-	Call(std::shared_ptr<ASTNode> function) : Call(function, {}, {}) {}
+	Call(std::shared_ptr<ASTNode> function, SourceLocation source_location)
+		: Call(function, {}, {}, source_location)
+	{}
 
 	const std::shared_ptr<ASTNode> &function() const { return m_function; }
 	const std::vector<std::shared_ptr<ASTNode>> &args() const { return m_args; }
@@ -671,7 +701,9 @@ class Module : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_body;
 
   public:
-	Module(std::string filename) : ASTNode(ASTNodeType::Module), m_filename(std::move(filename)) {}
+	Module(std::string filename)
+		: ASTNode(ASTNodeType::Module, SourceLocation{}), m_filename(std::move(filename))
+	{}
 
 	template<typename T> void emplace(T node) { m_body.emplace_back(std::move(node)); }
 
@@ -696,9 +728,10 @@ class If : public ASTNode
   public:
 	If(std::shared_ptr<ASTNode> test,
 		std::vector<std::shared_ptr<ASTNode>> body,
-		std::vector<std::shared_ptr<ASTNode>> orelse)
-		: ASTNode(ASTNodeType::If), m_test(std::move(test)), m_body(std::move(body)),
-		  m_orelse(std::move(orelse))
+		std::vector<std::shared_ptr<ASTNode>> orelse,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::If, source_location), m_test(std::move(test)),
+		  m_body(std::move(body)), m_orelse(std::move(orelse))
 	{}
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
@@ -724,9 +757,11 @@ class For : public ASTNode
 		std::shared_ptr<ASTNode> iter,
 		std::vector<std::shared_ptr<ASTNode>> body,
 		std::vector<std::shared_ptr<ASTNode>> orelse,
-		std::string type_comment)
-		: ASTNode(ASTNodeType::For), m_target(std::move(target)), m_iter(std::move(iter)),
-		  m_body(std::move(body)), m_orelse(std::move(orelse)), m_type_comment(type_comment)
+		std::string type_comment,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::For, source_location), m_target(std::move(target)),
+		  m_iter(std::move(iter)), m_body(std::move(body)), m_orelse(std::move(orelse)),
+		  m_type_comment(type_comment)
 	{}
 
 	const std::shared_ptr<ASTNode> &target() const { return m_target; }
@@ -751,9 +786,10 @@ class While : public ASTNode
   public:
 	While(std::shared_ptr<ASTNode> test,
 		std::vector<std::shared_ptr<ASTNode>> body,
-		std::vector<std::shared_ptr<ASTNode>> orelse)
-		: ASTNode(ASTNodeType::While), m_test(std::move(test)), m_body(std::move(body)),
-		  m_orelse(std::move(orelse))
+		std::vector<std::shared_ptr<ASTNode>> orelse,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::While, source_location), m_test(std::move(test)),
+		  m_body(std::move(body)), m_orelse(std::move(orelse))
 	{}
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
@@ -794,8 +830,12 @@ class Compare : public ASTNode
 	std::shared_ptr<ASTNode> m_rhs;
 
   public:
-	Compare(std::shared_ptr<ASTNode> lhs, OpType op, std::shared_ptr<ASTNode> rhs)
-		: ASTNode(ASTNodeType::Compare), m_lhs(std::move(lhs)), m_op(op), m_rhs(std::move(rhs))
+	Compare(std::shared_ptr<ASTNode> lhs,
+		OpType op,
+		std::shared_ptr<ASTNode> rhs,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Compare, source_location), m_lhs(std::move(lhs)), m_op(op),
+		  m_rhs(std::move(rhs))
 	{}
 
 	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
@@ -828,9 +868,12 @@ class Attribute : public ASTNode
 	ContextType m_ctx;
 
   public:
-	Attribute(std::shared_ptr<ASTNode> value, std::string attr, ContextType ctx)
-		: ASTNode(ASTNodeType::Attribute), m_value(std::move(value)), m_attr(std::move(attr)),
-		  m_ctx(ctx)
+	Attribute(std::shared_ptr<ASTNode> value,
+		std::string attr,
+		ContextType ctx,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Attribute, source_location), m_value(std::move(value)),
+		  m_attr(std::move(attr)), m_ctx(ctx)
 	{}
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
@@ -850,13 +893,17 @@ class Import : public ASTNode
 	std::optional<std::string> m_asname;
 
   public:
-	Import() : ASTNode(ASTNodeType::Import) {}
+	Import(SourceLocation source_location) : ASTNode(ASTNodeType::Import, source_location) {}
 
-	Import(std::vector<std::string> names) : ASTNode(ASTNodeType::Import), m_names(std::move(names))
+	Import(std::vector<std::string> names, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Import, source_location), m_names(std::move(names))
 	{}
 
-	Import(std::vector<std::string> names, std::optional<std::string> asname)
-		: ASTNode(ASTNodeType::Import), m_names(std::move(names)), m_asname(std::move(asname))
+	Import(std::vector<std::string> names,
+		std::optional<std::string> asname,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Import, source_location), m_names(std::move(names)),
+		  m_asname(std::move(asname))
 	{}
 
 	const std::optional<std::string> &asname() const { return m_asname; }
@@ -911,11 +958,14 @@ class Subscript : public ASTNode
 	ContextType m_ctx;
 
   public:
-	Subscript() : ASTNode(ASTNodeType::Subscript) {}
+	Subscript(SourceLocation source_location) : ASTNode(ASTNodeType::Subscript, source_location) {}
 
-	Subscript(std::shared_ptr<ASTNode> value, SliceType slice, ContextType ctx)
-		: ASTNode(ASTNodeType::Subscript), m_value(std::move(value)), m_slice(std::move(slice)),
-		  m_ctx(ctx)
+	Subscript(std::shared_ptr<ASTNode> value,
+		SliceType slice,
+		ContextType ctx,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Subscript, source_location), m_value(std::move(value)),
+		  m_slice(std::move(slice)), m_ctx(ctx)
 	{}
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
@@ -944,10 +994,13 @@ class Raise : public ASTNode
 	std::shared_ptr<ASTNode> m_cause;
 
   public:
-	Raise();
+	Raise(SourceLocation source_location) : ASTNode(ASTNodeType::Raise, source_location) {}
 
-	Raise(std::shared_ptr<ASTNode> exception, std::shared_ptr<ASTNode> cause)
-		: ASTNode(ASTNodeType::Raise), m_exception(std::move(exception)), m_cause(std::move(cause))
+	Raise(std::shared_ptr<ASTNode> exception,
+		std::shared_ptr<ASTNode> cause,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Raise, source_location), m_exception(std::move(exception)),
+		  m_cause(std::move(cause))
 	{}
 
 	const std::shared_ptr<ASTNode> &exception() const { return m_exception; }
@@ -970,9 +1023,10 @@ class ExceptHandler : public ASTNode
   public:
 	ExceptHandler(std::shared_ptr<ASTNode> type,
 		std::string name,
-		std::vector<std::shared_ptr<ASTNode>> body)
-		: ASTNode(ASTNodeType::ExceptHandler), m_type(std::move(type)), m_name(std::move(name)),
-		  m_body(std::move(body))
+		std::vector<std::shared_ptr<ASTNode>> body,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::ExceptHandler, source_location), m_type(std::move(type)),
+		  m_name(std::move(name)), m_body(std::move(body))
 	{}
 
 	const std::shared_ptr<ASTNode> &type() const { return m_type; }
@@ -998,9 +1052,11 @@ class Try : public ASTNode
 	Try(std::vector<std::shared_ptr<ASTNode>> body,
 		std::vector<std::shared_ptr<ExceptHandler>> handlers,
 		std::vector<std::shared_ptr<ASTNode>> orelse,
-		std::vector<std::shared_ptr<ASTNode>> finalbody)
-		: ASTNode(ASTNodeType::Try), m_body(std::move(body)), m_handlers(std::move(handlers)),
-		  m_orelse(std::move(orelse)), m_finalbody(std::move(finalbody))
+		std::vector<std::shared_ptr<ASTNode>> finalbody,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Try, source_location), m_body(std::move(body)),
+		  m_handlers(std::move(handlers)), m_orelse(std::move(orelse)),
+		  m_finalbody(std::move(finalbody))
 	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
@@ -1022,8 +1078,11 @@ class Assert : public ASTNode
 	std::shared_ptr<ASTNode> m_msg{ nullptr };
 
   public:
-	Assert(std::shared_ptr<ASTNode> test, std::shared_ptr<ASTNode> msg)
-		: ASTNode(ASTNodeType::Assert), m_test(std::move(test)), m_msg(std::move(msg))
+	Assert(std::shared_ptr<ASTNode> test,
+		std::shared_ptr<ASTNode> msg,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Assert, source_location), m_test(std::move(test)),
+		  m_msg(std::move(msg))
 	{
 		ASSERT(m_test)
 	}
@@ -1056,8 +1115,8 @@ class BoolOp : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_values;
 
   public:
-	BoolOp(OpType op, std::vector<std::shared_ptr<ASTNode>> values)
-		: ASTNode(ASTNodeType::BoolOp), m_op(op), m_values(std::move(values))
+	BoolOp(OpType op, std::vector<std::shared_ptr<ASTNode>> values, SourceLocation source_location)
+		: ASTNode(ASTNodeType::BoolOp, source_location), m_op(op), m_values(std::move(values))
 	{
 		ASSERT(m_values.size() >= 2);
 	}
@@ -1086,7 +1145,7 @@ class BoolOp : public ASTNode
 class Pass : public ASTNode
 {
   public:
-	Pass() : ASTNode(ASTNodeType::Pass) {}
+	Pass(SourceLocation source_location) : ASTNode(ASTNodeType::Pass, source_location) {}
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1099,7 +1158,8 @@ class Global : public ASTNode
 	std::vector<std::string> m_names;
 
   public:
-	Global(std::vector<std::string> names) : ASTNode(ASTNodeType::Global), m_names(std::move(names))
+	Global(std::vector<std::string> names, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Global, source_location), m_names(std::move(names))
 	{}
 
 	const std::vector<std::string> &names() const { return m_names; }
@@ -1116,8 +1176,8 @@ class Delete : public ASTNode
 	std::vector<std::shared_ptr<ASTNode>> m_targets;
 
   public:
-	Delete(std::vector<std::shared_ptr<ASTNode>> targets)
-		: ASTNode(ASTNodeType::Delete), m_targets(std::move(targets))
+	Delete(std::vector<std::shared_ptr<ASTNode>> targets, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Delete, source_location), m_targets(std::move(targets))
 	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &targets() const { return m_targets; }
@@ -1133,8 +1193,10 @@ class WithItem : public ASTNode
 	std::shared_ptr<ASTNode> m_optional_vars;
 
   public:
-	WithItem(std::shared_ptr<ASTNode> context_expr, std::shared_ptr<ASTNode> optional_vars)
-		: ASTNode(ASTNodeType::WithItem), m_context_expr(std::move(context_expr)),
+	WithItem(std::shared_ptr<ASTNode> context_expr,
+		std::shared_ptr<ASTNode> optional_vars,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::WithItem, source_location), m_context_expr(std::move(context_expr)),
 		  m_optional_vars(std::move(optional_vars))
 	{}
 
@@ -1156,9 +1218,10 @@ class With : public ASTNode
   public:
 	With(std::vector<std::shared_ptr<WithItem>> items,
 		std::vector<std::shared_ptr<ASTNode>> body,
-		std::string type_comment)
-		: ASTNode(ASTNodeType::With), m_items(std::move(items)), m_body(std::move(body)),
-		  m_type_comment(std::move(type_comment))
+		std::string type_comment,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::With, source_location), m_items(std::move(items)),
+		  m_body(std::move(body)), m_type_comment(std::move(type_comment))
 	{}
 
 	const std::vector<std::shared_ptr<WithItem>> &items() const { return m_items; }
@@ -1179,9 +1242,10 @@ class IfExpr : public ASTNode
   public:
 	IfExpr(std::shared_ptr<ASTNode> test,
 		std::shared_ptr<ASTNode> body,
-		std::shared_ptr<ASTNode> orelse)
-		: ASTNode(ASTNodeType::IfExpr), m_test(std::move(test)), m_body(std::move(body)),
-		  m_orelse(std::move(orelse))
+		std::shared_ptr<ASTNode> orelse,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::IfExpr, source_location), m_test(std::move(test)),
+		  m_body(std::move(body)), m_orelse(std::move(orelse))
 	{}
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
@@ -1199,8 +1263,8 @@ class Starred : public ASTNode
 	ContextType m_ctx;
 
   public:
-	Starred(std::shared_ptr<ASTNode> value, ContextType ctx)
-		: ASTNode(ASTNodeType::Starred), m_value(std::move(value)), m_ctx(ctx)
+	Starred(std::shared_ptr<ASTNode> value, ContextType ctx, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Starred, source_location), m_value(std::move(value)), m_ctx(ctx)
 	{}
 
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
@@ -1217,8 +1281,11 @@ class NamedExpr : public ASTNode
 	std::shared_ptr<ASTNode> m_value;
 
   public:
-	NamedExpr(std::shared_ptr<ASTNode> target, std::shared_ptr<ASTNode> value)
-		: ASTNode(ASTNodeType::NamedExpr), m_target(std::move(target)), m_value(std::move(value))
+	NamedExpr(std::shared_ptr<ASTNode> target,
+		std::shared_ptr<ASTNode> value,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::NamedExpr, source_location), m_target(std::move(target)),
+		  m_value(std::move(value))
 	{}
 
 	const std::shared_ptr<ASTNode> &target() const { return m_target; }
