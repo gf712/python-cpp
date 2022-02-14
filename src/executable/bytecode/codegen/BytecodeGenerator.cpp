@@ -44,6 +44,8 @@
 #include "executable/Program.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 
+#include "VariablesResolver.hpp"
+
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -54,33 +56,49 @@ namespace codegen {
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
-	const auto &globals = m_stack.top().globals;
-	const auto &nonlocals = m_stack.top().nonlocals;
-	const auto &locals = m_stack.top().locals;
-
-	if (std::find(globals.begin(), globals.end(), name) != globals.end()) {
-		emit<StoreGlobal>(name, src->get_register());
-	} else if (nonlocals.contains(name)) {
-		TODO();
-	} else {
-		if (m_stack.top().type == Scope::Type::MODULE || m_stack.top().type == Scope::Type::CLASS) {
-			// module namespace
-			auto *value = create_value();
-			emit<StoreName>(name, src->get_register());
-			m_stack.top().locals.emplace(name, value);
-		} else if (m_stack.top().type == Scope::Type::CLOSURE) {
-			TODO();
+	const auto &scope_name = m_stack.top().mangled_name;
+	const auto &visibility = [&] {
+		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
+			return it;
 		} else {
-			auto *value = [&] {
-				if (auto it = locals.find(name); it != locals.end()) {
-					return std::get<BytecodeStackValue *>(it->second);
-				} else {
-					return create_stack_value();
-				}
-			}();
-			emit<StoreFast>(value->get_stack_index(), name, src->get_register());
-			m_stack.top().locals.emplace(name, value);
+			TODO();
 		}
+	}();
+
+	const auto &name_visibility = [&] {
+		if (auto it = visibility->second->visibility.find(name);
+			it != visibility->second->visibility.end()) {
+			return it->second;
+		} else {
+			TODO();
+		}
+	}();
+
+	switch (name_visibility) {
+	case VariablesResolver::Visibility::GLOBAL: {
+		emit<StoreGlobal>(name, src->get_register());
+	} break;
+	case VariablesResolver::Visibility::NAME: {
+		emit<StoreName>(name, src->get_register());
+	} break;
+	case VariablesResolver::Visibility::LOCAL: {
+		auto *value = [&] {
+			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				return std::get<BytecodeStackValue *>(it->second);
+			} else {
+				auto *value = create_stack_value();
+				m_stack.top().locals.emplace(name, value);
+				return value;
+			}
+		}();
+		emit<StoreFast>(value->get_stack_index(), name, src->get_register());
+	} break;
+	case VariablesResolver::Visibility::CLOSURE: {
+		TODO();
+		// auto *value = create_stack_value();
+		// emit<StoreDeref>(value->get_stack_index(), name, src->get_register());
+	} break;
 	}
 }
 
@@ -88,28 +106,41 @@ BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 {
 	auto *dst = create_value();
 
-	const auto &globals = m_stack.top().globals;
-
-	if (std::find(globals.begin(), globals.end(), name) != globals.end()) {
-		emit<LoadGlobal>(dst->get_register(), name);
-	} else {
-		if (m_stack.top().type == Scope::Type::MODULE || m_stack.top().type == Scope::Type::CLASS) {
-			emit<LoadName>(dst->get_register(), name);
+	const auto &scope_name = m_stack.top().mangled_name;
+	const auto &visibility = [&] {
+		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
+			return it;
 		} else {
-			const auto &locals = m_stack.top().locals;
-			const auto &nonlocals = m_stack.top().nonlocals;
-
-			if (nonlocals.contains(name)) {
-				TODO();
-			} else if (auto it = locals.find(name); it != locals.end()) {
-				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
-				emit<LoadFast>(dst->get_register(),
-					std::get<BytecodeStackValue *>(it->second)->get_stack_index(),
-					name);
-			} else {
-				emit<LoadGlobal>(dst->get_register(), name);
-			}
+			TODO();
 		}
+	}();
+
+	const auto &name_visibility = [&] {
+		if (auto it = visibility->second->visibility.find(name);
+			it != visibility->second->visibility.end()) {
+			return it->second;
+		} else {
+			TODO();
+		}
+	}();
+
+	switch (name_visibility) {
+	case VariablesResolver::Visibility::GLOBAL: {
+		emit<LoadGlobal>(dst->get_register(), name);
+	} break;
+	case VariablesResolver::Visibility::NAME: {
+		emit<LoadName>(dst->get_register(), name);
+	} break;
+	case VariablesResolver::Visibility::LOCAL: {
+		const auto &l = m_stack.top().locals.at(name);
+		ASSERT(std::holds_alternative<BytecodeStackValue *>(l))
+		emit<LoadFast>(
+			dst->get_register(), std::get<BytecodeStackValue *>(l)->get_stack_index(), name);
+	} break;
+	case VariablesResolver::Visibility::CLOSURE: {
+		TODO();
+		// emit<LoadDeref>(dst->get_register(), value->get_free_var_index(), name);
+	} break;
 	}
 	return dst;
 }
@@ -181,12 +212,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		mangle_namespace(m_stack), node->name(), node->source_location());
 	auto *f = create_function(function_name);
 
-	// if (m_stack.top().type == Scope::Type::FUNCTION) {
-	// 	// this function is a closure, has to potentially capture variables in the parent function
-	// 	// scope
-	// 	TODO();
-	// }
-	m_stack.push(Scope{ .name = node->name(), .type = Scope::Type::FUNCTION });
+	m_stack.push(Scope{ .name = node->name(), .mangled_name = function_name });
 
 	auto *block = allocate_block(f->function_info().function_id);
 	auto *old_block = m_current_block;
@@ -647,7 +673,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 			mangle_namespace(m_stack), node->name(), node->source_location());
 
 		auto *class_builder_func = create_function(class_mangled_name);
-		m_stack.push(Scope{ .name = node->name(), .type = Scope::Type::CLASS });
+		m_stack.push(Scope{ .name = node->name(), .mangled_name = class_mangled_name });
 		class_id = class_builder_func->function_info().function_id;
 
 		auto *block = allocate_block(class_id);
@@ -830,7 +856,7 @@ Value *BytecodeGenerator::visit(const Import *node)
 Value *BytecodeGenerator::visit(const Module *node)
 {
 	const auto &module_name = fs::path(node->filename()).stem();
-	m_stack.push(Scope{ .name = module_name, .type = Scope::Type::MODULE });
+	m_stack.push(Scope{ .name = module_name, .mangled_name = module_name });
 	BytecodeValue *last = nullptr;
 	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
 
@@ -960,26 +986,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 
 Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
-Value *BytecodeGenerator::visit(const Global *node)
-{
-	const auto &locals = m_stack.top().locals;
-	const auto &nonlocals = m_stack.top().nonlocals;
-
-	for (const auto &name : node->names()) {
-		if (locals.contains(name)) {
-			// TODO: raise SyntaxError
-			spdlog::error("SyntaxError: name '{}' is assigned to before global declaration", name);
-			std::abort();
-		} else if (nonlocals.contains(name)) {
-			// TODO: raise SyntaxError
-			spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
-			std::abort();
-		} else {
-			m_stack.top().globals.insert(name);
-		}
-	}
-	return nullptr;
-}
+Value *BytecodeGenerator::visit(const Global *) { return nullptr; }
 
 Value *BytecodeGenerator::visit(const Delete *) { TODO(); }
 
@@ -1106,13 +1113,9 @@ void BytecodeGenerator::exit_function(size_t function_id)
 
 BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &name)
 {
-	// auto &new_func = m_functions.emplace_back();
-	// // allocate the first block
-	// new_func.blocks.emplace_back();
-	// new_func.metadata.function_name = std::to_string(m_functions.size() - 1);
-	// return FunctionInfo{ m_functions.size() - 1, new_func, this };
-
 	auto &new_func = m_functions.emplace_back();
+	m_function_map.emplace(name, std::ref(new_func));
+
 	// allocate the first block
 	new_func.blocks.emplace_back();
 	new_func.metadata.function_name = name;
@@ -1162,6 +1165,23 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 	if (lvl > compiler::OptimizationLevel::None) { ast::optimizer::constant_folding(node); }
 
 	auto generator = BytecodeGenerator();
+
+	generator.m_variable_visibility = VariablesResolver::resolve(module.get());
+
+	// for (const auto &[scope_name, scope] : generator.m_variable_visibility) {
+	// 	std::cout << "Scope name: " << scope_name << '\n';
+	// 	for (const auto &[k, v] : scope->visibility) {
+	// 		if (v == VariablesResolver::Visibility::NAME) {
+	// 			std::cout << fmt::format("  - {}: NAME", k) << '\n';
+	// 		} else if (v == VariablesResolver::Visibility::LOCAL) {
+	// 			std::cout << fmt::format("  - {}: LOCAL", k) << '\n';
+	// 		} else if (v == VariablesResolver::Visibility::CLOSURE) {
+	// 			std::cout << fmt::format("  - {}: CLOSURE", k) << '\n';
+	// 		} else if (v == VariablesResolver::Visibility::GLOBAL) {
+	// 			std::cout << fmt::format("  - {}: GLOBAL", k) << '\n';
+	// 		}
+	// 	}
+	// }
 
 	node->codegen(&generator);
 

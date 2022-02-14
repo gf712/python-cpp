@@ -1,16 +1,14 @@
 #pragma once
 
+#include "VariablesResolver.hpp"
 #include "ast/AST.hpp"
 #include "ast/optimizers/ConstantFolding.hpp"
-
-#include "forward.hpp"
-#include "utilities.hpp"
-
 #include "executable/FunctionBlock.hpp"
 #include "executable/Label.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 
-#include <set>
+#include "forward.hpp"
+#include "utilities.hpp"
 
 namespace codegen {
 
@@ -49,6 +47,20 @@ class BytecodeStackValue : public ast::Value
 	{}
 
 	Register get_stack_index() const { return m_stack_index; }
+
+	virtual bool is_function() const { return false; }
+};
+
+class BytecodeFreeValue : public ast::Value
+{
+	Register m_free_var_index;
+
+  public:
+	BytecodeFreeValue(const std::string &name, Register free_var_index)
+		: ast::Value(name), m_free_var_index(free_var_index)
+	{}
+
+	Register get_free_var_index() const { return m_free_var_index; }
 
 	virtual bool is_function() const { return false; }
 };
@@ -92,13 +104,10 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	struct Scope
 	{
-		enum class Type { MODULE = 0, FUNCTION = 1, CLASS = 2, CLOSURE = 3 };
-
 		std::string name;
-		Type type;
-		std::set<std::string> globals;
+		std::string mangled_name;
+
 		std::unordered_map<std::string, std::variant<BytecodeValue *, BytecodeStackValue *>> locals;
-		std::unordered_map<std::string, BytecodeStackValue *> nonlocals;
 	};
 
   public:
@@ -107,6 +116,12 @@ class BytecodeGenerator : public ast::CodeGenerator
 
   private:
 	FunctionBlocks m_functions;
+	std::unordered_map<std::string, std::reference_wrapper<FunctionBlocks::value_type>>
+		m_function_map;
+
+	std::unordered_map<std::string, std::unique_ptr<VariablesResolver::Scope>>
+		m_variable_visibility;
+
 	size_t m_function_id{ 0 };
 	InstructionBlock *m_current_block{ nullptr };
 
@@ -115,6 +130,10 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	std::vector<size_t> m_frame_register_count;
 	std::vector<size_t> m_frame_stack_value_count;
+	std::vector<size_t> m_frame_free_var_count;
+
+	std::unordered_map<std::string, std::reference_wrapper<size_t>> m_function_free_var_count;
+
 	size_t m_value_index{ 0 };
 	ASTContext m_ctx;
 	std::stack<Scope> m_stack;
@@ -260,6 +279,17 @@ class BytecodeGenerator : public ast::CodeGenerator
 		m_values.push_back(std::make_unique<BytecodeStackValue>(
 			"%" + std::to_string(m_value_index++), allocate_stack_value()));
 		return static_cast<BytecodeStackValue *>(m_values.back().get());
+	}
+
+	BytecodeFreeValue *create_free_value(const std::string &function_name)
+	{
+		auto &free_var_count = m_function_free_var_count.at(function_name);
+		spdlog::debug("Allocating free variable at index {} for function {}",
+			free_var_count.get(),
+			function_name);
+		m_values.push_back(std::make_unique<BytecodeFreeValue>(
+			"%" + std::to_string(m_value_index++), free_var_count.get()++));
+		return static_cast<BytecodeFreeValue *>(m_values.back().get());
 	}
 
 	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
