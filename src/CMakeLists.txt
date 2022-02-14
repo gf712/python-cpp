@@ -8,6 +8,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/Bytecode.cpp
     executable/bytecode/BytecodeProgram.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
+    executable/bytecode/codegen/VariablesResolver.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/FunctionCall.cpp
