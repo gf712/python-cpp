@@ -1364,6 +1364,35 @@ TEST(Parser, SimpleForLoopWithFunctionCall)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, ForLoopMultipleTargets)
+{
+	constexpr std::string_view program =
+		"for x, y in z:\n"
+		"	print(x, y)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<For>(
+		std::make_shared<Tuple>(
+			std::vector<std::shared_ptr<ast::ASTNode>>{
+				std::make_shared<Name>("x", ContextType::STORE, SourceLocation{}),
+				std::make_shared<Name>("y", ContextType::STORE, SourceLocation{}) },
+			ContextType::STORE,
+			SourceLocation{}),// target
+		std::make_shared<Name>("z", ContextType::LOAD, SourceLocation{}),// iter
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
+			std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}),
+				std::make_shared<Name>("y", ContextType::LOAD, SourceLocation{}) },
+			std::vector<std::shared_ptr<Keyword>>{},
+			SourceLocation{}) },// body
+		std::vector<std::shared_ptr<ASTNode>>{},// orelse
+		"",// type_comment
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, ForLoopWithElseBlock)
 {
 	// you live and learn
