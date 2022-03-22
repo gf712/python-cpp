@@ -743,6 +743,7 @@ struct StarTargetsPattern : Pattern<StarTargetsPattern>
 	// | star_target (',' star_target )* [',']
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
 		DEBUG_LOG("star_targets");
 		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
 
@@ -751,12 +752,22 @@ struct StarTargetsPattern : Pattern<StarTargetsPattern>
 			NegativeLookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("star_target !','");
+			ASSERT(p.stack().size() == 1);
+			scope.parent().push_back(p.pop_back());
 			return true;
 		}
 		using pattern2 = PatternMatch<StarTargetPattern,
 			OneOrMorePattern<SingleTokenPattern<Token::TokenType::COMMA>, StarTargetPattern>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("star_target (',' star_target )* [',']");
+			ASSERT(p.stack().size() >= 1);
+			std::vector<std::shared_ptr<ASTNode>> nodes;
+			nodes.reserve(p.stack().size());
+			while (!p.stack().empty()) { nodes.push_back(p.pop_front()); }
+			scope.parent().push_back(std::make_shared<Tuple>(nodes,
+				ContextType::STORE,
+				SourceLocation{
+					nodes.front()->source_location().start, nodes.back()->source_location().end }));
 			return true;
 		}
 

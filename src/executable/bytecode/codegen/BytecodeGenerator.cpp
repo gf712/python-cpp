@@ -148,6 +148,7 @@ BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 		emit<LoadName>(dst->get_register(), name);
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
+		ASSERT(m_stack.top().locals.contains(name));
 		const auto &l = m_stack.top().locals.at(name);
 		ASSERT(std::holds_alternative<BytecodeStackValue *>(l))
 		emit<LoadFast>(
@@ -155,6 +156,7 @@ BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 	} break;
 	case VariablesResolver::Visibility::CELL:
 	case VariablesResolver::Visibility::FREE: {
+		ASSERT(m_stack.top().locals.contains(name));
 		const auto &l = m_stack.top().locals.at(name);
 		ASSERT(std::holds_alternative<BytecodeFreeValue *>(l))
 		emit<LoadDeref>(
@@ -648,14 +650,25 @@ Value *BytecodeGenerator::visit(const For *node)
 	// call the __iter__ implementation
 	emit<GetIter>(iterator_register, iterator_func->get_register());
 
-	// call the __next__ implementation
-	auto target_ids = as<Name>(node->target())->ids();
-	if (target_ids.size() != 1) { TODO(); }
-	auto target_name = target_ids[0];
-
 	bind(*forloop_start_label);
 	emit<ForIter>(iter_variable->get_register(), iterator_register, forloop_end_label);
-	store_name(target_name, iter_variable);
+
+	// call the __next__ implementation
+	if (auto target = as<Name>(node->target())) {
+		auto target_ids = target->ids();
+		if (target_ids.size() != 1) { TODO(); }
+		auto target_name = target_ids[0];
+		store_name(target_name, iter_variable);
+	} else if (auto target = as<Tuple>(node->target())) {
+		for (const auto &el : target->elements()) {
+			auto name = as<Name>(el);
+			ASSERT(name);
+			auto target_ids = name->ids();
+			if (target_ids.size() != 1) { TODO(); }
+			auto target_name = target_ids[0];
+			store_name(target_name, iter_variable);
+		}
+	}
 
 	generate(node->target().get(), m_function_id);
 
@@ -1283,15 +1296,15 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 		spdlog::debug("Scope name: {}", scope_name);
 		for (const auto &[k, v] : scope->visibility) {
 			if (v == VariablesResolver::Visibility::NAME) {
-				spdlog::debug("  - {}: NAME {}", k);
+				spdlog::debug("  - {}: NAME", k);
 			} else if (v == VariablesResolver::Visibility::LOCAL) {
-				spdlog::debug("  - {}: LOCAL {}", k);
+				spdlog::debug("  - {}: LOCAL", k);
 			} else if (v == VariablesResolver::Visibility::FREE) {
-				spdlog::debug("  - {}: FREE {}", k);
+				spdlog::debug("  - {}: FREE", k);
 			} else if (v == VariablesResolver::Visibility::CELL) {
-				spdlog::debug("  - {}: CELL {}", k);
+				spdlog::debug("  - {}: CELL", k);
 			} else if (v == VariablesResolver::Visibility::GLOBAL) {
-				spdlog::debug("  - {}: GLOBAL {}", k);
+				spdlog::debug("  - {}: GLOBAL", k);
 			}
 		}
 	}
