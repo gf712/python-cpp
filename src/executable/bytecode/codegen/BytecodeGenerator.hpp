@@ -107,7 +107,9 @@ class BytecodeGenerator : public ast::CodeGenerator
 		std::string name;
 		std::string mangled_name;
 
-		std::unordered_map<std::string, std::variant<BytecodeValue *, BytecodeStackValue *>> locals;
+		std::unordered_map<std::string,
+			std::variant<BytecodeValue *, BytecodeStackValue *, BytecodeFreeValue *>>
+			locals;
 	};
 
   public:
@@ -209,6 +211,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	size_t register_count() const { return m_frame_register_count.back(); }
 	size_t stack_variable_count() const { return m_frame_stack_value_count.back(); }
+	size_t free_variable_count() const { return m_frame_free_var_count.back(); }
 
 	Register allocate_register()
 	{
@@ -222,6 +225,12 @@ class BytecodeGenerator : public ast::CodeGenerator
 		return m_frame_stack_value_count.back()++;
 	}
 
+	Register allocate_free_value()
+	{
+		spdlog::debug("New free value: {}", m_frame_free_var_count.back());
+		return m_frame_free_var_count.back()++;
+	}
+
 	BytecodeFunctionValue *create_function(const std::string &);
 
 	InstructionBlock *allocate_block(size_t);
@@ -230,6 +239,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	{
 		m_frame_register_count.emplace_back(start_register);
 		m_frame_stack_value_count.emplace_back(start_stack_index);
+		m_frame_free_var_count.emplace_back(start_stack_index);
 	}
 
 	void exit_function(size_t function_id);
@@ -281,14 +291,10 @@ class BytecodeGenerator : public ast::CodeGenerator
 		return static_cast<BytecodeStackValue *>(m_values.back().get());
 	}
 
-	BytecodeFreeValue *create_free_value(const std::string &function_name)
+	BytecodeFreeValue *create_free_value()
 	{
-		auto &free_var_count = m_function_free_var_count.at(function_name);
-		spdlog::debug("Allocating free variable at index {} for function {}",
-			free_var_count.get(),
-			function_name);
 		m_values.push_back(std::make_unique<BytecodeFreeValue>(
-			"%" + std::to_string(m_value_index++), free_var_count.get()++));
+			"%" + std::to_string(m_value_index++), allocate_free_value()));
 		return static_cast<BytecodeFreeValue *>(m_values.back().get());
 	}
 
@@ -298,5 +304,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void set_insert_point(InstructionBlock *block) { m_current_block = block; }
 
 	std::string mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const;
+
+	void create_nested_scope(const std::string &name, const std::string &mangled_name);
 };
 }// namespace codegen

@@ -2,10 +2,12 @@
 
 #include "ast/AST.hpp"
 
+#include <set>
+
 class VariablesResolver : public ast::CodeGenerator
 {
   public:
-	enum class Visibility { GLOBAL = 0, NAME = 1, LOCAL = 2, CLOSURE = 3 };
+	enum class Visibility { GLOBAL = 0, NAME = 1, LOCAL = 2, CELL = 3, FREE = 4 };
 
 	struct Scope : NonCopyable
 	{
@@ -16,6 +18,7 @@ class VariablesResolver : public ast::CodeGenerator
 		Type type;
 		Scope *parent;
 		std::vector<std::reference_wrapper<Scope>> children;
+		std::set<std::string> captures;
 		std::unordered_map<std::string, Visibility> visibility;
 	};
 
@@ -33,6 +36,8 @@ class VariablesResolver : public ast::CodeGenerator
 
 	void store(const std::string &name, SourceLocation source_location);
 	void load(const std::string &name, SourceLocation source_location);
+	void annotate_free_and_cell_variables(const std::string &name);
+	Scope* top_level_node(const std::string &name) const;
 
   public:
 	static VisibilityMap resolve(ast::Module *node)

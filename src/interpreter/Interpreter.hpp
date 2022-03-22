@@ -3,7 +3,6 @@
 #include "ExecutionFrame.hpp"
 
 #include "forward.hpp"
-#include "runtime/PyFunction.hpp"
 #include "runtime/forward.hpp"
 #include "vm/VM.hpp"
 
@@ -14,7 +13,7 @@ class BytecodeProgram;
 
 struct ScopedStack
 {
-	const StackFrame& top_frame;
+	const StackFrame &top_frame;
 	~ScopedStack();
 };
 
@@ -82,12 +81,9 @@ class Interpreter
 	const std::vector<std::string> &argv() const { return m_argv; }
 
 	py::PyObject *make_function(const std::string &function_name,
-		const std::vector<std::string> &argnames,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		size_t positional_args_count,
-		size_t kwonly_args_count,
-		const CodeFlags &flags) const;
+		const std::vector<py::PyCell *> &closure) const;
 
 	ScopedStack setup_call_stack(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
 	py::PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);

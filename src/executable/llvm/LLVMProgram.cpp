@@ -225,20 +225,14 @@ void LLVMProgram::create_interop_function(const std::shared_ptr<::Function> &fun
 }
 
 py::PyObject *LLVMProgram::as_pyfunction(const std::string &function_name,
-	const std::vector<std::string> &argnames,
 	const std::vector<py::Value> &default_values,
 	const std::vector<py::Value> &kw_default_values,
-	size_t positional_args_count,
-	size_t kwonly_args_count,
-	const CodeFlags &flags) const
+	const std::vector<py::PyCell *> &closure) const
 {
 	if (!default_values.empty()) { TODO(); }
 	if (!kw_default_values.empty()) { TODO(); }
 
-	(void)argnames;
-	(void)positional_args_count;
-	(void)kwonly_args_count;
-	(void)flags;
+	(void)closure;
 
 	const std::string demangled_name =
 		::Mangler::default_mangler().function_demangle(function_name);

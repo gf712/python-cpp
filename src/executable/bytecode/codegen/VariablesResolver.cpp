@@ -7,6 +7,52 @@ namespace fs = std::filesystem;
 
 using namespace ast;
 
+namespace {
+bool captured_by_closure(VariablesResolver::Visibility v)
+{
+	return v == VariablesResolver::Visibility::CELL || v == VariablesResolver::Visibility::FREE;
+}
+}// namespace
+
+
+VariablesResolver::Scope *VariablesResolver::top_level_node(const std::string &name) const
+{
+	auto *node = &m_current_scope->get();
+	Scope *top_node = nullptr;
+	while (node->parent) {
+		node = node->parent;
+		if (!node->parent) break;
+		if (node->visibility.contains(name)) {
+			top_node = node;
+			break;
+		}
+	}
+
+	return top_node;
+}
+
+void VariablesResolver::annotate_free_and_cell_variables(const std::string &name)
+{
+	auto *top_node = top_level_node(name);
+	auto *child = &m_current_scope->get();
+	ASSERT(child);
+
+	if (!top_node) {
+		child->visibility[name] = Visibility::LOCAL;
+		return;
+	}
+	auto *parent = child->parent;
+	ASSERT(parent)
+
+	while (child != top_node) {
+		child->visibility[name] = Visibility::FREE;
+		child->captures.insert(name);
+		child = child->parent;
+		ASSERT(child)
+	}
+
+	top_node->visibility[name] = Visibility::CELL;
+}
 
 void VariablesResolver::store(const std::string &name, SourceLocation source_location)
 {
@@ -32,7 +78,7 @@ void VariablesResolver::store(const std::string &name, SourceLocation source_loc
 				if (auto it = visibility.find(name); it != visibility.end()) {
 					if (it->second == Visibility::GLOBAL) {
 					} else {
-						it->second = Visibility::CLOSURE;
+						annotate_free_and_cell_variables(name);
 					}
 					found = true;
 					break;
@@ -58,7 +104,7 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 	if (auto it = current_scope_vars.find(name); it != current_scope_vars.end()) { return; }
 
 	if (m_current_scope->get().type == Scope::Type::MODULE) {
-		current_scope_vars[name] = Visibility::GLOBAL;
+		current_scope_vars[name] = Visibility::NAME;
 	} else if (m_current_scope->get().type == Scope::Type::FUNCTION) {
 		current_scope_vars[name] = Visibility::GLOBAL;
 	} else if (m_current_scope->get().type == Scope::Type::CLOSURE) {
@@ -70,8 +116,7 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 				if (it->second == Visibility::GLOBAL) {
 					current_scope_vars[name] = Visibility::GLOBAL;
 				} else {
-					it->second = Visibility::CLOSURE;
-					current_scope_vars[name] = Visibility::CLOSURE;
+					annotate_free_and_cell_variables(name);
 				}
 				found = true;
 				break;
@@ -249,14 +294,14 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 			.type = Scope::Type::CLOSURE,
 			.parent = &caller->get() });
 		m_current_scope = std::ref(*m_visibility.at(function_name));
-		m_current_scope->get().visibility[node->name()] = Visibility::LOCAL;
+		caller->get().visibility[node->name()] = Visibility::LOCAL;
 	} else {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
 			.namespace_ = ns,
 			.type = Scope::Type::FUNCTION,
 			.parent = &caller->get() });
 		m_current_scope = std::ref(*m_visibility.at(function_name));
-		m_current_scope->get().visibility[node->name()] = Visibility::NAME;
+		caller->get().visibility[node->name()] = Visibility::NAME;
 	}
 
 	caller->get().children.push_back(*m_current_scope);
@@ -283,7 +328,7 @@ Value *VariablesResolver::visit(const Global *node)
 				spdlog::error(
 					"SyntaxError: name '{}' is assigned to before global declaration", name);
 				std::abort();
-			} else if (it->second == Visibility::CLOSURE) {
+			} else if (captured_by_closure(it->second)) {
 				// TODO: raise SyntaxError
 				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
 				std::abort();

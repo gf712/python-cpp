@@ -169,8 +169,7 @@ PyObject *build_class(const PyTuple *args, const PyDict *kwargs, Interpreter &in
 			// auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
 			// FIXME: what should be the module for this?
-			auto *f = interpreter.make_function(
-				mangled_class_name_as_string, {}, {}, {}, 0, 0, CodeFlags::create());
+			auto *f = interpreter.make_function(mangled_class_name_as_string, {}, {}, {});
 			ASSERT(as<PyFunction>(f))
 			return as<PyFunction>(f);
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {
@@ -472,6 +471,7 @@ auto initialize_types()
 	function();
 	native_function();
 	code();
+	cell();
 	builtin_method();
 	slot_wrapper();
 	bound_method();
@@ -480,8 +480,7 @@ auto initialize_types()
 	property();
 	classmethod();
 
-	return std::array{
-		type(),
+	return std::array{ type(),
 		bool_(),
 		bytes(),
 		ellipsis(),
@@ -495,8 +494,7 @@ auto initialize_types()
 		tuple(),
 		range(),
 		property(),
-		classmethod()
-	};
+		classmethod() };
 }
 
 auto initialize_exceptions(PyModule *blt)

@@ -42,10 +42,22 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		start_idx = m_instructions.size();
 	}
 
-	m_main_function = std::make_shared<Bytecode>(main_func.metadata.register_count,
+	auto main_bytecode = std::make_shared<Bytecode>(main_func.metadata.register_count,
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
 		main_blocks);
+	m_main_function = std::make_shared<py::PyCode>(main_bytecode,
+		main_func.metadata.cellvars,
+		main_func.metadata.varnames,
+		main_func.metadata.freevars,
+		main_func.metadata.stack_size,
+		main_func.metadata.filename,
+		main_func.metadata.first_line_number,
+		main_func.metadata.arg_count,
+		main_func.metadata.kwonly_arg_count,
+		main_func.metadata.cell2arg,
+		main_func.metadata.nlocals,
+		main_func.metadata.flags);
 
 	for (size_t i = 1; i < func_blocks.size(); ++i) {
 		auto &func = *std::next(func_blocks.begin(), i);
@@ -65,23 +77,49 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			func.metadata.stack_size,
 			func.metadata.function_name,
 			func_blocks_view);
+		auto code = std::make_shared<py::PyCode>(bytecode,
+			func.metadata.cellvars,
+			func.metadata.varnames,
+			func.metadata.freevars,
+			func.metadata.stack_size,
+			func.metadata.filename,
+			func.metadata.first_line_number,
+			func.metadata.arg_count,
+			func.metadata.kwonly_arg_count,
+			func.metadata.cell2arg,
+			func.metadata.nlocals,
+			func.metadata.flags);
 
-		m_functions.emplace_back(std::move(bytecode));
+		m_functions.emplace_back(std::move(code));
 	}
 }
 
 size_t BytecodeProgram::main_stack_size() const { return m_main_function->register_count(); }
 
+std::vector<View>::const_iterator BytecodeProgram::begin() const
+{
+	// FIXME: assumes all functions are bytecode
+	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
+	return std::static_pointer_cast<Bytecode>(m_main_function->function())->begin();
+}
+
+std::vector<View>::const_iterator BytecodeProgram::end() const
+{
+	// FIXME: assumes all functions are bytecode
+	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
+	return std::static_pointer_cast<Bytecode>(m_main_function->function())->end();
+}
+
 std::string BytecodeProgram::to_string() const
 {
 	std::stringstream ss;
 	for (const auto &func : m_functions) {
-		ss << func->function_name() << ":\n";
-		ss << func->to_string() << '\n';
+		ss << func->function()->function_name() << ":\n";
+		ss << func->function()->to_string() << '\n';
 	}
 
 	ss << "main:\n";
-	ss << m_main_function->to_string() << '\n';
+	ss << m_main_function->function()->to_string() << '\n';
 	return ss.str();
 }
 
@@ -115,7 +153,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 			 vm->set_instruction_pointer(std::next(vm->instruction_pointer()))) {
 			ASSERT((*vm->instruction_pointer()).get())
 			const auto &instruction = *vm->instruction_pointer();
-			// spdlog::info("{} {}", (void *)instruction.get(), instruction->to_string());
+			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 			instruction->execute(*vm, vm->interpreter());
 			// we left the current stack frame in the previous instruction
 			if (vm->stack().size() != stack_count) { break; }
@@ -151,41 +189,29 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 }
 
 py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
-	const std::vector<std::string> &argnames,
 	const std::vector<py::Value> &default_values,
 	const std::vector<py::Value> &kw_default_values,
-	size_t positional_args_count,
-	size_t kwonly_args_count,
-	const CodeFlags &flags) const
+	const std::vector<py::PyCell *> &closure) const
 {
 	for (const auto &backend : m_backends) {
-		if (auto *f = backend->as_pyfunction(function_name,
-				argnames,
-				default_values,
-				kw_default_values,
-				positional_args_count,
-				kwonly_args_count,
-				flags)) {
+		if (auto *f =
+				backend->as_pyfunction(function_name, default_values, kw_default_values, closure)) {
 			return f;
 		}
 	}
 	if (auto it = std::find_if(m_functions.begin(),
 			m_functions.end(),
-			[&function_name](const auto &f) { return f->function_name() == function_name; });
+			[&function_name](
+				const auto &f) { return f->function()->function_name() == function_name; });
 		it != m_functions.end()) {
-		auto function = *it;
-		auto *code = VirtualMachine::the().heap().allocate<py::PyCode>(function,
-			argnames,
+		auto *code = it->get();
+		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);
+		return VirtualMachine::the().heap().allocate<py::PyFunction>(demangled_name,
 			default_values,
 			kw_default_values,
-			positional_args_count,
-			kwonly_args_count,
-			flags,
-			VirtualMachine::the().interpreter().module());
-
-		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);
-		return VirtualMachine::the().heap().allocate<py::PyFunction>(
-			demangled_name, code, VirtualMachine::the().interpreter().execution_frame()->globals());
+			code,
+			closure,
+			VirtualMachine::the().interpreter().execution_frame()->globals());
 	}
 	return nullptr;
 }

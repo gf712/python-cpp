@@ -70,7 +70,7 @@ int VirtualMachine::call(const std::shared_ptr<Function> &function)
 		const auto end = block_view->end();
 		for (; m_instruction_pointer != end; ++m_instruction_pointer) {
 			const auto &instruction = *m_instruction_pointer;
-			// spdlog::info("{} {}", (void *)instruction.get(), instruction->to_string());
+			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 			instruction->execute(*this, interpreter());
 
 			// we left the current stack frame in the previous instruction
@@ -142,6 +142,29 @@ void VirtualMachine::dump() const
 {
 	size_t i = 0;
 	ASSERT(registers().has_value())
+	ASSERT(stack_locals().has_value())
+
+	std::cout << "Stack: " << (void *)(stack_locals()->get().data()) << " \n";
+	for (const auto &register_ : stack_locals()->get()) {
+		std::visit(overloaded{ [&i](const auto &stack_value) {
+								  std::ostringstream os;
+								  os << stack_value;
+								  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
+							  },
+					   [&i](PyObject *obj) {
+						   if (obj) {
+							   std::cout << fmt::format("[{}]  {} ({})\n",
+								   i++,
+								   static_cast<const void *>(obj),
+								   obj->to_string());
+						   } else {
+							   std::cout << fmt::format("[{}]  (Empty)\n", i++);
+						   }
+					   } },
+			register_);
+	}
+
+	i = 0;
 	std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
 	for (const auto &register_ : registers()->get()) {
 		std::visit(overloaded{ [&i](const auto &register_value) {

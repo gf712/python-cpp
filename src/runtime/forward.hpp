@@ -2,6 +2,8 @@
 
 namespace py {
 
+class PyCell;
+class PyCode;
 class PyDict;
 class PyFloat;
 class PyFunction;

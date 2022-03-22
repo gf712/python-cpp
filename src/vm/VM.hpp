@@ -153,7 +153,10 @@ class VirtualMachine
 
 	void pop_frame();
 
-	const std::deque<std::vector<const py::Value *>> &stack_objects() const { return m_stack_objects; }
+	const std::deque<std::vector<const py::Value *>> &stack_objects() const
+	{
+		return m_stack_objects;
+	}
 
   private:
 	VirtualMachine();

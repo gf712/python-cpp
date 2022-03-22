@@ -20,6 +20,7 @@ class BuiltinTypes
 	std::unique_ptr<TypePrototype> m_function;
 	std::unique_ptr<TypePrototype> m_native_function;
 	std::unique_ptr<TypePrototype> m_code;
+	std::unique_ptr<TypePrototype> m_cell;
 
 	std::unique_ptr<TypePrototype> m_dict;
 	std::unique_ptr<TypePrototype> m_dict_items;
@@ -80,6 +81,7 @@ class BuiltinTypes
 	TypePrototype &function() const { return *m_function; }
 	TypePrototype &native_function() const { return *m_native_function; }
 	TypePrototype &code() const { return *m_code; }
+	TypePrototype &cell() const { return *m_cell; }
 
 	TypePrototype &builtin_method() const { return *m_builtin_method; }
 	TypePrototype &slot_wrapper() const { return *m_slot_wrapper; }
@@ -114,6 +116,7 @@ PyType *range_iterator();
 PyType *function();
 PyType *native_function();
 PyType *code();
+PyType *cell();
 PyType *builtin_method();
 PyType *slot_wrapper();
 PyType *bound_method();

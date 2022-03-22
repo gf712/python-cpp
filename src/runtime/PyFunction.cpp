@@ -1,5 +1,6 @@
 #include "PyFunction.hpp"
 #include "PyBoundMethod.hpp"
+#include "PyCell.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
 #include "PyNone.hpp"
@@ -16,33 +17,38 @@
 using namespace py;
 
 PyCode::PyCode(std::shared_ptr<Function> function,
+	std::vector<std::string> cellvars,
 	std::vector<std::string> varnames,
-	std::vector<Value> defaults,
-	std::vector<Value> kwonly_defaults,
+	std::vector<std::string> freevars,
+	size_t stack_size,
+	std::string filename,
+	size_t first_line_number,
 	size_t arg_count,
 	size_t kwonly_arg_count,
-	CodeFlags flags,
-	PyModule *module)
+	std::vector<size_t> cell2arg,
+	size_t nlocals,
+	CodeFlags flags)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function),
-	  m_register_count(function->register_count()), m_varnames(std::move(varnames)),
-	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
-	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_flags(flags), m_module(module)
+	  m_register_count(function->register_count()), m_cellvars(std::move(cellvars)),
+	  m_varnames(std::move(varnames)), m_freevars(std::move(freevars)), m_stack_size(stack_size),
+	  m_filename(std::move(filename)), m_first_line_number(first_line_number),
+	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_cell2arg(std::move(cell2arg)),
+	  m_nlocals(nlocals), m_flags(flags)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
+
+size_t PyCode::freevars_count() const { return m_freevars.size(); }
+
+size_t PyCode::cellvars_count() const { return m_cellvars.size(); }
+
+const std::vector<size_t> &PyCode::cell2arg() const { return m_cell2arg; }
 
 size_t PyCode::arg_count() const { return m_arg_count; }
 
 size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 
 CodeFlags PyCode::flags() const { return m_flags; }
-
-void PyCode::visit_graph(Visitor &visitor)
-{
-	PyObject::visit_graph(visitor);
-	// FIXME: this should probably never be null
-	if (m_module) m_module->visit_graph(visitor);
-}
 
 PyType *PyCode::type() const { return code(); }
 
@@ -60,9 +66,15 @@ std::unique_ptr<TypePrototype> PyCode::register_type()
 	return std::move(type);
 }
 
-PyFunction::PyFunction(std::string name, PyCode *code, PyDict *globals)
+PyFunction::PyFunction(std::string name,
+	std::vector<Value> defaults,
+	std::vector<Value> kwonly_defaults,
+	PyCode *code,
+	std::vector<PyCell *> closure,
+	PyDict *globals)
 	: PyBaseObject(BuiltinTypes::the().function()), m_name(std::move(name)), m_code(code),
-	  m_globals(globals)
+	  m_globals(globals), m_defaults(std::move(defaults)),
+	  m_kwonly_defaults(std::move(kwonly_defaults)), m_closure(std::move(closure))
 {}
 
 void PyFunction::visit_graph(Visitor &visitor)
@@ -70,6 +82,8 @@ void PyFunction::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	m_code->visit_graph(visitor);
 	if (m_globals) visitor.visit(*m_globals);
+	if (m_module) m_module->visit_graph(visitor);
+	for (const auto &c : m_closure) { c->visit_graph(visitor); }
 }
 
 PyType *PyFunction::type() const { return function(); }
@@ -90,16 +104,23 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 	auto *function_frame =
 		ExecutionFrame::create(VirtualMachine::the().interpreter().execution_frame(),
 			m_code->register_count(),
+			m_code->cellvars_count() + m_code->freevars_count(),
 			m_globals,
 			locals);
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_code->function(), function_frame);
 
+	for (size_t i = 0; i < m_code->cellvars_count(); ++i) {
+		function_frame->freevars()[i] = PyCell::create();
+	}
+
+	const auto &cell2arg = m_code->cell2arg();
 	const auto &varnames = m_code->varnames();
+	const size_t total_arguments_count = m_code->arg_count() + m_code->kwonly_arg_count();
 	std::vector<std::string> positional_args{ varnames.begin(),
 		varnames.begin() + m_code->arg_count() };
 	std::vector<std::string> keyword_only_args{ varnames.begin() + m_code->arg_count(),
-		varnames.end() };
+		varnames.begin() + total_arguments_count };
 
 	size_t args_count = 0;
 	size_t kwargs_count = 0;
@@ -107,7 +128,12 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 	if (args) {
 		size_t max_args = std::min(args->size(), m_code->arg_count());
 		for (size_t idx = 0; idx < max_args; ++idx) {
-			VirtualMachine::the().stack_local(idx) = args->elements()[idx];
+			const auto &obj = args->elements()[idx];
+			VirtualMachine::the().stack_local(idx) = obj;
+			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), idx); it != cell2arg.end()) {
+				const auto free_var_idx = std::distance(cell2arg.begin(), it);
+				function_frame->freevars()[free_var_idx] = PyCell::create(obj);
+			}
 		}
 		args_count = max_args;
 	}
@@ -136,13 +162,18 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 					return nullptr;
 				}
 			}
+			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), kwargs_count);
+				it != cell2arg.end()) {
+				const auto free_var_idx = std::distance(cell2arg.begin(), it);
+				function_frame->freevars()[free_var_idx] = PyCell::create(value);
+			}
 			arg = value;
 			kwargs_count++;
 		}
 	}
 
 	{
-		const auto &defaults = m_code->defaults();
+		const auto &defaults = m_defaults;
 		auto default_iter = defaults.rbegin();
 		for (size_t i = m_code->arg_count() - 1; i > (m_code->arg_count() - defaults.size() - 1);
 			 --i) {
@@ -150,16 +181,25 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
 				VirtualMachine::the().stack_local(i) = *default_iter;
 			}
+			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), i); it != cell2arg.end()) {
+				const auto free_var_idx = std::distance(cell2arg.begin(), it);
+				function_frame->freevars()[free_var_idx] = PyCell::create(*default_iter);
+			}
 			default_iter = std::next(default_iter);
 		}
-
-		const auto &kw_defaults = m_code->kwonly_defaults();
+	}
+	{
+		const auto &kw_defaults = m_kwonly_defaults;
 		auto kw_default_iter = kw_defaults.rbegin();
 		const size_t start = m_code->kwonly_arg_count() + m_code->arg_count() - 1;
 		for (size_t i = start; i > start - kw_defaults.size(); --i) {
 			auto &arg = VirtualMachine::the().stack_local(i);
 			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
 				VirtualMachine::the().stack_local(i) = *kw_default_iter;
+			}
+			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), i); it != cell2arg.end()) {
+				const auto free_var_idx = std::distance(cell2arg.begin(), it);
+				function_frame->freevars()[free_var_idx] = PyCell::create(*kw_default_iter);
 			}
 			kw_default_iter = std::next(kw_default_iter);
 		}
@@ -172,8 +212,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				remaining_args.push_back(args->elements()[idx]);
 			}
 		}
-		VirtualMachine::the().stack_local(m_code->varnames().size()) =
-			PyTuple::create(remaining_args);
+		VirtualMachine::the().stack_local(total_arguments_count) = PyTuple::create(remaining_args);
 	} else if (args_count < args->size()) {
 		VirtualMachine::the().interpreter().raise_exception(type_error(
 			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
@@ -203,15 +242,19 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		}
 		size_t kwargs_index = [&]() {
 			if (m_code->flags().is_set(CodeFlags::Flag::VARARGS)) {
-				return m_code->varnames().size() + 1;
+				return total_arguments_count + 1;
 			} else {
-				return m_code->varnames().size();
+				return total_arguments_count;
 			}
 		}();
 		VirtualMachine::the().stack_local(kwargs_index) = remaining_kwargs;
 	}
 
 	spdlog::debug("Requesting stack frame with {} virtual registers", m_code->register_count());
+
+	for (size_t idx = m_code->cellvars_count(); const auto &el : m_closure) {
+		function_frame->freevars()[idx++] = el;
+	}
 
 	// spdlog::debug("Frame: {}", (void *)execution_frame);
 	// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
@@ -227,7 +270,6 @@ PyObject *PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 }
 
 namespace {
-
 std::once_flag function_flag;
 
 std::unique_ptr<TypePrototype> register_function()
@@ -269,7 +311,6 @@ void PyNativeFunction::visit_graph(Visitor &visitor)
 PyType *PyNativeFunction::type() const { return native_function(); }
 
 namespace {
-
 std::once_flag native_function_flag;
 
 std::unique_ptr<TypePrototype> register_native_function()

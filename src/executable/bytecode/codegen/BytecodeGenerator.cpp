@@ -23,6 +23,8 @@
 #include "executable/bytecode/instructions/LoadAssertionError.hpp"
 #include "executable/bytecode/instructions/LoadAttr.hpp"
 #include "executable/bytecode/instructions/LoadBuildClass.hpp"
+#include "executable/bytecode/instructions/LoadClosure.hpp"
+#include "executable/bytecode/instructions/LoadDeref.hpp"
 #include "executable/bytecode/instructions/LoadGlobal.hpp"
 #include "executable/bytecode/instructions/LoadMethod.hpp"
 #include "executable/bytecode/instructions/LoadName.hpp"
@@ -32,6 +34,7 @@
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
+#include "executable/bytecode/instructions/StoreDeref.hpp"
 #include "executable/bytecode/instructions/StoreGlobal.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
 #include "executable/bytecode/instructions/TrueDivide.cpp"
@@ -56,6 +59,10 @@ namespace codegen {
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
+	auto &varnames = std::next(m_functions.begin(), m_function_id)->metadata.varnames;
+	if (std::find(varnames.begin(), varnames.end(), name) != varnames.end()) {
+		varnames.push_back(name);
+	}
 	const auto &scope_name = m_stack.top().mangled_name;
 	const auto &visibility = [&] {
 		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
@@ -94,10 +101,19 @@ void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 		}();
 		emit<StoreFast>(value->get_stack_index(), name, src->get_register());
 	} break;
-	case VariablesResolver::Visibility::CLOSURE: {
-		TODO();
-		// auto *value = create_stack_value();
-		// emit<StoreDeref>(value->get_stack_index(), name, src->get_register());
+	case VariablesResolver::Visibility::CELL:
+	case VariablesResolver::Visibility::FREE: {
+		auto *value = [&]() -> BytecodeFreeValue * {
+			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(it->second))
+				return std::get<BytecodeFreeValue *>(it->second);
+			} else {
+				auto *value = create_free_value();
+				m_stack.top().locals.emplace(name, value);
+				return value;
+			}
+		}();
+		emit<StoreDeref>(value->get_free_var_index(), src->get_register());
 	} break;
 	}
 }
@@ -137,9 +153,12 @@ BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 		emit<LoadFast>(
 			dst->get_register(), std::get<BytecodeStackValue *>(l)->get_stack_index(), name);
 	} break;
-	case VariablesResolver::Visibility::CLOSURE: {
-		TODO();
-		// emit<LoadDeref>(dst->get_register(), value->get_free_var_index(), name);
+	case VariablesResolver::Visibility::CELL:
+	case VariablesResolver::Visibility::FREE: {
+		const auto &l = m_stack.top().locals.at(name);
+		ASSERT(std::holds_alternative<BytecodeFreeValue *>(l))
+		emit<LoadDeref>(
+			dst->get_register(), std::get<BytecodeFreeValue *>(l)->get_free_var_index(), name);
 	} break;
 	}
 	return dst;
@@ -206,13 +225,21 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		decorator_functions.push_back(f);
 	}
 
-	std::vector<std::string> arg_names;
+	std::vector<std::string> varnames;
+	std::vector<size_t> cell2arg;
+
 	m_ctx.push_local_args(node->args());
 	const std::string &function_name = Mangler::default_mangler().function_mangle(
 		mangle_namespace(m_stack), node->name(), node->source_location());
 	auto *f = create_function(function_name);
 
-	m_stack.push(Scope{ .name = node->name(), .mangled_name = function_name });
+	create_nested_scope(node->name(), function_name);
+	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
+	for (const auto &capture : m_variable_visibility.at(function_name)->captures) {
+		auto *value = create_free_value();
+		captures.emplace_back(capture, value);
+		m_stack.top().locals.emplace(capture, value);
+	}
 
 	auto *block = allocate_block(f->function_info().function_id);
 	auto *old_block = m_current_block;
@@ -228,9 +255,28 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	emit<LoadConst>(none_value_register, py::NameConstant{ py::NoneType{} });
 	emit<ReturnValue>(none_value_register);
 
-	for (const auto &arg_name : node->args()->argument_names()) { arg_names.push_back(arg_name); }
-	for (const auto &arg_name : node->args()->kw_only_argument_names()) {
-		arg_names.push_back(arg_name);
+	const auto &name_visibility_it = m_variable_visibility.find(function_name);
+	ASSERT(name_visibility_it != m_variable_visibility.end())
+	const auto &name_visibility = name_visibility_it->second->visibility;
+
+	for (size_t idx = 0; const auto &arg_name : node->args()->argument_names()) {
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+		idx++;
+	}
+	for (size_t idx = node->args()->argument_names().size();
+		 const auto &arg_name : node->args()->kw_only_argument_names()) {
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+		idx++;
 	}
 
 	set_insert_point(old_block);
@@ -257,15 +303,59 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		}
 	}
 
-	emit<MakeFunction>(f->get_register(),
-		f->get_name(),
-		arg_names,
-		defaults,
-		kw_defaults,
-		arg_count,
-		kwonly_arg_count,
-		node->args()->vararg() != nullptr,
-		node->args()->kwarg() != nullptr);
+	auto captures_tuple = [&]() -> std::optional<Register> {
+		if (!captures.empty()) {
+			auto *tuple_value = create_value();
+			std::vector<Register> capture_regs;
+			capture_regs.reserve(captures.size());
+			for (const auto &[name, el] : captures) {
+				ASSERT(m_stack.top().locals.contains(name));
+				const auto &value = m_stack.top().locals.at(name);
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				emit<LoadClosure>(el->get_free_var_index(),
+					std::get<BytecodeFreeValue *>(value)->get_free_var_index(),
+					name);
+				capture_regs.push_back(el->get_free_var_index());
+			}
+			emit<BuildTuple>(tuple_value->get_register(), capture_regs);
+			return tuple_value->get_register();
+		} else {
+			return {};
+		}
+	}();
+
+	auto flags = CodeFlags::create();
+	if (node->args()->vararg() != nullptr) { flags.set(CodeFlags::Flag::VARARGS); }
+	if (node->args()->kwarg() != nullptr) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
+
+	f->function_info().function.metadata.varnames = varnames;
+
+	for (const auto &[varname, v] : name_visibility) {
+		if (v == VariablesResolver::Visibility::FREE) {
+			f->function_info().function.metadata.freevars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::CELL) {
+			f->function_info().function.metadata.cellvars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::LOCAL) {
+			f->function_info().function.metadata.varnames.push_back(varname);
+		} else {
+			// TODO: add to co_names
+			// A tuple containing names used by the bytecode:
+			//  * global variables,
+			//  * functions
+			//  * classes
+			//	* attributes loaded from objects
+		}
+	}
+
+	// TODO
+	// f->function_info().function.metadata.filename = ;
+	f->function_info().function.metadata.arg_count = arg_count;
+	f->function_info().function.metadata.kwonly_arg_count = kwonly_arg_count;
+	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
+	f->function_info().function.metadata.nlocals = varnames.size();
+	f->function_info().function.metadata.flags = flags;
+
+	emit<MakeFunction>(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
 	store_name(node->name(), f);
 	if (!decorator_functions.empty()) {
@@ -297,8 +387,26 @@ Value *BytecodeGenerator::visit(const Arguments *node)
 
 Value *BytecodeGenerator::visit(const Argument *node)
 {
-	auto *value = create_stack_value();
-	m_stack.top().locals.emplace(node->name(), value);
+	const auto &var_scope =
+		m_variable_visibility.at(m_stack.top().mangled_name)->visibility.at(node->name());
+	switch (var_scope) {
+	case VariablesResolver::Visibility::CELL: {
+		m_stack.top().locals.emplace(node->name(), create_free_value());
+		auto f = std::next(m_functions.begin(), m_function_id);
+		f->metadata.varnames.push_back(node->name());
+	} break;
+	case VariablesResolver::Visibility::FREE: {
+		TODO();
+	} break;
+	case VariablesResolver::Visibility::LOCAL: {
+		m_stack.top().locals.emplace(node->name(), create_stack_value());
+	} break;
+	case VariablesResolver::Visibility::GLOBAL: {
+		TODO();
+	} break;
+	case VariablesResolver::Visibility::NAME:
+		m_stack.top().locals.emplace(node->name(), create_value());
+	}
 	return nullptr;
 }
 
@@ -673,7 +781,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 			mangle_namespace(m_stack), node->name(), node->source_location());
 
 		auto *class_builder_func = create_function(class_mangled_name);
-		m_stack.push(Scope{ .name = node->name(), .mangled_name = class_mangled_name });
+		create_nested_scope(node->name(), class_mangled_name);
 		class_id = class_builder_func->function_info().function_id;
 
 		auto *block = allocate_block(class_id);
@@ -856,7 +964,7 @@ Value *BytecodeGenerator::visit(const Import *node)
 Value *BytecodeGenerator::visit(const Module *node)
 {
 	const auto &module_name = fs::path(node->filename()).stem();
-	m_stack.push(Scope{ .name = module_name, .mangled_name = module_name });
+	create_nested_scope(module_name, module_name);
 	BytecodeValue *last = nullptr;
 	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
 
@@ -1095,6 +1203,7 @@ BytecodeGenerator::BytecodeGenerator()
 {
 	m_frame_register_count.push_back(0u);
 	m_frame_stack_value_count.push_back(0u);
+	m_frame_free_var_count.push_back(0u);
 	(void)create_function("__main__entry__");
 	m_current_block = &m_functions.back().blocks.back();
 }
@@ -1106,9 +1215,10 @@ void BytecodeGenerator::exit_function(size_t function_id)
 	ASSERT(function_id < m_functions.size())
 	auto function = std::next(m_functions.begin(), function_id);
 	function->metadata.register_count = register_count();
-	function->metadata.stack_size = stack_variable_count();
+	function->metadata.stack_size = stack_variable_count() + free_variable_count();
 	m_frame_register_count.pop_back();
 	m_frame_stack_value_count.pop_back();
+	m_frame_free_var_count.pop_back();
 }
 
 BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &name)
@@ -1142,6 +1252,7 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 {
 	ASSERT(m_frame_register_count.size() == 2)
 	ASSERT(m_frame_stack_value_count.size() == 2)
+	ASSERT(m_frame_free_var_count.size() == 2)
 	relocate_labels(m_functions);
 	return std::make_shared<BytecodeProgram>(std::move(m_functions), filename, argv);
 }
@@ -1168,20 +1279,22 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 
 	generator.m_variable_visibility = VariablesResolver::resolve(module.get());
 
-	// for (const auto &[scope_name, scope] : generator.m_variable_visibility) {
-	// 	std::cout << "Scope name: " << scope_name << '\n';
-	// 	for (const auto &[k, v] : scope->visibility) {
-	// 		if (v == VariablesResolver::Visibility::NAME) {
-	// 			std::cout << fmt::format("  - {}: NAME", k) << '\n';
-	// 		} else if (v == VariablesResolver::Visibility::LOCAL) {
-	// 			std::cout << fmt::format("  - {}: LOCAL", k) << '\n';
-	// 		} else if (v == VariablesResolver::Visibility::CLOSURE) {
-	// 			std::cout << fmt::format("  - {}: CLOSURE", k) << '\n';
-	// 		} else if (v == VariablesResolver::Visibility::GLOBAL) {
-	// 			std::cout << fmt::format("  - {}: GLOBAL", k) << '\n';
-	// 		}
-	// 	}
-	// }
+	for (const auto &[scope_name, scope] : generator.m_variable_visibility) {
+		spdlog::debug("Scope name: {}", scope_name);
+		for (const auto &[k, v] : scope->visibility) {
+			if (v == VariablesResolver::Visibility::NAME) {
+				spdlog::debug("  - {}: NAME {}", k);
+			} else if (v == VariablesResolver::Visibility::LOCAL) {
+				spdlog::debug("  - {}: LOCAL {}", k);
+			} else if (v == VariablesResolver::Visibility::FREE) {
+				spdlog::debug("  - {}: FREE {}", k);
+			} else if (v == VariablesResolver::Visibility::CELL) {
+				spdlog::debug("  - {}: CELL {}", k);
+			} else if (v == VariablesResolver::Visibility::GLOBAL) {
+				spdlog::debug("  - {}: GLOBAL {}", k);
+			}
+		}
+	}
 
 	node->codegen(&generator);
 
@@ -1202,5 +1315,17 @@ std::string BytecodeGenerator::mangle_namespace(std::stack<BytecodeGenerator::Sc
 		s.pop();
 	}
 	return result;
+}
+
+void BytecodeGenerator::create_nested_scope(const std::string &name,
+	const std::string &mangled_name)
+{
+	decltype(Scope::locals) locals;
+	if (!m_stack.empty()) {
+		for (const auto &[k, v] : m_stack.top().locals) {
+			if (std::holds_alternative<BytecodeFreeValue *>(v)) { locals[k] = v; }
+		}
+	}
+	m_stack.push(Scope{ .name = name, .mangled_name = mangled_name, .locals = locals });
 }
 }// namespace codegen
