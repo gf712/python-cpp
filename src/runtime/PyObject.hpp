@@ -137,6 +137,8 @@ namespace {
 	}
 }// namespace
 
+enum class LookupAttrResult { NOT_FOUND = 0, FOUND = 1, ERROR = 2 };
+
 class PyObject : public Cell
 {
 	struct NotImplemented_
@@ -217,6 +219,7 @@ class PyObject : public Cell
 	const PyDict &attributes() const { return *m_attributes; }
 	PyObject *get_method(PyObject *name) const;
 	PyObject *get_attribute(PyObject *name) const;
+	std::tuple<PyObject *, LookupAttrResult> lookup_attribute(PyObject *name) const;
 
 	static std::unique_ptr<TypePrototype> register_type();
 

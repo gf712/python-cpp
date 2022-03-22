@@ -25,3 +25,9 @@ PyType *AttributeError::register_type(PyModule *module)
 	}
 	return s_attribute_error;
 }
+
+PyType *AttributeError::static_type()
+{
+	ASSERT(s_attribute_error)
+	return s_attribute_error;
+}

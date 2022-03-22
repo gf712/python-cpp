@@ -636,6 +636,47 @@ PyObject *PyObject::get_attribute(PyObject *name) const
 	return nullptr;
 }
 
+std::tuple<PyObject *, LookupAttrResult> PyObject::lookup_attribute(PyObject *name) const
+{
+	PyObject *result = nullptr;
+	if (!as<PyString>(name)) {
+		VirtualMachine::the().interpreter().raise_exception(
+			type_error("attribute name must be a string, not {}", name->type()->to_string()));
+		return { nullptr, LookupAttrResult::ERROR };
+	}
+
+	const auto &getattribute_ = type()->underlying_type().__getattribute__;
+	if (getattribute_.has_value()
+		&& get_address(*getattribute_)
+			   != get_address(*object()->underlying_type().__getattribute__)) {
+		result = get_attribute(name);
+	}
+	// TODO: check tp_getattr? This field is deprecated in [c]python so maybe should not even bother
+	// to implement it here?
+	else if (getattribute_.has_value()) {
+		result = call_slot(*getattribute_, this, name);
+	} else {
+		return { nullptr, LookupAttrResult::NOT_FOUND };
+	}
+
+	// TODO: check if error occured
+	if (result) {
+		return { result, LookupAttrResult::FOUND };
+	} else if (auto *exception = VirtualMachine::the()
+									 .interpreter()
+									 .execution_frame()
+									 ->exception_info()
+									 ->exception;
+			   exception && exception->type() == AttributeError::static_type()) {
+		VirtualMachine::the().interpreter().execution_frame()->set_exception(nullptr);
+		VirtualMachine::the().interpreter().set_status(Interpreter::Status::OK);
+		return { nullptr, LookupAttrResult::NOT_FOUND };
+	} else {
+		return { nullptr, LookupAttrResult::ERROR };
+	}
+}
+
+
 PyObject *PyObject::get_method(PyObject *name) const
 {
 	bool method_found = false;
