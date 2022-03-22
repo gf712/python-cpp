@@ -66,7 +66,8 @@ int run_and_execute_script(int argc,
 	char **argv,
 	bool print_bytecode,
 	bool print_tokens,
-	bool use_llvm)
+	bool use_llvm,
+	bool print_ast)
 {
 	size_t arg_idx{ 1 };
 	const char *filename = argv[arg_idx];
@@ -84,6 +85,12 @@ int run_and_execute_script(int argc,
 	}
 	parser::Parser p{ lexer };
 	p.parse();
+	if (print_ast) {
+		const auto lvl = spdlog::get_level();
+		spdlog::set_level(spdlog::level::debug);
+		p.module()->print_node("");
+		spdlog::set_level(lvl);
+	}
 	auto bytecode = codegen::BytecodeGenerator::compile(
 		p.module(), argv_vector, compiler::OptimizationLevel::None);
 
@@ -120,6 +127,7 @@ int main(int argc, char **argv)
 	options.add_options()
 		("f,filename", "Script path", cxxopts::value<std::string>())
 		("b,bytecode", "Print the script's bytecode to stdout", cxxopts::value<bool>()->default_value("false"))
+		("a,ast", "Print the script's tokens to stdout", cxxopts::value<bool>()->default_value("false"))
 		("t,tokenize", "Print the script's tokens to stdout", cxxopts::value<bool>()->default_value("false"))
 		("d,debug", "Enable debug logging", cxxopts::value<bool>()->default_value("false"))
 		("trace", "Enable trace logging", cxxopts::value<bool>()->default_value("false"))
@@ -150,7 +158,8 @@ int main(int argc, char **argv)
 			argv,
 			result["bytecode"].as<bool>(),
 			result["tokenize"].as<bool>(),
-			result["use-llvm"].as<bool>());
+			result["use-llvm"].as<bool>(),
+			result["ast"].as<bool>());
 	}
 
 	TODO();
