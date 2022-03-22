@@ -271,6 +271,30 @@ PyObject *id(const PyTuple *args, const PyDict *, Interpreter &)
 		Number{ static_cast<int64_t>(bit_cast<intptr_t>(args->operator[](0))) });
 }
 
+PyObject *hasattr(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+{
+	if (args->size() != 2) {
+		interpreter.raise_exception(
+			type_error("hasattr expected 2 arguments, got {}", args->size()));
+		return nullptr;
+	}
+	auto *obj = PyObject::from(args->elements()[0]);
+	auto *name = PyObject::from(args->elements()[1]);
+	if (!as<PyString>(name)) {
+		interpreter.raise_exception(type_error("hasattr(): attribute name must be string"));
+		return nullptr;
+	}
+
+	auto [_, found_status] = obj->lookup_attribute(name);
+	if (found_status == LookupAttrResult::FOUND) {
+		return py_true();
+	} else if (found_status == LookupAttrResult::NOT_FOUND) {
+		return py_false();
+	} else {
+		return nullptr;
+	}
+}
+
 PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
@@ -554,6 +578,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->insert(PyString::create("globals"),
 		heap.allocate<PyNativeFunction>("globals", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return globals(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->insert(PyString::create("hasattr"),
+		heap.allocate<PyNativeFunction>("hasattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return hasattr(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->insert(PyString::create("hex"),
