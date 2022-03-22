@@ -181,18 +181,14 @@ std::string PyDictItems::to_string() const
 	os << "dict_items([";
 	auto it = begin();
 	auto end_it = end();
-	if (it == end_it) {
-		os << "])";
-		return os.str();
-	}
-	std::advance(end_it, -1);
 
-	while (true) {
-		if (it == end_it) break;
-		os << (*it)->to_string() << ", ";
+	while (it != end_it) {
+		os << (*it)->to_string();
 		std::advance(it, 1);
+		if (it != end_it) { os << ","; }
 	}
-	os << (*it)->to_string() << "])";
+
+	os << "])";
 	return os.str();
 }
 

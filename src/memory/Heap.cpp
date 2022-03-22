@@ -116,7 +116,7 @@ bool Slab::has_address(uint8_t *address) const
 		block1024.get(),
 		block2048.get(),
 	};
-	for (const auto& block: blocks) {
+	for (const auto &block : blocks) {
 		for (auto &chunk : block->chunks()) {
 			if (chunk.has_address(address)) { return true; }
 		}
@@ -144,5 +144,10 @@ uint8_t *Heap::allocate_gc(uint8_t *ptr) const
 
 void Heap::log_allocation(PyObject *obj) const
 {
-	spdlog::debug("Allocated {} on the heap @{}", obj->m_type_prototype.__name__, (void *)obj);
+	spdlog::debug(
+		"Allocated type \'{}\' on the heap @{}", obj->m_type_prototype.__name__, (void *)obj);
+	// spdlog::debug("Allocated type \'{}\' ({}) on the heap @{}",
+	// 	obj->m_type_prototype.__name__,
+	// 	obj->to_string(),
+	// 	(void *)obj);
 }
