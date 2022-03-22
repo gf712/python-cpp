@@ -307,10 +307,12 @@ std::pair<String, PyObject *> wrap_slot(PyType *type,
 
 void PyType::initialize(PyDict *ns)
 {
-	// FIXME: this is only allocated in static memory so that the lifetime of __dict__
-	//        matches the one of m_underlying_type
+	// FIXME: this a hack to extend the lifetime of all objects owned by types, which *can* be
+	// static (i.e. builtin types) and not visited by the garbage collector
+	[[maybe_unused]] auto scope_static_alloc =
+		VirtualMachine::the().heap().scoped_static_allocation();
 	m_underlying_type.__class__ = this;
-	m_underlying_type.__dict__ = VirtualMachine::the().heap().allocate_static<PyDict>().get();
+	m_underlying_type.__dict__ = PyDict::create();
 	// m_attributes should be a "mappingproxy" object, not dict for PyType
 	m_attributes = m_underlying_type.__dict__;
 	if (m_underlying_type.__add__.has_value()) {

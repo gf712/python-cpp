@@ -262,6 +262,7 @@ class Heap
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;
 	uintptr_t *m_bottom_stack_pointer;
+	bool m_allocate_in_static{ false };
 
 	struct ScopedGCPause
 	{
@@ -269,6 +270,15 @@ class Heap
 		ScopedGCPause(GarbageCollector &gc) : gc_(gc) { gc_.pause(); }
 		~ScopedGCPause() { gc_.resume(); }
 	};
+
+	struct ScopedStaticAllocation
+	{
+		Heap &heap;
+		ScopedStaticAllocation(Heap &heap_) : heap(heap_) { heap.m_allocate_in_static = true; }
+		~ScopedStaticAllocation() { heap.m_allocate_in_static = false; }
+	};
+
+	friend ScopedStaticAllocation;
 
   public:
 	static Heap &the()
@@ -295,6 +305,7 @@ class Heap
 
 	template<typename T, typename... Args> T *allocate(Args &&... args)
 	{
+		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...).get(); }
 		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
 
@@ -322,6 +333,11 @@ class Heap
 	Slab &slab() { return m_slab; }
 
 	[[nodiscard]] ScopedGCPause scoped_gc_pause() { return ScopedGCPause(*m_gc); }
+
+	[[nodiscard]] ScopedStaticAllocation scoped_static_allocation()
+	{
+		return ScopedStaticAllocation(*this);
+	}
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;
