@@ -1,11 +1,11 @@
 #pragma once
 
+#include "Program.hpp"
 #include "forward.hpp"
 #include <list>
 #include <memory>
 #include <string>
 #include <vector>
-
 
 using InstructionVector = std::vector<std::unique_ptr<Instruction>>;
 using InstructionBlock = InstructionVector;
@@ -17,6 +17,16 @@ struct FunctionMetaData
 	std::string function_name;
 	size_t register_count{ 0 };
 	size_t stack_size{ 0 };
+	std::vector<std::string> cellvars;
+	std::vector<std::string> varnames;
+	std::vector<std::string> freevars;
+	std::string filename;
+	size_t first_line_number;
+	size_t arg_count;
+	size_t kwonly_arg_count;
+	size_t nlocals;
+	std::vector<size_t> cell2arg;
+	CodeFlags flags = CodeFlags::create();
 };
 
 struct FunctionBlock

@@ -13,6 +13,8 @@ using namespace py;
 namespace {
 std::vector<Value> make_value_vector(const std::vector<PyObject *> &elements)
 {
+	ASSERT(std::all_of(
+		elements.begin(), elements.end(), [](const auto &el) { return el != nullptr; }));
 	std::vector<Value> result;
 	result.reserve(elements.size());
 	result.insert(result.end(), elements.begin(), elements.end());
@@ -34,7 +36,12 @@ template<> const PyTuple *py::as(const PyObject *obj)
 
 PyTuple::PyTuple(std::vector<Value> &&elements)
 	: PyBaseObject(BuiltinTypes::the().tuple()), m_elements(std::move(elements))
-{}
+{
+	ASSERT(std::all_of(m_elements.begin(), m_elements.end(), [](const auto &el) {
+		if (std::holds_alternative<PyObject *>(el)) return std::get<PyObject *>(el) != nullptr;
+		return true;
+	}));
+}
 
 PyTuple::PyTuple() : PyTuple(std::vector<Value>{}) {}
 
@@ -197,8 +204,9 @@ PyObject *PyTupleIterator::operator*() const
 		m_pytuple.elements()[m_current_index]);
 }
 
-void PyTupleIterator::visit_graph(Visitor &visitor) {
-	const_cast<PyTuple&>(m_pytuple).visit_graph(visitor);
+void PyTupleIterator::visit_graph(Visitor &visitor)
+{
+	const_cast<PyTuple &>(m_pytuple).visit_graph(visitor);
 }
 
 

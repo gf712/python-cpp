@@ -4,6 +4,7 @@
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
 #include "runtime/PyBytes.hpp"
+#include "runtime/PyCell.hpp"
 #include "runtime/PyClassMethod.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
@@ -31,8 +32,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_integer(PyInteger::register_type()), m_none(PyNone::register_type()),
 	  m_module(PyModule::register_type()), m_object(PyObject::register_type()),
 	  m_function(PyFunction::register_type()), m_native_function(PyNativeFunction::register_type()),
-	  m_code(PyCode::register_type()), m_dict(PyDict::register_type()),
-	  m_dict_items(PyDictItems::register_type()),
+	  m_code(PyCode::register_type()), m_cell(PyCell::register_type()),
+	  m_dict(PyDict::register_type()), m_dict_items(PyDictItems::register_type()),
 	  m_dict_items_iterator(PyDictItemsIterator::register_type()), m_list(PyList::register_type()),
 	  m_list_iterator(PyListIterator::register_type()), m_tuple(PyTuple::register_type()),
 	  m_tuple_iterator(PyTupleIterator::register_type()), m_range(PyRange::register_type()),
@@ -84,6 +85,7 @@ INITIALIZE_TYPE(range_iterator)
 INITIALIZE_TYPE(function)
 INITIALIZE_TYPE(native_function)
 INITIALIZE_TYPE(code)
+INITIALIZE_TYPE(cell)
 
 INITIALIZE_TYPE(builtin_method)
 INITIALIZE_TYPE(slot_wrapper)

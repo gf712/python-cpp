@@ -255,6 +255,10 @@ class LoadFast final : public Instruction
 			"LOAD_FAST       r{:<3} {} (\"{}\")", m_destination, m_stack_index, m_object_name);
 	}
 
+	Register dst() const { return m_destination; }
+	Register stack_index() const { return m_stack_index; }
+	const std::string &object_name() const { return m_object_name; }
+
 	void execute(VirtualMachine &vm, Interpreter &) const final
 	{
 		vm.reg(m_destination) = vm.stack_local(m_stack_index);
@@ -293,31 +297,20 @@ class MakeFunction : public Instruction
 {
 	Register m_dst;
 	std::string m_function_name;
-	std::vector<std::string> m_args;
 	std::vector<Register> m_defaults;
 	std::vector<std::optional<Register>> m_kw_defaults;
-	size_t m_arg_count;
-	size_t m_kwonly_arg_count;
-	bool m_has_varargs;
-	bool m_has_varkeywords;
+	std::optional<Register> m_captures_tuple;
 
   public:
 	MakeFunction(Register dst,
 		std::string function_name,
-		std::vector<std::string> args,
 		std::vector<Register> defaults,
 		std::vector<std::optional<Register>> kw_defaults,
-		size_t arg_count,
-		size_t kwonly_arg_count,
-		bool has_varargs,
-		bool has_keywords)
-		: m_dst(dst), m_function_name(std::move(function_name)), m_args(std::move(args)),
-		  m_defaults(std::move(defaults)), m_kw_defaults(std::move(kw_defaults)),
-		  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_has_varargs(has_varargs),
-		  m_has_varkeywords(has_keywords)
+		std::optional<Register> captures_tuple)
+		: m_dst(dst), m_function_name(std::move(function_name)), m_defaults(std::move(defaults)),
+		  m_kw_defaults(std::move(kw_defaults)), m_captures_tuple(std::move(captures_tuple))
 	{}
 
-	~MakeFunction() override {}
 	std::string to_string() const final
 	{
 		return fmt::format("MAKE_FUNCTION   ({})", m_function_name);

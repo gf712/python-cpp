@@ -24,6 +24,7 @@ class ExecutionFrame : public Cell
 	py::PyModule *m_builtins;
 	py::PyDict *m_globals;
 	py::PyDict *m_locals;
+	std::vector<py::PyCell *> m_freevars;
 	ExecutionFrame *m_parent{ nullptr };
 	py::PyObject *m_exception_to_catch{ nullptr };
 	std::optional<ExceptionInfo> m_exception;
@@ -32,6 +33,7 @@ class ExecutionFrame : public Cell
   public:
 	static ExecutionFrame *create(ExecutionFrame *parent,
 		size_t register_count,
+		size_t freevar_count,
 		py::PyDict *globals,
 		py::PyDict *locals);
 
@@ -62,6 +64,8 @@ class ExecutionFrame : public Cell
 	py::PyDict *globals() const;
 	py::PyDict *locals() const;
 	py::PyModule *builtins() const;
+	const std::vector<py::PyCell *> &freevars() const;
+	std::vector<py::PyCell *> &freevars();
 
 	std::string to_string() const override;
 	void visit_graph(Visitor &) override;

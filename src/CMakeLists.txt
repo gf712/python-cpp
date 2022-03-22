@@ -31,6 +31,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
+    executable/bytecode/instructions/LoadClosure.cpp
+    executable/bytecode/instructions/LoadDeref.cpp
     executable/bytecode/instructions/LoadGlobal.cpp
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
@@ -40,6 +42,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/StoreAttr.cpp
+    executable/bytecode/instructions/StoreDeref.cpp
     executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/TrueDivide.cpp
@@ -82,6 +85,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
     runtime/PyBytes.cpp
+    runtime/PyCell.cpp
     runtime/PyClassMethod.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
@@ -115,6 +119,7 @@ set(UNITTEST_SOURCES
     ast/optimizers/Optimizers_tests.cpp
     executable/bytecode/Bytecode_tests.cpp
     executable/bytecode/codegen/BytecodeGenerator_tests.cpp
+    executable/bytecode/codegen/VariablesResolver_tests.cpp
     lexer/Lexer_tests.cpp
     parser/Parser_tests.cpp
     runtime/PyNumber_tests.cpp

@@ -5,6 +5,7 @@
 #include "executable/bytecode/Bytecode.hpp"
 
 #include "runtime/PyBool.hpp"
+#include "runtime/PyCell.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyList.hpp"
@@ -22,10 +23,6 @@ void Move::execute(VirtualMachine &vm, Interpreter &) const
 
 void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	auto flags = CodeFlags::create();
-	if (m_has_varargs) { flags.set(CodeFlags::Flag::VARARGS); }
-	if (m_has_varkeywords) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
-
 	std::vector<Value> default_values;
 	default_values.reserve(m_defaults.size());
 	for (const auto &default_value : m_defaults) {
@@ -35,20 +32,28 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	std::vector<Value> kw_default_values;
 	kw_default_values.reserve(m_kw_defaults.size());
 	for (const auto &default_value : m_kw_defaults) {
-		if (default_value.has_value()) {
-			kw_default_values.push_back(vm.reg(*default_value));
-		} else {
-			ASSERT(m_has_varkeywords == false)
-		}
+		if (default_value.has_value()) { kw_default_values.push_back(vm.reg(*default_value)); }
 	}
 
-	auto *func = interpreter.make_function(m_function_name,
-		m_args,
-		default_values,
-		kw_default_values,
-		m_arg_count,
-		m_kwonly_arg_count,
-		flags);
+	auto closure = [&]() -> std::vector<PyCell *> {
+		if (m_captures_tuple) {
+			auto *value = PyObject::from(vm.reg(*m_captures_tuple));
+			ASSERT(as<PyTuple>(value))
+			std::vector<PyCell *> cells;
+			cells.reserve(as<PyTuple>(value)->size());
+			for (const auto &el : as<PyTuple>(value)->elements()) {
+				ASSERT(std::holds_alternative<PyObject *>(el))
+				ASSERT(as<PyCell>(std::get<PyObject*>(el)))
+				cells.push_back(as<PyCell>(std::get<PyObject*>(el)));
+			}
+			return cells;
+		} else {
+			return {};
+		}
+	}();
+
+	auto *func =
+		interpreter.make_function(m_function_name, default_values, kw_default_values, closure);
 	ASSERT(func)
 	// FIXME: demangle should be a function visible in the whole project
 	const std::string demangled_name =

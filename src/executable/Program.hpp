@@ -60,10 +60,7 @@ class Program : NonCopyable
 	virtual std::string to_string() const = 0;
 
 	virtual py::PyObject *as_pyfunction(const std::string &function_name,
-		const std::vector<std::string> &argnames,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		size_t positional_args_count,
-		size_t kwonly_args_count,
-		const CodeFlags &flags) const = 0;
+		const std::vector<py::PyCell *> &closure) const = 0;
 };

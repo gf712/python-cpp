@@ -57,7 +57,7 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame = ExecutionFrame::create(nullptr, local_registers, globals, locals);
+	m_current_frame = ExecutionFrame::create(nullptr, local_registers, 0, globals, locals);
 	m_global_frame = m_current_frame;
 }
 
@@ -102,20 +102,11 @@ PyModule *Interpreter::get_imported_module(PyString *name) const
 }
 
 PyObject *Interpreter::make_function(const std::string &function_name,
-	const std::vector<std::string> &argnames,
 	const std::vector<py::Value> &default_values,
 	const std::vector<py::Value> &kw_default_values,
-	size_t positional_args_count,
-	size_t kwonly_args_count,
-	const CodeFlags &flags) const
+	const std::vector<py::PyCell *> &closure) const
 {
-	auto *f = m_program->as_pyfunction(function_name,
-		argnames,
-		default_values,
-		kw_default_values,
-		positional_args_count,
-		kwonly_args_count,
-		flags);
+	auto *f = m_program->as_pyfunction(function_name, default_values, kw_default_values, closure);
 	ASSERT(f)
 	return f;
 }
@@ -130,7 +121,8 @@ ScopedStack Interpreter::setup_call_stack(const std::shared_ptr<Function> &func,
 	ExecutionFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
-	vm.setup_call_stack(function_frame->m_register_count, func->stack_size());
+	vm.setup_call_stack(
+		function_frame->m_register_count, func->stack_size() + function_frame->freevars().size());
 	return ScopedStack{ vm.stack().top() };
 }
 

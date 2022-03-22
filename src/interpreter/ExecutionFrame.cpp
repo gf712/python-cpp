@@ -1,6 +1,8 @@
 #include "ExecutionFrame.hpp"
+#include "runtime/PyCell.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyModule.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/types/builtin.hpp"
@@ -11,6 +13,7 @@ ExecutionFrame::ExecutionFrame() {}
 
 ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	size_t register_count,
+	size_t free_vars_count,
 	PyDict *globals,
 	PyDict *locals)
 {
@@ -19,6 +22,13 @@ ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
+	// if (parent) {
+	// 	new_frame->m_freevars = parent->m_freevars;
+	// 	new_frame->m_freevars.resize(parent->m_freevars.size() + free_vars_count, nullptr);
+	// } else {
+	// 	new_frame->m_freevars = std::vector<PyCell *>(free_vars_count, nullptr);
+	// }
+	new_frame->m_freevars = std::vector<PyCell *>(free_vars_count, nullptr);
 
 	if (new_frame->m_parent) {
 		new_frame->m_builtins = new_frame->m_parent->m_builtins;
@@ -77,6 +87,9 @@ PyDict *ExecutionFrame::locals() const { return m_locals; }
 PyDict *ExecutionFrame::globals() const { return m_globals; }
 PyModule *ExecutionFrame::builtins() const { return m_builtins; }
 
+const std::vector<py::PyCell *> &ExecutionFrame::freevars() const { return m_freevars; }
+std::vector<py::PyCell *> &ExecutionFrame::freevars() { return m_freevars; }
+
 ExecutionFrame *ExecutionFrame::exit() { return m_parent; }
 
 std::string ExecutionFrame::to_string() const
@@ -103,4 +116,7 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 	if (m_exception.has_value()) visitor.visit(*m_exception->exception);
 	if (m_stashed_exception.has_value()) visitor.visit(*m_stashed_exception->exception);
 	if (m_parent) { visitor.visit(*m_parent); }
+	for (const auto &freevar : m_freevars) {
+		if (freevar) { visitor.visit(*freevar); }
+	}
 }

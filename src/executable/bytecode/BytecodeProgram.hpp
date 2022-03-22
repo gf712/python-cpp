@@ -4,12 +4,13 @@
 #include "executable/Function.hpp"
 #include "executable/FunctionBlock.hpp"
 #include "executable/Program.hpp"
+#include "runtime/forward.hpp"
 
 class BytecodeProgram : public Program
 {
 	InstructionVector m_instructions;
-	std::vector<std::shared_ptr<Function>> m_functions;
-	std::shared_ptr<Function> m_main_function;
+	std::vector<std::shared_ptr<py::PyCode>> m_functions;
+	std::shared_ptr<py::PyCode> m_main_function;
 	std::vector<std::shared_ptr<Program>> m_backends;
 
   public:
@@ -17,29 +18,16 @@ class BytecodeProgram : public Program
 		std::string filename,
 		std::vector<std::string> argv);
 
-	auto begin() const
-	{
-		// FIXME: assumes all functions are bytecode
-		ASSERT(m_main_function->backend() == FunctionExecutionBackend::BYTECODE)
-		return std::static_pointer_cast<Bytecode>(m_main_function)->begin();
-	}
+	std::vector<View>::const_iterator begin() const;
 
-	auto end() const
-	{
-		// FIXME: assumes all functions are bytecode
-		ASSERT(m_main_function->backend() == FunctionExecutionBackend::BYTECODE)
-		return std::static_pointer_cast<Bytecode>(m_main_function)->end();
-	}
+	std::vector<View>::const_iterator end() const;
 
 	size_t main_stack_size() const;
 
 	py::PyObject *as_pyfunction(const std::string &function_name,
-		const std::vector<std::string> &argnames,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		size_t positional_args_count,
-		size_t kwonly_args_count,
-		const CodeFlags &flags) const override;
+		const std::vector<py::PyCell *> &closure) const override;
 
 	std::string to_string() const override;
 
