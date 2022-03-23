@@ -271,17 +271,17 @@ PyObject *PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 
 namespace {
 std::once_flag function_flag;
-
-std::unique_ptr<TypePrototype> register_function()
-{
-	return std::move(klass<PyFunction>("function").type);
-}
 }// namespace
 
 std::unique_ptr<TypePrototype> PyFunction::register_type()
 {
 	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(function_flag, []() { type = ::register_function(); });
+	std::call_once(function_flag, []() {
+		type = std::move(klass<PyFunction>("function")
+							 .attr("__code__", &PyFunction::m_code)
+							 .attr("__globals__", &PyFunction::m_globals)
+							 .type);
+	});
 	return std::move(type);
 }
 
@@ -292,15 +292,17 @@ PyNativeFunction::PyNativeFunction(std::string &&name,
 	  m_function(std::move(function))
 {}
 
+std::string PyNativeFunction::to_string() const
+{
+	return fmt::format("built-in method {} at {}", m_name, (void *)this);
+}
+
 PyObject *PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
 	return VirtualMachine::the().interpreter().call(this, args, kwargs);
 }
 
-PyObject *PyNativeFunction::__repr__() const
-{
-	return PyString::create(fmt::format("built-in method {} at {}", m_name, (void *)this));
-}
+PyObject *PyNativeFunction::__repr__() const { return PyString::create(to_string()); }
 
 void PyNativeFunction::visit_graph(Visitor &visitor)
 {

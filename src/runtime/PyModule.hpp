@@ -12,6 +12,7 @@ class PyModule : public PyBaseObject
 
   private:
 	friend class ::Heap;
+	friend class VM;
 
 	MapType m_symbol_table;
 	PyString *m_module_name;
