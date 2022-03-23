@@ -364,7 +364,8 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		std::vector<BytecodeValue *> args;
 		auto *function = load_name(node->name());
 		args.push_back(function);
-		for (const auto &decorator_function : decorator_functions) {
+		for (int32_t i = decorator_functions.size() - 1; i >= 0; --i) {
+			const auto &decorator_function = decorator_functions[i];
 			emit<FunctionCall>(decorator_function->get_register(),
 				std::vector<Register>{ args.back()->get_register() });
 			args.clear();
