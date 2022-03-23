@@ -458,6 +458,12 @@ ast::Value *LLVMGenerator::visit(const ast::UnaryExpr *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::While *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::Expression *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::FormattedValue *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::JoinedStr *node) { TODO(); }
+
 template<typename... Args>
 void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)
 {

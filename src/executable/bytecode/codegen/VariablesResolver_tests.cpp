@@ -122,3 +122,17 @@ TEST(VariablesResolver, Closure)
 	ASSERT_TRUE(foo_bar->visibility.contains("c"));
 	ASSERT_EQ(foo_bar->visibility.at("c"), VariablesResolver::Visibility::GLOBAL);
 }
+
+TEST(VariablesResolver, ClassDefinition)
+{
+	static constexpr std::string_view program =
+		"class A:\n"
+		"   pass\n"
+		"\n"
+		"class B:\n"
+		"  def a(self):\n"
+		"		return A\n";
+
+	auto visibility = generate_resolver(program);
+	(void)visibility;
+}

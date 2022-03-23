@@ -248,3 +248,9 @@ void VirtualMachine::pop_frame()
 		// m_stack.pop();
 	}
 }
+
+PyModule *import(PyString *path) {
+	(void)path;
+	TODO();
+	return nullptr;	
+}

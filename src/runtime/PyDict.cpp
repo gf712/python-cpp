@@ -3,6 +3,7 @@
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
+#include "RuntimeError.hpp"
 #include "StopIteration.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
@@ -140,6 +141,19 @@ PyObject *PyDict::get(PyObject *key, PyObject *default_value) const
 	return py_none();
 }
 
+PyObject *PyDict::update(PyDict *other)
+{
+	for (const auto &[key, value] : other->map()) {
+		if (auto it = m_map.find(key); it != m_map.end()) {
+			it->second = value;
+		} else {
+			other->insert(key, value);
+		}
+	}
+
+	return py_none();
+}
+
 namespace {
 
 std::once_flag dict_flag;
@@ -159,6 +173,19 @@ std::unique_ptr<TypePrototype> register_dict()
 									 default_value = PyObject::from(args->elements()[1]);
 								 }
 								 return self->get(key, default_value);
+							 })
+						 .def(
+							 "update",
+							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyObject * {
+								 ASSERT(args)
+								 ASSERT(!kwargs || kwargs->size() == 0)
+								 PyObject *other = PyObject::from(args->elements()[0]);
+								 if (other->type() != dict()) {
+									 VirtualMachine::the().interpreter().raise_exception(
+										 runtime_error("TODO"));
+									 return nullptr;
+								 }
+								 return self->update(as<PyDict>(other));
 							 })
 						 .type);
 }

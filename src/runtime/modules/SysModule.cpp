@@ -1,3 +1,4 @@
+#include "runtime/PyDict.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyString.hpp"
@@ -14,12 +15,10 @@ static PyModule *s_sys_module = nullptr;
 namespace {
 PyList *create_sys_paths(Interpreter &interpreter)
 {
-	auto &heap = VirtualMachine::the().heap();
-
-	auto *path_list = heap.allocate<PyList>();
 	const auto &entry_script = interpreter.entry_script();
-	path_list->elements().push_back(
-		PyString::create(std::filesystem::path(entry_script).parent_path()));
+	auto *entry_parent = PyString::create(std::filesystem::path(entry_script).parent_path());
+
+	auto *path_list = PyList::create({ entry_parent });
 
 	return path_list;
 }
@@ -51,6 +50,10 @@ PyModule *sys_module(Interpreter &interpreter)
 
 	s_sys_module->insert(PyString::create("path"), create_sys_paths(interpreter));
 	s_sys_module->insert(PyString::create("argv"), create_sys_argv(interpreter));
+
+	auto *modules = PyDict::create();
+	modules->insert(PyString::create("sys"), s_sys_module);
+	s_sys_module->insert(PyString::create("modules"), modules);
 
 	return s_sys_module;
 }

@@ -49,6 +49,13 @@ Constant::Constant(const py::Value &value, SourceLocation source_location)
 	: ASTNode(ASTNodeType::Constant, source_location), m_value(std::make_unique<py::Value>(value))
 {}
 
+void Expression::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Expression", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	m_value->print_node(new_indent);
+}
+
 void Constant::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Constant [{}:{}-{}:{}]",
@@ -711,6 +718,25 @@ void NamedExpr::print_this_node(const std::string &indent) const
 	m_target->print_node(new_indent);
 	spdlog::debug("{}  - value: ", indent);
 	m_value->print_node(new_indent);
+}
+
+void JoinedStr::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}JoinedStr", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - values: ", indent);
+	for (const auto &v : m_values) { v->print_node(new_indent); }
+}
+
+void FormattedValue::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}FormattedValue", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - value: ", indent);
+	m_value->print_node(new_indent);
+	spdlog::debug("{}  - conversion: ", indent, static_cast<int64_t>(m_conversion));
+	spdlog::debug("{}  - format_spec: ", indent);
+	if (m_format_spec) m_format_spec->print_node(new_indent);
 }
 
 }// namespace ast

@@ -63,9 +63,10 @@ class PyFunction : public PyBaseObject
 {
 	friend std::unique_ptr<TypePrototype> register_type();
 
-	const std::string m_name;
-	PyCode *m_code;
-	PyDict *m_globals;
+	PyString *m_name = nullptr;
+	PyCode *m_code = nullptr;
+	PyDict *m_globals = nullptr;
+	PyDict *m_dict = nullptr;
 	const std::vector<Value> m_defaults;
 	const std::vector<Value> m_kwonly_defaults;
 	std::vector<PyCell *> m_closure;
@@ -85,12 +86,10 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> &defaults() const { return m_defaults; }
 	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
-	const std::string &name() const { return m_name; }
-
 	PyObject *call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
 
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);
-	const std::string &function_name() const { return m_name; }
+	PyString *function_name() const { return m_name; }
 
 	PyDict *globals() const { return m_globals; }
 

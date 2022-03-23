@@ -59,6 +59,9 @@ void Interpreter::internal_setup(const std::string &name,
 	auto *locals = globals;
 	m_current_frame = ExecutionFrame::create(nullptr, local_registers, 0, globals, locals);
 	m_global_frame = m_current_frame;
+
+	m_importlib = nullptr;
+	m_import_func = nullptr;
 }
 
 void Interpreter::setup(const BytecodeProgram &program)

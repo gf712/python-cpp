@@ -18,7 +18,10 @@
 #include "executable/llvm/LLVMGenerator.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
+#include "runtime/modules/Modules.hpp"
 #include "vm/VM.hpp"
+
+using namespace py;
 
 namespace repl {
 std::optional<std::string> getline(const std::string &prompt)
@@ -117,6 +120,23 @@ int run_and_execute_script(int argc,
 	}
 	return vm.execute(bytecode);
 }
+
+int run_and_execute_module_as_script(int argc,
+	char **argv,
+	const std::string &module_name,
+	bool print_bytecode,
+	bool print_ast,
+	bool print_tokens)
+{
+	size_t arg_idx{ 1 };
+	std::vector<std::string> argv_vector;
+	argv_vector.reserve(argc - 1);
+	while (arg_idx < argc) { argv_vector.emplace_back(argv[arg_idx++]); }
+
+	auto *sys = sys_module(VirtualMachine::the().interpreter());
+
+	return 0;
+}
 }// namespace
 
 int main(int argc, char **argv)
@@ -126,6 +146,7 @@ int main(int argc, char **argv)
 	// clang-format off
 	options.add_options()
 		("f,filename", "Script path", cxxopts::value<std::string>())
+		("m", "run library module as a script", cxxopts::value<std::string>())
 		("b,bytecode", "Print the script's bytecode to stdout", cxxopts::value<bool>()->default_value("false"))
 		("a,ast", "Print the script's tokens to stdout", cxxopts::value<bool>()->default_value("false"))
 		("t,tokenize", "Print the script's tokens to stdout", cxxopts::value<bool>()->default_value("false"))
@@ -160,6 +181,15 @@ int main(int argc, char **argv)
 			result["tokenize"].as<bool>(),
 			result["use-llvm"].as<bool>(),
 			result["ast"].as<bool>());
+	}
+
+	if (result.count("m")) {
+		return run_and_execute_module_as_script(argc,
+			argv,
+			result["m"].as<std::string>(),
+			result["bytecode"].as<bool>(),
+			result["ast"].as<bool>(),
+			result["tokenize"].as<bool>());
 	}
 
 	TODO();

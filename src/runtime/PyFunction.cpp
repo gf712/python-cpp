@@ -72,10 +72,13 @@ PyFunction::PyFunction(std::string name,
 	PyCode *code,
 	std::vector<PyCell *> closure,
 	PyDict *globals)
-	: PyBaseObject(BuiltinTypes::the().function()), m_name(std::move(name)), m_code(code),
-	  m_globals(globals), m_defaults(std::move(defaults)),
-	  m_kwonly_defaults(std::move(kwonly_defaults)), m_closure(std::move(closure))
-{}
+	: PyBaseObject(BuiltinTypes::the().function()), m_code(code), m_globals(globals),
+	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
+	  m_closure(std::move(closure))
+{
+	m_name = PyString::create(name);
+	m_dict = PyDict::create();
+}
 
 void PyFunction::visit_graph(Visitor &visitor)
 {
@@ -83,6 +86,8 @@ void PyFunction::visit_graph(Visitor &visitor)
 	m_code->visit_graph(visitor);
 	if (m_globals) visitor.visit(*m_globals);
 	if (m_module) m_module->visit_graph(visitor);
+	if (m_dict) visitor.visit(*m_dict);
+	if (m_name) visitor.visit(*m_name);
 	for (const auto &c : m_closure) { c->visit_graph(visitor); }
 }
 
@@ -90,7 +95,7 @@ PyType *PyFunction::type() const { return function(); }
 
 PyObject *PyFunction::__repr__() const
 {
-	return PyString::create(fmt::format("<function {}>", m_name));
+	return PyString::create(fmt::format("<function {}>", m_name->value()));
 }
 
 PyObject *PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const
@@ -147,8 +152,10 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				if (m_code->flags().is_set(CodeFlags::Flag::VARKEYWORDS)) {
 					continue;
 				} else {
-					VirtualMachine::the().interpreter().raise_exception(type_error(
-						"{}() got an unexpected keyword argument '{}'", m_name, key_str.s));
+					VirtualMachine::the().interpreter().raise_exception(
+						type_error("{}() got an unexpected keyword argument '{}'",
+							m_name->value(),
+							key_str.s));
 					return nullptr;
 				}
 			}
@@ -158,7 +165,7 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			if (std::holds_alternative<PyObject *>(arg)) {
 				if (std::get<PyObject *>(arg)) {
 					VirtualMachine::the().interpreter().raise_exception(type_error(
-						"{}() got multiple values for argument '{}'", m_name, key_str.s));
+						"{}() got multiple values for argument '{}'", m_name->value(), key_str.s));
 					return nullptr;
 				}
 			}
@@ -214,8 +221,11 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 		}
 		VirtualMachine::the().stack_local(total_arguments_count) = PyTuple::create(remaining_args);
 	} else if (args_count < args->size()) {
-		VirtualMachine::the().interpreter().raise_exception(type_error(
-			"{}() takes {} positional arguments but {} given", m_name, args_count, args->size()));
+		VirtualMachine::the().interpreter().raise_exception(
+			type_error("{}() takes {} positional arguments but {} given",
+				m_name->value(),
+				args_count,
+				args->size()));
 		return nullptr;
 	}
 
@@ -280,6 +290,8 @@ std::unique_ptr<TypePrototype> PyFunction::register_type()
 		type = std::move(klass<PyFunction>("function")
 							 .attr("__code__", &PyFunction::m_code)
 							 .attr("__globals__", &PyFunction::m_globals)
+							 .attr("__dict__", &PyFunction::m_dict)
+							 .attr("__name__", &PyFunction::m_name)
 							 .type);
 	});
 	return std::move(type);

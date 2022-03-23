@@ -38,6 +38,7 @@ class PyDict : public PyBaseObject
 
 	void insert(const Value &key, const Value &value);
 	void merge(PyTuple *args, PyDict *kwargs);
+	PyObject *update(PyDict *other);
 
 	Value operator[](Value key) const;
 

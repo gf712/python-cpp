@@ -2642,3 +2642,26 @@ TEST(Parser, WithItemVar)
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
+
+// TEST(Parser, FString)
+// {
+// 	constexpr std::string_view program = "f\"sin({a}) is {sin(a):.3}\"\n";
+
+// 	auto expected_ast = create_test_module();
+// 	expected_ast->emplace(std::make_shared<JoinedStr>(std::vector<std::shared_ptr<ASTNode>>{
+// 		std::make_shared<Constant>("sin("),
+// 		std::make_shared<FormattedValue>(std::make_shared<Name>("a", ContextType::LOAD),
+// 			FormattedValue::Conversion::NONE,
+// 			nullptr),
+// 		std::make_shared<Constant>(") is "),
+// 		std::make_shared<FormattedValue>(
+// 			std::make_shared<Call>(std::make_shared<Name>("sin", ContextType::LOAD),
+// 				std::vector<std::shared_ptr<ast::ASTNode>>{
+// 					std::make_shared<Name>("a", ContextType::LOAD) },
+// 				std::vector<std::shared_ptr<ast::Keyword>>{}),
+// 			FormattedValue::Conversion::NONE,
+// 			std::make_shared<JoinedStr>(
+// 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(".3") }))
+// 	}));
+// 	assert_generates_ast(program, expected_ast);
+// }

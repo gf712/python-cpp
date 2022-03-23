@@ -9,8 +9,10 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/BytecodeProgram.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/codegen/VariablesResolver.cpp
+    executable/bytecode/instructions/BinarySubscript.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/DictMerge.cpp
+    executable/bytecode/instructions/DeleteName.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
@@ -45,6 +47,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/StoreDeref.cpp
     executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
+    executable/bytecode/instructions/StoreSubscript.cpp
     executable/bytecode/instructions/TrueDivide.cpp
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp

@@ -454,7 +454,7 @@ PyObject *staticmethod(const PyTuple *args, const PyDict *kwargs, Interpreter &i
 
 	auto *function = as<PyFunction>(PyObject::from(args->elements()[0]));
 
-	return PyStaticMethod::create(PyString::create(function->function_name()), function);
+	return PyStaticMethod::create(function->function_name(), function);
 }
 
 PyObject *isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)

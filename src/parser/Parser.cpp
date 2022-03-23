@@ -63,13 +63,13 @@ template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
 		using CurrentType = typename std::tuple_element<TypeIdx, PatternTuple>::type;
 		const size_t original_token_position = p.token_position();
 		if (CurrentType::matches(p)) {
-			std::string str;
-			for (size_t i = original_token_position; i < p.token_position(); ++i) {
-				str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
-					p.lexer().peek_token(i)->end().pointer_to_program);
-				str += ' ';
-			}
-			DEBUG_LOG("match: " + str + '\n');
+			// std::string str;
+			// for (size_t i = original_token_position; i < p.token_position(); ++i) {
+			// 	str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
+			// 		p.lexer().peek_token(i)->end().pointer_to_program);
+			// 	str += ' ';
+			// }
+			// DEBUG_LOG("match: " + str + '\n');
 			if constexpr (has_advance_by<CurrentType>::value) {
 				p.token_position() += CurrentType::advance_by;
 			}
@@ -79,13 +79,13 @@ template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
 				return PatternMatch_<TypeIdx + 1, PatternTuple>::match(p);
 			}
 		} else {
-			std::string str;
-			for (size_t i = original_token_position; i < p.token_position(); ++i) {
-				str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
-					p.lexer().peek_token(i)->end().pointer_to_program);
-				str += ' ';
-			}
-			DEBUG_LOG("no match: " + str + '\n');
+			// std::string str;
+			// for (size_t i = original_token_position; i < p.token_position(); ++i) {
+			// 	str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
+			// 		p.lexer().peek_token(i)->end().pointer_to_program);
+			// 	str += ' ';
+			// }
+			// DEBUG_LOG("no match: " + str + '\n');
 			p.token_position() = original_token_position;
 			return false;
 		}
@@ -4095,11 +4095,17 @@ struct ElifStatementPattern : Pattern<ElifStatementPattern>
 			}
 			auto test = p.pop_front();
 			while (!p.stack().empty()) { body.push_back(p.pop_front()); }
-			scope.parent().push_back(std::make_shared<If>(test,
-				body,
-				orelse,
-				SourceLocation{
-					test->source_location().start, orelse.back()->source_location().end }));
+			ASSERT(!body.empty());
+			SourceLocation location = [&]() {
+				if (orelse.empty()) {
+					return SourceLocation{ test->source_location().start,
+						body.back()->source_location().end };
+				} else {
+					return SourceLocation{ test->source_location().start,
+						orelse.back()->source_location().end };
+				}
+			}();
+			scope.parent().push_back(std::make_shared<If>(test, body, orelse, location));
 			return true;
 		}
 		return false;

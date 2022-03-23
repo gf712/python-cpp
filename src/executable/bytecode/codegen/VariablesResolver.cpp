@@ -238,7 +238,6 @@ Value *VariablesResolver::visit(const Constant *) { return nullptr; }
 
 Value *VariablesResolver::visit(const Delete *node)
 {
-	TODO();
 	(void)node;
 	return nullptr;
 }
@@ -367,8 +366,15 @@ Value *VariablesResolver::visit(const Import *node)
 
 Value *VariablesResolver::visit(const Keyword *node)
 {
-	if (node->arg().has_value()) { load(*node->arg(), node->source_location()); }
-	m_current_scope->get().visibility[*node->arg()] = Visibility::LOCAL;
+	if (node->arg().has_value()) {
+		load(*node->arg(), node->source_location());
+	} else {
+		auto name = as<Name>(node->value());
+		ASSERT(name);
+		ASSERT(name->ids().size() == 1);
+		load(name->ids()[0], node->source_location());
+	}
+	// m_current_scope->get().visibility[*node->arg()] = Visibility::LOCAL;
 	if (node->value()) { node->value()->codegen(this); }
 	return nullptr;
 }
@@ -423,7 +429,8 @@ Value *VariablesResolver::visit(const Pass *) { return nullptr; }
 
 Value *VariablesResolver::visit(const Raise *node)
 {
-	node->cause()->codegen(this);
+	if (node->exception()) { node->exception()->codegen(this); }
+	if (node->cause()) { node->cause()->codegen(this); }
 	return nullptr;
 }
 
@@ -497,14 +504,32 @@ Value *VariablesResolver::visit(const While *node)
 
 Value *VariablesResolver::visit(const With *node)
 {
-	TODO();
-	(void)node;
+	for (const auto &item : node->items()) { item->codegen(this); }
+	for (const auto &el : node->body()) { el->codegen(this); }
 	return nullptr;
 }
 
 Value *VariablesResolver::visit(const WithItem *node)
 {
-	TODO();
+	node->context_expr()->codegen(this);
+	if (node->optional_vars()) { node->optional_vars()->codegen(this); }
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const Expression *node)
+{
+	(void)node;
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const FormattedValue *node)
+{
+	(void)node;
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const JoinedStr *node)
+{
 	(void)node;
 	return nullptr;
 }

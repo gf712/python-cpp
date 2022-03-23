@@ -29,6 +29,8 @@ class Interpreter
 	ExecutionFrame *m_global_frame{ nullptr };
 	std::vector<py::PyModule *> m_available_modules;
 	py::PyModule *m_module;
+	py::PyModule *m_importlib;
+	py::PyObject *m_import_func;
 	Status m_status{ Status::OK };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;

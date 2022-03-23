@@ -38,12 +38,15 @@ namespace ast {
 	__AST_NODE_TYPE(Delete)             \
 	__AST_NODE_TYPE(Dict)               \
 	__AST_NODE_TYPE(ExceptHandler)      \
+	__AST_NODE_TYPE(Expression)         \
 	__AST_NODE_TYPE(For)                \
+	__AST_NODE_TYPE(FormattedValue)     \
 	__AST_NODE_TYPE(FunctionDefinition) \
 	__AST_NODE_TYPE(Global)             \
 	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(IfExpr)             \
 	__AST_NODE_TYPE(Import)             \
+	__AST_NODE_TYPE(JoinedStr)          \
 	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(Module)             \
@@ -122,7 +125,7 @@ class ASTNode
 
   private:
 	virtual void print_this_node(const std::string &indent) const = 0;
-	virtual void print_this_node() const { print_this_node(""); };
+	virtual void dump() const { print_this_node(""); };
 
   public:
 	ASTNode(ASTNodeType node_type, SourceLocation source_location)
@@ -137,7 +140,21 @@ class ASTNode
 	virtual Value *codegen(CodeGenerator *) const = 0;
 };// namespace ast
 
-// FormatterValue, JoinedStr, List, Tuple, Set, Dict
+class Expression : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_value;
+
+  public:
+	Expression(std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Expression, source_location), m_value(std::move(value))
+	{}
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+	void print_this_node(const std::string &indent) const override;
+};
 
 class Constant : public ASTNode
 {
@@ -1295,6 +1312,52 @@ class NamedExpr : public ASTNode
   private:
 	void print_this_node(const std::string &indent) const override;
 };
+
+class JoinedStr : public ASTNode
+{
+	std::vector<std::shared_ptr<ASTNode>> m_values;
+
+  public:
+	JoinedStr(std::vector<std::shared_ptr<ASTNode>> values, SourceLocation source_location)
+		: ASTNode(ASTNodeType::JoinedStr, source_location), m_values(std::move(values))
+	{}
+
+	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class FormattedValue : public ASTNode
+{
+  public:
+	enum class Conversion { NONE, STRING, REPR, ASCII };
+
+  private:
+	std::shared_ptr<ASTNode> m_value;
+	Conversion m_conversion;
+	std::shared_ptr<JoinedStr> m_format_spec;
+
+  public:
+	FormattedValue(std::shared_ptr<ASTNode> value,
+		Conversion conversion,
+		std::shared_ptr<JoinedStr> format_spec,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::FormattedValue, source_location), m_value(std::move(value)),
+		  m_conversion(conversion), m_format_spec(std::move(format_spec))
+	{}
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
+	Conversion conversion() const { return m_conversion; }
+	const std::shared_ptr<JoinedStr> &format_spec() const { return m_format_spec; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
 
 template<typename NodeType> std::shared_ptr<NodeType> as(std::shared_ptr<ASTNode> node);
 

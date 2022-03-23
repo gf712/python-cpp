@@ -158,6 +158,8 @@ class VirtualMachine
 		return m_stack_objects;
 	}
 
+	py::PyModule *import(py::PyString *path);
+
   private:
 	VirtualMachine();
 

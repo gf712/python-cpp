@@ -1,6 +1,8 @@
 #include "BytecodeGenerator.hpp"
 #include "executable/bytecode/BytecodeProgram.hpp"
+#include "executable/bytecode/instructions/BinarySubscript.hpp"
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
+#include "executable/bytecode/instructions/DeleteName.hpp"
 #include "executable/bytecode/instructions/DictMerge.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
@@ -37,6 +39,7 @@
 #include "executable/bytecode/instructions/StoreDeref.hpp"
 #include "executable/bytecode/instructions/StoreGlobal.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
+#include "executable/bytecode/instructions/StoreSubscript.hpp"
 #include "executable/bytecode/instructions/TrueDivide.cpp"
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
@@ -449,6 +452,17 @@ Value *BytecodeGenerator::visit(const Assign *node)
 				const auto &el = ast_tuple->elements()[idx++];
 				store_name(as<Name>(el)->ids()[0], dst_value);
 			}
+		} else if (auto ast_subscript = as<Subscript>(target)) {
+			auto *obj = generate(ast_subscript->value().get(), m_function_id);
+			const auto &slice = ast_subscript->slice();
+			auto *index = [&]() -> BytecodeValue * {
+				if (std::holds_alternative<Subscript::Index>(slice)) {
+					return generate(std::get<Subscript::Index>(slice).value.get(), m_function_id);
+				} else {
+					TODO();
+				}
+			}();
+			emit<StoreSubscript>(obj->get_register(), index->get_register(), src->get_register());
 		} else {
 			TODO();
 		}
@@ -990,11 +1004,59 @@ Value *BytecodeGenerator::visit(const Module *node)
 	return last;
 }
 
-Value *BytecodeGenerator::visit(const Subscript *) { TODO(); }
+Value *BytecodeGenerator::visit(const Subscript *node)
+{
+	auto *result = create_value();
+	const auto *value = generate(node->value().get(), m_function_id);
+	if (std::holds_alternative<Subscript::Index>(node->slice())) {
+		const auto *index =
+			generate(std::get<Subscript::Index>(node->slice()).value.get(), m_function_id);
+		emit<BinarySubscript>(result->get_register(), value->get_register(), index->get_register());
+		return result;
+	} else if (std::holds_alternative<Subscript::Slice>(node->slice())) {
+		TODO();
+	} else if (std::holds_alternative<Subscript::ExtSlice>(node->slice())) {
+		TODO();
+	} else {
+		TODO();
+	}
+	return nullptr;
+}
 
-Value *BytecodeGenerator::visit(const Raise *) { TODO(); }
+Value *BytecodeGenerator::visit(const Raise *node)
+{
+	if (node->cause()) {
+		ASSERT(node->exception())
+		const auto *exception = generate(node->exception().get(), m_function_id);
+		const auto *cause = generate(node->cause().get(), m_function_id);
+		emit<RaiseVarargs>(exception->get_register(), cause->get_register());
+	} else if (node->exception()) {
+		const auto *exception = generate(node->exception().get(), m_function_id);
+		emit<RaiseVarargs>(exception->get_register());
+	} else {
+		emit<RaiseVarargs>();
+	}
+	return nullptr;
+}
 
-Value *BytecodeGenerator::visit(const With *) { TODO(); }
+Value *BytecodeGenerator::visit(const With *node)
+{
+	auto *body_block = allocate_block(m_function_id);
+	auto *cleanup_block = allocate_block(m_function_id);
+
+	emit<SetupExceptionHandling>();
+
+	if (node->items().size() > 1) { TODO(); }
+	for (const auto &item : node->items()) { generate(item.get(), m_function_id); }
+
+	set_insert_point(body_block);
+	for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
+	emit<JumpForward>(node->items().size());
+
+	set_insert_point(cleanup_block);
+	// emit<WithExceptStart>();
+	return nullptr;
+}
 
 Value *BytecodeGenerator::visit(const WithItem *node)
 {
@@ -1108,9 +1170,21 @@ Value *BytecodeGenerator::visit(const Try *node)
 
 Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
+Value *BytecodeGenerator::visit(const Expression *node)
+{
+	return generate(node->value().get(), m_function_id);
+}
+
 Value *BytecodeGenerator::visit(const Global *) { return nullptr; }
 
-Value *BytecodeGenerator::visit(const Delete *) { TODO(); }
+Value *BytecodeGenerator::visit(const Delete *node)
+{
+	for (const auto &target : node->targets()) {
+		const auto *value = generate(target.get(), m_function_id);
+		emit<DeleteName>(value->get_register());
+	}
+	return nullptr;
+}
 
 Value *BytecodeGenerator::visit(const UnaryExpr *node)
 {
@@ -1206,6 +1280,10 @@ Value *BytecodeGenerator::visit(const NamedExpr *node)
 
 	return dst;
 }
+
+Value *BytecodeGenerator::visit(const JoinedStr *) { TODO(); }
+
+Value *BytecodeGenerator::visit(const FormattedValue *) { TODO(); }
 
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)
 	: function_id(function_id_), function(f), generator(generator_)
