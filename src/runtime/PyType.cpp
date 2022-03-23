@@ -4,6 +4,7 @@
 #include "PyFunction.hpp"
 #include "PyInteger.hpp"
 #include "PyList.hpp"
+#include "PyMemberDescriptor.hpp"
 #include "PyMethodDescriptor.hpp"
 #include "PyNone.hpp"
 #include "PySlotWrapper.hpp"
@@ -15,17 +16,16 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
-
-template<> PyType *py::as(PyObject *obj)
+namespace py {
+template<> PyType *as(PyObject *obj)
 {
-	if (obj->type() == type()) { return static_cast<PyType *>(obj); }
+	if (obj->type() == py::type()) { return static_cast<PyType *>(obj); }
 	return nullptr;
 }
 
-template<> const PyType *py::as(const PyObject *obj)
+template<> const PyType *as(const PyObject *obj)
 {
-	if (obj->type() == type()) { return static_cast<const PyType *>(obj); }
+	if (obj->type() == py::type()) { return static_cast<const PyType *>(obj); }
 	return nullptr;
 }
 
@@ -63,13 +63,6 @@ static PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slo
 	} else {
 		TODO();
 	}
-}
-
-std::once_flag type_flag;
-
-std::unique_ptr<TypePrototype> register_type()
-{
-	return std::move(klass<PyType>("type").def("mro", &PyType::mro).type);
 }
 
 std::vector<PyObject *> merge(const std::vector<std::vector<PyObject *>> &mros)
@@ -152,7 +145,7 @@ PyType *PyType::type() const
 	if (m_underlying_type.__name__ == "type") {
 		return const_cast<PyType *>(this);// :(
 	} else {
-		return ::type();
+		return py::type();
 	}
 }
 
@@ -163,21 +156,31 @@ PyType *PyType::initialize(TypePrototype type_prototype)
 	return type;
 }
 
+namespace {
+	std::once_flag type_flag;
+
+	std::unique_ptr<TypePrototype> register_type_()
+	{
+		return std::move(klass<PyType>("type").def("mro", &PyType::mro).type);
+	}
+}// namespace
+
 std::unique_ptr<TypePrototype> PyType::register_type()
 {
 	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(type_flag, []() { type = ::register_type(); });
+	std::call_once(type_flag, []() { type = register_type_(); });
 	return std::move(type);
 }
 
 namespace {
-bool descriptor_is_data(const PyObject *obj)
-{
-	// FIXME: temporary hack to get object.__new__ working, but requires __set__ to be implemented
-	//        should be:
-	//        obj->type()->underlying_type().__set__.has_value()
-	return !as<PyStaticMethod>(obj) && !as<PySlotWrapper>(obj);
-}
+	bool descriptor_is_data(const PyObject *obj)
+	{
+		// FIXME: temporary hack to get object.__new__ working, but requires __set__ to be
+		// implemented
+		//        should be:
+		//        obj->type()->underlying_type().__set__.has_value()
+		return !as<PyStaticMethod>(obj) && !as<PySlotWrapper>(obj);
+	}
 }// namespace
 
 PyObject *PyType::__getattribute__(PyObject *attribute) const
@@ -276,33 +279,33 @@ void PyType::update_methods_and_class_attributes(PyDict *ns)
 }
 
 namespace {
-template<typename SlotFunctionType, typename FunctorType>
-std::pair<String, PyObject *> wrap_slot(PyType *type,
-	std::string_view name_,
-	PyDict *ns,
-	std::variant<SlotFunctionType, PyObject *> &slot,
-	FunctorType &&f)
-{
-	String name_str{ std::string(name_) };
-	if (ns) {
-		if (auto it = ns->map().find(name_str); it != ns->map().end()) {
-			slot = PyObject::from(it->second);
+	template<typename SlotFunctionType, typename FunctorType>
+	std::pair<String, PyObject *> wrap_slot(PyType *type,
+		std::string_view name_,
+		PyDict *ns,
+		std::variant<SlotFunctionType, PyObject *> &slot,
+		FunctorType &&f)
+	{
+		String name_str{ std::string(name_) };
+		if (ns) {
+			if (auto it = ns->map().find(name_str); it != ns->map().end()) {
+				slot = PyObject::from(it->second);
+				return { name_str, std::get<PyObject *>(slot) };
+			}
+		}
+
+		if (std::holds_alternative<SlotFunctionType>(slot)) {
+			// FIXME: should PyString have a std::string_view constructor and not worry about the
+			// 		  lifetime of the string_view?
+			auto *name = PyString::create(std::string(name_));
+			// the lifetime of the type is extended by the slot wrapper
+			auto *func = PySlotWrapper::create(name, type, f);
+			// FIXME: String should handle string_view, no need create a std::string here
+			return { name_str, func };
+		} else {
 			return { name_str, std::get<PyObject *>(slot) };
 		}
 	}
-
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		// FIXME: should PyString have a std::string_view constructor and not worry about the
-		// 		  lifetime of the string_view?
-		auto *name = PyString::create(std::string(name_));
-		// the lifetime of the type is extended by the slot wrapper
-		auto *func = PySlotWrapper::create(name, type, f);
-		// FIXME: String should handle string_view, no need create a std::string here
-		return { name_str, func };
-	} else {
-		return { name_str, std::get<PyObject *>(slot) };
-	}
-}
 }// namespace
 
 void PyType::initialize(PyDict *ns)
@@ -393,6 +396,11 @@ void PyType::initialize(PyDict *ns)
 			m_underlying_type.__dict__->insert(
 				String{ "__new__" }, std::get<PyObject *>(*m_underlying_type.__new__));
 		}
+	}
+	for (auto member : m_underlying_type.__members__) {
+		auto *name = PyString::create(member.name);
+		auto *m = PyMemberDescriptor::create(name, this, member.member_accessor);
+		m_underlying_type.__dict__->insert(String{ member.name }, m);
 	}
 	for (auto method : m_underlying_type.__methods__) {
 		auto *name = PyString::create(method.name);
@@ -501,7 +509,7 @@ PyType *PyType::build_type(PyString *type_name, PyTuple *bases, PyDict *ns)
 PyObject *PyType::__call__(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
-	if (this == ::type()) {
+	if (this == py::type()) {
 		if (args->size() == 1) { return PyObject::from(args->elements()[0])->type(); }
 		if (args->size() != 3) {
 			VirtualMachine::the().interpreter().raise_exception(
@@ -617,3 +625,4 @@ void PyType::visit_graph(Visitor &visitor)
 
 	if (m_underlying_type.__class__) { visitor.visit(*m_underlying_type.__class__); }
 }
+}// namespace py

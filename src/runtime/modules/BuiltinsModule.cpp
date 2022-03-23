@@ -295,6 +295,35 @@ PyObject *hasattr(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	}
 }
 
+PyObject *getattr(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+{
+	if (args->size() != 2 && args->size() != 3) {
+		interpreter.raise_exception(
+			type_error("getattr expected 2 or 3 arguments, got {}", args->size()));
+		return nullptr;
+	}
+	auto *obj = PyObject::from(args->elements()[0]);
+	auto *name = PyObject::from(args->elements()[1]);
+	if (!as<PyString>(name)) {
+		interpreter.raise_exception(type_error("getattr(): attribute name must be string"));
+		return nullptr;
+	}
+
+	if (args->size() == 2) {
+		return obj->getattribute(name);
+	} else {
+		auto *default_value = PyObject::from(args->elements()[2]);
+		auto [attr_value, found_status] = obj->lookup_attribute(name);
+		if (found_status == LookupAttrResult::FOUND) {
+			return attr_value;
+		} else if (found_status == LookupAttrResult::NOT_FOUND) {
+			return default_value;
+		} else {
+			return nullptr;
+		}
+	}
+}
+
 PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
@@ -573,6 +602,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->insert(PyString::create("dir"),
 		heap.allocate<PyNativeFunction>("dir", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return dir(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->insert(PyString::create("getattr"),
+		heap.allocate<PyNativeFunction>("getattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return getattr(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->insert(PyString::create("globals"),

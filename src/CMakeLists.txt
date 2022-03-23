@@ -94,6 +94,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyInteger.cpp
     runtime/PyList.cpp
     runtime/PyMethodDescriptor.cpp
+    runtime/PyMemberDescriptor.cpp
     runtime/PyModule.cpp
     runtime/PyNone.cpp
     runtime/PyNumber.cpp
