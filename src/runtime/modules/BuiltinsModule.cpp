@@ -324,6 +324,26 @@ PyObject *getattr(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 	}
 }
 
+PyObject *setattr(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+{
+	if (args->size() != 3) {
+		interpreter.raise_exception(
+			type_error("setattr expected 3 arguments, got {}", args->size()));
+		return nullptr;
+	}
+	auto *obj = PyObject::from(args->elements()[0]);
+	auto *name = PyObject::from(args->elements()[1]);
+	auto *value = PyObject::from(args->elements()[2]);
+	if (!as<PyString>(name)) {
+		interpreter.raise_exception(type_error("setattr(): attribute name must be string"));
+		return nullptr;
+	}
+
+	if (!obj->setattribute(name, value)) { return nullptr; }
+
+	return py_none();
+}
+
 PyObject *hex(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() == 1)
@@ -674,6 +694,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->insert(PyString::create("repr"),
 		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return repr(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->insert(PyString::create("setattr"),
+		heap.allocate<PyNativeFunction>("setattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return setattr(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->insert(PyString::create("staticmethod"),
