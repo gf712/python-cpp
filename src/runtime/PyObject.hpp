@@ -36,6 +36,12 @@ struct MethodDefinition
 		method;
 };
 
+struct MemberDefinition
+{
+	std::string name;
+	std::function<PyObject *(PyObject *)> member_accessor;
+};
+
 using CallSlotFunctionType = std::function<PyObject *(PyObject *, PyTuple *, PyDict *)>;
 using NewSlotFunctionType = std::function<PyObject *(const PyType *, PyTuple *, PyDict *)>;
 using InitSlotFunctionType = std::function<std::optional<int32_t>(PyObject *, PyTuple *, PyDict *)>;
@@ -109,7 +115,9 @@ struct TypePrototype
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __lt__;
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __ne__;
 
+	std::vector<MemberDefinition> __members__;
 	std::vector<MethodDefinition> __methods__;
+
 	PyDict *__dict__{ nullptr };
 
 	PyTuple *__mro__{ nullptr };
@@ -118,6 +126,7 @@ struct TypePrototype
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
+	void add_member(MemberDefinition &&member) { __members__.push_back(std::move(member)); }
 	void add_method(MethodDefinition &&method) { __methods__.push_back(std::move(method)); }
 };
 

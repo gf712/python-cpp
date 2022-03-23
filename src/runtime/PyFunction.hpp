@@ -61,6 +61,8 @@ class PyCode : public PyBaseObject
 
 class PyFunction : public PyBaseObject
 {
+	friend std::unique_ptr<TypePrototype> register_type();
+
 	const std::string m_name;
 	PyCode *m_code;
 	PyDict *m_globals;
@@ -134,10 +136,7 @@ class PyNativeFunction : public PyBaseObject
 
 	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
 
-	std::string to_string() const override
-	{
-		return fmt::format("PyNativeFunction {}", static_cast<const void *>(&m_function));
-	}
+	std::string to_string() const override;
 
 	const std::string &name() const { return m_name; }
 	PyObject *__call__(PyTuple *args, PyDict *kwargs);

@@ -12,6 +12,7 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyMemberDescriptor.hpp"
 #include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNone.hpp"
@@ -43,7 +44,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_bound_method(PyBoundMethod::register_type()),
 	  m_method_wrapper(PyMethodDescriptor::register_type()),
 	  m_static_method(PyStaticMethod::register_type()), m_property(PyProperty::register_type()),
-	  m_classmethod(PyClassMethod::register_type())
+	  m_classmethod(PyClassMethod::register_type()),
+	  m_member_descriptor(PyMemberDescriptor::register_type())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                             \
@@ -94,4 +96,5 @@ INITIALIZE_TYPE(method_wrapper)
 INITIALIZE_TYPE(static_method)
 INITIALIZE_TYPE(property)
 INITIALIZE_TYPE(classmethod)
+INITIALIZE_TYPE(member_descriptor)
 }// namespace py

@@ -26,6 +26,19 @@ template<typename T> struct klass
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
 
+	template<typename MemberType>
+	klass &attr(std::string_view name, MemberType &&member) requires requires(PyObject *self)
+	{
+		static_cast<T *>(self)->*member;
+	}
+	{
+		type->add_member(MemberDefinition{
+			.name = std::string(name), .member_accessor = [member](PyObject *self) -> PyObject * {
+				return static_cast<T *>(self)->*member;
+			} });
+		return *this;
+	}
+
 	template<typename FuncType>
 	klass &def(std::string_view name, FuncType &&F) requires requires(PyObject *self)
 	{
