@@ -6,12 +6,19 @@
 class BuildList final : public Instruction
 {
 	Register m_dst;
-	std::vector<Register> m_srcs;
+	size_t m_size;
+	size_t m_stack_offset;
 
   public:
-	BuildList(Register dst, std::vector<Register> srcs) : m_dst(dst), m_srcs(std::move(srcs)) {}
+	BuildList(Register dst, size_t size, size_t stack_offset)
+		: m_dst(dst), m_size(size), m_stack_offset(stack_offset)
+	{}
 
-	std::string to_string() const final { return fmt::format("BUILD_LIST      r{:<3}", m_dst); }
+	std::string to_string() const final
+	{
+		return fmt::format(
+			"BUILD_LIST      r{:<3} (size={}, offset={})", m_dst, m_size, m_stack_offset);
+	}
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 

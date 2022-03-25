@@ -132,6 +132,13 @@ class VirtualMachine
 		return m_instruction_pointer;
 	}
 
+	const py::Value *stack_pointer() const
+	{
+		ASSERT(!m_stack.empty())
+		ASSERT(!m_stack.top().registers.empty())
+		return &m_stack.top().registers.front();
+	}
+
 	void clear();
 
 	void dump() const;

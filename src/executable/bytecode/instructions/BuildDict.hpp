@@ -6,15 +6,19 @@
 class BuildDict final : public Instruction
 {
 	Register m_dst;
-	std::vector<Register> m_keys;
-	std::vector<Register> m_values;
+	size_t m_size;
+	size_t m_stack_offset;
 
   public:
-	BuildDict(Register dst, std::vector<Register> keys, std::vector<Register> values)
-		: m_dst(dst), m_keys(std::move(keys)), m_values(std::move(values))
+	BuildDict(Register dst, size_t size, size_t stack_offset)
+		: m_dst(dst), m_size(size), m_stack_offset(stack_offset)
 	{}
 
-	std::string to_string() const final { return fmt::format("BUILD_DICT     r{:<3}", m_dst); }
+	std::string to_string() const final
+	{
+		return fmt::format(
+			"BUILD_DICT      r{:<3} (size={}, offset={})", m_dst, m_size, m_stack_offset);
+	}
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 

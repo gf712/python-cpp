@@ -85,6 +85,88 @@ namespace {
 	}
 }// namespace
 
+
+BytecodeValue *BytecodeGenerator::build_dict(const std::vector<Register> &key_registers,
+	const std::vector<Register> &value_registers)
+{
+	auto *result = create_value();
+
+	// FIXME: the move instructions below guarantee that the dictionary keys/values are contiguosly
+	// layed out on the stack. Ideally this would be done immediately when generating the
+	// keys/values
+	if (!key_registers.empty()) {
+		std::optional<size_t> offset;
+		bool first = true;
+		for (const auto &key : key_registers) {
+			auto *dst = create_value();
+			if (first) {
+				offset = dst->get_register();
+				first = false;
+			}
+			emit<Move>(dst->get_register(), key);
+		}
+
+		for (const auto &value : value_registers) {
+			auto *dst = create_value();
+			emit<Move>(dst->get_register(), value);
+		}
+
+
+		ASSERT(offset.has_value())
+		ASSERT(key_registers.size() == value_registers.size())
+
+		size_t size = key_registers.size();
+		emit<BuildDict>(result->get_register(), size, *offset);
+	} else {
+		emit<BuildDict>(result->get_register(), 0, 0);
+	}
+	return result;
+}
+
+BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &element_registers)
+{
+	auto *result = create_value();
+	if (!element_registers.empty()) {
+		std::optional<size_t> offset;
+		bool first = true;
+		for (const auto &key : element_registers) {
+			auto *dst = create_value();
+			if (first) {
+				offset = dst->get_register();
+				first = false;
+			}
+			emit<Move>(dst->get_register(), key);
+		}
+		ASSERT(offset.has_value())
+		emit<BuildList>(result->get_register(), element_registers.size(), *offset);
+	} else {
+		emit<BuildList>(result->get_register(), 0, 0);
+	}
+	return result;
+}
+
+BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &element_registers)
+{
+	auto *result = create_value();
+	if (!element_registers.empty()) {
+		std::optional<size_t> offset;
+		bool first = true;
+		for (const auto &key : element_registers) {
+			auto *dst = create_value();
+			if (first) {
+				offset = dst->get_register();
+				first = false;
+			}
+			emit<Move>(dst->get_register(), key);
+		}
+		ASSERT(offset.has_value())
+		emit<BuildTuple>(result->get_register(), element_registers.size(), *offset);
+	} else {
+		emit<BuildTuple>(result->get_register(), 0, 0);
+	}
+	return result;
+}
+
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
 	auto &varnames = std::next(m_functions.functions.begin(), m_function_id)->metadata.varnames;
@@ -373,7 +455,6 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 
 	auto captures_tuple = [&]() -> std::optional<Register> {
 		if (!captures.empty()) {
-			auto *tuple_value = create_value();
 			std::vector<Register> capture_regs;
 			capture_regs.reserve(captures.size());
 			for (const auto &[name, el] : captures) {
@@ -385,7 +466,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 					name);
 				capture_regs.push_back(el->get_free_var_index());
 			}
-			emit<BuildTuple>(tuple_value->get_register(), capture_regs);
+			auto *tuple_value = build_tuple(capture_regs);
 			return tuple_value->get_register();
 		} else {
 			return {};
@@ -557,13 +638,13 @@ Value *BytecodeGenerator::visit(const Call *node)
 		std::any_of(node->keywords().begin(), node->keywords().end(), is_kwargs_expansion);
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
-		auto *list_value = create_value();
+		BytecodeValue *list_value = nullptr;
 		bool first_args_expansion = true;
 		std::vector<Register> args_lhs;
 		for (const auto &arg : node->args()) {
 			if (is_args_expansion(arg)) {
 				if (first_args_expansion) {
-					emit<BuildList>(list_value->get_register(), args_lhs);
+					list_value = build_list(args_lhs);
 					args_lhs.clear();
 					first_args_expansion = false;
 				}
@@ -580,13 +661,13 @@ Value *BytecodeGenerator::visit(const Call *node)
 		}
 		// we didn't hit any *args, but we still want to build a list of args so that
 		// we can call FunctionCallEx
-		if (first_args_expansion) { emit<BuildList>(list_value->get_register(), args_lhs); }
+		if (first_args_expansion) { list_value = build_list(args_lhs); }
 		auto *args_tuple = create_value();
 		emit<ListToTuple>(args_tuple->get_register(), list_value->get_register());
 		arg_values.push_back(args_tuple);
 
 		if (requires_kwargs_expansion) {
-			auto *dict_value = create_value();
+			BytecodeValue *dict_value = nullptr;
 			std::vector<Register> key_registers;
 			std::vector<Register> value_registers;
 			bool first_kwargs_expansion = true;
@@ -594,32 +675,31 @@ Value *BytecodeGenerator::visit(const Call *node)
 			for (const auto &el : node->keywords()) {
 				if (is_kwargs_expansion(el)) {
 					if (first_kwargs_expansion) {
-						emit<BuildDict>(dict_value->get_register(), key_registers, value_registers);
-						value_registers.clear();
+						ASSERT(key_registers.size() == value_registers.size())
+						dict_value = build_dict(key_registers, value_registers);
 						key_registers.clear();
+						value_registers.clear();
 						first_kwargs_expansion = false;
 					}
 					auto *kwargs_dict = generate(el->value().get(), m_function_id);
 					emit<DictMerge>(dict_value->get_register(), kwargs_dict->get_register());
 				} else {
-					auto *value = generate(el.get(), m_function_id);
 					const auto &name = *el->arg();
 					auto *key = create_value();
+					auto *value = generate(el.get(), m_function_id);
 					emit<LoadConst>(key->get_register(),
 						load_const(py::String{ name }, m_function_id)->get_index());
 					if (first_kwargs_expansion) {
 						key_registers.push_back(key->get_register());
 						value_registers.push_back(value->get_register());
 					} else {
-						const auto new_dict_reg = allocate_register();
-						emit<BuildDict>(new_dict_reg,
-							std::vector<Register>{ key->get_register() },
-							std::vector<Register>{ value->get_register() });
-						emit<DictMerge>(dict_value->get_register(), new_dict_reg);
+						auto *new_dict = build_dict(key_registers, value_registers);
+						emit<DictMerge>(dict_value->get_register(), new_dict->get_register());
 					}
 				}
 			}
 			ASSERT(first_kwargs_expansion == false)
+			ASSERT(dict_value)
 			keyword_values.push_back(dict_value);
 		} else {
 			// dummy value that will be ignore at runtime, since requires_kwargs_expansion is false
@@ -871,10 +951,7 @@ Value *BytecodeGenerator::visit(const List *node)
 		element_registers.push_back(element_value->get_register());
 	}
 
-	auto *result = create_value();
-	emit<BuildList>(result->get_register(), element_registers);
-
-	return result;
+	return build_list(element_registers);
 }
 
 Value *BytecodeGenerator::visit(const Tuple *node)
@@ -887,10 +964,7 @@ Value *BytecodeGenerator::visit(const Tuple *node)
 		element_registers.push_back(element_value->get_register());
 	}
 
-	auto *result = create_value();
-	emit<BuildTuple>(result->get_register(), element_registers);
-
-	return result;
+	return build_tuple(element_registers);
 }
 
 Value *BytecodeGenerator::visit(const ClassDefinition *node)
@@ -992,10 +1066,7 @@ Value *BytecodeGenerator::visit(const Dict *node)
 		value_registers.push_back(v->get_register());
 	}
 
-	auto *result = create_value();
-	emit<BuildDict>(result->get_register(), key_registers, value_registers);
-
-	return result;
+	return build_dict(key_registers, value_registers);
 }
 
 Value *BytecodeGenerator::visit(const Attribute *node)

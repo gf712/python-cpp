@@ -6,8 +6,14 @@ using namespace py;
 void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 {
 	PyDict::MapType map;
-	for (size_t i = 0; i < m_keys.size(); ++i) {
-		map.emplace(vm.reg(m_keys[i]), vm.reg(m_values[i]));
+
+	if (m_size > 0) {
+		auto *end = vm.stack_pointer() + m_stack_offset + m_size;
+		for (auto *sp = vm.stack_pointer() + m_stack_offset; sp < end; ++sp) {
+			const auto &key = *sp;
+			const auto &value = *(sp + m_size);
+			map.emplace(key, value);
+		}
 	}
 
 	auto &heap = vm.heap();
