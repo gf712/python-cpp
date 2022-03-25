@@ -2,18 +2,18 @@
 
 #include "Instructions.hpp"
 
-class GreaterThan final : public Instruction
+
+class GetIter final : public Instruction
 {
 	Register m_dst;
-	Register m_lhs;
-	Register m_rhs;
+	Register m_src;
 
   public:
-	GreaterThan(Register dst, Register lhs, Register rhs) : m_dst(dst), m_lhs(lhs), m_rhs(rhs) {}
+	GetIter(Register dst, Register src) : m_dst(dst), m_src(src) {}
 
 	std::string to_string() const final
 	{
-		return fmt::format("GREATER_THAN    r{:<3} r{:<3} r{:<3}", m_dst, m_lhs, m_rhs);
+		return fmt::format("GET_ITER        r{:<3} r{:<3}", m_dst, m_src);
 	}
 
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;

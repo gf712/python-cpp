@@ -9,21 +9,25 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/BytecodeProgram.cpp
     executable/bytecode/codegen/BytecodeGenerator.cpp
     executable/bytecode/codegen/VariablesResolver.cpp
+    executable/bytecode/instructions/BinaryOperation.cpp
     executable/bytecode/instructions/BinarySubscript.cpp
+    executable/bytecode/instructions/BuildDict.cpp
+    executable/bytecode/instructions/BuildList.cpp
+    executable/bytecode/instructions/BuildTuple.cpp
+    executable/bytecode/instructions/CompareOperation.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/DeleteName.cpp
+    executable/bytecode/instructions/ForIter.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
-    executable/bytecode/instructions/GreaterThan.cpp
-    executable/bytecode/instructions/GreaterThanEquals.cpp
-    executable/bytecode/instructions/InOp.cpp
+    executable/bytecode/instructions/GetIter.cpp
     executable/bytecode/instructions/InplaceSub.cpp
-    executable/bytecode/instructions/IsOp.cpp
     executable/bytecode/instructions/ImportName.cpp
-    executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/Jump.cpp
     executable/bytecode/instructions/JumpForward.cpp
+    executable/bytecode/instructions/JumpIfFalse.cpp
     executable/bytecode/instructions/JumpIfFalseOrPop.cpp
     executable/bytecode/instructions/JumpIfNotExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
@@ -38,8 +42,9 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/LoadGlobal.cpp
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
+    executable/bytecode/instructions/MakeFunction.cpp
     executable/bytecode/instructions/MethodCall.cpp
-    executable/bytecode/instructions/NotEqual.cpp
+    executable/bytecode/instructions/Move.cpp
     executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
@@ -48,7 +53,6 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/StoreSubscript.cpp
-    executable/bytecode/instructions/TrueDivide.cpp
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp
     executable/Mangler.cpp)
@@ -60,8 +64,7 @@ set(LEXER_SOURCE_FILES # cmake-format: sortable
                        lexer/Lexer.cpp)
 
 set(LLVM_BACKEND_FILES # cmake-format: sortable
-                       executable/llvm/LLVMGenerator.cpp
-                       executable/llvm/LLVMProgram.cpp)
+                       executable/llvm/LLVMGenerator.cpp executable/llvm/LLVMProgram.cpp)
 
 set(INTERPRETER_SOURCE_FILES
     # cmake-format: sortable
@@ -160,7 +163,7 @@ if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
 endif()
 
-if (LLVM_FOUND)
+if(LLVM_FOUND)
   message(STATUS "Configuring LLVM backend")
   add_library(python-cpp-llvm ${LLVM_BACKEND_FILES})
 
@@ -181,7 +184,12 @@ if (LLVM_FOUND)
   if(STL_SUPPORTS_BIT_CAST)
     target_compile_definitions(llvm-interface INTERFACE "STL_SUPPORTS_BIT_CAST")
   endif()
-  llvm_map_components_to_libnames(llvm_libs core orcjit x86asmparser x86codegen)
+  llvm_map_components_to_libnames(
+    llvm_libs
+    core
+    orcjit
+    x86asmparser
+    x86codegen)
   target_link_libraries(llvm-interface INTERFACE ${llvm_libs})
   # TODO: not all versions of llvm are ready for C++20, figure out when to use this
   set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)

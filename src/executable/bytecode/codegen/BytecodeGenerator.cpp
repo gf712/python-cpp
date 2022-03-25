@@ -1,21 +1,26 @@
 #include "BytecodeGenerator.hpp"
 #include "executable/bytecode/BytecodeProgram.hpp"
+#include "executable/bytecode/instructions/BinaryOperation.hpp"
 #include "executable/bytecode/instructions/BinarySubscript.hpp"
+#include "executable/bytecode/instructions/BuildDict.hpp"
+#include "executable/bytecode/instructions/BuildList.hpp"
+#include "executable/bytecode/instructions/BuildTuple.hpp"
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
+#include "executable/bytecode/instructions/CompareOperation.hpp"
 #include "executable/bytecode/instructions/DeleteName.hpp"
 #include "executable/bytecode/instructions/DictMerge.hpp"
+#include "executable/bytecode/instructions/ForIter.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
-#include "executable/bytecode/instructions/GreaterThan.hpp"
-#include "executable/bytecode/instructions/GreaterThanEquals.hpp"
+#include "executable/bytecode/instructions/GetIter.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
-#include "executable/bytecode/instructions/InOp.hpp"
 #include "executable/bytecode/instructions/InplaceAdd.hpp"
 #include "executable/bytecode/instructions/InplaceSub.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
-#include "executable/bytecode/instructions/IsOp.hpp"
+#include "executable/bytecode/instructions/Jump.hpp"
 #include "executable/bytecode/instructions/JumpForward.hpp"
+#include "executable/bytecode/instructions/JumpIfFalse.hpp"
 #include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
 #include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
@@ -26,21 +31,24 @@
 #include "executable/bytecode/instructions/LoadAttr.hpp"
 #include "executable/bytecode/instructions/LoadBuildClass.hpp"
 #include "executable/bytecode/instructions/LoadClosure.hpp"
+#include "executable/bytecode/instructions/LoadConst.hpp"
 #include "executable/bytecode/instructions/LoadDeref.hpp"
+#include "executable/bytecode/instructions/LoadFast.hpp"
 #include "executable/bytecode/instructions/LoadGlobal.hpp"
 #include "executable/bytecode/instructions/LoadMethod.hpp"
 #include "executable/bytecode/instructions/LoadName.hpp"
+#include "executable/bytecode/instructions/MakeFunction.hpp"
 #include "executable/bytecode/instructions/MethodCall.hpp"
-#include "executable/bytecode/instructions/NotEqual.hpp"
+#include "executable/bytecode/instructions/Move.hpp"
 #include "executable/bytecode/instructions/RaiseVarargs.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
 #include "executable/bytecode/instructions/StoreDeref.hpp"
+#include "executable/bytecode/instructions/StoreFast.hpp"
 #include "executable/bytecode/instructions/StoreGlobal.hpp"
 #include "executable/bytecode/instructions/StoreName.hpp"
 #include "executable/bytecode/instructions/StoreSubscript.hpp"
-#include "executable/bytecode/instructions/TrueDivide.cpp"
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 
@@ -224,27 +232,48 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 
 	switch (node->op_type()) {
 	case BinaryOpType::PLUS: {
-		emit<Add>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::PLUS);
 	} break;
 	case BinaryOpType::MINUS: {
-		emit<Subtract>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::MINUS);
 	} break;
 	case BinaryOpType::MULTIPLY: {
-		emit<Multiply>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::MULTIPLY);
 	} break;
 	case BinaryOpType::EXP: {
-		emit<Exp>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::EXP);
 	} break;
 	case BinaryOpType::MODULO: {
-		emit<Modulo>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::MODULO);
 	} break;
 	case BinaryOpType::SLASH: {
-		emit<TrueDivide>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::SLASH);
 	} break;
 	case BinaryOpType::FLOORDIV:
 		TODO();
 	case BinaryOpType::LEFTSHIFT: {
-		emit<LeftShift>(dst->get_register(), lhs->get_register(), rhs->get_register());
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::LEFTSHIFT);
 	} break;
 	case BinaryOpType::RIGHTSHIFT:
 		TODO();
@@ -768,34 +797,64 @@ Value *BytecodeGenerator::visit(const Compare *node)
 
 	switch (node->op()) {
 	case Compare::OpType::Eq: {
-		emit<Equal>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::Eq);
 	} break;
 	case Compare::OpType::NotEq: {
-		emit<NotEqual>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::NotEq);
 	} break;
 	case Compare::OpType::Lt: {
-		emit<LessThan>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::Lt);
 	} break;
 	case Compare::OpType::LtE: {
-		emit<LessThanEquals>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::LtE);
 	} break;
 	case Compare::OpType::Gt: {
-		emit<GreaterThan>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::Gt);
 	} break;
 	case Compare::OpType::GtE: {
-		emit<GreaterThanEquals>(result->get_register(), lhs->get_register(), rhs->get_register());
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::GtE);
 	} break;
 	case Compare::OpType::Is: {
-		emit<IsOp>(result->get_register(), lhs->get_register(), rhs->get_register(), false);
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::Is);
 	} break;
 	case Compare::OpType::IsNot: {
-		emit<IsOp>(result->get_register(), lhs->get_register(), rhs->get_register(), true);
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::IsNot);
 	} break;
 	case Compare::OpType::In: {
-		emit<InOp>(result->get_register(), lhs->get_register(), rhs->get_register(), false);
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::In);
 	} break;
 	case Compare::OpType::NotIn: {
-		emit<InOp>(result->get_register(), lhs->get_register(), rhs->get_register(), true);
+		emit<CompareOperation>(result->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			CompareOperation::Comparisson::NotIn);
 	} break;
 	}
 
