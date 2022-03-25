@@ -26,6 +26,7 @@ struct FunctionMetaData
 	size_t kwonly_arg_count;
 	size_t nlocals;
 	std::vector<size_t> cell2arg;
+	std::vector<py::Value> consts;
 	CodeFlags flags = CodeFlags::create();
 };
 
@@ -36,4 +37,9 @@ struct FunctionBlock
 	std::string to_string() const;
 };
 
-using FunctionBlocks = std::list<FunctionBlock>;
+struct FunctionBlocks
+{
+	std::list<FunctionBlock> functions;
+
+	using FunctionType = decltype(functions)::value_type;
+};

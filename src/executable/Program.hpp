@@ -1,6 +1,7 @@
 #pragma once
 
 #include "forward.hpp"
+#include "memory/GarbageCollector.hpp"
 #include "runtime/forward.hpp"
 #include "utilities.hpp"
 
@@ -63,4 +64,6 @@ class Program : NonCopyable
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const = 0;
+
+	virtual void visit_functions(Cell::Visitor &) const = 0;
 };

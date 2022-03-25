@@ -27,13 +27,14 @@ PyCode::PyCode(std::shared_ptr<Function> function,
 	size_t kwonly_arg_count,
 	std::vector<size_t> cell2arg,
 	size_t nlocals,
+	PyTuple *consts,
 	CodeFlags flags)
 	: PyBaseObject(BuiltinTypes::the().code()), m_function(function),
 	  m_register_count(function->register_count()), m_cellvars(std::move(cellvars)),
 	  m_varnames(std::move(varnames)), m_freevars(std::move(freevars)), m_stack_size(stack_size),
 	  m_filename(std::move(filename)), m_first_line_number(first_line_number),
 	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_cell2arg(std::move(cell2arg)),
-	  m_nlocals(nlocals), m_flags(flags)
+	  m_nlocals(nlocals), m_consts(consts), m_flags(flags)
 {}
 
 size_t PyCode::register_count() const { return m_register_count; }
@@ -51,6 +52,14 @@ size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 CodeFlags PyCode::flags() const { return m_flags; }
 
 PyType *PyCode::type() const { return code(); }
+
+const PyTuple *PyCode::consts() const { return m_consts; }
+
+void PyCode::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (m_consts) { visitor.visit(*const_cast<PyTuple *>(m_consts)); }
+}
 
 namespace {
 
@@ -111,7 +120,8 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			m_code->register_count(),
 			m_code->cellvars_count() + m_code->freevars_count(),
 			m_globals,
-			locals);
+			locals,
+			m_code->consts());
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_code->function(), function_frame);
 

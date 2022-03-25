@@ -65,8 +65,18 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 			ASSERT(module)
 			roots.insert(module);
 		}
+		struct AddRoot : Cell::Visitor
+		{
+			std::unordered_set<Cell *> &roots_;
+			AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
+			void visit(Cell &cell)
+			{
+				spdlog::debug("Adding root {}", (void *)&cell);
+				roots_.insert(&cell);
+			}
+		} visitor{ roots };
+		if (auto *program = interpreter->program()) { program->visit_functions(visitor); }
 	}
-
 	return roots;
 }
 
@@ -197,5 +207,14 @@ void MarkSweepGC::run(Heap &heap) const
 	m_iterations_since_last_sweep = 0;
 }
 
-void MarkSweepGC::resume() { m_pause = false; }
-void MarkSweepGC::pause() { m_pause = true; }
+void MarkSweepGC::resume()
+{
+	ASSERT(m_pause)
+	m_pause = false;
+}
+
+void MarkSweepGC::pause()
+{
+	ASSERT(!m_pause)
+	m_pause = true;
+}

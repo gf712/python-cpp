@@ -18,34 +18,30 @@ class Instruction : NonCopyable
 	virtual std::string to_string() const = 0;
 	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
 	virtual void relocate(codegen::BytecodeGenerator &, size_t) = 0;
+	// virtual std::vector<char> serialize() const = 0;
 };
 
+// std::vector<std::unique_ptr<Instruction>> deserialize(std::vector<char> instruction_stream);
 
 class LoadConst final : public Instruction
 {
 	Register m_destination;
-	py::Value m_source;
+	size_t m_static_value_index;
 
   public:
-	LoadConst(Register destination, py::Value source)
-		: m_destination(destination), m_source(std::move(source))
+	LoadConst(Register destination, size_t static_value_index)
+		: m_destination(destination), m_static_value_index(static_value_index)
 	{}
 	~LoadConst() override {}
 	std::string to_string() const final
 	{
-		return std::visit(
-			[this](const auto &val) {
-				std::ostringstream os;
-				os << val;
-				return fmt::format("LOAD_CONST      r{:<3} {:<3}", m_destination, os.str());
-			},
-			m_source);
+		return fmt::format("LOAD_CONST      r{:<3} s{:<3}", m_destination, m_static_value_index);
 	}
-	void execute(VirtualMachine &vm, Interpreter &) const final
+	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
 	{
 		ASSERT(vm.registers().has_value())
 		ASSERT(vm.registers()->get().size() > m_destination)
-		vm.reg(m_destination) = m_source;
+		vm.reg(m_destination) = interpreter.execution_frame()->consts(m_static_value_index);
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
@@ -61,7 +57,7 @@ class Move final : public Instruction
 	~Move() override {}
 	std::string to_string() const final
 	{
-		return fmt::format("STORE           r{:<3}  r{:<3}", m_destination, m_source);
+		return fmt::format("MOVE            r{:<3}  r{:<3}", m_destination, m_source);
 	}
 	void execute(VirtualMachine &, Interpreter &) const final;
 

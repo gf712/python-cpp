@@ -189,6 +189,9 @@ void VirtualMachine::dump() const
 
 void VirtualMachine::clear()
 {
+	while (!m_interpreter_session->interpreters().empty()) {
+		m_interpreter_session->shutdown(m_interpreter_session->interpreter());
+	}
 	m_heap.reset();
 	while (!m_stack.empty()) m_stack.pop();
 	// should instruction pointer be optional?
@@ -249,8 +252,9 @@ void VirtualMachine::pop_frame()
 	}
 }
 
-PyModule *import(PyString *path) {
+PyModule *import(PyString *path)
+{
 	(void)path;
 	TODO();
-	return nullptr;	
+	return nullptr;
 }

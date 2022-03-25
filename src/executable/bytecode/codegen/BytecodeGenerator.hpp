@@ -37,6 +37,18 @@ class BytecodeValue : public ast::Value
 	virtual bool is_function() const { return false; }
 };
 
+class BytecodeStaticValue : public ast::Value
+{
+	size_t m_index;
+
+  public:
+	BytecodeStaticValue(size_t index) : ast::Value("constant"), m_index(index) {}
+
+	size_t get_index() const { return m_index; }
+
+	virtual bool is_function() const { return false; }
+};
+
 class BytecodeStackValue : public ast::Value
 {
 	Register m_stack_index;
@@ -118,7 +130,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
   private:
 	FunctionBlocks m_functions;
-	std::unordered_map<std::string, std::reference_wrapper<FunctionBlocks::value_type>>
+	std::unordered_map<std::string, std::reference_wrapper<FunctionBlocks::FunctionType>>
 		m_function_map;
 
 	std::unordered_map<std::string, std::unique_ptr<VariablesResolver::Scope>>
@@ -162,14 +174,14 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	const std::list<InstructionBlock> &function(size_t idx) const
 	{
-		ASSERT(idx < m_functions.size())
-		return std::next(m_functions.begin(), idx)->blocks;
+		ASSERT(idx < m_functions.functions.size())
+		return std::next(m_functions.functions.begin(), idx)->blocks;
 	}
 
 	const InstructionBlock &function(size_t idx, size_t block) const
 	{
-		ASSERT(idx < m_functions.size())
-		auto f = std::next(m_functions.begin(), idx);
+		ASSERT(idx < m_functions.functions.size())
+		auto f = std::next(m_functions.functions.begin(), idx);
 		ASSERT(block < f->blocks.size())
 		return *std::next(f->blocks.begin(), block);
 	}
@@ -246,6 +258,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	void store_name(const std::string &, BytecodeValue *);
 	BytecodeValue *load_name(const std::string &);
+
+	BytecodeStaticValue *load_const(const py::Value &, size_t);
 
   private:
 #define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;

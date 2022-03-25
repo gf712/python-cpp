@@ -12,11 +12,11 @@ class PythonVMEnvironment : public ::testing::Environment
 	void TearDown() override {}
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
+	::testing::InitGoogleTest(&argc, argv);
 
 	(void)AddGlobalTestEnvironment(new PythonVMEnvironment);
-	
-    return RUN_ALL_TESTS();
+
+	return RUN_ALL_TESTS();
 }

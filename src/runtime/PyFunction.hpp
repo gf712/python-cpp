@@ -23,6 +23,7 @@ class PyCode : public PyBaseObject
 	const size_t m_kwonly_arg_count;
 	const std::vector<size_t> m_cell2arg;
 	const size_t m_nlocals;
+	const PyTuple *m_consts = nullptr;
 	CodeFlags m_flags;
 
   public:
@@ -37,6 +38,7 @@ class PyCode : public PyBaseObject
 		size_t kwonly_arg_count,
 		std::vector<size_t> cell2arg,
 		size_t nlocals,
+		PyTuple *consts,
 		CodeFlags flags);
 
 	PyObject *call(PyTuple *args, PyDict *kwargs);
@@ -51,11 +53,14 @@ class PyCode : public PyBaseObject
 	size_t kwonly_arg_count() const;
 	CodeFlags flags() const;
 	const std::vector<size_t> &cell2arg() const;
+	const PyTuple *consts() const;
 
 	const std::shared_ptr<Function> &function() const { return m_function; }
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
+
+	void visit_graph(Visitor &) override;
 };
 
 

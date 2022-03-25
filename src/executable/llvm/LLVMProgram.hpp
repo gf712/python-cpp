@@ -35,6 +35,8 @@ class LLVMProgram : public Program
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const override;
 
+	void visit_functions(Cell::Visitor &) const final {}
+
   private:
 	void create_interop_function(const std::shared_ptr<Function> &,
 		const std::string &mangled_name) const;

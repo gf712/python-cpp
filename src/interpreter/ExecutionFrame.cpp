@@ -15,13 +15,15 @@ ExecutionFrame *ExecutionFrame::create(ExecutionFrame *parent,
 	size_t register_count,
 	size_t free_vars_count,
 	PyDict *globals,
-	PyDict *locals)
+	PyDict *locals,
+	const PyTuple *consts)
 {
 	auto *new_frame = Heap::the().allocate<ExecutionFrame>();
 	new_frame->m_parent = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
+	new_frame->m_consts = consts;
 	// if (parent) {
 	// 	new_frame->m_freevars = parent->m_freevars;
 	// 	new_frame->m_freevars.resize(parent->m_freevars.size() + free_vars_count, nullptr);
@@ -119,4 +121,12 @@ void ExecutionFrame::visit_graph(Visitor &visitor)
 	for (const auto &freevar : m_freevars) {
 		if (freevar) { visitor.visit(*freevar); }
 	}
+	if (m_consts) { visitor.visit(*const_cast<PyTuple *>(m_consts)); }
+}
+
+py::Value ExecutionFrame::consts(size_t index) const
+{
+	ASSERT(index < m_consts->size())
+	spdlog::debug("m_consts: {}", (void*)m_consts);
+	return m_consts->elements()[index];
 }

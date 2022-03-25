@@ -30,7 +30,8 @@ Interpreter::Interpreter() {}
 void Interpreter::internal_setup(const std::string &name,
 	std::string entry_script,
 	std::vector<std::string> argv,
-	size_t local_registers)
+	size_t local_registers,
+	const PyTuple *consts)
 {
 	m_entry_script = std::move(entry_script);
 	m_argv = std::move(argv);
@@ -40,7 +41,6 @@ void Interpreter::internal_setup(const std::string &name,
 	// initialize the standard types by initializing the builtins module
 	auto *builtins = builtins_module(*this);
 
-	// before we construct the first PyObject we need to initialize the standard types
 	auto name_ = PyString::create(name);
 	auto *main_module = heap.allocate<PyModule>(name_);
 	m_module = main_module;
@@ -57,7 +57,7 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame = ExecutionFrame::create(nullptr, local_registers, 0, globals, locals);
+	m_current_frame = ExecutionFrame::create(nullptr, local_registers, 0, globals, locals, consts);
 	m_global_frame = m_current_frame;
 
 	m_importlib = nullptr;
@@ -66,18 +66,27 @@ void Interpreter::internal_setup(const std::string &name,
 
 void Interpreter::setup(const BytecodeProgram &program)
 {
+	m_program = static_cast<const Program *>(&program);
+
 	const auto name = fs::path(program.filename()).stem();
-	internal_setup(name, program.filename(), program.argv(), program.main_stack_size());
-	m_program = &program;
+	internal_setup(name,
+		program.filename(),
+		program.argv(),
+		program.main_stack_size(),
+		program.main_function()->consts());
 }
 
 void Interpreter::setup_main_interpreter(const BytecodeProgram &program)
 {
+	m_program = static_cast<const Program *>(&program);
 	auto &heap = VirtualMachine::the().heap();
 
-	internal_setup("__main__", program.filename(), program.argv(), program.main_stack_size());
+	internal_setup("__main__",
+		program.filename(),
+		program.argv(),
+		program.main_stack_size(),
+		program.main_function()->consts());
 	if (!s_main__) { s_main__ = heap.allocate<PyString>("__main__"); }
-	m_program = &program;
 }
 
 void Interpreter::unwind()

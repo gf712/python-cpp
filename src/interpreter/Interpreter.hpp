@@ -92,9 +92,12 @@ class Interpreter
 
 	py::PyObject *call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
+	const Program *program() const { return m_program; }
+
   private:
 	void internal_setup(const std::string &name,
 		std::string entry_script,
 		std::vector<std::string> argv,
-		size_t local_registers);
+		size_t local_registers,
+		const py::PyTuple *consts);
 };

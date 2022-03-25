@@ -7,14 +7,18 @@
 
 #include <numeric>
 
+using namespace py;
+
 BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 	std::string filename,
 	std::vector<std::string> argv)
 	: Program(std::move(filename), std::move(argv))
 {
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
+
 	std::vector<size_t> functions_instruction_count;
-	functions_instruction_count.reserve(func_blocks.size());
-	for (const auto &f : func_blocks) {
+	functions_instruction_count.reserve(func_blocks.functions.size());
+	for (const auto &f : func_blocks.functions) {
 		functions_instruction_count.push_back(std::transform_reduce(
 			f.blocks.begin(), f.blocks.end(), 0u, std::plus<size_t>{}, [](const auto &ins) {
 				return ins.size();
@@ -27,7 +31,7 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 	// since the iterators depend on the vector memory layout
 	m_instructions.reserve(instruction_count);
 
-	auto &main_func = func_blocks.front();
+	auto &main_func = func_blocks.functions.front();
 
 	std::vector<View> main_blocks;
 	main_blocks.reserve(main_func.blocks.size());
@@ -46,7 +50,7 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
 		main_blocks);
-	m_main_function = std::make_shared<py::PyCode>(main_bytecode,
+	m_main_function = VirtualMachine::the().heap().allocate<PyCode>(main_bytecode,
 		main_func.metadata.cellvars,
 		main_func.metadata.varnames,
 		main_func.metadata.freevars,
@@ -57,10 +61,11 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		main_func.metadata.kwonly_arg_count,
 		main_func.metadata.cell2arg,
 		main_func.metadata.nlocals,
+		PyTuple::create(main_func.metadata.consts),
 		main_func.metadata.flags);
 
-	for (size_t i = 1; i < func_blocks.size(); ++i) {
-		auto &func = *std::next(func_blocks.begin(), i);
+	for (size_t i = 1; i < func_blocks.functions.size(); ++i) {
+		auto &func = *std::next(func_blocks.functions.begin(), i);
 		std::vector<View> func_blocks_view;
 		func_blocks_view.reserve(func.blocks.size());
 		for (size_t start_idx = m_instructions.size(); auto &block : func.blocks) {
@@ -77,7 +82,7 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			func.metadata.stack_size,
 			func.metadata.function_name,
 			func_blocks_view);
-		auto code = std::make_shared<py::PyCode>(bytecode,
+		auto *code = VirtualMachine::the().heap().allocate<PyCode>(bytecode,
 			func.metadata.cellvars,
 			func.metadata.varnames,
 			func.metadata.freevars,
@@ -88,9 +93,10 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			func.metadata.kwonly_arg_count,
 			func.metadata.cell2arg,
 			func.metadata.nlocals,
+			PyTuple::create(func.metadata.consts),
 			func.metadata.flags);
 
-		m_functions.emplace_back(std::move(code));
+		m_functions.emplace_back(code);
 	}
 }
 
@@ -139,7 +145,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 	vm->set_instruction_pointer(begin_function_block->begin());
 	const auto stack_count = vm->stack().size();
 	// can only initialize interpreter after creating the initial stack frame
-	vm->interpreter_session()->start_new_interpreter(*this);
+	[[maybe_unused]] auto &interpreter = vm->interpreter_session()->start_new_interpreter(*this);
 	const auto initial_ip = vm->instruction_pointer();
 	auto block_view = begin_function_block;
 
@@ -185,13 +191,15 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 		}
 	}
 
+	// vm->interpreter_session()->shutdown(interpreter);
+
 	return EXIT_SUCCESS;
 }
 
-py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
-	const std::vector<py::Value> &default_values,
-	const std::vector<py::Value> &kw_default_values,
-	const std::vector<py::PyCell *> &closure) const
+PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
+	const std::vector<Value> &default_values,
+	const std::vector<Value> &kw_default_values,
+	const std::vector<PyCell *> &closure) const
 {
 	for (const auto &backend : m_backends) {
 		if (auto *f =
@@ -204,9 +212,9 @@ py::PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 			[&function_name](
 				const auto &f) { return f->function()->function_name() == function_name; });
 		it != m_functions.end()) {
-		auto *code = it->get();
+		auto *code = *it;
 		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);
-		return VirtualMachine::the().heap().allocate<py::PyFunction>(demangled_name,
+		return VirtualMachine::the().heap().allocate<PyFunction>(demangled_name,
 			default_values,
 			kw_default_values,
 			code,
@@ -231,4 +239,10 @@ std::string FunctionBlock::to_string() const
 		for (const auto &ins : block) { os << "    " << ins->to_string() << '\n'; }
 	}
 	return os.str();
+}
+
+void BytecodeProgram::visit_functions(Cell::Visitor &visitor) const
+{
+	visitor.visit(*const_cast<PyCode *>(m_main_function));
+	for (auto &f : m_functions) { visitor.visit(*const_cast<PyCode *>(f)); };
 }

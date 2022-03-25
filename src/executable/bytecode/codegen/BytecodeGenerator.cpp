@@ -60,9 +60,26 @@ using namespace ast;
 
 namespace codegen {
 
+namespace {
+	bool compare_values(const py::Value &lhs, const py::Value &rhs)
+	{
+		if (lhs.index() != rhs.index()) { return false; }
+		return std::visit(
+			overloaded{
+				[&]<typename T>(const T &lhs_value) { return lhs_value == std::get<T>(rhs); },
+				[&](const py::Number &lhs_value) {
+					// make sure that doubles and integers are stored independently even when their
+					// values are equivalent
+					return lhs_value.value.index() == std::get<py::Number>(rhs).value.index()
+						   && lhs_value == std::get<py::Number>(rhs);
+				} },
+			lhs);
+	}
+}// namespace
+
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
-	auto &varnames = std::next(m_functions.begin(), m_function_id)->metadata.varnames;
+	auto &varnames = std::next(m_functions.functions.begin(), m_function_id)->metadata.varnames;
 	if (std::find(varnames.begin(), varnames.end(), name) != varnames.end()) {
 		varnames.push_back(name);
 	}
@@ -169,6 +186,21 @@ BytecodeValue *BytecodeGenerator::load_name(const std::string &name)
 	return dst;
 }
 
+BytecodeStaticValue *BytecodeGenerator::load_const(const py::Value &value, size_t function_id)
+{
+	auto &consts = std::next(m_functions.functions.begin(), function_id)->metadata.consts;
+	for (size_t i = 0; const auto &static_value : consts) {
+		if (compare_values(static_value, value)) {
+			m_values.push_back(std::make_unique<BytecodeStaticValue>(i));
+			return static_cast<BytecodeStaticValue *>(m_values.back().get());
+		}
+		++i;
+	}
+	consts.push_back(value);
+	m_values.push_back(std::make_unique<BytecodeStaticValue>(consts.size() - 1));
+	return static_cast<BytecodeStaticValue *>(m_values.back().get());
+}
+
 Value *BytecodeGenerator::visit(const Name *node)
 {
 	ASSERT(node->ids().size() == 1)
@@ -179,7 +211,8 @@ Value *BytecodeGenerator::visit(const Name *node)
 Value *BytecodeGenerator::visit(const Constant *node)
 {
 	auto *dst = create_value();
-	emit<LoadConst>(dst->get_register(), *node->value());
+	auto *value = load_const(*node->value(), m_function_id);
+	emit<LoadConst>(dst->get_register(), value->get_index());
 	return dst;
 }
 
@@ -257,7 +290,8 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	// always return None
 	// this can be optimised away later on
 	auto none_value_register = allocate_register();
-	emit<LoadConst>(none_value_register, py::NameConstant{ py::NoneType{} });
+	auto *value = load_const(py::NameConstant{ py::NoneType{} }, f->function_info().function_id);
+	emit<LoadConst>(none_value_register, value->get_index());
 	emit<ReturnValue>(none_value_register);
 
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
@@ -398,7 +432,7 @@ Value *BytecodeGenerator::visit(const Argument *node)
 	switch (var_scope) {
 	case VariablesResolver::Visibility::CELL: {
 		m_stack.top().locals.emplace(node->name(), create_free_value());
-		auto f = std::next(m_functions.begin(), m_function_id);
+		auto f = std::next(m_functions.functions.begin(), m_function_id);
 		f->metadata.varnames.push_back(node->name());
 	} break;
 	case VariablesResolver::Visibility::FREE: {
@@ -542,7 +576,8 @@ Value *BytecodeGenerator::visit(const Call *node)
 					auto *value = generate(el.get(), m_function_id);
 					const auto &name = *el->arg();
 					auto *key = create_value();
-					emit<LoadConst>(key->get_register(), py::String{ name });
+					emit<LoadConst>(key->get_register(),
+						load_const(py::String{ name }, m_function_id)->get_index());
 					if (first_kwargs_expansion) {
 						key_registers.push_back(key->get_register());
 						value_registers.push_back(value->get_register());
@@ -823,13 +858,15 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		// class definition preamble, a la CPython
 		emit<LoadName>(name_register, "__name__");
 		emit<StoreName>("__module__", name_register);
-		emit<LoadConst>(qualname_register, py::String{ node->name() });
+		emit<LoadConst>(
+			qualname_register, load_const(py::String{ node->name() }, class_id)->get_index());
 		emit<StoreName>("__qualname__", qualname_register);
 
 		// the actual class definition
 		for (const auto &el : node->body()) { generate(el.get(), class_id); }
 
-		emit<LoadConst>(return_none_register, py::NameConstant{ py::NoneType{} });
+		emit<LoadConst>(return_none_register,
+			load_const(py::NameConstant{ py::NoneType{} }, class_id)->get_index());
 		emit<ReturnValue>(return_none_register);
 		m_stack.pop();
 		exit_function(class_builder_func->function_info().function_id);
@@ -861,8 +898,10 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);
-	emit<LoadConst>(class_name_register, py::String{ class_mangled_name });
-	emit<LoadConst>(class_location_register, py::Number{ static_cast<int64_t>(class_id) });
+	emit<LoadConst>(class_name_register,
+		load_const(py::String{ class_mangled_name }, m_function_id)->get_index());
+	emit<LoadConst>(class_location_register,
+		load_const(py::Number{ static_cast<int64_t>(class_id) }, m_function_id)->get_index());
 
 	if (kwarg_registers.empty()) {
 		emit<FunctionCall>(builtin_build_class_register, std::move(arg_registers));
@@ -998,7 +1037,8 @@ Value *BytecodeGenerator::visit(const Module *node)
 
 	// TODO: should the module return the last value if there is one?
 	last = create_value();
-	emit<LoadConst>(last->get_register(), py::NameConstant{ py::NoneType{} });
+	emit<LoadConst>(last->get_register(),
+		load_const(py::NameConstant{ py::NoneType{} }, m_function_id)->get_index());
 	emit<ReturnValue>(last->get_register());
 	m_stack.pop();
 	return last;
@@ -1297,15 +1337,15 @@ BytecodeGenerator::BytecodeGenerator()
 	m_frame_stack_value_count.push_back(0u);
 	m_frame_free_var_count.push_back(0u);
 	(void)create_function("__main__entry__");
-	m_current_block = &m_functions.back().blocks.back();
+	m_current_block = &m_functions.functions.back().blocks.back();
 }
 
 BytecodeGenerator::~BytecodeGenerator() {}
 
 void BytecodeGenerator::exit_function(size_t function_id)
 {
-	ASSERT(function_id < m_functions.size())
-	auto function = std::next(m_functions.begin(), function_id);
+	ASSERT(function_id < m_functions.functions.size())
+	auto function = std::next(m_functions.functions.begin(), function_id);
 	function->metadata.register_count = register_count();
 	function->metadata.stack_size = stack_variable_count() + free_variable_count();
 	m_frame_register_count.pop_back();
@@ -1315,14 +1355,15 @@ void BytecodeGenerator::exit_function(size_t function_id)
 
 BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &name)
 {
-	auto &new_func = m_functions.emplace_back();
+	auto &new_func = m_functions.functions.emplace_back();
 	m_function_map.emplace(name, std::ref(new_func));
 
 	// allocate the first block
 	new_func.blocks.emplace_back();
 	new_func.metadata.function_name = name;
-	m_values.push_back(std::make_unique<BytecodeFunctionValue>(
-		name, allocate_register(), FunctionInfo{ m_functions.size() - 1, new_func, this }));
+	m_values.push_back(std::make_unique<BytecodeFunctionValue>(name,
+		allocate_register(),
+		FunctionInfo{ m_functions.functions.size() - 1, new_func, this }));
 	static_cast<BytecodeFunctionValue *>(m_values.back().get())
 		->function_info()
 		.function.metadata.function_name = name;
@@ -1331,7 +1372,7 @@ BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &nam
 
 void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 {
-	for (const auto &function : functions) {
+	for (const auto &function : functions.functions) {
 		size_t instruction_idx{ 0 };
 		for (const auto &block : function.blocks) {
 			for (const auto &ins : block) { ins->relocate(*this, instruction_idx++); }
@@ -1351,9 +1392,9 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 
 InstructionBlock *BytecodeGenerator::allocate_block(size_t function_id)
 {
-	ASSERT(function_id < m_functions.size())
+	ASSERT(function_id < m_functions.functions.size())
 
-	auto function = std::next(m_functions.begin(), function_id);
+	auto function = std::next(m_functions.functions.begin(), function_id);
 	auto &new_block = function->blocks.emplace_back();
 	return &new_block;
 }
@@ -1391,8 +1432,8 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 	node->codegen(&generator);
 
 	// allocate registers for __main__
-	generator.m_functions.front().metadata.register_count = generator.register_count();
-	generator.m_functions.front().metadata.stack_size = 0;
+	generator.m_functions.functions.front().metadata.register_count = generator.register_count();
+	generator.m_functions.functions.front().metadata.stack_size = 0;
 
 	auto executable = generator.generate_executable(module->filename(), argv);
 	return executable;

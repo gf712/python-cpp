@@ -9,8 +9,8 @@
 class BytecodeProgram : public Program
 {
 	InstructionVector m_instructions;
-	std::vector<std::shared_ptr<py::PyCode>> m_functions;
-	std::shared_ptr<py::PyCode> m_main_function;
+	std::vector<py::PyCode *> m_functions;
+	py::PyCode *m_main_function;
 	std::vector<std::shared_ptr<Program>> m_backends;
 
   public:
@@ -35,5 +35,9 @@ class BytecodeProgram : public Program
 
 	const auto &functions() const { return m_functions; }
 
+	const auto &main_function() const { return m_main_function; }
+
 	void add_backend(std::shared_ptr<Program>);
+
+	void visit_functions(Cell::Visitor &) const override;
 };
