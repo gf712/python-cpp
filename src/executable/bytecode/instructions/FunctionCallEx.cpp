@@ -35,3 +35,15 @@ void FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 
 	vm.reg(0) = callable_object->call(args, kwargs);
 }
+
+std::vector<uint8_t> FunctionCallEx::serialize() const
+{
+	return {
+		FUNCTION_CALL_EX,
+		m_function,
+		m_args,
+		m_kwargs,
+		m_expand_args,
+		m_expand_kwargs,
+	};
+}

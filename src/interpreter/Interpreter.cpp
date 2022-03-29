@@ -2,6 +2,7 @@
 
 #include "runtime/BaseException.hpp"
 #include "runtime/NameError.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyNone.hpp"
@@ -129,7 +130,7 @@ ScopedStack::~ScopedStack()
 	if (&vm.stack().top() == &top_frame) { vm.pop_frame(); }
 }
 
-ScopedStack Interpreter::setup_call_stack(const std::shared_ptr<Function> &func,
+ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,
 	ExecutionFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
@@ -138,7 +139,7 @@ ScopedStack Interpreter::setup_call_stack(const std::shared_ptr<Function> &func,
 	return ScopedStack{ vm.stack().top() };
 }
 
-PyObject *Interpreter::call(const std::shared_ptr<Function> &func, ExecutionFrame *function_frame)
+PyObject *Interpreter::call(const std::unique_ptr<Function> &func, ExecutionFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
 	function_frame->m_parent = m_current_frame;

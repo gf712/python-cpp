@@ -5,21 +5,22 @@
 class FunctionCall final : public Instruction
 {
 	Register m_function_name;
-	std::vector<Register> m_args;
+	size_t m_size;
+	size_t m_stack_offset;
 
   public:
-	FunctionCall(Register function_name, std::vector<Register> &&args)
-		: m_function_name(std::move(function_name)), m_args(std::move(args))
+	FunctionCall(Register function_name, size_t size, size_t stack_offset)
+		: m_function_name(function_name), m_size(size), m_stack_offset(stack_offset)
 	{}
-	~FunctionCall() override {}
+
 	std::string to_string() const final
 	{
-		std::string args_regs{};
-		for (const auto arg : m_args) { args_regs += fmt::format(" r{:<3}", arg); }
-		return fmt::format("CALL            r{:<3}{}", m_function_name, args_regs);
+		return fmt::format("CALL            r{:<3} ({})", m_function_name, m_size);
 	}
 
 	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const final;
 };

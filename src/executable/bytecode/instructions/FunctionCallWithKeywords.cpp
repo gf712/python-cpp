@@ -32,3 +32,12 @@ void FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
 
 	if (auto *result = function_object->call(args_tuple, kwargs_dict)) { vm.reg(0) = result; }
 }
+
+std::vector<uint8_t> FunctionCallWithKeywords::serialize() const
+{
+	TODO();
+	return {
+		FUNCTION_CALL_WITH_KW,
+		m_function_name,
+	};
+}

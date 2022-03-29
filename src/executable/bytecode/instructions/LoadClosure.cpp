@@ -11,3 +11,13 @@ void LoadClosure::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	// const auto &value = vm.stack_local(freevars_stack_offset + m_source);
 	vm.reg(m_destination) = interpreter.execution_frame()->freevars()[m_source];
 }
+
+std::vector<uint8_t> LoadClosure::serialize() const
+{
+	TODO();
+	return {
+		LOAD_CLOSURE,
+		m_destination,
+		m_source,
+	};
+}

@@ -5,7 +5,7 @@
 class BinaryOperation : public Instruction
 {
   public:
-	enum class Operation {
+	enum class Operation : uint8_t {
 		PLUS = 0,
 		MINUS = 1,
 		MODULO = 2,
@@ -37,4 +37,6 @@ class BinaryOperation : public Instruction
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const final;
 };

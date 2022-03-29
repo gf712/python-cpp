@@ -87,8 +87,8 @@ class Interpreter
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const;
 
-	ScopedStack setup_call_stack(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
-	py::PyObject *call(const std::shared_ptr<Function> &, ExecutionFrame *function_frame);
+	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, ExecutionFrame *function_frame);
+	py::PyObject *call(const std::unique_ptr<Function> &, ExecutionFrame *function_frame);
 
 	py::PyObject *call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 

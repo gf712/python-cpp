@@ -1,6 +1,7 @@
 #include "PyFunction.hpp"
 #include "PyBoundMethod.hpp"
 #include "PyCell.hpp"
+#include "PyCode.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
 #include "PyNone.hpp"
@@ -14,66 +15,7 @@
 
 #include "utilities.hpp"
 
-using namespace py;
-
-PyCode::PyCode(std::shared_ptr<Function> function,
-	std::vector<std::string> cellvars,
-	std::vector<std::string> varnames,
-	std::vector<std::string> freevars,
-	size_t stack_size,
-	std::string filename,
-	size_t first_line_number,
-	size_t arg_count,
-	size_t kwonly_arg_count,
-	std::vector<size_t> cell2arg,
-	size_t nlocals,
-	PyTuple *consts,
-	CodeFlags flags)
-	: PyBaseObject(BuiltinTypes::the().code()), m_function(function),
-	  m_register_count(function->register_count()), m_cellvars(std::move(cellvars)),
-	  m_varnames(std::move(varnames)), m_freevars(std::move(freevars)), m_stack_size(stack_size),
-	  m_filename(std::move(filename)), m_first_line_number(first_line_number),
-	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_cell2arg(std::move(cell2arg)),
-	  m_nlocals(nlocals), m_consts(consts), m_flags(flags)
-{}
-
-size_t PyCode::register_count() const { return m_register_count; }
-
-size_t PyCode::freevars_count() const { return m_freevars.size(); }
-
-size_t PyCode::cellvars_count() const { return m_cellvars.size(); }
-
-const std::vector<size_t> &PyCode::cell2arg() const { return m_cell2arg; }
-
-size_t PyCode::arg_count() const { return m_arg_count; }
-
-size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
-
-CodeFlags PyCode::flags() const { return m_flags; }
-
-PyType *PyCode::type() const { return code(); }
-
-const PyTuple *PyCode::consts() const { return m_consts; }
-
-void PyCode::visit_graph(Visitor &visitor)
-{
-	PyObject::visit_graph(visitor);
-	if (m_consts) { visitor.visit(*const_cast<PyTuple *>(m_consts)); }
-}
-
-namespace {
-
-std::once_flag code_flag;
-
-std::unique_ptr<TypePrototype> register_code() { return std::move(klass<PyCode>("code").type); }
-}// namespace
-
-std::unique_ptr<TypePrototype> PyCode::register_type()
-{
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(code_flag, []() { type = ::register_code(); });
-	return std::move(type);
-}
+namespace py {
 
 PyFunction::PyFunction(std::string name,
 	std::vector<Value> defaults,
@@ -290,7 +232,7 @@ PyObject *PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 }
 
 namespace {
-std::once_flag function_flag;
+	std::once_flag function_flag;
 }// namespace
 
 std::unique_ptr<TypePrototype> PyFunction::register_type()
@@ -335,41 +277,43 @@ void PyNativeFunction::visit_graph(Visitor &visitor)
 PyType *PyNativeFunction::type() const { return native_function(); }
 
 namespace {
-std::once_flag native_function_flag;
+	std::once_flag native_function_flag;
 
-std::unique_ptr<TypePrototype> register_native_function()
-{
-	return std::move(klass<PyNativeFunction>("builtin_function_or_method").type);
-}
+	std::unique_ptr<TypePrototype> register_native_function()
+	{
+		return std::move(klass<PyNativeFunction>("builtin_function_or_method").type);
+	}
 }// namespace
 
 std::unique_ptr<TypePrototype> PyNativeFunction::register_type()
 {
 	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(native_function_flag, []() { type = ::register_native_function(); });
+	std::call_once(native_function_flag, []() { type = register_native_function(); });
 	return std::move(type);
 }
 
-template<> PyFunction *py::as(PyObject *node)
+template<> PyFunction *as(PyObject *node)
 {
 	if (node->type() == function()) { return static_cast<PyFunction *>(node); }
 	return nullptr;
 }
 
-template<> const PyFunction *py::as(const PyObject *node)
+template<> const PyFunction *as(const PyObject *node)
 {
 	if (node->type() == function()) { return static_cast<const PyFunction *>(node); }
 	return nullptr;
 }
 
-template<> PyNativeFunction *py::as(PyObject *node)
+template<> PyNativeFunction *as(PyObject *node)
 {
 	if (node->type() == native_function()) { return static_cast<PyNativeFunction *>(node); }
 	return nullptr;
 }
 
-template<> const PyNativeFunction *py::as(const PyObject *node)
+template<> const PyNativeFunction *as(const PyObject *node)
 {
 	if (node->type() == native_function()) { return static_cast<const PyNativeFunction *>(node); }
 	return nullptr;
 }
+
+}// namespace py

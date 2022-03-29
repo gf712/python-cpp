@@ -33,3 +33,15 @@ void ForIter::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
 	m_exit_label->set_position(m_exit_label->position() - instruction_idx);
 }
+
+std::vector<uint8_t> ForIter::serialize() const
+{
+	ASSERT(m_exit_label->position() < std::numeric_limits<uint8_t>::max())
+
+	return {
+		FOR_ITER,
+		m_dst,
+		m_src,
+		static_cast<uint8_t>(m_exit_label->position()),
+	};
+}

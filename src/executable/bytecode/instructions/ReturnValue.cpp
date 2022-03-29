@@ -20,3 +20,11 @@ void ReturnValue::execute(VirtualMachine &vm, Interpreter &) const
 	// tell the VM to return to the calling stack frame
 	vm.ret();
 }
+
+std::vector<uint8_t> ReturnValue::serialize() const
+{
+	return {
+		RETURN_VALUE,
+		m_source,
+	};
+}

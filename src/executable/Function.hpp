@@ -20,6 +20,7 @@ enum class FunctionExecutionBackend { BYTECODE = 0, LLVM = 1 };
 
 class Function
 {
+  protected:
 	size_t m_register_count;
 	size_t m_stack_size;
 	std::string m_function_name;
@@ -43,4 +44,6 @@ class Function
 	const std::string function_name() const { return m_function_name; }
 
 	virtual std::string to_string() const = 0;
+
+	virtual std::vector<uint8_t> serialize() const = 0;
 };

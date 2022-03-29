@@ -21,3 +21,14 @@ void LoadAttr::execute(VirtualMachine &vm, Interpreter &) const
 		TODO();
 	}
 }
+
+std::vector<uint8_t> LoadAttr::serialize() const
+{
+	// attribute name has to be loaded from the stack
+	TODO();
+	return {
+		LOAD_ATTR,
+		m_destination,
+		m_value_source,
+	};
+}

@@ -17,3 +17,12 @@ void RaiseVarargs::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		TODO();
 	}
 }
+
+std::vector<uint8_t> RaiseVarargs::serialize() const
+{
+	return {
+		RAISE_VARARGS,
+		m_exception ? *m_exception : uint8_t{ 0 },
+		m_cause ? *m_cause : uint8_t{ 0 },
+	};
+}

@@ -36,3 +36,17 @@ void JumpIfFalseOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction
 	m_label->set_position(m_label->position() - instruction_idx - 1);
 	m_label->immutable();
 }
+
+std::vector<uint8_t> JumpIfFalseOrPop::serialize() const
+{
+	ASSERT(m_label->position() < std::numeric_limits<uint8_t>::max())
+	if (m_offset.has_value()) { ASSERT(m_offset < std::numeric_limits<uint8_t>::max()) }
+
+	return {
+		JUMP_IF_FALSE_OR_POP,
+		m_test_register,
+		m_result_register,
+		static_cast<uint8_t>(m_label->position()),
+		m_offset ? uint8_t{ 0 } : static_cast<uint8_t>(*m_offset),
+	};
+}

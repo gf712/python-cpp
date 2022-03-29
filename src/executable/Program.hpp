@@ -36,9 +36,18 @@ class CodeFlags
 		(f.m_flags.set(static_cast<uint8_t>(args)), ...);
 		return f;
 	}
+
+	static CodeFlags from_byte(uint8_t b)
+	{
+		auto f = CodeFlags();
+		f.m_flags = std::bitset<6>(b);
+		return f;
+	}
+
 	void set(Flag f) { m_flags.set(static_cast<uint8_t>(f)); }
 	void reset(Flag f) { m_flags.reset(static_cast<uint8_t>(f)); }
-	bool is_set(Flag f) { return m_flags[static_cast<uint8_t>(f)]; }
+	bool is_set(Flag f) const { return m_flags[static_cast<uint8_t>(f)]; }
+	std::bitset<6> bits() const { return m_flags; };
 };
 
 class Program : NonCopyable
@@ -46,8 +55,10 @@ class Program : NonCopyable
 	std::string m_filename;
 	std::vector<std::string> m_argv;
 
+  protected:
+	Program() {}
+
   public:
-	Program() = delete;
 	Program(std::string &&filename, std::vector<std::string> &&argv);
 	virtual ~Program() {}
 
@@ -66,4 +77,6 @@ class Program : NonCopyable
 		const std::vector<py::PyCell *> &closure) const = 0;
 
 	virtual void visit_functions(Cell::Visitor &) const = 0;
+
+	virtual std::vector<uint8_t> serialize() const = 0;
 };

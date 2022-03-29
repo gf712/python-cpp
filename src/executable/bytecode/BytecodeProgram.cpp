@@ -3,6 +3,7 @@
 #include "executable/Function.hpp"
 #include "executable/Mangler.hpp"
 #include "interpreter/InterpreterSession.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyFunction.hpp"
 
 #include <numeric>
@@ -29,7 +30,8 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		std::accumulate(functions_instruction_count.begin(), functions_instruction_count.end(), 0u);
 	// have to reserve instruction vector to avoid relocations
 	// since the iterators depend on the vector memory layout
-	m_instructions.reserve(instruction_count);
+	InstructionVector main_instructions;
+	main_instructions.reserve(instruction_count);
 
 	auto &main_func = func_blocks.functions.front();
 
@@ -39,18 +41,19 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 	for (size_t start_idx = 0; auto &block : main_func.blocks) {
 		// ASSERT(!block.empty())
 		if (block.empty()) { continue; }
-		for (auto &ins : block) { m_instructions.push_back(std::move(ins)); }
-		InstructionVector::const_iterator start = m_instructions.cbegin() + start_idx;
-		InstructionVector::const_iterator end = m_instructions.end();
+		for (auto &ins : block) { main_instructions.push_back(std::move(ins)); }
+		InstructionVector::const_iterator start = main_instructions.cbegin() + start_idx;
+		InstructionVector::const_iterator end = main_instructions.end();
 		main_blocks.emplace_back(start, end);
-		start_idx = m_instructions.size();
+		start_idx = main_instructions.size();
 	}
 
-	auto main_bytecode = std::make_shared<Bytecode>(main_func.metadata.register_count,
+	auto main_bytecode = std::make_unique<Bytecode>(main_func.metadata.register_count,
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
+		std::move(main_instructions),
 		main_blocks);
-	m_main_function = VirtualMachine::the().heap().allocate<PyCode>(main_bytecode,
+	m_main_function = VirtualMachine::the().heap().allocate<PyCode>(std::move(main_bytecode),
 		main_func.metadata.cellvars,
 		main_func.metadata.varnames,
 		main_func.metadata.freevars,
@@ -64,25 +67,28 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		PyTuple::create(main_func.metadata.consts),
 		main_func.metadata.flags);
 
+
 	for (size_t i = 1; i < func_blocks.functions.size(); ++i) {
 		auto &func = *std::next(func_blocks.functions.begin(), i);
 		std::vector<View> func_blocks_view;
-		func_blocks_view.reserve(func.blocks.size());
-		for (size_t start_idx = m_instructions.size(); auto &block : func.blocks) {
+		InstructionVector func_instructions;
+		func_instructions.reserve(func.blocks.size());
+		for (size_t start_idx = 0; auto &block : func.blocks) {
 			// ASSERT(!block.empty())
 			if (block.empty()) { continue; }
-			for (auto &ins : block) { m_instructions.push_back(std::move(ins)); }
-			InstructionVector::const_iterator start = m_instructions.cbegin() + start_idx;
-			InstructionVector::const_iterator end = m_instructions.end();
+			for (auto &ins : block) { func_instructions.push_back(std::move(ins)); }
+			InstructionVector::const_iterator start = func_instructions.cbegin() + start_idx;
+			InstructionVector::const_iterator end = func_instructions.end();
 			func_blocks_view.emplace_back(start, end);
-			start_idx = m_instructions.size();
+			start_idx = func_instructions.size();
 		}
 
-		auto bytecode = std::make_shared<Bytecode>(func.metadata.register_count,
+		auto bytecode = std::make_unique<Bytecode>(func.metadata.register_count,
 			func.metadata.stack_size,
 			func.metadata.function_name,
+			std::move(func_instructions),
 			func_blocks_view);
-		auto *code = VirtualMachine::the().heap().allocate<PyCode>(bytecode,
+		auto *code = VirtualMachine::the().heap().allocate<PyCode>(std::move(bytecode),
 			func.metadata.cellvars,
 			func.metadata.varnames,
 			func.metadata.freevars,
@@ -106,14 +112,14 @@ std::vector<View>::const_iterator BytecodeProgram::begin() const
 {
 	// FIXME: assumes all functions are bytecode
 	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
-	return std::static_pointer_cast<Bytecode>(m_main_function->function())->begin();
+	return static_cast<Bytecode *>(m_main_function->function().get())->begin();
 }
 
 std::vector<View>::const_iterator BytecodeProgram::end() const
 {
 	// FIXME: assumes all functions are bytecode
 	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
-	return std::static_pointer_cast<Bytecode>(m_main_function->function())->end();
+	return static_cast<Bytecode *>(m_main_function->function().get())->end();
 }
 
 std::string BytecodeProgram::to_string() const
@@ -245,4 +251,33 @@ void BytecodeProgram::visit_functions(Cell::Visitor &visitor) const
 {
 	visitor.visit(*const_cast<PyCode *>(m_main_function));
 	for (auto &f : m_functions) { visitor.visit(*const_cast<PyCode *>(f)); };
+}
+
+std::vector<uint8_t> BytecodeProgram::serialize() const
+{
+	std::vector<uint8_t> result;
+	const auto main_func_serialized = m_main_function->serialize();
+	result.insert(result.end(), main_func_serialized.begin(), main_func_serialized.end());
+
+	for (const auto &func : m_functions) {
+		const auto func_serialized = func->serialize();
+		result.insert(result.end(), func_serialized.begin(), func_serialized.end());
+	}
+
+	// TODO: Add support to serialize functions from different backends
+	ASSERT(m_backends.empty())
+
+	return result;
+}
+
+std::unique_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<uint8_t> &buffer)
+{
+	auto program = std::unique_ptr<BytecodeProgram>(new BytecodeProgram);
+
+	auto span = std::span{ buffer };
+	program->m_main_function = PyCode::deserialize(span).first;
+
+	while (!span.empty()) { program->m_functions.push_back(PyCode::deserialize(span).first); }
+
+	return program;
 }

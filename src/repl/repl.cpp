@@ -112,7 +112,7 @@ int run_and_execute_script(int argc,
 			std::cout << "Generated LLVM IR (experimental feature): \n";
 			std::cout << llvm_code->to_string() << '\n';
 			std::cout << "------------------------------------------------\n";
-			std::static_pointer_cast<BytecodeProgram>(bytecode)->add_backend(llvm_code);
+			static_cast<BytecodeProgram *>(bytecode.get())->add_backend(llvm_code);
 		}
 #else
 		std::cout << "Python interpreter was compiled without LLVM\n";

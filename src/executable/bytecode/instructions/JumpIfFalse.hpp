@@ -22,4 +22,6 @@ class JumpIfFalse final : public Instruction
 	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final;
+
+	std::vector<uint8_t> serialize() const final;
 };

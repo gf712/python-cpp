@@ -37,6 +37,8 @@ class LLVMProgram : public Program
 
 	void visit_functions(Cell::Visitor &) const final {}
 
+	std::vector<uint8_t> serialize() const final { TODO(); }
+
   private:
 	void create_interop_function(const std::shared_ptr<Function> &,
 		const std::string &mangled_name) const;

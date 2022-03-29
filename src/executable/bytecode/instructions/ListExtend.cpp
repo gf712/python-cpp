@@ -17,3 +17,12 @@ void ListExtend::execute(VirtualMachine &vm, Interpreter &) const
 
 	as<PyList>(pylist)->extend(PyTuple::create(value), nullptr);
 }
+
+std::vector<uint8_t> ListExtend::serialize() const
+{
+	return {
+		LIST_EXTEND,
+		m_list,
+		m_value,
+	};
+}

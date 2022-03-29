@@ -25,4 +25,13 @@ class StoreFast final : public Instruction
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const override
+	{
+		return {
+			STORE_FAST,
+			m_stack_index,
+			m_src,
+		};
+	}
 };

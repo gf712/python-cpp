@@ -30,4 +30,12 @@ class LoadFast final : public Instruction
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const final
+	{
+		return {
+			m_destination,
+			m_stack_index,
+		};
+	}
 };

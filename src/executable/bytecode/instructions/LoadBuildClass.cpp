@@ -11,3 +11,12 @@ void LoadBuildClass::execute(VirtualMachine &vm, Interpreter &intepreter) const
 		std::get<PyObject *>(intepreter.execution_frame()->builtins()->symbol_table().at(
 			PyString::create("__build_class__")));
 }
+
+
+std::vector<uint8_t> LoadBuildClass::serialize() const
+{
+	return {
+		LOAD_ATTR,
+		m_dst,
+	};
+}

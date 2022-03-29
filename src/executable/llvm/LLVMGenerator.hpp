@@ -49,5 +49,7 @@ class LLVMFunction : public ::Function
 	std::string to_string() const override;
 
 	const llvm::Function &impl() const { return m_function; }
+
+	std::vector<uint8_t> serialize() const override { TODO(); }
 };
 }// namespace codegen

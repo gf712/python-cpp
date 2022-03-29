@@ -25,3 +25,11 @@ void JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpret
 		vm.jump_blocks(2);
 	}
 }
+
+std::vector<uint8_t> JumpIfNotExceptionMatch::serialize() const
+{
+	return {
+		JUMP_IF_NOT_EXCEPTION_MATCH,
+		m_exception_type_reg,
+	};
+}

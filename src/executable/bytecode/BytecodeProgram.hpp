@@ -8,10 +8,11 @@
 
 class BytecodeProgram : public Program
 {
-	InstructionVector m_instructions;
 	std::vector<py::PyCode *> m_functions;
 	py::PyCode *m_main_function;
 	std::vector<std::shared_ptr<Program>> m_backends;
+
+	BytecodeProgram() {}
 
   public:
 	BytecodeProgram(FunctionBlocks &&func_blocks,
@@ -40,4 +41,8 @@ class BytecodeProgram : public Program
 	void add_backend(std::shared_ptr<Program>);
 
 	void visit_functions(Cell::Visitor &) const override;
+
+	std::vector<uint8_t> serialize() const final;
+
+	static std::unique_ptr<BytecodeProgram> deserialize(const std::vector<uint8_t> &);
 };

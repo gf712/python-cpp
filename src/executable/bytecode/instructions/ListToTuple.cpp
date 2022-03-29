@@ -15,3 +15,12 @@ void ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
 
 	vm.reg(m_tuple) = PyTuple::create(as<PyList>(pylist)->elements());
 }
+
+std::vector<uint8_t> ListToTuple::serialize() const
+{
+	return {
+		LIST_TO_TUPLE,
+		m_tuple,
+		m_list,
+	};
+}

@@ -95,7 +95,7 @@ PyModule *PyModule::create(PyString *name)
 
 	// hold on to the program until the module is destructed
 	// This is important to keep the instruction vector alive
-	module->m_program = program;
+	module->m_program = std::move(program);
 
 	for (const auto &[k, v] : module_dict->map()) {
 		if (std::holds_alternative<PyObject *>(k)) {

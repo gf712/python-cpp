@@ -12,3 +12,12 @@ void GetIter::execute(VirtualMachine &vm, Interpreter &) const
 			[](const auto &value) { return PyObject::from(value)->iter(); }, iterable_value);
 	}
 }
+
+std::vector<uint8_t> GetIter::serialize() const
+{
+	return {
+		GET_ITER,
+		m_dst,
+		m_src,
+	};
+}

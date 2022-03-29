@@ -95,7 +95,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 
 class RunPythonProgram : public ::testing::Test
 {
-	std::shared_ptr<Program> m_bytecode;
+	std::unique_ptr<Program> m_bytecode;
 
   protected:
 	RunPythonProgram() {}

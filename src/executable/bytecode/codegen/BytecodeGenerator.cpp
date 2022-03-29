@@ -129,13 +129,13 @@ BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &elemen
 	if (!element_registers.empty()) {
 		std::optional<size_t> offset;
 		bool first = true;
-		for (const auto &key : element_registers) {
+		for (const auto &el : element_registers) {
 			auto *dst = create_value();
 			if (first) {
 				offset = dst->get_register();
 				first = false;
 			}
-			emit<Move>(dst->get_register(), key);
+			emit<Move>(dst->get_register(), el);
 		}
 		ASSERT(offset.has_value())
 		emit<BuildList>(result->get_register(), element_registers.size(), *offset);
@@ -151,13 +151,13 @@ BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &eleme
 	if (!element_registers.empty()) {
 		std::optional<size_t> offset;
 		bool first = true;
-		for (const auto &key : element_registers) {
+		for (const auto &el : element_registers) {
 			auto *dst = create_value();
 			if (first) {
 				offset = dst->get_register();
 				first = false;
 			}
-			emit<Move>(dst->get_register(), key);
+			emit<Move>(dst->get_register(), el);
 		}
 		ASSERT(offset.has_value())
 		emit<BuildTuple>(result->get_register(), element_registers.size(), *offset);
@@ -166,6 +166,27 @@ BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &eleme
 	}
 	return result;
 }
+
+void BytecodeGenerator::emit_call(Register func, const std::vector<Register> &args)
+{
+	if (!args.empty()) {
+		std::optional<size_t> offset;
+		bool first = true;
+		for (const auto &arg : args) {
+			auto *dst = create_value();
+			if (first) {
+				offset = dst->get_register();
+				first = false;
+			}
+			emit<Move>(dst->get_register(), arg);
+		}
+		ASSERT(offset.has_value())
+		emit<FunctionCall>(func, args.size(), *offset);
+	} else {
+		emit<FunctionCall>(func, 0, 0);
+	}
+}
+
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
@@ -513,7 +534,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		args.push_back(function);
 		for (int32_t i = decorator_functions.size() - 1; i >= 0; --i) {
 			const auto &decorator_function = decorator_functions[i];
-			emit<FunctionCall>(decorator_function->get_register(),
+			emit_call(decorator_function->get_register(),
 				std::vector<Register>{ args.back()->get_register() });
 			args.clear();
 			args.push_back(create_return_value());
@@ -750,7 +771,7 @@ Value *BytecodeGenerator::visit(const Call *node)
 			}
 
 			if (keyword_registers.empty()) {
-				emit<FunctionCall>(func->get_register(), std::move(arg_registers));
+				emit_call(func->get_register(), std::move(arg_registers));
 			} else {
 				emit<FunctionCallWithKeywords>(func->get_register(),
 					std::move(arg_registers),
@@ -1037,7 +1058,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		load_const(py::Number{ static_cast<int64_t>(class_id) }, m_function_id)->get_index());
 
 	if (kwarg_registers.empty()) {
-		emit<FunctionCall>(builtin_build_class_register, std::move(arg_registers));
+		emit_call(builtin_build_class_register, std::move(arg_registers));
 	} else {
 		emit<FunctionCallWithKeywords>(builtin_build_class_register,
 			std::move(arg_registers),
@@ -1362,16 +1383,16 @@ Value *BytecodeGenerator::visit(const UnaryExpr *node)
 	auto *dst = create_value();
 	switch (node->op_type()) {
 	case UnaryOpType::ADD: {
-		emit<UnaryPositive>(dst->get_register(), src->get_register());
+		emit<Unary>(dst->get_register(), src->get_register(), Unary::Operation::POSITIVE);
 	} break;
 	case UnaryOpType::SUB: {
-		emit<UnaryNegative>(dst->get_register(), src->get_register());
+		emit<Unary>(dst->get_register(), src->get_register(), Unary::Operation::NEGATIVE);
 	} break;
 	case UnaryOpType::INVERT: {
-		emit<UnaryInvert>(dst->get_register(), src->get_register());
+		emit<Unary>(dst->get_register(), src->get_register(), Unary::Operation::INVERT);
 	} break;
 	case UnaryOpType::NOT: {
-		emit<UnaryNot>(dst->get_register(), src->get_register());
+		emit<Unary>(dst->get_register(), src->get_register(), Unary::Operation::NOT);
 	} break;
 	}
 
@@ -1427,7 +1448,7 @@ Value *BytecodeGenerator::visit(const Assert *node)
 	std::vector<Register> args;
 	if (node->msg()) { args.push_back(generate(node->msg().get(), m_function_id)->get_register()); }
 
-	emit<FunctionCall>(assertion_function->get_register(), std::move(args));
+	emit_call(assertion_function->get_register(), std::move(args));
 	auto *exception = create_return_value();
 	emit<RaiseVarargs>(exception->get_register());
 	bind(*end_label);
@@ -1510,14 +1531,14 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 	}
 }
 
-std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
+std::unique_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
 	std::vector<std::string> argv)
 {
 	ASSERT(m_frame_register_count.size() == 2)
 	ASSERT(m_frame_stack_value_count.size() == 2)
 	ASSERT(m_frame_free_var_count.size() == 2)
 	relocate_labels(m_functions);
-	return std::make_shared<BytecodeProgram>(std::move(m_functions), filename, argv);
+	return std::make_unique<BytecodeProgram>(std::move(m_functions), filename, argv);
 }
 
 InstructionBlock *BytecodeGenerator::allocate_block(size_t function_id)
@@ -1529,7 +1550,7 @@ InstructionBlock *BytecodeGenerator::allocate_block(size_t function_id)
 	return &new_block;
 }
 
-std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node,
+std::unique_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node,
 	std::vector<std::string> argv,
 	compiler::OptimizationLevel lvl)
 {

@@ -24,3 +24,12 @@ void LoadGlobal::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 	interpreter.raise_exception(name_error("name '{:s}' is not defined", m_object_name));
 }
+
+std::vector<uint8_t> LoadGlobal::serialize() const
+{
+	TODO();
+	return {
+		LOAD_GLOBAL,
+		m_destination,
+	};
+}

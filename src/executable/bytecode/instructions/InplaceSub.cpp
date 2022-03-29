@@ -7,3 +7,12 @@ void InplaceSub::execute(VirtualMachine &vm, Interpreter &interpreter) const
 	const auto &rhs = vm.reg(m_rhs);
 	if (auto result = subtract(lhs, rhs, interpreter)) { lhs = *result; }
 }
+
+std::vector<uint8_t> InplaceSub::serialize() const
+{
+	return {
+		INPLACE_SUB,
+		m_lhs,
+		m_rhs,
+	};
+}

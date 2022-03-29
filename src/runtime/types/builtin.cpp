@@ -6,6 +6,7 @@
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyCell.hpp"
 #include "runtime/PyClassMethod.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
 #include "runtime/PyFloat.hpp"

@@ -13,3 +13,5 @@ void ClearExceptionState::execute(VirtualMachine &, Interpreter &interpreter) co
 
 	interpreter.execution_frame()->clear_stashed_exception();
 }
+
+std::vector<uint8_t> ClearExceptionState::serialize() const { return { CLEAR_EXCEPTION_STATE }; }

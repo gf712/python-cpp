@@ -22,3 +22,12 @@ void DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 
 	as<PyDict>(this_pydict)->merge(PyTuple::create(other_pydict), nullptr);
 }
+
+std::vector<uint8_t> DictMerge::serialize() const
+{
+	return {
+		MERGE_DICT,
+		m_this_dict,
+		m_other_dict,
+	};
+}

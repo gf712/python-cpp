@@ -23,4 +23,6 @@ class MethodCall final : public Instruction
 	void execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const final;
 };

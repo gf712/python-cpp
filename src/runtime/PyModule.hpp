@@ -17,7 +17,7 @@ class PyModule : public PyBaseObject
 	MapType m_symbol_table;
 	PyString *m_module_name;
 
-	std::shared_ptr<Program> m_program;
+	std::unique_ptr<Program> m_program;
 
   public:
 	PyModule(PyString *module_name);

@@ -25,4 +25,14 @@ class LoadConst final : public Instruction
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+
+	std::vector<uint8_t> serialize() const final
+	{
+		ASSERT(m_static_value_index < std::numeric_limits<uint8_t>::max())
+		return {
+			LOAD_CONST,
+			m_destination,
+			static_cast<u_int8_t>(m_static_value_index),
+		};
+	}
 };

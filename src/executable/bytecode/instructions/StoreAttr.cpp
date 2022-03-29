@@ -16,3 +16,13 @@ void StoreAttr::execute(VirtualMachine &vm, Interpreter &) const
 		TODO();
 	}
 }
+
+std::vector<uint8_t> StoreAttr::serialize() const
+{
+	TODO();
+	return {
+		STORE_ATTR,
+		m_dst,
+		m_src,
+	};
+}

@@ -46,3 +46,14 @@ void BinaryOperation::execute(VirtualMachine &vm, Interpreter &interpreter) cons
 		vm.reg(m_destination) = *result;
 	}
 }
+
+std::vector<uint8_t> BinaryOperation::serialize() const
+{
+	return {
+		BINARY_OPERATION,
+		m_destination,
+		m_lhs,
+		m_rhs,
+		static_cast<uint8_t>(m_operation),
+	};
+}

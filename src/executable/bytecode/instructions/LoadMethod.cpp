@@ -27,7 +27,7 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &) const
 	} else {
 		auto maybe_method = this_obj->get_method(PyString::create(m_method_name));
 		if (!maybe_method) {
-			// FIXME: maybe check here if there is an active exception? 
+			// FIXME: maybe check here if there is an active exception?
 			// interpreter.raise_exception(attribute_error(
 			// 	"object '{}' has no attribute '{}'", this_obj->name(), m_method_name));
 			return;
@@ -36,4 +36,14 @@ void LoadMethod::execute(VirtualMachine &vm, Interpreter &) const
 		ASSERT(maybe_method->is_callable())
 		vm.reg(m_destination) = maybe_method;
 	}
+}
+
+std::vector<uint8_t> LoadMethod::serialize() const
+{
+	TODO();
+	return {
+		LOAD_METHOD,
+		m_destination,
+		m_value_source,
+	};
 }

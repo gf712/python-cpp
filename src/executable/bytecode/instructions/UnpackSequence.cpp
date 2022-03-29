@@ -89,3 +89,12 @@ void UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 		}
 	}
 }
+
+std::vector<uint8_t> UnpackSequence::serialize() const
+{
+	TODO();
+	return {
+		UNPACK_SEQUENCE,
+		m_source,
+	};
+}

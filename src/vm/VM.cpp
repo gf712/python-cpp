@@ -51,16 +51,16 @@ void VirtualMachine::setup_call_stack(size_t register_count, size_t stack_size)
 	push_frame(register_count, stack_size);
 }
 
-int VirtualMachine::call(const std::shared_ptr<Function> &function)
+int VirtualMachine::call(const std::unique_ptr<Function> &function)
 {
 	ASSERT(function->backend() == FunctionExecutionBackend::BYTECODE)
-	const auto &first_block = std::static_pointer_cast<Bytecode>(function)->begin();
+	const auto &first_block = static_cast<Bytecode *>(function.get())->begin();
 	const auto func_ip = first_block->begin();
 	int result = EXIT_SUCCESS;
 
 	const auto stack_depth = m_stack.size();
-	auto block_view = std::static_pointer_cast<Bytecode>(function)->begin();
-	auto end_function_block = std::static_pointer_cast<Bytecode>(function)->end();
+	auto block_view = static_cast<Bytecode *>(function.get())->begin();
+	auto end_function_block = static_cast<Bytecode *>(function.get())->end();
 
 	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
 	//            What you can do is leave a block (and not the function) at any time and
@@ -106,7 +106,7 @@ int VirtualMachine::call(const std::shared_ptr<Function> &function)
 
 void VirtualMachine::ret() { pop_frame(); }
 
-int VirtualMachine::execute(std::shared_ptr<Program> program) { return program->execute(this); }
+int VirtualMachine::execute(std::unique_ptr<Program> &program) { return program->execute(this); }
 
 Interpreter &VirtualMachine::interpreter() { return m_interpreter_session->interpreter(); }
 

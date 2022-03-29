@@ -93,6 +93,8 @@ class BytecodeFunctionValue : public BytecodeValue
 
 class BytecodeGenerator : public ast::CodeGenerator
 {
+	friend FunctionInfo;
+
 	class ASTContext
 	{
 		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
@@ -153,12 +155,13 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::stack<Scope> m_stack;
 
   public:
-	BytecodeGenerator();
-	~BytecodeGenerator();
-
-	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
+	static std::unique_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
 		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
+
+  private:
+	BytecodeGenerator();
+	~BytecodeGenerator();
 
 	template<typename OpType, typename... Args> void emit(Args &&... args)
 	{
@@ -264,6 +267,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeValue *build_dict(const std::vector<Register> &, const std::vector<Register> &);
 	BytecodeValue *build_list(const std::vector<Register> &);
 	BytecodeValue *build_tuple(const std::vector<Register> &);
+	void emit_call(Register func, const std::vector<Register> &);
 
   private:
 #define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;
@@ -316,7 +320,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		return static_cast<BytecodeFreeValue *>(m_values.back().get());
 	}
 
-	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
+	std::unique_ptr<Program> generate_executable(std::string, std::vector<std::string>);
 	void relocate_labels(const FunctionBlocks &functions);
 
 	void set_insert_point(InstructionBlock *block) { m_current_block = block; }

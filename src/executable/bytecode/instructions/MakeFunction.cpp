@@ -44,3 +44,12 @@ void MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		Mangler::default_mangler().function_demangle(m_function_name);
 	vm.reg(m_dst) = func;
 }
+
+std::vector<uint8_t> MakeFunction::serialize() const
+{
+	TODO();
+	return {
+		MAKE_FUNCTION,
+		m_dst,
+	};
+}

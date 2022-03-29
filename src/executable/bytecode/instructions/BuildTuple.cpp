@@ -15,3 +15,16 @@ void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 	}
 	vm.reg(m_dst) = PyTuple::create(elements);
 };
+
+std::vector<uint8_t> BuildTuple::serialize() const
+{
+	ASSERT(m_size < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_stack_offset < std::numeric_limits<uint8_t>::max())
+
+	return {
+		BUILD_TUPLE,
+		m_dst,
+		static_cast<uint8_t>(m_size),
+		static_cast<uint8_t>(m_stack_offset),
+	};
+}

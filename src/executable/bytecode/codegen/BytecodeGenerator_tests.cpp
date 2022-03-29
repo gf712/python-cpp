@@ -1,5 +1,5 @@
+#include "../BytecodeProgram.hpp"
 #include "BytecodeGenerator.hpp"
-
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
 
@@ -7,7 +7,7 @@
 
 
 namespace {
-std::unique_ptr<codegen::BytecodeGenerator> generate_bytecode(std::string_view program)
+std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_bytecode_generator_tests_.py");
 	parser::Parser p{ lexer };
@@ -16,12 +16,9 @@ std::unique_ptr<codegen::BytecodeGenerator> generate_bytecode(std::string_view p
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	auto generator = std::make_unique<codegen::BytecodeGenerator>();
-
-	ast::ASTContext ctx;
-	module->codegen(generator.get());
-
-	return generator;
+	return std::unique_ptr<BytecodeProgram>(static_cast<BytecodeProgram *>(
+		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None)
+			.release()));
 }
 }// namespace
 
@@ -30,14 +27,12 @@ TEST(BytecodeGenerator, EmitsMainProgram)
 	static constexpr std::string_view program = "print(\"Hello, world!\")\n";
 
 	auto bytecode_generator = generate_bytecode(program);
-	ASSERT_EQ(bytecode_generator->functions().size(), 1);
-
-	const auto &main = bytecode_generator->function(0);
-	ASSERT_EQ(main.size(), 1);
+	ASSERT_EQ(bytecode_generator->functions().size(), 0);
+	ASSERT_TRUE(bytecode_generator->main_function());
 }
 
 
-TEST(BytecodeGenerator, EmitsProgramWithFunctionDefinition)
+TEST(BytecodeGenerator, EmitsProgramWithFunctionDefinitions)
 {
 	constexpr std::string_view program =
 		"def foo(arg):\n"
@@ -46,20 +41,6 @@ TEST(BytecodeGenerator, EmitsProgramWithFunctionDefinition)
 		"   return arg\n";
 
 	auto bytecode_generator = generate_bytecode(program);
-	ASSERT_EQ(bytecode_generator->functions().size(), 3);
-}
-
-
-TEST(BytecodeGenerator, GeneratesCorrectLabels)
-{
-	constexpr std::string_view program =
-		"if foo == 42:\n"
-		"  print(\"It's foo!\")\n"
-		"else:\n"
-		"  print(\"Not foo..\")\n";
-
-	auto bytecode_generator = generate_bytecode(program);
-	ASSERT_EQ(bytecode_generator->functions().size(), 1);
-
-	ASSERT_EQ(bytecode_generator->labels().size(), 2);
+	ASSERT_EQ(bytecode_generator->functions().size(), 2);
+	ASSERT_TRUE(bytecode_generator->main_function());
 }

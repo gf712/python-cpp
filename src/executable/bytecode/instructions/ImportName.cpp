@@ -15,3 +15,12 @@ void ImportName::execute(VirtualMachine &vm, Interpreter &) const
 	auto module_name = PyString::create(name);
 	if (auto *module = PyModule::create(module_name)) { vm.reg(m_destination) = module; }
 }
+
+std::vector<uint8_t> ImportName::serialize() const
+{
+	TODO();
+	return {
+		IMPORT_NAME,
+		m_destination,
+	};
+}

@@ -4,10 +4,10 @@
 
 using namespace py;
 
-void UnaryPositive::execute(VirtualMachine &vm, Interpreter &interpreter) const
+namespace {
+Value unary_positive(const Value &val, Interpreter &interpreter)
 {
-	const auto &val = vm.reg(m_source);
-	const auto result = std::visit(
+	return std::visit(
 		overloaded{ [](const Number &val) -> Value { return val; },
 			[&interpreter](const String &) -> Value {
 				interpreter.raise_exception(type_error("bad operand type for unary +: 'str'"));
@@ -31,13 +31,11 @@ void UnaryPositive::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			},
 			[](PyObject *obj) -> Value { return obj->pos(); } },
 		val);
-	vm.reg(m_destination) = result;
 }
 
-void UnaryNegative::execute(VirtualMachine &vm, Interpreter &interpreter) const
+Value unary_negative(const Value &val, Interpreter &interpreter)
 {
-	const auto &val = vm.reg(m_source);
-	const auto result = std::visit(
+	return std::visit(
 		overloaded{ [](const Number &val) -> Value {
 					   return std::visit([](const auto &v) { return Number{ -v }; }, val.value);
 				   },
@@ -64,5 +62,34 @@ void UnaryNegative::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			},
 			[](PyObject *obj) -> Value { return obj->neg(); } },
 		val);
-	vm.reg(m_destination) = result;
+}
+}// namespace
+
+void Unary::execute(VirtualMachine &vm, Interpreter &interpreter) const
+{
+	const auto &val = vm.reg(m_source);
+	switch (m_operation) {
+	case Operation::POSITIVE: {
+		vm.reg(m_destination) = unary_positive(val, interpreter);
+	} break;
+	case Operation::NEGATIVE: {
+		vm.reg(m_destination) = unary_negative(val, interpreter);
+	} break;
+	case Operation::INVERT: {
+		TODO();
+	} break;
+	case Operation::NOT: {
+		TODO();
+	} break;
+	}
+}
+
+std::vector<uint8_t> Unary::serialize() const
+{
+	return {
+		UNARY,
+		m_destination,
+		m_source,
+		static_cast<uint8_t>(m_operation),
+	};
 }

@@ -24,6 +24,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/GetIter.cpp
     executable/bytecode/instructions/InplaceSub.cpp
+    executable/bytecode/instructions/Instructions.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Jump.cpp
     executable/bytecode/instructions/JumpForward.cpp
@@ -93,6 +94,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyBytes.cpp
     runtime/PyCell.cpp
     runtime/PyClassMethod.cpp
+    runtime/PyCode.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp
@@ -126,12 +128,14 @@ set(UNITTEST_SOURCES
     # cmake-format: sortable
     ast/optimizers/Optimizers_tests.cpp
     executable/bytecode/Bytecode_tests.cpp
+    executable/bytecode/BytecodeProgram_tests.cpp
     executable/bytecode/codegen/BytecodeGenerator_tests.cpp
     executable/bytecode/codegen/VariablesResolver_tests.cpp
     lexer/Lexer_tests.cpp
     parser/Parser_tests.cpp
     runtime/PyNumber_tests.cpp
-    runtime/PyType_tests.cpp)
+    runtime/PyType_tests.cpp
+    testing/main.cpp)
 
 add_library(
   python-cpp

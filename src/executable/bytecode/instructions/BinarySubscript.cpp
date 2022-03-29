@@ -8,3 +8,13 @@ void BinarySubscript::execute(VirtualMachine &vm, Interpreter &) const
 	(void)slice;
 	TODO();
 }
+
+std::vector<uint8_t> BinarySubscript::serialize() const
+{
+	return {
+		BINARY_SUBSCRIPT,
+		m_dst,
+		m_src,
+		m_index,
+	};
+}

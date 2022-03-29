@@ -27,3 +27,12 @@ void MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 
 	if (auto *result = obj->call(args_tuple, kwargs)) { vm.reg(0) = result; }
 }
+
+std::vector<uint8_t> MethodCall::serialize() const
+{
+	TODO();
+	return {
+		METHOD_CALL,
+		m_caller,
+	};
+}
