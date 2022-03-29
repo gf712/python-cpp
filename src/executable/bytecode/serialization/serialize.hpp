@@ -61,7 +61,7 @@ inline void serialize(const VectorType &value, std::vector<uint8_t> &result)
 }
 
 template<>
-inline void serialize<const PyTuple *>(const PyTuple *const &value, std::vector<uint8_t> &result)
+inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<uint8_t> &result)
 {
 	serialize(value->size(), result);
 	for (const auto &el : value->elements()) {

@@ -272,6 +272,7 @@ std::vector<uint8_t> BytecodeProgram::serialize() const
 
 std::unique_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<uint8_t> &buffer)
 {
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 	auto program = std::unique_ptr<BytecodeProgram>(new BytecodeProgram);
 
 	auto span = std::span{ buffer };

@@ -1,8 +1,6 @@
 #include "StoreName.hpp"
 
-#include "runtime/PyNumber.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
+#include "executable/bytecode/serialization/serialize.hpp"
 
 using namespace py;
 
@@ -14,9 +12,12 @@ void StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 
 std::vector<uint8_t> StoreName::serialize() const
 {
-	TODO();
-	return {
+	std::vector<uint8_t> result{
 		STORE_NAME,
 		m_source,
 	};
+
+	py::serialize(m_object_name, result);
+
+	return result;
 }

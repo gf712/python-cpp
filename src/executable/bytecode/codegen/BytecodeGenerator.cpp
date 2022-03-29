@@ -167,26 +167,54 @@ BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &eleme
 	return result;
 }
 
+std::tuple<size_t, size_t> BytecodeGenerator::move_to_stack(const std::vector<Register> &args)
+{
+	if (args.empty()) { return { 0, 0 }; }
+	std::optional<size_t> offset;
+	bool first = true;
+	for (const auto &arg : args) {
+		auto *dst = create_value();
+		if (first) {
+			offset = dst->get_register();
+			first = false;
+		}
+		emit<Move>(dst->get_register(), arg);
+	}
+	ASSERT(offset.has_value())
+	return { args.size(), *offset };
+}
+
 void BytecodeGenerator::emit_call(Register func, const std::vector<Register> &args)
 {
 	if (!args.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &arg : args) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), arg);
-		}
-		ASSERT(offset.has_value())
-		emit<FunctionCall>(func, args.size(), *offset);
+		const auto [args_size, stack_offset] = move_to_stack(args);
+		emit<FunctionCall>(func, args_size, stack_offset);
 	} else {
 		emit<FunctionCall>(func, 0, 0);
 	}
 }
 
+void BytecodeGenerator::make_function(Register dst,
+	const std::string &name,
+	const std::vector<Register> &defaults,
+	const std::vector<Register> &kw_defaults,
+	const std::optional<Register> &captures_tuple)
+{
+	auto *name_value_const = load_const(py::String{ name }, m_function_id);
+	auto *name_value = create_value();
+	emit<LoadConst>(name_value->get_register(), name_value_const->get_index());
+
+	const auto [defaults_size, defaults_stack_offset] = move_to_stack(defaults);
+	const auto [kw_defaults_size, kw_defaults_stack_offset] = move_to_stack(kw_defaults);
+
+	emit<MakeFunction>(dst,
+		name_value->get_register(),
+		defaults_size,
+		defaults_stack_offset,
+		kw_defaults_size,
+		kw_defaults_stack_offset,
+		captures_tuple);
+}
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
@@ -464,13 +492,11 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
 	}
 
-	std::vector<std::optional<Register>> kw_defaults;
+	std::vector<Register> kw_defaults;
 	kw_defaults.reserve(node->args()->kw_defaults().size());
 	for (const auto &default_node : node->args()->kw_defaults()) {
 		if (default_node) {
 			kw_defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
-		} else {
-			kw_defaults.push_back(std::nullopt);
 		}
 	}
 
@@ -525,7 +551,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	f->function_info().function.metadata.nlocals = varnames.size();
 	f->function_info().function.metadata.flags = flags;
 
-	emit<MakeFunction>(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
+	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
 	store_name(node->name(), f);
 	if (!decorator_functions.empty()) {

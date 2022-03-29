@@ -34,6 +34,7 @@ class LoadFast final : public Instruction
 	std::vector<uint8_t> serialize() const final
 	{
 		return {
+			LOAD_FAST,
 			m_destination,
 			m_stack_index,
 		};

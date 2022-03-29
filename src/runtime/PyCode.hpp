@@ -20,7 +20,7 @@ class PyCode : public PyBaseObject
 	const size_t m_kwonly_arg_count;
 	const std::vector<size_t> m_cell2arg;
 	const size_t m_nlocals;
-	const PyTuple *m_consts = nullptr;
+	PyTuple *m_consts = nullptr;
 	CodeFlags m_flags;
 
   public:

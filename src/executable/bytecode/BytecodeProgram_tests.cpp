@@ -21,7 +21,19 @@ std::unique_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 }
 }// namespace
 
-TEST(BytecodeProgramRun, SerializesMainFunction)
+class BytecodeProgramRun : public ::testing::Test
+{
+  protected:
+	BytecodeProgramRun() {}
+
+	virtual ~BytecodeProgramRun() {}
+
+	virtual void SetUp() { VirtualMachine::the().clear(); }
+
+	virtual void TearDown() { VirtualMachine::the().clear(); }
+};
+
+TEST_F(BytecodeProgramRun, SerializesMainFunction)
 {
 	static constexpr std::string_view program = "print(\"Hello, world!\")\n";
 
@@ -30,9 +42,26 @@ TEST(BytecodeProgramRun, SerializesMainFunction)
 	ASSERT_TRUE(!serialized_bytecode.empty());
 }
 
-TEST(BytecodeProgramRun, DeserializesMainFunction)
+TEST_F(BytecodeProgramRun, DeserializesMainFunction)
 {
 	static constexpr std::string_view program = "print(\"Hello, world!\")\n";
+
+	auto bytecode_program = generate_bytecode(program);
+	auto serialized_bytecode = bytecode_program->serialize();
+	auto deserialized_bytecode = BytecodeProgram::deserialize(serialized_bytecode);
+	auto executable = std::unique_ptr<Program>(deserialized_bytecode.release());
+	ASSERT_EQ(VirtualMachine::the().execute(executable), EXIT_SUCCESS);
+}
+
+TEST_F(BytecodeProgramRun, DeserializesMultipleFunctions)
+{
+	static constexpr std::string_view program =
+		"def add(a, b):\n"
+		"   return a + b\n"
+		"def sub(a, b):\n"
+		"   return a - b\n"
+		"assert add(20, 22) == 42\n"
+		"assert sub(42, 22) == 20\n";
 
 	auto bytecode_program = generate_bytecode(program);
 	auto serialized_bytecode = bytecode_program->serialize();

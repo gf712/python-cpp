@@ -19,6 +19,8 @@ class Label
 		: m_label_name(std::move(name)), m_function_id(function_id)
 	{}
 
+	Label(int64_t position) : m_position(position), m_immutable(true) {}
+
 	void set_position(int64_t position) const
 	{
 		// a hack to make sure multiple instructions cannot relocate a

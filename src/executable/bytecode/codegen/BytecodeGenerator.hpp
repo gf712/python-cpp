@@ -264,10 +264,16 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	BytecodeStaticValue *load_const(const py::Value &, size_t);
 
+	std::tuple<size_t, size_t> move_to_stack(const std::vector<Register> &args);
 	BytecodeValue *build_dict(const std::vector<Register> &, const std::vector<Register> &);
 	BytecodeValue *build_list(const std::vector<Register> &);
 	BytecodeValue *build_tuple(const std::vector<Register> &);
 	void emit_call(Register func, const std::vector<Register> &);
+	void make_function(Register,
+		const std::string &,
+		const std::vector<Register> &,
+		const std::vector<Register> &,
+		const std::optional<Register> &);
 
   private:
 #define __AST_NODE_TYPE(NodeType) ast::Value *visit(const ast::NodeType *node) override;

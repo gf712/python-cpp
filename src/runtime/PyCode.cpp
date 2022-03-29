@@ -83,7 +83,6 @@ std::vector<uint8_t> PyCode::serialize() const
 
 std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer)
 {
-	std::cout << "deserialize " << buffer.size() << '\n';
 	size_t serialized_function_size{ 0 };
 	for (size_t i = 0; i < sizeof(size_t); ++i) {
 		reinterpret_cast<uint8_t *>(&serialized_function_size)[i] = buffer[i];
@@ -125,7 +124,10 @@ std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 namespace {
 	std::once_flag code_flag;
 
-	std::unique_ptr<TypePrototype> register_code() { return std::move(klass<PyCode>("code").type); }
+	std::unique_ptr<TypePrototype> register_code() { 
+		return std::move(klass<PyCode>("code")
+							.attr("co_consts", &PyCode::m_consts)
+							.type); }
 }// namespace
 
 std::unique_ptr<TypePrototype> PyCode::register_type()
