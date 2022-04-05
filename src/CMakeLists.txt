@@ -212,7 +212,7 @@ if(LLVM_FOUND)
   target_link_libraries(unittests PRIVATE python-cpp-llvm)
 endif()
 
-target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main)
+target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main cxxopts)
 
 add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp)
