@@ -1541,7 +1541,6 @@ struct SlicesPattern : Pattern<SlicesPattern>
 			return true;
 		}
 
-		p.pop_back();
 		return false;
 	}
 };
