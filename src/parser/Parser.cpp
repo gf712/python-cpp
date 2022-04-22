@@ -340,9 +340,32 @@ template<typename PatternType> struct LookAhead : Pattern<LookAhead<PatternType>
 };
 
 
+template<typename... Ts> struct is_tuple : std::false_type
+{
+};
+
+template<typename... Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type
+{
+};
+
+template<typename T> static constexpr bool is_tuple_v = is_tuple<T>{};
+
 template<typename lhs, typename rhs> struct AndLiteral : Pattern<AndLiteral<lhs, rhs>>
 {
 	static constexpr size_t advance_by = lhs::advance_by;
+
+	template<typename PatternType>
+	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	{
+		return PatternType::matches(token);
+	}
+
+	template<typename PatternTypes>
+	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	{
+		return std::apply(
+			[&](auto... r) { return (... && decltype(r)::matches(token)); }, PatternTypes{});
+	}
 
 	static bool matches_impl(Parser &p)
 	{
@@ -351,7 +374,7 @@ template<typename lhs, typename rhs> struct AndLiteral : Pattern<AndLiteral<lhs,
 			const size_t size =
 				std::distance(token->start().pointer_to_program, token->end().pointer_to_program);
 			std::string_view token_sv{ token->start().pointer_to_program, size };
-			return rhs::matches(token_sv);
+			return matches_<rhs>(token_sv);
 		}
 		return false;
 	}
@@ -362,6 +385,19 @@ template<typename lhs, typename rhs> struct AndNotLiteral : Pattern<AndNotLitera
 {
 	static constexpr size_t advance_by = lhs::advance_by;
 
+	template<typename PatternType>
+	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	{
+		return !PatternType::matches(token);
+	}
+
+	template<typename PatternTypes>
+	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	{
+		return !std::apply(
+			[&](auto... r) { return (... || decltype(r)::matches(token)); }, PatternTypes{});
+	}
+
 	static bool matches_impl(Parser &p)
 	{
 		if (lhs::matches(p)) {
@@ -369,7 +405,7 @@ template<typename lhs, typename rhs> struct AndNotLiteral : Pattern<AndNotLitera
 			const size_t size =
 				std::distance(token->start().pointer_to_program, token->end().pointer_to_program);
 			std::string_view token_sv{ token->start().pointer_to_program, size };
-			return !rhs::matches(token_sv);
+			return matches_<rhs>(token_sv);
 		}
 		return true;
 	}
@@ -481,6 +517,11 @@ struct RaiseKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "raise"; }
 };
 
+struct ReturnPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "return"; }
+};
+
 struct TryKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "try"; }
@@ -495,6 +536,32 @@ struct WithKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "with"; }
 };
+
+using ReservedKeywords = std::tuple<AndKeywordPattern,
+	AsKeywordPattern,
+	AssertKeywordPattern,
+	BreakKeywordPattern,
+	ContinueKeywordPattern,
+	DeleteKeywordPattern,
+	ElifKeywordPattern,
+	ElseKeywordPattern,
+	ExceptKeywordPattern,
+	FinallyKeywordPattern,
+	ForKeywordPattern,
+	FromKeywordPattern,
+	GlobalKeywordPattern,
+	IfKeywordPattern,
+	IsKeywordPattern,
+	ImportKeywordPattern,
+	InKeywordPattern,
+	NotKeywordPattern,
+	OrKeywordPattern,
+	PassKeywordPattern,
+	RaiseKeywordPattern,
+	ReturnPattern,
+	TryKeywordPattern,
+	WhileKeywordPattern,
+	WithKeywordPattern>;
 
 struct StarAtomPattern : Pattern<StarAtomPattern>
 {
@@ -1131,15 +1198,7 @@ struct AtomPattern : Pattern<AtomPattern>
 		// NAME
 		// using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		using pattern1 = PatternMatch<AndPattern<SingleTokenPattern<Token::TokenType::NAME>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, RaiseKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AssertKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, IsKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, InKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
-			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>;
+			AndNotLiteral<SingleTokenPattern<Token::TokenType::NAME>, ReservedKeywords>>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("NAME");
 
@@ -1670,6 +1729,7 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, OrKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NotKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsKeywordPattern>,
+				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ReturnPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, GlobalKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, PassKeywordPattern>>>>;
 		if (pattern5::match(p)) {
@@ -2956,12 +3016,6 @@ struct AssignmentPattern : Pattern<AssignmentPattern>
 		return false;
 	}
 };
-
-struct ReturnPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "return"; }
-};
-
 
 struct ReturnStatementPattern : Pattern<ReturnStatementPattern>
 {
