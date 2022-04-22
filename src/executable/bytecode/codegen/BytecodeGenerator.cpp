@@ -1261,28 +1261,56 @@ Value *BytecodeGenerator::visit(const With *node)
 	auto *body_block = allocate_block(m_function_id);
 	auto *cleanup_block = allocate_block(m_function_id);
 
-	emit<SetupExceptionHandling>();
-
 	if (node->items().size() > 1) { TODO(); }
-	for (const auto &item : node->items()) { generate(item.get(), m_function_id); }
+	std::vector<BytecodeValue *> with_item_results;
+	for (const auto &item : node->items()) {
+		with_item_results.push_back(
+			static_cast<BytecodeValue *>(generate(item.get(), m_function_id)));
+	}
 
 	set_insert_point(body_block);
 	for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
-	emit<JumpForward>(node->items().size());
 
+	// TODO: pass exception type, value and traceback to __exit__, rather than None
 	set_insert_point(cleanup_block);
-	// emit<WithExceptStart>();
+	for (const auto &item : with_item_results) {
+		auto *exit_method = create_value();
+		emit<LoadMethod>(exit_method->get_register(), item->get_register(), "__exit__");
+		auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+		auto *none_value = create_value();
+		emit<LoadConst>(none_value->get_register(), none->get_index());
+		emit<MethodCall>(exit_method->get_register(),
+			"__exit__",
+			std::vector<Register>{ none_value->get_register(),
+				none_value->get_register(),
+				none_value->get_register() });
+	}
 	return nullptr;
 }
 
 Value *BytecodeGenerator::visit(const WithItem *node)
 {
-	auto *ctx_expr = generate(node->context_expr().get(), m_function_id);
+	auto *ctx_expr_result = generate(node->context_expr().get(), m_function_id);
+	auto *enter_method = create_value();
+	auto *ctx_expr = create_value();
+	emit<Move>(ctx_expr->get_register(), ctx_expr_result->get_register());
+	emit<LoadMethod>(enter_method->get_register(), ctx_expr->get_register(), "__enter__");
+	emit<MethodCall>(enter_method->get_register(), "__enter__", std::vector<Register>{});
+	auto *enter_result = create_return_value();
 
-	if (node->optional_vars()) {
-		ASSERT(as<Name>(node->context_expr()))
-		ASSERT(as<Name>(node->context_expr())->ids().size() == 1)
-		store_name(as<Name>(node->context_expr())->ids()[0], ctx_expr);
+	if (auto optional_vars = node->optional_vars()) {
+		if (auto name = as<Name>(optional_vars)) {
+			ASSERT(as<Name>(optional_vars)->ids().size() == 1)
+			store_name(as<Name>(optional_vars)->ids()[0], enter_result);
+		} else if (auto tuple = as<Tuple>(optional_vars)) {
+			(void)tuple;
+			TODO();
+		} else if (auto list = as<List>(optional_vars)) {
+			(void)list;
+			TODO();
+		} else {
+			ASSERT_NOT_REACHED();
+		}
 	}
 
 	return ctx_expr;
