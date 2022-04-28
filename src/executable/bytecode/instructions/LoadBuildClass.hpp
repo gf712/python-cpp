@@ -11,7 +11,7 @@ class LoadBuildClass final : public Instruction
 	LoadBuildClass(Register dst) : m_dst(dst) {}
 	std::string to_string() const final { return fmt::format("LOAD_BUILD_CLASS r{}", m_dst); }
 
-	void execute(VirtualMachine &vm, Interpreter &intepreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 
 	std::vector<uint8_t> serialize() const final;

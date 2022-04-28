@@ -3,7 +3,7 @@
 
 using namespace py;
 
-void BuildList::execute(VirtualMachine &vm, Interpreter &) const
+py::PyResult BuildList::execute(VirtualMachine &vm, Interpreter &) const
 {
 	std::vector<Value> elements;
 	elements.reserve(m_size);
@@ -13,7 +13,10 @@ void BuildList::execute(VirtualMachine &vm, Interpreter &) const
 			elements.push_back(*sp);
 		}
 	}
-	vm.reg(m_dst) = PyList::create(elements);
+
+	auto result = PyList::create(elements);
+	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
+	return result;
 };
 
 std::vector<uint8_t> BuildList::serialize() const

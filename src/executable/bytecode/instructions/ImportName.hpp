@@ -22,7 +22,7 @@ class ImportName : public Instruction
 		return fmt::format("IMPORT_NAME     r{:<3} {:<3}", m_destination, name);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

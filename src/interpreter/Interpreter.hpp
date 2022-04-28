@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ExecutionFrame.hpp"
 
 #include "forward.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/forward.hpp"
 #include "vm/VM.hpp"
 
@@ -25,8 +25,8 @@ class Interpreter
 	enum class Status { OK, EXCEPTION };
 
   private:
-	ExecutionFrame *m_current_frame{ nullptr };
-	ExecutionFrame *m_global_frame{ nullptr };
+	py::PyFrame *m_current_frame{ nullptr };
+	py::PyFrame *m_global_frame{ nullptr };
 	std::vector<py::PyModule *> m_available_modules;
 	py::PyModule *m_module;
 	py::PyModule *m_importlib;
@@ -48,14 +48,14 @@ class Interpreter
 		m_current_frame->set_exception(std::move(exception));
 	}
 
-	ExecutionFrame *execution_frame() const { return m_current_frame; }
-	ExecutionFrame *global_execution_frame() const { return m_global_frame; }
+	py::PyFrame *execution_frame() const { return m_current_frame; }
+	py::PyFrame *global_execution_frame() const { return m_global_frame; }
 
-	void set_execution_frame(ExecutionFrame *frame) { m_current_frame = frame; }
+	void set_execution_frame(py::PyFrame *frame) { m_current_frame = frame; }
 
 	void store_object(const std::string &name, const py::Value &value);
 
-	std::optional<py::Value> get_object(const std::string &name);
+	py::PyResult get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
 	py::PyObject *allocate_object(const std::string &name, Args &&... args)
@@ -87,10 +87,10 @@ class Interpreter
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const;
 
-	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, ExecutionFrame *function_frame);
-	py::PyObject *call(const std::unique_ptr<Function> &, ExecutionFrame *function_frame);
+	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
+	py::PyResult call(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
 
-	py::PyObject *call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
+	py::PyResult call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
 	const Program *program() const { return m_program; }
 

@@ -258,5 +258,5 @@ py::PyObject *LLVMProgram::as_pyfunction(const std::string &function_name,
 	std::function<PyObject *(PyTuple *, PyDict *)> llvm_func =
 		jitTargetAddressToFunction<PyObject *(*)(PyTuple *, PyDict *)>(maybe_symbol->getAddress());
 
-	return create_native_function(demangled_name, std::move(llvm_func));
+	return create_llvm_function(demangled_name, std::move(llvm_func));
 }

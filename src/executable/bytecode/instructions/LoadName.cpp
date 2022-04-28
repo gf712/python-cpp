@@ -1,10 +1,17 @@
 #include "LoadName.hpp"
 #include "executable/bytecode/serialization/serialize.hpp"
+#include "runtime/NameError.hpp"
 
+using namespace py;
 
-void LoadName::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult LoadName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	if (auto value = interpreter.get_object(m_object_name)) { vm.reg(m_destination) = *value; }
+	if (auto result = interpreter.get_object(m_object_name); result.is_ok()) {
+		vm.reg(m_destination) = result.unwrap();
+		return result;
+	} else {
+		return result;
+	}
 }
 
 std::vector<uint8_t> LoadName::serialize() const

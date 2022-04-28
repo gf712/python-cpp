@@ -11,7 +11,7 @@ class StopIteration : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend PyObject *stop_iteration(const std::string &message, Args &&... args);
+	friend BaseException *stop_iteration(const std::string &message, Args &&... args);
 
   private:
 	StopIteration(PyTuple *args);
@@ -29,11 +29,13 @@ class StopIteration : public Exception
 };
 
 template<typename... Args>
-inline PyObject *stop_iteration(const std::string &message, Args &&... args)
+inline BaseException *stop_iteration(const std::string &message, Args &&... args)
 {
-	auto *args_tuple =
-		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return StopIteration::create(args_tuple);
+	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
+	ASSERT(msg.is_ok())
+	auto args_tuple = PyTuple::create(msg.template unwrap_as<PyString>());
+	if (args_tuple.is_err()) { TODO(); }
+	return StopIteration::create(args_tuple.template unwrap_as<PyTuple>());
 }
 
 }// namespace py

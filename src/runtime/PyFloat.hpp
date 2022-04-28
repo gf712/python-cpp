@@ -9,7 +9,7 @@ class PyFloat final : public PyNumber
 	PyFloat(double);
 
   public:
-	static PyFloat *create(double);
+	static PyResult create(double);
 	PyType *type() const override;
 
 	double as_f64() const;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MemoryError.hpp"
 #include "PyObject.hpp"
 #include "PyTuple.hpp"
 #include "executable/Program.hpp"
@@ -33,15 +34,15 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> &defaults() const { return m_defaults; }
 	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
-	PyObject *call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
+	PyResult call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
 
-	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyResult __call__(PyTuple *args, PyDict *kwargs);
 	PyString *function_name() const { return m_name; }
 
 	PyDict *globals() const { return m_globals; }
 
-	PyObject *__repr__() const;
-	PyObject *__get__(PyObject *instance, PyObject *owner) const;
+	PyResult __repr__() const;
+	PyResult __get__(PyObject *instance, PyObject *owner) const;
 
 	void visit_graph(Visitor &) override;
 
@@ -53,18 +54,17 @@ class PyFunction : public PyBaseObject
 class PyNativeFunction : public PyBaseObject
 {
 	friend class ::Heap;
+	using FunctionType = std::function<PyResult(PyTuple *, PyDict *)>;
 
 	std::string m_name;
-	std::function<PyObject *(PyTuple *, PyDict *)> m_function;
+	FunctionType m_function;
 	std::vector<PyObject *> m_captures;
 
-	PyNativeFunction(std::string &&name, std::function<PyObject *(PyTuple *, PyDict *)> &&function);
+	PyNativeFunction(std::string &&name, FunctionType &&function);
 
 	// TODO: fix tracking of lambda captures
 	template<typename... Args>
-	PyNativeFunction(std::string &&name,
-		std::function<PyObject *(PyTuple *, PyDict *)> &&function,
-		Args &&... args)
+	PyNativeFunction(std::string &&name, FunctionType &&function, Args &&... args)
 		: PyNativeFunction(std::move(name), std::move(function))
 	{
 		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
@@ -72,21 +72,23 @@ class PyNativeFunction : public PyBaseObject
 
   public:
 	template<typename... Args>
-	static PyNativeFunction *create(std::string name,
-		std::function<PyObject *(PyTuple *, PyDict *)> function,
+	static PyResult create(std::string name,
+		std::function<PyResult(PyTuple *, PyDict *)> function,
 		Args &&... args)
 	{
-		return VirtualMachine::the().heap().allocate<PyNativeFunction>(
+		auto *result = VirtualMachine::the().heap().allocate<PyNativeFunction>(
 			std::move(name), std::move(function), std::forward<Args>(args)...);
+		if (!result) { return PyResult::Err(memory_error(sizeof(PyNativeFunction))); }
+		return PyResult::Ok(result);
 	}
 
-	PyObject *operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
+	PyResult operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
 
 	std::string to_string() const override;
 
 	const std::string &name() const { return m_name; }
-	PyObject *__call__(PyTuple *args, PyDict *kwargs);
-	PyObject *__repr__() const;
+	PyResult __call__(PyTuple *args, PyDict *kwargs);
+	PyResult __repr__() const;
 
 	void visit_graph(Visitor &) override;
 

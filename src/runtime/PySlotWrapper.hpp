@@ -6,29 +6,26 @@ namespace py {
 
 class PySlotWrapper : public PyBaseObject
 {
+	using FunctionType = std::function<PyResult(PyObject *, PyTuple *, PyDict *)>;
 	PyString *m_name;
 	PyType *m_slot_type;
-	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> m_slot;
+	FunctionType m_slot;
 
 	friend class ::Heap;
 
-	PySlotWrapper(PyString *name,
-		PyType *underlying_type,
-		std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function);
+	PySlotWrapper(PyString *name, PyType *underlying_type, FunctionType &&function);
 
   public:
-	static PySlotWrapper *create(PyString *name,
-		PyType *underlying_type,
-		std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function);
+	static PyResult create(PyString *name, PyType *underlying_type, FunctionType &&function);
 
 	PyString *slot_name() { return m_name; }
-	const std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> &slot() { return m_slot; }
+	const FunctionType &slot() { return m_slot; }
 
 	std::string to_string() const override;
 
-	PyObject *__repr__() const;
-	PyObject *__call__(PyTuple *args, PyDict *kwargs);
-	PyObject *__get__(PyObject *, PyObject *) const;
+	PyResult __repr__() const;
+	PyResult __call__(PyTuple *args, PyDict *kwargs);
+	PyResult __get__(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &visitor) override;
 

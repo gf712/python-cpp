@@ -1,5 +1,6 @@
 #include "JumpIfNotExceptionMatch.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyType.hpp"
 
 using namespace py;
@@ -11,7 +12,7 @@ bool has_stashed_exception(Interpreter &interpreter)
 }
 }// namespace
 
-void JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	ASSERT(has_stashed_exception(interpreter))
 	const auto &exception_type = vm.reg(m_exception_type_reg);
@@ -24,6 +25,7 @@ void JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpret
 		// skip exception handler body block
 		vm.jump_blocks(2);
 	}
+	return PyResult::Ok(py_none());
 }
 
 std::vector<uint8_t> JumpIfNotExceptionMatch::serialize() const

@@ -1,4 +1,5 @@
 #include "PyMemberDescriptor.hpp"
+#include "MemoryError.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
 #include "TypeError.hpp"
@@ -28,6 +29,16 @@ PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 	  m_underlying_type(underlying_type), m_member_accessor(std::move(member))
 {}
 
+PyResult PyMemberDescriptor::create(PyString *name,
+	PyType *underlying_type,
+	std::function<PyObject *(PyObject *)> member)
+{
+	auto *obj =
+		VirtualMachine::the().heap().allocate<PyMemberDescriptor>(name, underlying_type, member);
+	if (!obj) { return PyResult::Err(memory_error(sizeof(PyMemberDescriptor))); }
+	return PyResult::Ok(obj);
+}
+
 void PyMemberDescriptor::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
@@ -41,22 +52,21 @@ std::string PyMemberDescriptor::to_string() const
 		"<member '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
 }
 
-PyObject *PyMemberDescriptor::__repr__() const { return PyString::create(to_string()); }
+PyResult PyMemberDescriptor::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyMemberDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
+PyResult PyMemberDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
-	if (!instance) { return const_cast<PyMemberDescriptor *>(this); }
+	if (!instance) { return PyResult::Ok(const_cast<PyMemberDescriptor *>(this)); }
 	if (instance->type() != m_underlying_type) {
-		VirtualMachine::the().interpreter().raise_exception(
+		return PyResult::Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",
 				m_name->value(),
 				m_underlying_type->underlying_type().__name__,
 				instance->type()->underlying_type().__name__));
-		return nullptr;
 	}
 
-	return m_member_accessor(instance);
+	return PyResult::Ok(m_member_accessor(instance));
 }
 
 PyType *PyMemberDescriptor::type() const { return member_descriptor(); }

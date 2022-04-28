@@ -10,9 +10,9 @@ PyNone::PyNone() : PyBaseObject(BuiltinTypes::the().none()) {}
 
 std::string PyNone::to_string() const { return "None"; }
 
-PyObject *PyNone::__repr__() const { return PyString::create(to_string()); }
+PyResult PyNone::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyNone::__add__(const PyObject *) const { TODO(); }
+PyResult PyNone::__add__(const PyObject *) const { TODO(); }
 
 PyNone *PyNone::create()
 {

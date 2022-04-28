@@ -20,7 +20,7 @@ class BuildList final : public Instruction
 			"BUILD_LIST      r{:<3} (size={}, offset={})", m_dst, m_size, m_stack_offset);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

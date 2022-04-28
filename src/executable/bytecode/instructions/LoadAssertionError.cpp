@@ -4,9 +4,16 @@
 
 using namespace py;
 
-void LoadAssertionError::execute(VirtualMachine &vm, Interpreter &) const
+PyResult LoadAssertionError::execute(VirtualMachine &vm, Interpreter &) const
 {
-	vm.reg(m_assertion_location) = AssertionError::this_type();
+	auto *result = AssertionError::this_type();
+	// TODO: return a meaningful error. If this is nullptr then it is a serious internal error...
+	if (!result) {
+		TODO();
+		return PyResult::Err(nullptr);
+	}
+	vm.reg(m_assertion_location) = result;
+	return PyResult::Ok(result);
 }
 
 std::vector<uint8_t> LoadAssertionError::serialize() const

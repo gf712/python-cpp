@@ -19,6 +19,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/modules/Modules.hpp"
+#include "runtime/types/builtin.hpp"
 #include "vm/VM.hpp"
 
 using namespace py;
@@ -65,6 +66,44 @@ std::optional<std::string> getline(const std::string &prompt)
 }// namespace repl
 
 namespace {
+
+void initialize_types()
+{
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
+
+	type();
+	bool_();
+	bytes();
+	ellipsis();
+	str();
+	float_();
+	integer();
+	none();
+	module();
+	object();
+	dict();
+	dict_items();
+	dict_items_iterator();
+	list();
+	list_iterator();
+	tuple();
+	tuple_iterator();
+	range();
+	range_iterator();
+	function();
+	native_function();
+	code();
+	cell();
+	builtin_method();
+	slot_wrapper();
+	bound_method();
+	method_wrapper();
+	static_method();
+	property();
+	classmethod();
+}
+
+
 int run_and_execute_script(int argc,
 	char **argv,
 	bool print_bytecode,
@@ -94,6 +133,7 @@ int run_and_execute_script(int argc,
 		p.module()->print_node("");
 		spdlog::set_level(lvl);
 	}
+	initialize_types();
 	auto bytecode = codegen::BytecodeGenerator::compile(
 		p.module(), argv_vector, compiler::OptimizationLevel::None);
 

@@ -5,11 +5,14 @@
 
 using namespace py;
 
-void LoadBuildClass::execute(VirtualMachine &vm, Interpreter &intepreter) const
+PyResult LoadBuildClass::execute(VirtualMachine &vm, Interpreter &intepreter) const
 {
-	vm.reg(m_dst) =
-		std::get<PyObject *>(intepreter.execution_frame()->builtins()->symbol_table().at(
-			PyString::create("__build_class__")));
+	auto str = PyString::create("__build_class__");
+	if (str.is_err()) { return str; }
+	auto result = std::get<PyObject *>(
+		intepreter.execution_frame()->builtins()->symbol_table().at(str.unwrap_as<PyString>()));
+	vm.reg(m_dst) = result;
+	return PyResult::Ok(result);
 }
 
 

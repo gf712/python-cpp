@@ -13,7 +13,7 @@ class LoadAssertionError final : public Instruction
 		return fmt::format("LOAD_ASSERTION_ERROR r{}", m_assertion_location);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

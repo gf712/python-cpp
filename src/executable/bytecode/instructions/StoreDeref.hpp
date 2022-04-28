@@ -16,7 +16,7 @@ class StoreDeref final : public Instruction
 		return fmt::format("STORE_DEREF     f{:<3} r{:<3}", m_dst, m_src);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

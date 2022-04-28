@@ -3,7 +3,7 @@
 
 using namespace py;
 
-void BinaryOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult BinaryOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &lhs = vm.reg(m_lhs);
 	const auto &rhs = vm.reg(m_rhs);
@@ -40,11 +40,12 @@ void BinaryOperation::execute(VirtualMachine &vm, Interpreter &interpreter) cons
 		}
 	}();
 
-	if (result.has_value()) {
+	if (result.is_ok()) {
 		ASSERT(vm.registers().has_value())
 		ASSERT(m_destination < vm.registers()->get().size())
-		vm.reg(m_destination) = *result;
+		vm.reg(m_destination) = result.unwrap();
 	}
+	return result;
 }
 
 std::vector<uint8_t> BinaryOperation::serialize() const

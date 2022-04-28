@@ -1,6 +1,6 @@
 #include "LLVMPyUtils.hpp"
-#include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
+#include "runtime/PyLLVMFunction.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/Value.hpp"
@@ -27,17 +27,24 @@ template<> int64_t from_args(PyTuple *args, size_t index)
 	return as<PyInteger>(obj)->as_i64();
 }
 
-template<> PyObject *from(int64_t value) { return PyObject::from(Number{ value }); }
-
-PyObject *create_native_function(const std::string &name,
-	std::function<PyObject *(PyTuple *, PyDict *)> &&func)
+template<> PyObject *from(int64_t value)
 {
-	return PyNativeFunction::create(name, func);
+	auto obj = PyObject::from(Number{ value });
+	ASSERT(obj.is_ok())
+	return obj.unwrap_as<PyObject>();
 }
 
-int64_t from_args_i64(int8_t *args, int64_t idx)
+PyObject *create_llvm_function(const std::string &name,
+	std::function<PyObject *(PyTuple *, PyDict *)> &&func)
+{
+	auto obj = PyLLVMFunction::create(name, std::move(func));
+	ASSERT(obj.is_ok())
+	return obj.unwrap_as<PyObject>();
+}
+
+int64_t from_args_i64(uint8_t *args, int64_t idx)
 {
 	return from_args<int64_t>(bit_cast<PyTuple *>(args), idx);
 }
 
-int8_t *from_i64(int64_t value) { return bit_cast<int8_t *>(from<int64_t>(value)); }
+uint8_t *from_i64(int64_t value) { return bit_cast<uint8_t *>(from<int64_t>(value)); }

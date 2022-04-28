@@ -2,15 +2,26 @@
 
 using namespace py;
 
-void GetIter::execute(VirtualMachine &vm, Interpreter &) const
+PyResult GetIter::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto iterable_value = vm.reg(m_src);
-	if (auto *iterable_object = std::get_if<PyObject *>(&iterable_value)) {
-		vm.reg(m_dst) = (*iterable_object)->iter();
-	} else {
-		vm.reg(m_dst) = std::visit(
-			[](const auto &value) { return PyObject::from(value)->iter(); }, iterable_value);
-	}
+	auto result = [&]() {
+		if (auto *iterable_object = std::get_if<PyObject *>(&iterable_value)) {
+			return (*iterable_object)->iter();
+		} else {
+			return std::visit(
+				[](const auto &value) {
+					if (auto obj = PyObject::from(value); obj.is_ok()) {
+						return obj.template unwrap_as<PyObject>()->iter();
+					} else {
+						return obj;
+					}
+				},
+				iterable_value);
+		}
+	}();
+	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
+	return result;
 }
 
 std::vector<uint8_t> GetIter::serialize() const

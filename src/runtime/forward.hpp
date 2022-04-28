@@ -7,6 +7,7 @@ class PyCode;
 class PyDict;
 class PyFloat;
 class PyFunction;
+class PyFrame;
 class PyInteger;
 class PyList;
 class PyNativeFunction;
@@ -16,8 +17,12 @@ class PyMethodDescriptor;
 class PyModule;
 class PyObject;
 class PyString;
+class PyTraceback;
 class PyTuple;
 class PyType;
 struct TypePrototype;
+
+template<typename T> T *as(PyObject *node);
+template<typename T> const T *as(const PyObject *node);
 
 }// namespace py

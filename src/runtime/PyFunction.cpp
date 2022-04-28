@@ -27,8 +27,13 @@ PyFunction::PyFunction(std::string name,
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
 	  m_closure(std::move(closure))
 {
-	m_name = PyString::create(name);
-	m_dict = PyDict::create();
+	auto name_ = PyString::create(name);
+	if (name_.is_err()) { TODO(); }
+	m_name = name_.unwrap_as<PyString>();
+
+	auto dict_ = PyDict::create();
+	if (dict_.is_err()) { TODO(); }
+	m_dict = dict_.unwrap_as<PyDict>();
 }
 
 void PyFunction::visit_graph(Visitor &visitor)
@@ -44,31 +49,32 @@ void PyFunction::visit_graph(Visitor &visitor)
 
 PyType *PyFunction::type() const { return function(); }
 
-PyObject *PyFunction::__repr__() const
+PyResult PyFunction::__repr__() const
 {
 	return PyString::create(fmt::format("<function {}>", m_name->value()));
 }
 
-PyObject *PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const
+PyResult PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
-	if (!instance || instance == py_none()) { return const_cast<PyFunction *>(this); }
+	if (!instance || instance == py_none()) { return PyResult::Ok(const_cast<PyFunction *>(this)); }
 	return PyBoundMethod::create(instance, const_cast<PyFunction *>(this));
 }
 
-PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const
+PyResult PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const
 {
-	auto *function_frame =
-		ExecutionFrame::create(VirtualMachine::the().interpreter().execution_frame(),
-			m_code->register_count(),
-			m_code->cellvars_count() + m_code->freevars_count(),
-			m_globals,
-			locals,
-			m_code->consts());
+	auto *function_frame = PyFrame::create(VirtualMachine::the().interpreter().execution_frame(),
+		m_code->register_count(),
+		m_code->cellvars_count() + m_code->freevars_count(),
+		m_globals,
+		locals,
+		m_code->consts());
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_code->function(), function_frame);
 
 	for (size_t i = 0; i < m_code->cellvars_count(); ++i) {
-		function_frame->freevars()[i] = PyCell::create();
+		auto cell = PyCell::create();
+		if (cell.is_err()) return cell;
+		function_frame->freevars()[i] = cell.unwrap_as<PyCell>();
 	}
 
 	const auto &cell2arg = m_code->cell2arg();
@@ -89,7 +95,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			VirtualMachine::the().stack_local(idx) = obj;
 			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), idx); it != cell2arg.end()) {
 				const auto free_var_idx = std::distance(cell2arg.begin(), it);
-				function_frame->freevars()[free_var_idx] = PyCell::create(obj);
+				auto cell = PyCell::create(obj);
+				if (cell.is_err()) return cell;
+				function_frame->freevars()[free_var_idx] = cell.unwrap_as<PyCell>();
 			}
 		}
 		args_count = max_args;
@@ -104,11 +112,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				if (m_code->flags().is_set(CodeFlags::Flag::VARKEYWORDS)) {
 					continue;
 				} else {
-					VirtualMachine::the().interpreter().raise_exception(
-						type_error("{}() got an unexpected keyword argument '{}'",
-							m_name->value(),
-							key_str.s));
-					return nullptr;
+					return PyResult::Err(type_error("{}() got an unexpected keyword argument '{}'",
+						m_name->value(),
+						key_str.s));
 				}
 			}
 			auto &arg =
@@ -116,15 +122,16 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 
 			if (std::holds_alternative<PyObject *>(arg)) {
 				if (std::get<PyObject *>(arg)) {
-					VirtualMachine::the().interpreter().raise_exception(type_error(
+					return PyResult::Err(type_error(
 						"{}() got multiple values for argument '{}'", m_name->value(), key_str.s));
-					return nullptr;
 				}
 			}
 			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), kwargs_count);
 				it != cell2arg.end()) {
 				const auto free_var_idx = std::distance(cell2arg.begin(), it);
-				function_frame->freevars()[free_var_idx] = PyCell::create(value);
+				auto cell = PyCell::create(value);
+				if (cell.is_err()) return cell;
+				function_frame->freevars()[free_var_idx] = cell.unwrap_as<PyCell>();
 			}
 			arg = value;
 			kwargs_count++;
@@ -142,7 +149,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			}
 			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), i); it != cell2arg.end()) {
 				const auto free_var_idx = std::distance(cell2arg.begin(), it);
-				function_frame->freevars()[free_var_idx] = PyCell::create(*default_iter);
+				auto cell = PyCell::create(*default_iter);
+				if (cell.is_err()) return cell;
+				function_frame->freevars()[free_var_idx] = cell.unwrap_as<PyCell>();
 			}
 			default_iter = std::next(default_iter);
 		}
@@ -158,7 +167,9 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 			}
 			if (auto it = std::find(cell2arg.begin(), cell2arg.end(), i); it != cell2arg.end()) {
 				const auto free_var_idx = std::distance(cell2arg.begin(), it);
-				function_frame->freevars()[free_var_idx] = PyCell::create(*kw_default_iter);
+				auto cell = PyCell::create(*kw_default_iter);
+				if (cell.is_err()) return cell;
+				function_frame->freevars()[free_var_idx] = cell.unwrap_as<PyCell>();
 			}
 			kw_default_iter = std::next(kw_default_iter);
 		}
@@ -171,18 +182,20 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 				remaining_args.push_back(args->elements()[idx]);
 			}
 		}
-		VirtualMachine::the().stack_local(total_arguments_count) = PyTuple::create(remaining_args);
+		auto args_ = PyTuple::create(remaining_args);
+		if (args_.is_err()) { return args_; }
+		VirtualMachine::the().stack_local(total_arguments_count) = args_.unwrap_as<PyTuple>();
 	} else if (args_count < args->size()) {
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("{}() takes {} positional arguments but {} given",
-				m_name->value(),
-				args_count,
-				args->size()));
-		return nullptr;
+		return PyResult::Err(type_error("{}() takes {} positional arguments but {} given",
+			m_name->value(),
+			args_count,
+			args->size()));
 	}
 
 	if (m_code->flags().is_set(CodeFlags::Flag::VARKEYWORDS)) {
-		auto *remaining_kwargs = PyDict::create();
+		auto remaining_kwargs_ = PyDict::create();
+		if (remaining_kwargs_.is_err()) { return remaining_kwargs_; }
+		auto *remaining_kwargs = remaining_kwargs_.unwrap_as<PyDict>();
 		if (kwargs) {
 			const auto &argnames = m_code->varnames();
 			for (const auto &[key, value] : kwargs->map()) {
@@ -225,10 +238,11 @@ PyObject *PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwa
 	return VirtualMachine::the().interpreter().call(m_code->function(), function_frame);
 }
 
-PyObject *PyFunction::__call__(PyTuple *args, PyDict *kwargs)
+PyResult PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
-	auto function_locals = VirtualMachine::the().heap().allocate<PyDict>();
-	return call_with_frame(function_locals, args, kwargs);
+	auto function_locals = PyDict::create();
+	if (function_locals.is_err()) { return function_locals; }
+	return call_with_frame(function_locals.unwrap_as<PyDict>(), args, kwargs);
 }
 
 namespace {
@@ -250,8 +264,7 @@ std::unique_ptr<TypePrototype> PyFunction::register_type()
 }
 
 
-PyNativeFunction::PyNativeFunction(std::string &&name,
-	std::function<PyObject *(PyTuple *, PyDict *)> &&function)
+PyNativeFunction::PyNativeFunction(std::string &&name, FunctionType &&function)
 	: PyBaseObject(BuiltinTypes::the().native_function()), m_name(std::move(name)),
 	  m_function(std::move(function))
 {}
@@ -261,12 +274,12 @@ std::string PyNativeFunction::to_string() const
 	return fmt::format("built-in method {} at {}", m_name, (void *)this);
 }
 
-PyObject *PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
+PyResult PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
 	return VirtualMachine::the().interpreter().call(this, args, kwargs);
 }
 
-PyObject *PyNativeFunction::__repr__() const { return PyString::create(to_string()); }
+PyResult PyNativeFunction::__repr__() const { return PyString::create(to_string()); }
 
 void PyNativeFunction::visit_graph(Visitor &visitor)
 {

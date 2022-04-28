@@ -16,7 +16,7 @@ class InplaceSub : public Instruction
 		return fmt::format("INPLACE_SUB     r{:<3} r{:<3}", m_lhs, m_rhs);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

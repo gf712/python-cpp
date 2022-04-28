@@ -11,9 +11,11 @@ PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
 	: PyBaseObject(BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
 {}
 
-PyBoundMethod *PyBoundMethod::create(PyObject *self, PyFunction *method)
+PyResult PyBoundMethod::create(PyObject *self, PyFunction *method)
 {
-	return VirtualMachine::the().heap().allocate<PyBoundMethod>(self, method);
+	auto *result = VirtualMachine::the().heap().allocate<PyBoundMethod>(self, method);
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyBoundMethod))); }
+	return PyResult::Ok(result);
 }
 
 void PyBoundMethod::visit_graph(Visitor &visitor)
@@ -25,22 +27,27 @@ void PyBoundMethod::visit_graph(Visitor &visitor)
 
 std::string PyBoundMethod::to_string() const
 {
+	auto qualname_str = PyString::create("__qualname__");
+	if (qualname_str.is_err()) { TODO(); }
+	auto self_qualname = m_self->getattribute(qualname_str.unwrap_as<PyString>());
+	if (self_qualname.is_err()) { TODO(); }
 	return fmt::format("<bound method '{}' of '{}'>",
 		m_method->name(),
-		m_self->getattribute(PyString::create("__qualname__"))->to_string());
+		self_qualname.unwrap_as<PyObject>()->to_string());
 }
 
-PyObject *PyBoundMethod::__repr__() const { return PyString::create(to_string()); }
+PyResult PyBoundMethod::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
+PyResult PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
 {
 	// first create new args tuple -> (self, *args)
 	std::vector<Value> new_args_vector;
 	new_args_vector.reserve(args->size() + 1);
 	new_args_vector.push_back(m_self);
 	for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
-	args = PyTuple::create(new_args_vector);
-	return m_method->call(args, kwargs);
+	auto args_ = PyTuple::create(new_args_vector);
+	if (args_.is_err()) { return args_; }
+	return m_method->call(args_.unwrap_as<PyTuple>(), kwargs);
 }
 
 PyType *PyBoundMethod::type() const { return bound_method(); }

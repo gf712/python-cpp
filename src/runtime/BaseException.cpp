@@ -39,6 +39,12 @@ PyType *BaseException::type() const
 	return s_base_exception_type;
 }
 
+PyType *BaseException::static_type()
+{
+	ASSERT(s_base_exception_type)
+	return s_base_exception_type;
+}
+
 std::string BaseException::what() const { return BaseException::to_string(); }
 
 void BaseException::visit_graph(Visitor &visitor)
@@ -51,7 +57,9 @@ std::string BaseException::to_string() const
 {
 	if (m_args) {
 		if (m_args->size() == 1) {
-			return PyObject::from(m_args->elements()[0])->to_string();
+			auto obj_ = PyObject::from(m_args->elements()[0]);
+			ASSERT(obj_.is_ok())
+			return obj_.unwrap_as<PyObject>()->to_string();
 		} else {
 			return m_args->to_string();
 		}
@@ -60,7 +68,7 @@ std::string BaseException::to_string() const
 	}
 }
 
-PyObject *BaseException::__repr__() const
+PyResult BaseException::__repr__() const
 {
 	return PyString::create(fmt::format("{}({})", m_type_prototype.__name__, what()));
 }

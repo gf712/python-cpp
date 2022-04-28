@@ -4,6 +4,7 @@
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "interpreter/InterpreterSession.hpp"
+#include "runtime/BaseException.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 
@@ -71,12 +72,13 @@ int VirtualMachine::call(const std::unique_ptr<Function> &function)
 		for (; m_instruction_pointer != end; ++m_instruction_pointer) {
 			const auto &instruction = *m_instruction_pointer;
 			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
-			instruction->execute(*this, interpreter());
+			auto result = instruction->execute(*this, interpreter());
 
-			// we left the current stack frame in the previous instruction
 			if (m_stack.size() != stack_depth) { break; }
-			// dump();
-			if (interpreter().execution_frame()->exception_info().has_value()) {
+
+			if (result.is_err()) {
+				interpreter().raise_exception(result.unwrap_err());
+
 				if (!m_state->catch_exception) {
 					interpreter().unwind();
 					// restore instruction pointer
@@ -88,8 +90,6 @@ int VirtualMachine::call(const std::unique_ptr<Function> &function)
 					m_state->catch_exception = false;
 					break;
 				}
-			} else if (interpreter().status() == Interpreter::Status::EXCEPTION) {
-				TODO();
 			}
 		}
 		if (m_state->jump_block_count.has_value()) {

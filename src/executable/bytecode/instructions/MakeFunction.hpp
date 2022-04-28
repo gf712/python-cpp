@@ -29,7 +29,7 @@ class MakeFunction : public Instruction
 
 	std::string to_string() const final { return fmt::format("MAKE_FUNCTION   ({})", m_name); }
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

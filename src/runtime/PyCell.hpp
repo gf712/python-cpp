@@ -14,8 +14,8 @@ class PyCell : public PyBaseObject
 	PyCell(const Value &);
 
   public:
-	static PyCell *create();
-	static PyCell *create(const Value &);
+	static PyResult create();
+	static PyResult create(const Value &);
 
 	std::string to_string() const override;
 	void visit_graph(Visitor &visitor) override;
@@ -25,7 +25,7 @@ class PyCell : public PyBaseObject
 
 	const Value &content() const;
 
-	PyObject *__repr__() const;
+	PyResult __repr__() const;
 };
 
 }// namespace py

@@ -11,7 +11,7 @@ AssertionError::AssertionError(PyTuple *args)
 	: Exception(s_assertion_error->underlying_type(), args)
 {}
 
-PyObject *AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_assertion_error)
 	ASSERT(!kwargs || kwargs->map().empty())

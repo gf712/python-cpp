@@ -11,11 +11,11 @@ class PyBytes : public PyBaseObject
 	Bytes m_value;
 
   public:
-	static PyBytes *create(const Bytes &number);
+	static PyResult create(const Bytes &number);
 	~PyBytes() = default;
 	std::string to_string() const override;
 
-	PyObject *__add__(const PyObject *obj) const;
+	PyResult __add__(const PyObject *obj) const;
 
 	const Bytes &value() const { return m_value; }
 

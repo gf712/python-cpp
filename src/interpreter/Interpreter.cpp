@@ -43,14 +43,16 @@ void Interpreter::internal_setup(const std::string &name,
 	auto *builtins = builtins_module(*this);
 
 	auto name_ = PyString::create(name);
-	auto *main_module = heap.allocate<PyModule>(name_);
+	if (name_.is_err()) { TODO(); }
+	auto *main_module = heap.allocate<PyModule>(name_.unwrap_as<PyString>());
+	if (!main_module) { TODO(); }
 	m_module = main_module;
 	m_available_modules.push_back(main_module);
 	m_available_modules.push_back(builtins);
 	m_available_modules.push_back(sys_module(*this));
 
 	if (!s_sys__) { s_sys__ = heap.allocate<PyString>("sys"); }
-	PyDict::MapType global_map = { { String{ "__name__" }, name_ },
+	PyDict::MapType global_map = { { String{ "__name__" }, name_.unwrap_as<PyString>() },
 		{ String{ "__doc__" }, py_none() },
 		{ String{ "__package__" }, py_none() } };
 
@@ -58,7 +60,7 @@ void Interpreter::internal_setup(const std::string &name,
 
 	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
 	auto *locals = globals;
-	m_current_frame = ExecutionFrame::create(nullptr, local_registers, 0, globals, locals, consts);
+	m_current_frame = PyFrame::create(nullptr, local_registers, 0, globals, locals, consts);
 	m_global_frame = m_current_frame;
 
 	m_importlib = nullptr;
@@ -131,7 +133,7 @@ ScopedStack::~ScopedStack()
 }
 
 ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,
-	ExecutionFrame *function_frame)
+	PyFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
 	vm.setup_call_stack(
@@ -139,10 +141,10 @@ ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,
 	return ScopedStack{ vm.stack().top() };
 }
 
-PyObject *Interpreter::call(const std::unique_ptr<Function> &func, ExecutionFrame *function_frame)
+PyResult Interpreter::call(const std::unique_ptr<Function> &func, PyFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
-	function_frame->m_parent = m_current_frame;
+	function_frame->m_f_back = m_current_frame;
 	m_current_frame = function_frame;
 	auto result = vm.call(func);
 	(void)result;
@@ -150,19 +152,24 @@ PyObject *Interpreter::call(const std::unique_ptr<Function> &func, ExecutionFram
 	// cleanup: the current_frame will be garbage collected
 	m_current_frame = m_current_frame->exit();
 
+	if (std::holds_alternative<PyObject *>(vm.reg(0))) {
+		auto *obj = std::get<PyObject *>(vm.reg(0));
+		if (!obj) return PyResult::Ok(py_none());
+		return PyResult::Ok(obj);
+	}
 	return PyObject::from(vm.reg(0));
 }
 
-PyObject *Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs)
+PyResult Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs)
 {
 	auto &vm = VirtualMachine::the();
 	auto result = native_func->operator()(args, kwargs);
 
-	if (!result) { return nullptr; }
+	if (result.is_err()) { return result; }
 
-	spdlog::debug("Native function return value: {}", result->to_string());
+	spdlog::debug("Native function return value: {}", result.unwrap_as<PyObject>()->to_string());
 
-	vm.reg(0) = result;
+	vm.reg(0) = result.unwrap_as<PyObject>();
 	return result;
 }
 
@@ -187,7 +194,7 @@ void Interpreter::store_object(const std::string &name, const Value &value)
 	}
 }
 
-std::optional<Value> Interpreter::get_object(const std::string &name)
+PyResult Interpreter::get_object(const std::string &name)
 {
 	ASSERT(execution_frame()->locals())
 	ASSERT(execution_frame()->globals())
@@ -197,21 +204,23 @@ std::optional<Value> Interpreter::get_object(const std::string &name)
 	const auto &globals = execution_frame()->globals()->map();
 	const auto &builtins = execution_frame()->builtins()->symbol_table();
 
-	return [&]() -> Value {
+	return [&]() -> PyResult {
 		const auto &name_value = String{ name };
 
 		if (const auto &it = locals.find(name_value); it != locals.end()) {
-			return std::move(it->second);
+			return PyResult::Ok(std::move(it->second));
 		} else if (const auto &it = globals.find(name_value); it != globals.end()) {
-			return std::move(it->second);
+			return PyResult::Ok(std::move(it->second));
 		} else {
 			auto pystr_name = PyString::create(name);
-			if (const auto &it = builtins.find(pystr_name); it != builtins.end()) {
-				return std::move(it->second);
+			if (pystr_name.is_err()) { return pystr_name; }
+			if (const auto &it = builtins.find(pystr_name.unwrap_as<PyString>());
+				it != builtins.end()) {
+				return PyResult::Ok(std::move(it->second));
 			} else {
-				raise_exception(name_error("name '{:s}' is not defined", name));
+				return PyResult::Err(name_error("name '{:s}' is not defined", name));
 			}
 		}
-		return py_none();
+		return PyResult::Ok(py_none());
 	}();
 }

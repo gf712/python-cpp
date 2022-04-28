@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Exception.hpp"
+#include "MemoryError.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "vm/VM.hpp"
@@ -11,21 +12,23 @@ class AssertionError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend PyObject *assertion_error(const std::string &message, Args &&... args);
+	friend BaseException *assertion_error(const std::string &message, Args &&... args);
 
   private:
 	AssertionError(PyTuple *args);
 
-	static AssertionError *create(PyTuple *args)
+	static PyResult create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<AssertionError>(args);
+		auto result = heap.allocate<AssertionError>(args);
+		if (!result) { return PyResult::Err(memory_error(sizeof(AssertionError))); }
+		return PyResult::Ok(result);
 	}
 
   public:
 	static PyType *register_type(PyModule *);
 
-	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	PyType *type() const override;
 
@@ -35,10 +38,10 @@ class AssertionError : public Exception
 };
 
 template<typename... Args>
-inline PyObject *assertion_error(const std::string &message, Args &&... args)
+inline BaseException *assertion_error(const std::string &message, Args &&... args)
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return AssertionError::create(args_tuple);
+	return AssertionError::create(args_tuple).template unwrap_as<AssertionError>();
 }
 }// namespace py

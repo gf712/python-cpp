@@ -15,7 +15,7 @@ class Jump final : public Instruction
 		return fmt::format("JUMP            position: {}", m_label->position());
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final;
 

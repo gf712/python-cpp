@@ -1,5 +1,6 @@
 #include "builtin.hpp"
 
+#include "runtime/NotImplemented.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
@@ -10,8 +11,10 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
 #include "runtime/PyFloat.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
+#include "runtime/PyLLVMFunction.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyMemberDescriptor.hpp"
 #include "runtime/PyMethodDescriptor.hpp"
@@ -22,6 +25,7 @@
 #include "runtime/PySlotWrapper.hpp"
 #include "runtime/PyStaticMethod.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTraceback.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 
@@ -34,8 +38,9 @@ BuiltinTypes::BuiltinTypes()
 	  m_integer(PyInteger::register_type()), m_none(PyNone::register_type()),
 	  m_module(PyModule::register_type()), m_object(PyObject::register_type()),
 	  m_function(PyFunction::register_type()), m_native_function(PyNativeFunction::register_type()),
-	  m_code(PyCode::register_type()), m_cell(PyCell::register_type()),
-	  m_dict(PyDict::register_type()), m_dict_items(PyDictItems::register_type()),
+	  m_llvm_function(PyLLVMFunction::register_type()), m_code(PyCode::register_type()),
+	  m_cell(PyCell::register_type()), m_dict(PyDict::register_type()),
+	  m_dict_items(PyDictItems::register_type()),
 	  m_dict_items_iterator(PyDictItemsIterator::register_type()), m_list(PyList::register_type()),
 	  m_list_iterator(PyListIterator::register_type()), m_tuple(PyTuple::register_type()),
 	  m_tuple_iterator(PyTupleIterator::register_type()), m_range(PyRange::register_type()),
@@ -46,7 +51,9 @@ BuiltinTypes::BuiltinTypes()
 	  m_method_wrapper(PyMethodDescriptor::register_type()),
 	  m_static_method(PyStaticMethod::register_type()), m_property(PyProperty::register_type()),
 	  m_classmethod(PyClassMethod::register_type()),
-	  m_member_descriptor(PyMemberDescriptor::register_type())
+	  m_member_descriptor(PyMemberDescriptor::register_type()),
+	  m_traceback(PyTraceback::register_type()), m_frame(PyFrame::register_type()),
+	  m_not_implemented(NotImplemented::register_type())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                             \
@@ -87,6 +94,7 @@ INITIALIZE_TYPE(range_iterator)
 
 INITIALIZE_TYPE(function)
 INITIALIZE_TYPE(native_function)
+INITIALIZE_TYPE(llvm_function)
 INITIALIZE_TYPE(code)
 INITIALIZE_TYPE(cell)
 
@@ -98,4 +106,8 @@ INITIALIZE_TYPE(static_method)
 INITIALIZE_TYPE(property)
 INITIALIZE_TYPE(classmethod)
 INITIALIZE_TYPE(member_descriptor)
+
+INITIALIZE_TYPE(traceback)
+
+INITIALIZE_TYPE(not_implemented)
 }// namespace py

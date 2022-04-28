@@ -17,7 +17,7 @@ class StoreName final : public Instruction
 		return fmt::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

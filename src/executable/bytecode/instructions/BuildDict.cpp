@@ -3,7 +3,7 @@
 
 using namespace py;
 
-void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
+py::PyResult BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 {
 	PyDict::MapType map;
 
@@ -16,8 +16,9 @@ void BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 		}
 	}
 
-	auto &heap = vm.heap();
-	vm.reg(m_dst) = heap.allocate<PyDict>(map);
+	auto result = PyDict::create(map);
+	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
+	return result;
 };
 
 std::vector<uint8_t> BuildDict::serialize() const

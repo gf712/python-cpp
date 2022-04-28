@@ -3,7 +3,7 @@
 
 using namespace py;
 
-void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
+PyResult BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 {
 	std::vector<Value> elements;
 	elements.reserve(m_size);
@@ -13,7 +13,9 @@ void BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 			elements.push_back(*sp);
 		}
 	}
-	vm.reg(m_dst) = PyTuple::create(elements);
+	auto result = PyTuple::create(elements);
+	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
+	return result;
 };
 
 std::vector<uint8_t> BuildTuple::serialize() const

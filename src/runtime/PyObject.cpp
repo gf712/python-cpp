@@ -64,7 +64,12 @@ size_t ValueHash::operator()(const Value &value) const
 							   return bit_cast<size_t>(py_none());
 						   }
 					   },
-					   [](PyObject *obj) -> size_t { return obj->hash(); } },
+					   [](PyObject *obj) -> size_t {
+						   auto val = obj->hash();
+						   ASSERT(val.is_ok())
+						   ASSERT(val.unwrap_as<PyInteger>())
+						   return val.unwrap_as<PyInteger>()->as_size_t();
+					   } },
 			value);
 	return result;
 }
@@ -74,7 +79,9 @@ bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) cons
 {
 	const auto result =
 		std::visit(overloaded{ [](PyObject *const lhs, PyObject *const rhs) {
-								  return lhs->richcompare(rhs, RichCompare::Py_EQ) == py_true();
+								  auto r = lhs->richcompare(rhs, RichCompare::Py_EQ);
+								  ASSERT(r.is_ok())
+								  return r.template unwrap_as<PyObject>() == py_true();
 							  },
 					   [](PyObject *const lhs, const auto &rhs) { return lhs == rhs; },
 					   [](const auto &lhs, PyObject *const rhs) { return lhs == rhs; },
@@ -85,31 +92,31 @@ bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) cons
 }
 
 
-template<> PyObject *PyObject::from(PyObject *const &value)
+template<> PyResult PyObject::from(PyObject *const &value)
 {
 	ASSERT(value)
-	return value;
+	return PyResult::Ok(value);
 }
 
-template<> PyObject *PyObject::from(const Number &value) { return PyNumber::create(value); }
+template<> PyResult PyObject::from(const Number &value) { return PyNumber::create(value); }
 
-template<> PyObject *PyObject::from(const String &value) { return PyString::create(value.s); }
+template<> PyResult PyObject::from(const String &value) { return PyString::create(value.s); }
 
-template<> PyObject *PyObject::from(const Bytes &value) { return PyBytes::create(value); }
+template<> PyResult PyObject::from(const Bytes &value) { return PyBytes::create(value); }
 
-template<> PyObject *PyObject::from(const Ellipsis &) { return py_ellipsis(); }
+template<> PyResult PyObject::from(const Ellipsis &) { return PyResult::Ok(py_ellipsis()); }
 
-template<> PyObject *PyObject::from(const NameConstant &value)
+template<> PyResult PyObject::from(const NameConstant &value)
 {
 	if (std::holds_alternative<NoneType>(value.value)) {
-		return py_none();
+		return PyResult::Ok(py_none());
 	} else {
 		const bool bool_value = std::get<bool>(value.value);
-		return bool_value ? py_true() : py_false();
+		return PyResult::Ok(bool_value ? py_true() : py_false());
 	}
 }
 
-template<> PyObject *PyObject::from(const Value &value)
+template<> PyResult PyObject::from(const Value &value)
 {
 	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
 }
@@ -122,94 +129,104 @@ void PyObject::visit_graph(Visitor &visitor)
 	if (m_attributes) { visitor.visit(*m_attributes); }
 }
 
-PyObject *PyObject::__repr__() const
+PyResult PyObject::__repr__() const
 {
-	return PyString::from(String{ fmt::format("<object at {}>", static_cast<const void *>(this)) });
+	return PyString::create(fmt::format("<object at {}>", static_cast<const void *>(this)));
 }
 
-PyObject *PyObject::richcompare(const PyObject *other, RichCompare op) const
+PyResult PyObject::richcompare(const PyObject *other, RichCompare op) const
 {
 	constexpr std::array opstr{ "<", "<=", "==", "!=", ">", ">=" };
 
 	switch (op) {
 	case RichCompare::Py_EQ: {
-		if (auto result = eq(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->eq(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = eq(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->eq(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	case RichCompare::Py_GE: {
-		if (auto result = ge(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->le(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = ge(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->le(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	case RichCompare::Py_GT: {
-		if (auto result = gt(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->lt(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = gt(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->lt(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	case RichCompare::Py_LE: {
-		if (auto result = le(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->ge(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = le(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->ge(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	case RichCompare::Py_LT: {
-		if (auto result = lt(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->gt(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = lt(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->gt(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	case RichCompare::Py_NE: {
-		if (auto result = ne(other); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
-		} else if (auto result = other->ne(this); std::holds_alternative<PyObject *>(result)) {
-			return std::get<PyObject *>(result);
+		if (auto result = ne(other);
+			result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
+		} else if (auto result = other->ne(this);
+				   result.is_ok() && (result.unwrap_as<PyObject>() != not_implemented())) {
+			return result;
 		}
 	} break;
 	}
 
 	switch (op) {
 	case RichCompare::Py_EQ: {
-		return this == other ? py_true() : py_false();
+		return PyResult::Ok(this == other ? py_true() : py_false());
 	} break;
 	case RichCompare::Py_NE: {
-		return this != other ? py_true() : py_false();
+		return PyResult::Ok(this != other ? py_true() : py_false());
 	} break;
-	default:
+	default: {
 		// op not supported
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("'{}' not supported between instances of '{}' and '{}'",
-				opstr[static_cast<size_t>(op)],
-				m_type_prototype.__name__,
-				other->m_type_prototype.__name__));
+		return PyResult::Err(type_error("'{}' not supported between instances of '{}' and '{}'",
+			opstr[static_cast<size_t>(op)],
+			m_type_prototype.__name__,
+			other->m_type_prototype.__name__));
 	}
-
-	return nullptr;
+	}
 }
 
 namespace {
 template<typename SlotFunctionType, typename... Args>
-PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&... args_)
+PyResult call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&... args_)
 {
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		auto result = std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
 		using ResultType = std::remove_pointer_t<decltype(result)>;
 
-		if constexpr (std::is_base_of_v<PyObject, ResultType>) {
+		if constexpr (std::is_same_v<PyResult, ResultType>) {
 			return result;
 		} else if constexpr (std::is_same_v<std::optional<int>, ResultType>) {
 			ASSERT(result.has_value())
 			return PyInteger::create(static_cast<int64_t>(*result));
 		} else if constexpr (std::is_same_v<bool, ResultType>) {
-			return result ? py_true() : py_false();
+			return PyResult::Ok(result ? py_true() : py_false());
 		} else if constexpr (std::is_same_v<size_t, ResultType>) {
 			return PyInteger::create(result);
 		} else {
@@ -221,17 +238,18 @@ PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args
 		//		  PyObject constness (right?). But for the internal calls handled above
 		//		  which are resolved in the C++ runtime, we want to enforce constness
 		//		  so we end up with the awkward line below. But how could we do better?
-		auto *args = PyTuple::create(
+		auto args = PyTuple::create(
 			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
+		if (args.is_err()) { return args; }
 		PyDict *kwargs = nullptr;
-		return std::get<PyObject *>(slot)->call(args, kwargs);
+		return std::get<PyObject *>(slot)->call(args.template unwrap_as<PyTuple>(), kwargs);
 	} else {
 		TODO();
 	}
 }
 
 template<typename SlotFunctionType>
-PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+PyResult call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 	PyObject *self,
 	PyTuple *args,
 	PyDict *kwargs)
@@ -240,7 +258,7 @@ PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 		auto result = std::get<SlotFunctionType>(slot)(self, args, kwargs);
 		using ResultType = std::remove_pointer_t<decltype(result)>;
 
-		if constexpr (std::is_base_of_v<PyObject, ResultType>) {
+		if constexpr (std::is_same_v<PyResult, ResultType>) {
 			return result;
 		} else if constexpr (std::is_same_v<std::optional<int>, ResultType>) {
 			ASSERT(result.has_value())
@@ -254,8 +272,9 @@ PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 		new_args.reserve(args->size() + 1);
 		new_args.push_back(self);
 		new_args.insert(new_args.end(), args->elements().begin(), args->elements().end());
-		auto *args_ = PyTuple::create(new_args);
-		return std::get<PyObject *>(slot)->call(args_, kwargs);
+		auto args_ = PyTuple::create(new_args);
+		if (args_.is_err()) return args_;
+		return std::get<PyObject *>(slot)->call(args_.unwrap_as<PyTuple>(), kwargs);
 	} else {
 		TODO();
 	}
@@ -263,55 +282,55 @@ PyObject *call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 
 }// namespace
 
-PyObject::PyResult PyObject::eq(const PyObject *other) const
+PyResult PyObject::eq(const PyObject *other) const
 {
 	if (m_type_prototype.__eq__.has_value()) {
 		return call_slot(*m_type_prototype.__eq__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject::PyResult PyObject::ge(const PyObject *other) const
+PyResult PyObject::ge(const PyObject *other) const
 {
 	if (m_type_prototype.__eq__.has_value()) {
 		return call_slot(*m_type_prototype.__ge__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject::PyResult PyObject::gt(const PyObject *other) const
+PyResult PyObject::gt(const PyObject *other) const
 {
 	if (m_type_prototype.__gt__.has_value()) {
 		return call_slot(*m_type_prototype.__gt__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject::PyResult PyObject::le(const PyObject *other) const
+PyResult PyObject::le(const PyObject *other) const
 {
 	if (m_type_prototype.__le__.has_value()) {
 		return call_slot(*m_type_prototype.__le__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject::PyResult PyObject::lt(const PyObject *other) const
+PyResult PyObject::lt(const PyObject *other) const
 {
 	if (m_type_prototype.__lt__.has_value()) {
 		return call_slot(*m_type_prototype.__lt__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject::PyResult PyObject::ne(const PyObject *other) const
+PyResult PyObject::ne(const PyObject *other) const
 {
 	if (m_type_prototype.__ne__.has_value()) {
 		return call_slot(*m_type_prototype.__ne__, this, other);
 	}
-	return NotImplemented_{};
+	return PyResult::Ok(not_implemented());
 }
 
-PyObject *PyObject::getattribute(PyObject *attribute) const
+PyResult PyObject::getattribute(PyObject *attribute) const
 {
 	if (m_type_prototype.__getattribute__.has_value()) {
 		return call_slot(*m_type_prototype.__getattribute__, this, attribute);
@@ -319,32 +338,39 @@ PyObject *PyObject::getattribute(PyObject *attribute) const
 	TODO();
 }
 
-bool PyObject::setattribute(PyObject *attribute, PyObject *value)
+PyResult PyObject::setattribute(PyObject *attribute, PyObject *value)
 {
 	if (!as<PyString>(attribute)) {
-		VirtualMachine::the().interpreter().raise_exception(
+		return PyResult::Err(
 			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
-		return false;
 	}
 
-	auto *descriptor = type()->lookup(attribute);
-
-	if (descriptor) {
+	if (auto descriptor_ = type()->lookup(attribute); descriptor_.is_ok()) {
+		auto *descriptor = descriptor_.unwrap_as<PyObject>();
 		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
 		if (descriptor_set.has_value()) {
 			TODO();
-			return call_slot(*descriptor_set, this, attribute, value) == py_true();
+			return call_slot(*descriptor_set, this, attribute, value)
+				.and_then<PyObject>([](auto *obj) {
+					return PyResult::Ok(obj == py_true() ? py_true() : py_false());
+				});
 		}
 	}
 
-	if (!m_attributes) { m_attributes = PyDict::create(); }
+	if (!m_attributes) {
+		if (auto dict = PyDict::create(); dict.is_ok()) {
+			m_attributes = dict.unwrap_as<PyDict>();
+		} else {
+			return dict;
+		}
+	}
 
 	m_attributes->insert(attribute, value);
 
-	return true;
+	return PyResult::Ok(py_none());
 }
 
-PyObject *PyObject::repr() const
+PyResult PyObject::repr() const
 {
 	if (m_type_prototype.__repr__.has_value()) {
 		return call_slot(*m_type_prototype.__repr__, this);
@@ -352,205 +378,176 @@ PyObject *PyObject::repr() const
 	TODO();
 }
 
-size_t PyObject::hash() const
+PyResult PyObject::hash() const
 {
 	if (m_type_prototype.__hash__.has_value()) {
-		auto *result = call_slot(*m_type_prototype.__hash__, this);
-		if (auto *result_int = as<PyInteger>(result)) { return result_int->as_size_t(); }
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error(" __hash__ method should return an integer"));
-		return 0;
+		auto result_ = call_slot(*m_type_prototype.__hash__, this);
+		if (result_.is_err()) return result_;
+		auto *result = result_.unwrap_as<PyObject>();
+		if (auto *result_int = as<PyInteger>(result)) { return result_; }
+		return PyResult::Err(type_error(" __hash__ method should return an integer"));
 	} else {
-		return bit_cast<size_t>(this);
+		return __hash__();
 	}
 }
 
-PyObject *PyObject::call(PyTuple *args, PyDict *kwargs)
+PyResult PyObject::call(PyTuple *args, PyDict *kwargs)
 {
 	if (m_type_prototype.__call__.has_value()) {
 		return call_slot(*m_type_prototype.__call__, this, args, kwargs);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("'{}' object is not callable", m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("'{}' object is not callable", m_type_prototype.__name__));
 }
 
 
-PyObject *PyObject::add(const PyObject *other) const
+PyResult PyObject::add(const PyObject *other) const
 {
 	if (m_type_prototype.__add__.has_value()) {
 		return call_slot(*m_type_prototype.__add__, this, other);
 	} else if (other->m_type_prototype.__add__.has_value()) {
 		return call_slot(*other->m_type_prototype.__add__, other, this);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::subtract(const PyObject *other) const
+PyResult PyObject::subtract(const PyObject *other) const
 {
 	if (m_type_prototype.__sub__.has_value()) {
 		return call_slot(*m_type_prototype.__sub__, this, other);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for -: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for -: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::multiply(const PyObject *other) const
+PyResult PyObject::multiply(const PyObject *other) const
 {
 	if (m_type_prototype.__mul__.has_value()) {
 		return call_slot(*m_type_prototype.__mul__, this, other);
 	} else if (other->m_type_prototype.__mul__.has_value()) {
 		return call_slot(*other->m_type_prototype.__mul__, other, this);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::exp(const PyObject *other) const
+PyResult PyObject::exp(const PyObject *other) const
 {
 	if (m_type_prototype.__exp__.has_value()) {
 		return call_slot(*m_type_prototype.__exp__, this, other);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::lshift(const PyObject *other) const
+PyResult PyObject::lshift(const PyObject *other) const
 {
 	if (m_type_prototype.__lshift__.has_value()) {
 		return call_slot(*m_type_prototype.__lshift__, this, other);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for <<: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for <<: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::modulo(const PyObject *other) const
+PyResult PyObject::modulo(const PyObject *other) const
 {
 	if (m_type_prototype.__mod__.has_value()) {
 		return call_slot(*m_type_prototype.__mod__, this, other);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
+		m_type_prototype.__name__,
+		other->m_type_prototype.__name__));
 }
 
-PyObject *PyObject::abs() const
+PyResult PyObject::abs() const
 {
 	if (m_type_prototype.__abs__.has_value()) { return call_slot(*m_type_prototype.__abs__, this); }
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("bad operand type for abs(): '{}'", m_type_prototype.__name__));
-	return nullptr;
+	return PyResult::Err(type_error("bad operand type for abs(): '{}'", m_type_prototype.__name__));
 }
 
-PyObject *PyObject::neg() const
+PyResult PyObject::neg() const
 {
 	if (m_type_prototype.__neg__.has_value()) { return call_slot(*m_type_prototype.__neg__, this); }
-	VirtualMachine::the().interpreter().raise_exception(
+	return PyResult::Err(
 		type_error("bad operand type for unary -: '{}'", m_type_prototype.__name__));
-	return nullptr;
 }
 
-PyObject *PyObject::pos() const
+PyResult PyObject::pos() const
 {
 	if (m_type_prototype.__pos__.has_value()) { return call_slot(*m_type_prototype.__pos__, this); }
-	VirtualMachine::the().interpreter().raise_exception(
+	return PyResult::Err(
 		type_error("bad operand type for unary +: '{}'", m_type_prototype.__name__));
-	return nullptr;
 }
 
-PyObject *PyObject::invert() const
+PyResult PyObject::invert() const
 {
 	if (m_type_prototype.__invert__.has_value()) {
 		return call_slot(*m_type_prototype.__invert__, this);
 	}
-	VirtualMachine::the().interpreter().raise_exception(
+	return PyResult::Err(
 		type_error("bad operand type for unary ~: '{}'", m_type_prototype.__name__));
-	return nullptr;
 }
 
 
-PyObject *PyObject::bool_() const
+PyResult PyObject::bool_() const
 {
 	ASSERT(m_type_prototype.__bool__.has_value())
 	return call_slot(*m_type_prototype.__bool__, this);
 }
 
 
-PyObject *PyObject::len() const
+PyResult PyObject::len() const
 {
 	if (m_type_prototype.__len__.has_value()) { return call_slot(*m_type_prototype.__len__, this); }
 
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("object of type '{}' has no len()", type()->name()));
-	return nullptr;
+	return PyResult::Err(type_error("object of type '{}' has no len()", type()->name()));
 }
 
-PyObject *PyObject::iter() const
+PyResult PyObject::iter() const
 {
 	if (m_type_prototype.__iter__.has_value()) {
 		return call_slot(*m_type_prototype.__iter__, this);
 	}
 
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("'{}' object is not iterable", type()->name()));
-	return nullptr;
+	return PyResult::Err(type_error("'{}' object is not iterable", type()->name()));
 }
 
-PyObject *PyObject::next()
+PyResult PyObject::next()
 {
 	if (m_type_prototype.__next__.has_value()) {
 		return call_slot(*m_type_prototype.__next__, this);
 	}
 
-	VirtualMachine::the().interpreter().raise_exception(
-		type_error("'{}' object is not an iterator", type()->name()));
-	return nullptr;
+	return PyResult::Err(type_error("'{}' object is not an iterator", type()->name()));
 }
 
-PyObject *PyObject::get(PyObject *instance, PyObject *owner) const
+PyResult PyObject::get(PyObject *instance, PyObject *owner) const
 {
 	if (m_type_prototype.__get__.has_value()) {
 		return call_slot(*m_type_prototype.__get__, this, instance, owner);
-	} else {
-		TODO();
 	}
-	return nullptr;
+	TODO();
 }
 
-PyObject *PyObject::new_(PyTuple *args, PyDict *kwargs) const
+PyResult PyObject::new_(PyTuple *args, PyDict *kwargs) const
 {
 	if (!as<PyType>(this)) {
 		// FIXME: should be SystemError
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("__new__() called with non-type 'self'"));
-		return nullptr;
+		return PyResult::Err(type_error("__new__() called with non-type 'self'"));
 	}
 	if (!args || args->size() < 1) {
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("object.__new__(): not enough arguments"));
-		return nullptr;
+		return PyResult::Err(type_error("object.__new__(): not enough arguments"));
 	}
-	auto *maybe_type = PyObject::from(args->elements()[0]);
+	auto maybe_type_ = PyObject::from(args->elements()[0]);
+	if (maybe_type_.is_err()) return maybe_type_;
+	auto *maybe_type = maybe_type_.unwrap_as<PyObject>();
 	if (!as<PyType>(maybe_type)) {
-		VirtualMachine::the().interpreter().raise_exception(type_error(
+		return PyResult::Err(type_error(
 			"object.__new__(X): X is not a type object ({})", maybe_type->type()->name()));
 	}
 	auto *type = as<PyType>(maybe_type);
@@ -561,123 +558,116 @@ PyObject *PyObject::new_(PyTuple *args, PyDict *kwargs) const
 	std::vector<Value> new_args;
 	new_args.resize(args->size() - 1);
 	new_args.insert(new_args.end(), args->elements().begin() + 1, args->elements().end());
-	args = PyTuple::create(new_args);
+	auto args_ = PyTuple::create(new_args);
+	if (args_.is_err()) return args_;
+	args = args_.unwrap_as<PyTuple>();
 
 	if (m_type_prototype.__new__.has_value()) {
 		return call_slot(*m_type_prototype.__new__, type, args, kwargs);
 	}
-	return nullptr;
+	TODO();
 }
 
 std::optional<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 {
 	if (m_type_prototype.__init__.has_value()) {
-		auto *result = call_slot(*m_type_prototype.__init__, this, args, kwargs);
+		auto result_ = call_slot(*m_type_prototype.__init__, this, args, kwargs);
+		ASSERT(result_.is_ok())
+		auto *result = result_.unwrap_as<PyObject>();
 		if (as<PyInteger>(result) || result == py_none()) { return 0; }
 		TODO();
 	}
 	return {};
 }
 
-PyObject *PyObject::__eq__(const PyObject *other) const
+PyResult PyObject::__eq__(const PyObject *other) const
 {
-	return this == other ? py_true() : py_false();
+	return PyResult::Ok(this == other ? py_true() : py_false());
 }
 
-PyObject *PyObject::__getattribute__(PyObject *attribute) const
+PyResult PyObject::__getattribute__(PyObject *attribute) const
 {
 	if (!as<PyString>(attribute)) {
-		VirtualMachine::the().interpreter().raise_exception(
+		return PyResult::Err(
 			type_error("attribute name must be a string, not {}", attribute->type()->to_string()));
-		return nullptr;
 	}
 
 	auto *name = as<PyString>(attribute);
 
-	auto *descriptor = type()->lookup(name);
+	auto descriptor_ = type()->lookup(name);
+	if (descriptor_.is_err()) return descriptor_;
+	auto *descriptor = descriptor_.unwrap_as<PyObject>();
+
 	bool descriptor_has_get = false;
 	if (descriptor) {
 		const auto &descriptor_get = descriptor->type()->underlying_type().__get__;
 		if (descriptor_get.has_value()) { descriptor_has_get = true; }
 		if (descriptor_get.has_value() && descriptor_is_data(descriptor->type())) {
-			auto *res = descriptor->get(const_cast<PyObject *>(this), type());
-			if (!res) { TODO(); }
-			return res;
+			return descriptor->get(const_cast<PyObject *>(this), type());
 		}
 	}
 
 	if (m_attributes) {
 		const auto &dict = m_attributes->map();
 		if (auto it = dict.find(name); it != dict.end()) { return PyObject::from(it->second); }
-		// FIXME: we should abort here if PyDict returns an exception that is not an AttributeError
+		// FIXME: we should abort here if PyDict returns an exception that is not an
+		// AttributeError
 	}
 
 	if (descriptor_has_get) { return descriptor->get(const_cast<PyObject *>(this), type()); }
 
-	if (descriptor) { return descriptor; }
+	if (descriptor) { return descriptor_; }
 
-	VirtualMachine::the().interpreter().raise_exception(attribute_error(
+	return PyResult::Err(attribute_error(
 		"'{}' object has no attribute '{}'", m_type_prototype.__name__, name->to_string()));
-	return nullptr;
 }
 
-PyObject *PyObject::get_attribute(PyObject *name) const
+PyResult PyObject::get_attribute(PyObject *name) const
 {
 	if (!as<PyString>(name)) {
-		VirtualMachine::the().interpreter().raise_exception(
+		return PyResult::Err(
 			type_error("attribute name must be a string, not {}", name->type()->to_string()));
-		return nullptr;
 	}
 	const auto &getattribute_ = type()->underlying_type().__getattribute__;
 	if (getattribute_.has_value()) { return getattribute(name); }
 
-	VirtualMachine::the().interpreter().raise_exception(
+	return PyResult::Err(
 		attribute_error("'{}' object has no attribute '{}'", type()->name(), name->to_string()));
-	return nullptr;
 }
 
-std::tuple<PyObject *, LookupAttrResult> PyObject::lookup_attribute(PyObject *name) const
+std::tuple<PyResult, LookupAttrResult> PyObject::lookup_attribute(PyObject *name) const
 {
-	PyObject *result = nullptr;
-	if (!as<PyString>(name)) {
-		VirtualMachine::the().interpreter().raise_exception(
-			type_error("attribute name must be a string, not {}", name->type()->to_string()));
-		return { nullptr, LookupAttrResult::ERROR };
-	}
+	auto result = [&]() -> std::tuple<PyResult, LookupAttrResult> {
+		if (!as<PyString>(name)) {
+			return { PyResult::Err(type_error(
+						 "attribute name must be a string, not {}", name->type()->to_string())),
+				LookupAttrResult::NOT_FOUND };
+		}
 
-	const auto &getattribute_ = type()->underlying_type().__getattribute__;
-	if (getattribute_.has_value()
-		&& get_address(*getattribute_)
-			   != get_address(*object()->underlying_type().__getattribute__)) {
-		result = get_attribute(name);
-	}
-	// TODO: check tp_getattr? This field is deprecated in [c]python so maybe should not even bother
-	// to implement it here?
-	else if (getattribute_.has_value()) {
-		result = call_slot(*getattribute_, this, name);
-	} else {
-		return { nullptr, LookupAttrResult::NOT_FOUND };
-	}
+		const auto &getattribute_ = type()->underlying_type().__getattribute__;
+		if (getattribute_.has_value()
+			&& get_address(*getattribute_)
+				   != get_address(*object()->underlying_type().__getattribute__)) {
+			return { get_attribute(name), LookupAttrResult::FOUND };
+		}
+		// TODO: check tp_getattr? This field is deprecated in [c]python so maybe should not
+		// even bother to implement it here?
+		else if (getattribute_.has_value()) {
+			return { call_slot(*getattribute_, this, name), LookupAttrResult::FOUND };
+		} else {
+			return { PyResult::Ok(py_none()), LookupAttrResult::NOT_FOUND };
+		}
+	}();
 
-	// TODO: check if error occured
-	if (result) {
-		return { result, LookupAttrResult::FOUND };
-	} else if (auto *exception = VirtualMachine::the()
-									 .interpreter()
-									 .execution_frame()
-									 ->exception_info()
-									 ->exception;
-			   exception && exception->type() == AttributeError::static_type()) {
-		VirtualMachine::the().interpreter().execution_frame()->set_exception(nullptr);
-		VirtualMachine::the().interpreter().set_status(Interpreter::Status::OK);
-		return { nullptr, LookupAttrResult::NOT_FOUND };
+	if (std::get<0>(result).unwrap_err()->type() == AttributeError::static_type()) {
+		return { PyResult::Ok(py_none()), LookupAttrResult::NOT_FOUND };
 	} else {
-		return { nullptr, LookupAttrResult::ERROR };
+		return result;
 	}
 }
 
 
-PyObject *PyObject::get_method(PyObject *name) const
+PyResult PyObject::get_method(PyObject *name) const
 {
 	bool method_found = false;
 
@@ -691,15 +681,16 @@ PyObject *PyObject::get_method(PyObject *name) const
 		}
 	}
 
-	auto *descriptor = type()->lookup(name);
+	auto descriptor_ = type()->lookup(name);
+	if (descriptor_.is_err()) return descriptor_;
+	auto *descriptor = descriptor_.unwrap_as<PyObject>();
+
 	if (descriptor) {
 		if (is_method_descriptor(descriptor->type())) {
 			method_found = true;
 		} else {
 			if (descriptor->type()->underlying_type().__get__.has_value()) {
-				auto result = descriptor->get(const_cast<PyObject *>(this), type());
-				ASSERT(result)
-				return result;
+				return descriptor->get(const_cast<PyObject *>(this), type());
 			}
 		}
 	}
@@ -711,35 +702,36 @@ PyObject *PyObject::get_method(PyObject *name) const
 
 	if (method_found) {
 		auto result = descriptor->get(const_cast<PyObject *>(this), type());
-		ASSERT(result)
+		ASSERT(result.is_ok())
 		return result;
 	}
 
-	VirtualMachine::the().interpreter().raise_exception(attribute_error(
+	return PyResult::Err(attribute_error(
 		"'{}' object has no attribute '{}'", m_type_prototype.__name__, name->to_string()));
-	return nullptr;
 }
 
-PyObject *PyObject::__setattribute__(PyObject *attribute, PyObject *value)
+PyResult PyObject::__setattribute__(PyObject *attribute, PyObject *value)
 {
 	if (as<PyString>(attribute)) {
-		if (!m_attributes) { m_attributes = PyDict::create(); }
+		if (!m_attributes) {
+			auto d = PyDict::create();
+			if (d.is_err()) return d;
+			m_attributes = d.unwrap_as<PyDict>();
+		}
 		m_attributes->insert(attribute, value);
-	} else {
-		TODO();
 	}
-	return py_none();
+	TODO();
 }
 
-PyObject *PyObject::__bool__() const { return py_true(); }
+PyResult PyObject::__bool__() const { return PyResult::Ok(py_true()); }
 
-size_t PyObject::__hash__() const { return bit_cast<size_t>(this) >> 4; }
+PyResult PyObject::__hash__() const { return PyInteger::create(bit_cast<size_t>(this) >> 4); }
 
 bool PyObject::is_callable() const { return m_type_prototype.__call__.has_value(); }
 
 const std::string &PyObject::name() const { return m_type_prototype.__name__; }
 
-PyObject *PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
 
@@ -753,9 +745,8 @@ PyObject *PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 			ASSERT(custom_new_fn)
 
 			if (new_fn != custom_new_fn) {
-				VirtualMachine::the().interpreter().raise_exception(type_error(
+				return PyResult::Err(type_error(
 					"object.__new__() takes exactly one argument (the type to instantiate)"));
-				return nullptr;
 			}
 		}
 
@@ -768,14 +759,14 @@ PyObject *PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
 			ASSERT(object)
 			if (init_fn == custom_init_fn) {
-				VirtualMachine::the().interpreter().raise_exception(
-					type_error("object() takes no arguments"));
-				return nullptr;
+				return PyResult::Err(type_error("object() takes no arguments"));
 			}
 		}
 	}
 	// FIXME: if custom allocators are ever added, should call the type's allocator here
-	return VirtualMachine::the().heap().allocate<CustomPyObject>(type);
+	auto *obj = VirtualMachine::the().heap().allocate<CustomPyObject>(type);
+	if (!obj) { return PyResult::Err(memory_error(sizeof(CustomPyObject))); }
+	return PyResult::Ok(obj);
 }
 
 std::optional<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
@@ -791,8 +782,9 @@ std::optional<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 			ASSERT(custom_new_fn)
 
 			if (new_fn == custom_new_fn) {
-				VirtualMachine::the().interpreter().raise_exception(type_error(
-					"object.__new__() takes exactly one argument (the type to instantiate)"));
+				TODO();
+				// VirtualMachine::the().interpreter().raise_exception(type_error(
+				// 	"object.__new__() takes exactly one argument (the type to instantiate)"));
 				return -1;
 			}
 		}
@@ -807,8 +799,9 @@ std::optional<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 			ASSERT(custom_init_fn)
 
 			if (init_fn != custom_init_fn) {
-				VirtualMachine::the().interpreter().raise_exception(
-					type_error("object() takes no arguments"));
+				TODO();
+				// VirtualMachine::the().interpreter().raise_exception(
+				// 	type_error("object() takes no arguments"));
 				return -1;
 			}
 		}

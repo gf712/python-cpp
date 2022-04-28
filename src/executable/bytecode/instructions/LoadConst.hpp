@@ -17,11 +17,13 @@ class LoadConst final : public Instruction
 	{
 		return fmt::format("LOAD_CONST      r{:<3} s{:<3}", m_destination, m_static_value_index);
 	}
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final
 	{
 		ASSERT(vm.registers().has_value())
 		ASSERT(vm.registers()->get().size() > m_destination)
-		vm.reg(m_destination) = interpreter.execution_frame()->consts(m_static_value_index);
+		auto result = interpreter.execution_frame()->consts(m_static_value_index);
+		vm.reg(m_destination) = result;
+		return py::PyResult::Ok(result);
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}

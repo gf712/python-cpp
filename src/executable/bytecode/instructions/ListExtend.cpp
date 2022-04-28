@@ -4,7 +4,7 @@
 
 using namespace py;
 
-void ListExtend::execute(VirtualMachine &vm, Interpreter &) const
+PyResult ListExtend::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &list = vm.reg(m_list);
 	auto &value = vm.reg(m_value);
@@ -15,7 +15,10 @@ void ListExtend::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(pylist)
 	ASSERT(as<PyList>(pylist))
 
-	as<PyList>(pylist)->extend(PyTuple::create(value), nullptr);
+	auto result = PyTuple::create(value);
+	if (result.is_err()) { return result; }
+
+	return as<PyList>(pylist)->extend(result.unwrap_as<PyTuple>(), nullptr);
 }
 
 std::vector<uint8_t> ListExtend::serialize() const

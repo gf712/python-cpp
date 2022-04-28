@@ -1,4 +1,5 @@
 #include "PyRange.hpp"
+#include "MemoryError.hpp"
 #include "PyDict.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
@@ -10,31 +11,51 @@
 
 using namespace py;
 
-PyObject *PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	ASSERT(args && args->size() > 0 && args->size() < 4)
 	ASSERT(type == range())
 
-	if (args->size() == 1) {
-		auto stop = as<PyInteger>(PyObject::from(args->elements()[0]));
-		return VirtualMachine::the().heap().allocate<PyRange>(
-			std::get<int64_t>(stop->value().value));
-	} else if (args->size() == 2) {
-		auto start = as<PyInteger>(PyObject::from(args->elements()[0]));
-		auto stop = as<PyInteger>(PyObject::from(args->elements()[1]));
-		return VirtualMachine::the().heap().allocate<PyRange>(
-			std::get<int64_t>(start->value().value), std::get<int64_t>(stop->value().value));
-	} else if (args->size() == 3) {
-		auto start = as<PyInteger>(PyObject::from(args->elements()[0]));
-		auto stop = as<PyInteger>(PyObject::from(args->elements()[1]));
-		auto step = as<PyInteger>(PyObject::from(args->elements()[2]));
-		return VirtualMachine::the().heap().allocate<PyRange>(
-			std::get<int64_t>(start->value().value),
-			std::get<int64_t>(stop->value().value),
-			std::get<int64_t>(step->value().value));
-	}
-	ASSERT_NOT_REACHED()
+	auto obj = [&]() -> std::variant<PyRange *, PyResult> {
+		if (args->size() == 1) {
+			if (auto arg1 = PyObject::from(args->elements()[0]); arg1.is_ok()) {
+				auto stop = as<PyInteger>(arg1.unwrap_as<PyObject>());
+				return VirtualMachine::the().heap().allocate<PyRange>(
+					std::get<int64_t>(stop->value().value));
+			} else {
+				return arg1;
+			}
+		} else if (args->size() == 2) {
+			auto start_ = PyObject::from(args->elements()[0]);
+			if (start_.is_err()) return start_;
+			auto *start = as<PyInteger>(start_.unwrap_as<PyObject>());
+			auto stop_ = PyObject::from(args->elements()[1]);
+			if (stop_.is_err()) return stop_;
+			auto *stop = as<PyInteger>(stop_.unwrap_as<PyObject>());
+			return VirtualMachine::the().heap().allocate<PyRange>(
+				std::get<int64_t>(start->value().value), std::get<int64_t>(stop->value().value));
+		} else if (args->size() == 3) {
+			auto start_ = PyObject::from(args->elements()[0]);
+			if (start_.is_err()) return start_;
+			auto *start = as<PyInteger>(start_.unwrap_as<PyObject>());
+			auto stop_ = PyObject::from(args->elements()[1]);
+			if (stop_.is_err()) return stop_;
+			auto *stop = as<PyInteger>(stop_.unwrap_as<PyObject>());
+			auto step_ = PyObject::from(args->elements()[2]);
+			if (step_.is_err()) return step_;
+			auto *step = as<PyInteger>(step_.unwrap_as<PyObject>());
+			return VirtualMachine::the().heap().allocate<PyRange>(
+				std::get<int64_t>(start->value().value),
+				std::get<int64_t>(stop->value().value),
+				std::get<int64_t>(step->value().value));
+		}
+		ASSERT_NOT_REACHED()
+	}();
+
+	if (std::holds_alternative<PyResult>(obj)) return std::get<PyResult>(obj);
+	if (!std::get<PyRange *>(obj)) { return PyResult::Err(memory_error(sizeof(PyRange))); }
+	return PyResult::Ok(std::get<PyRange *>(obj));
 }
 
 
@@ -55,12 +76,14 @@ std::string PyRange::to_string() const
 	}
 }
 
-PyObject *PyRange::__repr__() const { return PyString::create(to_string()); }
+PyResult PyRange::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyRange::__iter__() const
+PyResult PyRange::__iter__() const
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyRangeIterator>(*this);
+	auto *obj = heap.allocate<PyRangeIterator>(*this);
+	if (!obj) { return PyResult::Err(memory_error(sizeof(PyRangeIterator))); }
+	return PyResult::Ok(obj);
 }
 
 PyType *PyRange::type() const { return range(); }
@@ -90,17 +113,16 @@ std::string PyRangeIterator::to_string() const
 	return fmt::format("<range_iterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyRangeIterator::__repr__() const { return PyString::create(to_string()); }
+PyResult PyRangeIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyRangeIterator::__next__()
+PyResult PyRangeIterator::__next__()
 {
 	if (m_current_index < m_pyrange.stop()) {
 		auto result = PyNumber::from(Number{ m_current_index });
 		m_current_index += m_pyrange.step();
 		return result;
 	}
-	VirtualMachine::the().interpreter().raise_exception(stop_iteration(""));
-	return nullptr;
+	return PyResult::Err(stop_iteration(""));
 }
 
 PyType *PyRangeIterator::type() const { return range_iterator(); }

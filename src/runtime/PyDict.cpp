@@ -1,4 +1,5 @@
 #include "PyDict.hpp"
+#include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyNone.hpp"
 #include "PyString.hpp"
@@ -25,10 +26,31 @@ template<> const PyDict *py::as(const PyObject *obj)
 }
 
 PyDict::PyDict(MapType &&map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(std::move(map)) {}
+
 PyDict::PyDict(const MapType &map) : PyBaseObject(BuiltinTypes::the().dict()), m_map(map) {}
+
 PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
 
-PyDict *PyDict::create() { return VirtualMachine::the().heap().allocate<PyDict>(); }
+PyResult PyDict::create()
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDict>();
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
+	return PyResult::Ok(result);
+}
+
+PyResult PyDict::create(MapType &&map)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDict>(std::move(map));
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
+	return PyResult::Ok(result);
+}
+
+PyResult PyDict::create(const MapType &map)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDict>(map);
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
+	return PyResult::Ok(result);
+}
 
 std::string PyDict::to_string() const
 {
@@ -39,7 +61,11 @@ std::string PyDict::to_string() const
 
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
-		std::visit(overloaded{ [&os](PyObject *key) { os << key->repr()->to_string(); },
+		std::visit(overloaded{ [&os](PyObject *key) {
+								  auto r = key->repr();
+								  ASSERT(r.is_ok())
+								  os << r.unwrap_as<PyObject>()->to_string();
+							  },
 					   [&os](const auto &key) { os << key; } },
 			it->first);
 		os << ": ";
@@ -47,7 +73,9 @@ std::string PyDict::to_string() const
 								  if (value == this) {
 									  os << "{...}";
 								  } else {
-									  os << value->repr()->to_string();
+									  auto r = value->repr();
+									  ASSERT(r.is_ok())
+									  os << r.unwrap_as<PyObject>()->to_string();
 								  }
 							  },
 					   [&os](const auto &value) { os << value; } },
@@ -56,14 +84,20 @@ std::string PyDict::to_string() const
 
 		std::advance(it, 1);
 	}
-	std::visit(overloaded{ [&os](PyObject *key) { os << key->repr()->to_string() << ": "; },
+	std::visit(overloaded{ [&os](PyObject *key) {
+							  auto r = key->repr();
+							  ASSERT(r.is_ok())
+							  os << r.unwrap_as<PyObject>()->to_string() << ": ";
+						  },
 				   [&os](const auto &key) { os << key << ": "; } },
 		it->first);
 	std::visit(overloaded{ [&os, this](PyObject *value) {
 							  if (value == this) {
 								  os << "{...}";
 							  } else {
-								  os << value->repr()->to_string();
+								  auto r = value->repr();
+								  ASSERT(r.is_ok())
+								  os << r.unwrap_as<PyObject>()->to_string();
 							  }
 						  },
 				   [&os](const auto &value) { os << value; } },
@@ -73,13 +107,13 @@ std::string PyDict::to_string() const
 	return os.str();
 }
 
-PyObject *PyDict::__repr__() const { return PyString::from(String{ to_string() }); }
+PyResult PyDict::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyDict::__eq__(const PyObject *other) const
+PyResult PyDict::__eq__(const PyObject *other) const
 {
-	if (!as<PyDict>(other)) { return py_false(); }
+	if (!as<PyDict>(other)) { return PyResult::Ok(py_false()); }
 
-	return m_map == as<PyDict>(other)->map() ? py_true() : py_false();
+	return PyResult::Ok(m_map == as<PyDict>(other)->map() ? py_true() : py_false());
 }
 
 PyDictItems *PyDict::items() const
@@ -98,12 +132,14 @@ Value PyDict::operator[](Value key) const
 
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
 
-void PyDict::merge(PyTuple *args, PyDict *kwargs)
+PyResult PyDict::merge(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs || kwargs->map().empty())
 
-	auto *other_dict = PyObject::from(args->elements()[0]);
+	auto other_dict_ = PyObject::from(args->elements()[0]);
+	if (other_dict_.is_err()) return other_dict_;
+	auto *other_dict = other_dict_.unwrap_as<PyObject>();
 	ASSERT(as<PyDict>(other_dict))
 
 	auto map_copy = as<PyDict>(other_dict)->map();
@@ -112,6 +148,8 @@ void PyDict::merge(PyTuple *args, PyDict *kwargs)
 		// should raise error if duplicates are not allowed
 		TODO();
 	}
+
+	return PyResult::Ok(py_none());
 }
 
 
@@ -131,17 +169,17 @@ void PyDict::visit_graph(Visitor &visitor)
 
 PyType *PyDict::type() const { return ::dict(); }
 
-PyObject *PyDict::get(PyObject *key, PyObject *default_value) const
+PyResult PyDict::get(PyObject *key, PyObject *default_value) const
 {
 	if (auto it = m_map.find(key); it != m_map.end()) {
 		return PyObject::from(it->second);
 	} else if (default_value) {
-		return default_value;
+		return PyResult::Ok(default_value);
 	}
-	return py_none();
+	return PyResult::Ok(py_none());
 }
 
-PyObject *PyDict::update(PyDict *other)
+PyResult PyDict::update(PyDict *other)
 {
 	for (const auto &[key, value] : other->map()) {
 		if (auto it = m_map.find(key); it != m_map.end()) {
@@ -151,7 +189,7 @@ PyObject *PyDict::update(PyDict *other)
 		}
 	}
 
-	return py_none();
+	return PyResult::Ok(py_none());
 }
 
 namespace {
@@ -166,24 +204,27 @@ std::unique_ptr<TypePrototype> register_dict()
 							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
 								 ASSERT(args)
 								 ASSERT(!kwargs || kwargs->size() == 0)
-								 PyObject *key = nullptr;
+								 auto key_ = PyObject::from(args->elements()[0]);
+								 if (key_.is_err()) return key_;
+								 PyObject *key = key_.unwrap_as<PyObject>();
 								 PyObject *default_value = nullptr;
-								 key = PyObject::from(args->elements()[0]);
 								 if (args->elements().size() == 2) {
-									 default_value = PyObject::from(args->elements()[1]);
+									 auto default_value_ = PyObject::from(args->elements()[1]);
+									 if (default_value_.is_err()) return default_value_;
+									 default_value = default_value_.unwrap_as<PyObject>();
 								 }
 								 return self->get(key, default_value);
 							 })
 						 .def(
 							 "update",
-							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyObject * {
+							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
 								 ASSERT(args)
 								 ASSERT(!kwargs || kwargs->size() == 0)
-								 PyObject *other = PyObject::from(args->elements()[0]);
+								 auto other_ = PyObject::from(args->elements()[0]);
+								 if (other_.is_err()) return other_;
+								 auto *other = other_.unwrap_as<PyObject>();
 								 if (other->type() != dict()) {
-									 VirtualMachine::the().interpreter().raise_exception(
-										 runtime_error("TODO"));
-									 return nullptr;
+									 return PyResult::Err(runtime_error("TODO"));
 								 }
 								 return self->update(as<PyDict>(other));
 							 })
@@ -280,17 +321,16 @@ std::string PyDictItemsIterator::to_string() const
 	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
 }
 
-PyObject *PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
+PyResult PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PyDictItemsIterator::__next__()
+PyResult PyDictItemsIterator::__next__()
 {
 	if (m_current_iterator != m_pydictitems.m_pydict.map().end()) {
 		auto [key, value] = *m_current_iterator;
 		m_current_iterator++;
-		return VirtualMachine::the().heap().allocate<PyTuple>(std::vector{ key, value });
+		return PyTuple::create(key, value);
 	}
-	VirtualMachine::the().interpreter().raise_exception(stop_iteration(""));
-	return nullptr;
+	return PyResult::Err(stop_iteration(""));
 }
 
 bool PyDictItemsIterator::operator==(const PyDictItemsIterator &other) const

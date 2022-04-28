@@ -2,7 +2,7 @@
 
 using namespace py;
 
-void ReturnValue::execute(VirtualMachine &vm, Interpreter &) const
+PyResult ReturnValue::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto result = vm.reg(m_source);
 
@@ -19,6 +19,8 @@ void ReturnValue::execute(VirtualMachine &vm, Interpreter &) const
 
 	// tell the VM to return to the calling stack frame
 	vm.ret();
+
+	return PyResult::Ok(result);
 }
 
 std::vector<uint8_t> ReturnValue::serialize() const

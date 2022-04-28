@@ -6,23 +6,25 @@
 
 using namespace py;
 
-void LoadGlobal::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult LoadGlobal::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &globals = interpreter.execution_frame()->globals()->map();
 	const auto &builtins = interpreter.execution_frame()->builtins()->symbol_table();
 
 	if (const auto &it = globals.find(String{ m_object_name }); it != globals.end()) {
 		vm.reg(m_destination) = it->second;
-		return;
+		return PyResult::Ok(it->second);
 	}
 
-	auto *name = PyString::create(m_object_name);
-	if (const auto &it = builtins.find(name); it != builtins.end()) {
+	auto name = PyString::create(m_object_name);
+	if (name.is_err()) { return name; }
+
+	if (const auto &it = builtins.find(name.unwrap_as<PyString>()); it != builtins.end()) {
 		vm.reg(m_destination) = it->second;
-		return;
+		return PyResult::Ok(it->second);
 	}
 
-	interpreter.raise_exception(name_error("name '{:s}' is not defined", m_object_name));
+	return PyResult::Err(name_error("name '{:s}' is not defined", m_object_name));
 }
 
 std::vector<uint8_t> LoadGlobal::serialize() const

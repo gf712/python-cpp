@@ -3,31 +3,29 @@
 
 using namespace py;
 
-void JumpIfTrue::execute(VirtualMachine &vm, Interpreter &) const
+PyResult JumpIfTrue::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
-	const bool test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> bool {
-								  ASSERT(obj)
-								  return obj->bool_() == py_true();
-							  },
-					   [](const auto &) -> bool {
+	const auto test_result =
+		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult { return obj->bool_(); },
+					   [](const auto &) -> PyResult {
 						   TODO();
-						   return false;
+						   return PyResult::Err(nullptr);
 					   },
-					   [](const NameConstant &value) -> bool {
+					   [](const NameConstant &value) -> PyResult {
 						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return *bool_type;
+							   return PyResult::Ok(*bool_type ? py_true() : py_false());
 						   } else {
-							   return false;
+							   return PyResult::Ok(py_false());
 						   }
 					   } },
 			result);
-	if (test_result) {
+	if (test_result.is_ok() && test_result.unwrap_as<PyObject>() == py_true()) {
 		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
+	return test_result;
 }
 
 void JumpIfTrue::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)

@@ -27,7 +27,7 @@ class Unary final : public Instruction
 		return fmt::format("UNARY  r{:<3} r{:<3}", m_destination, m_source, m_operation);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -1,4 +1,5 @@
 #include "PyCode.hpp"
+#include "MemoryError.hpp"
 #include "PyTuple.hpp"
 #include "executable/Function.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -8,9 +9,42 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-
 namespace py {
+
+template<> PyCode *as(PyObject *obj)
+{
+	if (obj->type() == code()) { return static_cast<PyCode *>(obj); }
+	return nullptr;
+}
+
+template<> const PyCode *as(const PyObject *obj)
+{
+	if (obj->type() == code()) { return static_cast<const PyCode *>(obj); }
+	return nullptr;
+}
+
 PyCode::PyCode(std::unique_ptr<Function> &&function,
+	std::vector<std::string> &&cellvars,
+	std::vector<std::string> &&varnames,
+	std::vector<std::string> &&freevars,
+	size_t stack_size,
+	std::string &&filename,
+	size_t first_line_number,
+	size_t arg_count,
+	size_t kwonly_arg_count,
+	std::vector<size_t> &&cell2arg,
+	size_t nlocals,
+	PyTuple *consts,
+	CodeFlags flags)
+	: PyBaseObject(BuiltinTypes::the().code()), m_function(std::move(function)),
+	  m_register_count(m_function->register_count()), m_cellvars(std::move(cellvars)),
+	  m_varnames(std::move(varnames)), m_freevars(std::move(freevars)), m_stack_size(stack_size),
+	  m_filename(std::move(filename)), m_first_line_number(first_line_number),
+	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_cell2arg(std::move(cell2arg)),
+	  m_nlocals(nlocals), m_consts(consts), m_flags(flags)
+{}
+
+PyResult PyCode::create(std::unique_ptr<Function> &&function,
 	std::vector<std::string> cellvars,
 	std::vector<std::string> varnames,
 	std::vector<std::string> freevars,
@@ -23,13 +57,23 @@ PyCode::PyCode(std::unique_ptr<Function> &&function,
 	size_t nlocals,
 	PyTuple *consts,
 	CodeFlags flags)
-	: PyBaseObject(BuiltinTypes::the().code()), m_function(std::move(function)),
-	  m_register_count(m_function->register_count()), m_cellvars(std::move(cellvars)),
-	  m_varnames(std::move(varnames)), m_freevars(std::move(freevars)), m_stack_size(stack_size),
-	  m_filename(std::move(filename)), m_first_line_number(first_line_number),
-	  m_arg_count(arg_count), m_kwonly_arg_count(kwonly_arg_count), m_cell2arg(std::move(cell2arg)),
-	  m_nlocals(nlocals), m_consts(consts), m_flags(flags)
-{}
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyCode>(std::move(function),
+		std::move(cellvars),
+		std::move(varnames),
+		std::move(freevars),
+		stack_size,
+		std::move(filename),
+		first_line_number,
+		arg_count,
+		kwonly_arg_count,
+		std::move(cell2arg),
+		nlocals,
+		consts,
+		flags);
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyCode))); }
+	return PyResult::Ok(result);
+}
 
 PyCode::~PyCode() {}
 
@@ -81,7 +125,7 @@ std::vector<uint8_t> PyCode::serialize() const
 	return result;
 }
 
-std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer)
+std::pair<PyResult, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer)
 {
 	size_t serialized_function_size{ 0 };
 	for (size_t i = 0; i < sizeof(size_t); ++i) {
@@ -101,10 +145,11 @@ std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 	const auto kwonly_arg_count = ::py::deserialize<size_t>(buffer);
 	const auto cell2arg = ::py::deserialize<std::vector<size_t>>(buffer);
 	const auto nlocals = ::py::deserialize<size_t>(buffer);
-	const auto consts = ::py::deserialize<PyTuple *>(buffer);
+	const auto consts = ::py::deserialize<PyTuple>(buffer);
+	if (consts.is_err()) { return { consts, 0 }; }
 	const auto flags = ::py::deserialize<uint8_t>(buffer);
 
-	return { VirtualMachine::the().heap().allocate<PyCode>(std::move(function),
+	return { PyCode::create(std::move(function),
 				 cellvars,
 				 varnames,
 				 freevars,
@@ -115,7 +160,7 @@ std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 				 kwonly_arg_count,
 				 cell2arg,
 				 nlocals,
-				 consts,
+				 consts.unwrap_as<PyTuple>(),
 				 CodeFlags::from_byte(flags)),
 		0 };
 }
@@ -124,10 +169,10 @@ std::pair<PyCode *, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 namespace {
 	std::once_flag code_flag;
 
-	std::unique_ptr<TypePrototype> register_code() { 
-		return std::move(klass<PyCode>("code")
-							.attr("co_consts", &PyCode::m_consts)
-							.type); }
+	std::unique_ptr<TypePrototype> register_code()
+	{
+		return std::move(klass<PyCode>("code").attr("co_consts", &PyCode::m_consts).type);
+	}
 }// namespace
 
 std::unique_ptr<TypePrototype> PyCode::register_type()

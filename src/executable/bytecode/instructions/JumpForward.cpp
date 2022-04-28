@@ -1,8 +1,12 @@
 #include "JumpForward.hpp"
+#include "runtime/PyNone.hpp"
 
-void JumpForward::execute(VirtualMachine &vm, Interpreter &) const
+using namespace py;
+
+PyResult JumpForward::execute(VirtualMachine &vm, Interpreter &) const
 {
 	vm.jump_blocks(m_block_count);
+	return PyResult::Ok(py_none());
 }
 
 std::vector<uint8_t> JumpForward::serialize() const

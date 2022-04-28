@@ -1,10 +1,13 @@
 #include "Jump.hpp"
+#include "runtime/PyNone.hpp"
 
+using namespace py;
 
-void Jump::execute(VirtualMachine &vm, Interpreter &) const
+PyResult Jump::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto ip = vm.instruction_pointer() + m_label->position();
 	vm.set_instruction_pointer(ip);
+	return PyResult::Ok(py_none());
 };
 
 

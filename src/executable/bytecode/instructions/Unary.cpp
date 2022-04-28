@@ -5,83 +5,80 @@
 using namespace py;
 
 namespace {
-Value unary_positive(const Value &val, Interpreter &interpreter)
+PyResult unary_positive(const Value &val)
 {
 	return std::visit(
-		overloaded{ [](const Number &val) -> Value { return val; },
-			[&interpreter](const String &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary +: 'str'"));
-				return nullptr;
+		overloaded{ [](const Number &val) -> PyResult { return PyResult::Ok(val); },
+			[](const String &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary +: 'str'"));
 			},
-			[&interpreter](const Bytes &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary +: 'bytes'"));
-				return nullptr;
+			[](const Bytes &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary +: 'bytes'"));
 			},
-			[&interpreter](const Ellipsis &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary +: 'ellipsis'"));
-				return nullptr;
+			[](const Ellipsis &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary +: 'ellipsis'"));
 			},
-			[&interpreter](const NameConstant &c) -> Value {
+			[](const NameConstant &c) -> PyResult {
 				if (std::holds_alternative<NoneType>(c.value)) {
-					interpreter.raise_exception(
-						type_error("bad operand type for unary +: 'NoneType'"));
-					return nullptr;
+					return PyResult::Err(type_error("bad operand type for unary +: 'NoneType'"));
 				}
-				return c;
+				return PyResult::Ok(c);
 			},
-			[](PyObject *obj) -> Value { return obj->pos(); } },
+			[](PyObject *obj) -> PyResult { return obj->pos(); } },
 		val);
 }
 
-Value unary_negative(const Value &val, Interpreter &interpreter)
+PyResult unary_negative(const Value &val)
 {
 	return std::visit(
-		overloaded{ [](const Number &val) -> Value {
-					   return std::visit([](const auto &v) { return Number{ -v }; }, val.value);
+		overloaded{ [](const Number &val) -> PyResult {
+					   return PyResult::Ok(
+						   std::visit([](const auto &v) { return Number{ -v }; }, val.value));
 				   },
-			[&interpreter](const String &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary -: 'str'"));
-				return nullptr;
+			[](const String &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary -: 'str'"));
 			},
-			[&interpreter](const Bytes &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary -: 'bytes'"));
-				return nullptr;
+			[](const Bytes &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary -: 'bytes'"));
 			},
-			[&interpreter](const Ellipsis &) -> Value {
-				interpreter.raise_exception(type_error("bad operand type for unary -: 'ellipsis'"));
-				return nullptr;
+			[](const Ellipsis &) -> PyResult {
+				return PyResult::Err(type_error("bad operand type for unary -: 'ellipsis'"));
 			},
-			[&interpreter](const NameConstant &c) -> Value {
+			[](const NameConstant &c) -> PyResult {
 				if (std::holds_alternative<NoneType>(c.value)) {
-					interpreter.raise_exception(
-						type_error("bad operand type for unary -: 'NoneType'"));
-					return nullptr;
+					return PyResult::Err(type_error("bad operand type for unary -: 'NoneType'"));
 				}
-				if (std::get<bool>(c.value)) { return Number{ int64_t{ -1 } }; }
-				return Number{ int64_t{ 0 } };
+				if (std::get<bool>(c.value)) { return PyResult::Ok(Number{ int64_t{ -1 } }); }
+				return PyResult::Ok(Number{ int64_t{ 0 } });
 			},
-			[](PyObject *obj) -> Value { return obj->neg(); } },
+			[](PyObject *obj) -> PyResult { return obj->neg(); } },
 		val);
 }
 }// namespace
 
-void Unary::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult Unary::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &val = vm.reg(m_source);
-	switch (m_operation) {
-	case Operation::POSITIVE: {
-		vm.reg(m_destination) = unary_positive(val, interpreter);
-	} break;
-	case Operation::NEGATIVE: {
-		vm.reg(m_destination) = unary_negative(val, interpreter);
-	} break;
-	case Operation::INVERT: {
-		TODO();
-	} break;
-	case Operation::NOT: {
-		TODO();
-	} break;
-	}
+	auto result = [&]() -> PyResult {
+		switch (m_operation) {
+		case Operation::POSITIVE: {
+			return unary_positive(val);
+		} break;
+		case Operation::NEGATIVE: {
+			return unary_negative(val);
+		} break;
+		case Operation::INVERT: {
+			TODO();
+		} break;
+		case Operation::NOT: {
+			TODO();
+		} break;
+		}
+	}();
+
+	if (result.is_err()) return result;
+	vm.reg(m_destination) = result.unwrap();
+	return result;
 }
 
 std::vector<uint8_t> Unary::serialize() const

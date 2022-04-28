@@ -23,36 +23,38 @@ void PySlotWrapper::visit_graph(Visitor &visitor)
 	visitor.visit(*m_slot_type);
 }
 
-PyObject *PySlotWrapper::__repr__() const { return PyString::create(to_string()); }
+PyResult PySlotWrapper::__repr__() const { return PyString::create(to_string()); }
 
-PyObject *PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
+PyResult PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 {
 	// split args tuple -> (args[0], args[1:])
 	// since args[0] is self (right?)
 	std::vector<Value> new_args_vector;
 	new_args_vector.reserve(args->size() - 1);
-	PyObject *self = PyObject::from(args->elements()[0]);
+	auto self_ = PyObject::from(args->elements()[0]);
+	if (self_.is_err()) return self_;
+	auto *self = self_.unwrap_as<PyObject>();
 	for (size_t i = 1; i < args->size(); ++i) { new_args_vector.push_back(args->elements()[i]); }
-	args = PyTuple::create(new_args_vector);
-	auto *result = m_slot(self, args, kwargs);
+	auto args_ = PyTuple::create(new_args_vector);
+	if (args_.is_err()) return args_;
+	args = args_.unwrap_as<PyTuple>();
 
-	// FIXME: this should be independent from the VM's registers
-	VirtualMachine::the().reg(0) = result;
-
-	return result;
+	return m_slot(self, args, kwargs).and_then<PyObject>([](auto *result) {
+		VirtualMachine::the().reg(0) = result;
+		return PyResult::Ok(result);
+	});
 }
 
-PyObject *PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
+PyResult PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
-	if (!instance) { return const_cast<PySlotWrapper *>(this); }
+	if (!instance) { return PyResult::Ok(const_cast<PySlotWrapper *>(this)); }
 	if (!instance->type()->issubclass(m_slot_type)) {
-		VirtualMachine::the().interpreter().raise_exception(
+		return PyResult::Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",
 				m_name->value(),
 				m_slot_type->underlying_type().__name__,
 				instance->type()->underlying_type().__name__));
-		return nullptr;
 	}
 	// bind slot wrapper to the instance
 	return PyNativeFunction::create(
@@ -62,27 +64,27 @@ PyObject *PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
 			args_.reserve(args->size() + 1);
 			args_.push_back(instance);
 			args_.insert(args_.end(), args->elements().begin(), args->elements().end());
-			args = PyTuple::create(args_);
-			return const_cast<PySlotWrapper *>(this)->__call__(args, kwargs);
+			return PyTuple::create(args_).and_then<PyTuple>([this, kwargs](auto *args) {
+				return const_cast<PySlotWrapper *>(this)->__call__(args, kwargs);
+			});
 		},
 		const_cast<PySlotWrapper *>(this),
 		instance);
 }
 
-PySlotWrapper::PySlotWrapper(PyString *name,
-	PyType *slot_type,
-	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function)
+PySlotWrapper::PySlotWrapper(PyString *name, PyType *slot_type, FunctionType &&function)
 	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
 	  m_slot_type(slot_type), m_slot(std::move(function))
 {}
 
-PySlotWrapper *PySlotWrapper::create(PyString *name,
-	PyType *slot_type,
-	std::function<PyObject *(PyObject *, PyTuple *, PyDict *)> function)
+PyResult PySlotWrapper::create(PyString *name, PyType *slot_type, FunctionType &&function)
 {
 	ASSERT(name)
 	ASSERT(slot_type)
-	return VirtualMachine::the().heap().allocate<PySlotWrapper>(name, slot_type, function);
+	auto *obj =
+		VirtualMachine::the().heap().allocate<PySlotWrapper>(name, slot_type, std::move(function));
+	if (!obj) return PyResult::Err(memory_error(sizeof(PySlotWrapper)));
+	return PyResult::Ok(obj);
 }
 
 PyType *PySlotWrapper::type() const { return slot_wrapper(); }

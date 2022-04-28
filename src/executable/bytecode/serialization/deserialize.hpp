@@ -8,7 +8,9 @@
 
 namespace py {
 
-template<typename T> inline T deserialize(std::span<const uint8_t> &buffer)
+template<typename T>
+inline auto deserialize(std::span<const uint8_t> &buffer)
+	-> std::conditional_t<std::is_base_of_v<PyObject, T>, PyResult, T>
 {
 	if constexpr (std::is_same_v<T, std::string>) {
 		const size_t string_size = deserialize<size_t>(buffer);
@@ -56,7 +58,7 @@ template<typename T> inline T deserialize(std::span<const uint8_t> &buffer)
 			result[i] = deserialize<typename is_vector<T>::ElementType>(buffer);
 		}
 		return result;
-	} else if constexpr (std::is_same_v<T, PyTuple *>) {
+	} else if constexpr (std::is_same_v<T, PyTuple>) {
 		const size_t vector_size = deserialize<size_t>(buffer);
 		std::vector<Value> result;
 		result.resize(vector_size);

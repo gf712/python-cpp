@@ -5,7 +5,7 @@
 
 using namespace py;
 
-void ImportName::execute(VirtualMachine &vm, Interpreter &) const
+PyResult ImportName::execute(VirtualMachine &vm, Interpreter &) const
 {
 	std::string name = std::accumulate(
 		std::next(m_names.begin()), m_names.end(), *m_names.begin(), [](auto rhs, auto lhs) {
@@ -13,7 +13,10 @@ void ImportName::execute(VirtualMachine &vm, Interpreter &) const
 		});
 
 	auto module_name = PyString::create(name);
-	if (auto *module = PyModule::create(module_name)) { vm.reg(m_destination) = module; }
+	if (module_name.is_err()) { return module_name; }
+	auto module = PyModule::create(module_name.unwrap_as<PyString>());
+	if (module.is_ok()) { vm.reg(m_destination) = module.unwrap(); }
+	return module;
 }
 
 std::vector<uint8_t> ImportName::serialize() const

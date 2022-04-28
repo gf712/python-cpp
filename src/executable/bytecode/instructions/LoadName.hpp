@@ -18,7 +18,7 @@ class LoadName final : public Instruction
 		return fmt::format("LOAD_NAME       r{:<3} \"{}\"", m_destination, m_object_name);
 	}
 
-	void execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

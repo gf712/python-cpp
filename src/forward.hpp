@@ -33,6 +33,7 @@ struct NoneType;
 struct NameConstant;
 class PyObject;
 using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, PyObject *>;
+class PyResult;
 }// namespace py
 
 using Register = uint8_t;

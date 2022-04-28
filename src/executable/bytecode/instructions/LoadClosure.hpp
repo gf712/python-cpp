@@ -20,7 +20,7 @@ class LoadClosure final : public Instruction
 			"LOAD_CLOSURE    r{:<3} f{:<3} \"{}\"", m_destination, m_source, m_object_name);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -20,7 +20,7 @@ class MethodCall final : public Instruction
 		return fmt::format("CALL_METHOD     r{:<3} {} ()", m_caller, args_regs, m_function_name);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

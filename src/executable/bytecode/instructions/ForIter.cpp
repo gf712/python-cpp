@@ -1,18 +1,21 @@
 #include "ForIter.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/StopIteration.hpp"
 
 using namespace py;
 
-void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto iterator = vm.reg(m_src);
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
 		const auto &next_value = (*iterable_object)->next();
-		if (interpreter.execution_frame()->exception_info().has_value()) {
-			auto *last_exception = interpreter.execution_frame()->exception_info()->exception;
+		if (next_value.is_err()) {
+			auto *last_exception = next_value.unwrap_err();
+			interpreter.raise_exception(last_exception);
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
 				// exit loop in error state and handle unwinding to interpreter
+				return PyResult::Err(static_cast<BaseException *>(last_exception));
 			} else {
 				interpreter.execution_frame()->set_exception(nullptr);
 				interpreter.set_status(Interpreter::Status::OK);
@@ -20,12 +23,14 @@ void ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				//        is this always true?
 				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label->position() - 1);
 			}
-			return;
+			return PyResult::Ok(py_none());
 		}
-		vm.reg(m_dst) = next_value;
+		if (next_value.is_ok()) { vm.reg(m_dst) = next_value.unwrap(); }
+		return next_value;
 	} else {
 		// this is probably always going to be something that went wrong
 		TODO();
+		return PyResult::Err(nullptr);
 	}
 }
 

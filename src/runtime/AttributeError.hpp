@@ -10,7 +10,7 @@ class AttributeError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend PyObject *attribute_error(const std::string &message, Args &&... args);
+	friend BaseException *attribute_error(const std::string &message, Args &&... args);
 
   private:
 	AttributeError(PyTuple *args);
@@ -26,15 +26,17 @@ class AttributeError : public Exception
 
 	PyType *type() const override;
 
-	static PyType* static_type();
+	static PyType *static_type();
 };
 
 
 template<typename... Args>
-inline PyObject *attribute_error(const std::string &message, Args &&... args)
+inline BaseException *attribute_error(const std::string &message, Args &&... args)
 {
-	auto *args_tuple =
-		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return AttributeError::create(args_tuple);
+	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
+	ASSERT(msg.is_ok())
+	auto args_tuple = PyTuple::create(msg.template unwrap_as<PyString>());
+	ASSERT(args_tuple.is_ok())
+	return AttributeError::create(args_tuple.template unwrap_as<PyTuple>());
 }
 }// namespace py

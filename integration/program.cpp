@@ -56,8 +56,10 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 	// 	spdlog::debug(
 	// 		"Key: {}, Value: {}", PyObject::from(k)->to_string(), PyObject::from(v)->to_string());
 	// }
-	auto *obj =
+	auto obj_ =
 		PyObject::from(vm.interpreter().execution_frame()->locals()->map().at(String{ name }));
+	ASSERT_TRUE(obj_.is_ok());
+	auto *obj = obj_.template unwrap_as<PyObject>();
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
 		ASSERT_EQ(obj->type(), list());
@@ -68,7 +70,8 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 			std::visit(
 				overloaded{ [&](const PyObject *obj) { check_value(obj, expected_value[i]); },
 					[&](const auto &value) {
-						check_value(PyObject::from(value), expected_value[i]);
+						check_value(PyObject::from(value).template unwrap_as<PyObject>(),
+							expected_value[i]);
 					} },
 				el);
 			i++;
@@ -81,12 +84,12 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 		//		  for (const auto &p : pydict->items()) {...}
 		auto items = pydict->items();
 		for (const auto &p : *items) {
-			auto key = p->operator[](0);
-			auto value = p->operator[](1);
+			auto key_ = p->operator[](0);
+			auto value_ = p->operator[](1);
 			// only support string keys for now
-			ASSERT(as<PyString>(key))
-			auto key_string = as<PyString>(key)->value();
-			check_value(value, expected_value[key_string]);
+			ASSERT(key_.template unwrap_as<PyString>())
+			auto key_string = key_.template unwrap_as<PyString>()->value();
+			check_value(value_.template unwrap_as<PyObject>(), expected_value[key_string]);
 		}
 	} else {
 		check_value(obj, expected_value);

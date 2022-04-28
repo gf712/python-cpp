@@ -6,31 +6,25 @@ namespace py {
 
 class PyBuiltInMethod : public PyBaseObject
 {
+	using FunctionType = std::function<PyResult(PyTuple *, PyDict *)>;
 	const std::string m_name;
-	std::function<PyObject *(PyTuple *, PyDict *)> m_builtin_method;
+	FunctionType m_builtin_method;
 	PyObject *m_self;
 
 	friend class ::Heap;
 
-	PyBuiltInMethod(std::string name,
-		std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
-		PyObject *self);
+	PyBuiltInMethod(std::string name, FunctionType &&builtin_method, PyObject *self);
 
   public:
-	static PyBuiltInMethod *create(std::string name,
-		std::function<PyObject *(PyTuple *, PyDict *)> builtin_method,
-		PyObject *self);
+	static PyResult create(std::string name, FunctionType &&builtin_method, PyObject *self);
 
 	const std::string &name() { return m_name; }
-	const std::function<PyObject *(PyTuple *, PyDict *)> &builtin_method()
-	{
-		return m_builtin_method;
-	}
+	const FunctionType &builtin_method() { return m_builtin_method; }
 
 	std::string to_string() const override;
 
-	PyObject *__repr__() const;
-	PyObject *__call__(PyTuple *args, PyDict *kwargs);
+	PyResult __repr__() const;
+	PyResult __call__(PyTuple *args, PyDict *kwargs);
 
 	void visit_graph(Visitor &visitor) override;
 

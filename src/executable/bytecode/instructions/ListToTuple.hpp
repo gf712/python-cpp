@@ -16,7 +16,7 @@ class ListToTuple final : public Instruction
 		return fmt::format("LIST_TO_TUPLE   r{:<3} r{:<3}", m_tuple, m_list);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

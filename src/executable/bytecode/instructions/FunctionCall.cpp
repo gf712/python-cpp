@@ -5,7 +5,7 @@
 
 using namespace py;
 
-void FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
+PyResult FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto func = vm.reg(m_function_name);
 	ASSERT(std::get_if<PyObject *>(&func));
@@ -20,11 +20,14 @@ void FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 		}
 	}
 
-	auto *args_tuple = PyTuple::create(args);
-	spdlog::debug("args_tuple: {}", (void *)&args_tuple);
-	ASSERT(args_tuple);
+	auto args_tuple = PyTuple::create(args);
+	if (args_tuple.is_err()) { return args_tuple; }
+	spdlog::debug("args_tuple: {}", (void *)args_tuple.unwrap_as<PyTuple>());
 
-	if (auto *result = callable_object->call(args_tuple, nullptr)) { vm.reg(0) = result; }
+	auto result =
+		callable_object->call(as<PyTuple>(std::get<PyObject *>(args_tuple.unwrap())), nullptr);
+	if (result.is_ok()) { vm.reg(0) = result.unwrap(); }
+	return result;
 }
 
 std::vector<uint8_t> FunctionCall::serialize() const

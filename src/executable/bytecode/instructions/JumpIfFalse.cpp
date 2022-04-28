@@ -3,28 +3,29 @@
 
 using namespace py;
 
-void JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
+PyResult JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
-	const bool test_result = std::visit(
-		overloaded{ [](PyObject *const &obj) -> bool { return obj->bool_() == py_true(); },
-			[](const auto &) -> bool {
-				TODO();
-				return false;
-			},
-			[](const NameConstant &value) -> bool {
-				if (auto *bool_type = std::get_if<bool>(&value.value)) {
-					return *bool_type;
-				} else {
-					return false;
-				}
-			} },
-		result);
-	if (!test_result) {
+	const auto test_result =
+		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult { return obj->bool_(); },
+					   [](const auto &) -> PyResult {
+						   TODO();
+						   return PyResult::Err(nullptr);
+					   },
+					   [](const NameConstant &value) -> PyResult {
+						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
+							   return PyResult::Ok(*bool_type ? py_true() : py_false());
+						   } else {
+							   return PyResult::Ok(py_false());
+						   }
+					   } },
+			result);
+	if (test_result.is_ok() && test_result.unwrap_as<PyObject>() == py_false()) {
 		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
+	return test_result;
 };
 
 

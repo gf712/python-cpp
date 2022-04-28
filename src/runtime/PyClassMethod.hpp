@@ -13,14 +13,14 @@ class PyClassMethod : public PyBaseObject
 	PyClassMethod();
 
   public:
-	static PyClassMethod *create();
+	static PyResult create();
 
 	std::string to_string() const override;
 
-	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	std::optional<int32_t> __init__(PyTuple *args, PyDict *kwargs);
-	PyObject *__repr__() const;
-	PyObject *__get__(PyObject *instance, PyObject *owner) const;
+	PyResult __repr__() const;
+	PyResult __get__(PyObject *instance, PyObject *owner) const;
 
 	void visit_graph(Visitor &visitor) override;
 

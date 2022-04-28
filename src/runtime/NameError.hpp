@@ -11,7 +11,7 @@ class NameError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend PyObject *name_error(const std::string &message, Args &&... args);
+	friend BaseException *name_error(const std::string &message, Args &&... args);
 
   private:
 	NameError(PyTuple *args);
@@ -29,11 +29,14 @@ class NameError : public Exception
 };
 
 
-template<typename... Args> inline PyObject *name_error(const std::string &message, Args &&... args)
+template<typename... Args>
+inline BaseException *name_error(const std::string &message, Args &&... args)
 {
-	auto *args_tuple =
-		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return NameError::create(args_tuple);
+	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
+	ASSERT(msg.is_ok())
+	auto args_tuple = PyTuple::create(msg.template unwrap_as<PyString>());
+	ASSERT(args_tuple.is_ok())
+	return NameError::create(args_tuple.template unwrap_as<PyTuple>());
 }
 
 }// namespace py

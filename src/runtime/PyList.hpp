@@ -11,23 +11,23 @@ class PyList : public PyBaseObject
 	std::vector<Value> m_elements;
 
   public:
-	static PyList *create(std::vector<Value> elements);
-	static PyList *create();
+	static PyResult create(std::vector<Value> elements);
+	static PyResult create();
 
 	std::string to_string() const override;
 
-	PyObject *__repr__() const;
-	PyObject *__iter__() const;
-	PyObject *__len__() const;
-	PyObject *__eq__(const PyObject *other) const;
+	PyResult __repr__() const;
+	PyResult __iter__() const;
+	PyResult __len__() const;
+	PyResult __eq__(const PyObject *other) const;
 
 	const std::vector<Value> &elements() const { return m_elements; }
 	std::vector<Value> &elements() { return m_elements; }
 
 	void visit_graph(Visitor &) override;
 
-	PyObject *append(PyTuple *args, PyDict *kwargs);
-	PyObject *extend(PyTuple *args, PyDict *kwargs);
+	PyResult append(PyTuple *args, PyDict *kwargs);
+	PyResult extend(PyTuple *args, PyDict *kwargs);
 
 	void sort();
 
@@ -54,8 +54,8 @@ class PyListIterator : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	PyObject *__repr__() const;
-	PyObject *__next__();
+	PyResult __repr__() const;
+	PyResult __next__();
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;

@@ -13,15 +13,15 @@ class PyString : public PyBaseObject
 	std::string m_value;
 
   public:
-	static PyString *create(const std::string &value);
-	static PyString *create(PyString *self, PyTuple *args, PyDict *kwargs)
+	static PyResult create(const std::string &value);
+	static PyResult create(PyString *self, PyTuple *args, PyDict *kwargs)
 	{
 		// FIXME with proper error handling
 		ASSERT(self)
 		ASSERT(!args || (args->size() == 0))
 		ASSERT(!kwargs)
 
-		return self;
+		return PyResult::Ok(self);
 	}
 
 	const std::string &value() const { return m_value; }
@@ -30,30 +30,30 @@ class PyString : public PyBaseObject
 
 	std::string to_string() const override { return m_value; }
 
-	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
-	PyObject *__repr__() const;
-	size_t __hash__() const;
-	PyObject *__eq__(const PyObject *obj) const;
-	PyObject *__lt__(const PyObject *obj) const;
+	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult __repr__() const;
+	PyResult __hash__() const;
+	PyResult __eq__(const PyObject *obj) const;
+	PyResult __lt__(const PyObject *obj) const;
 
-	PyObject *__len__() const;
-	PyObject *__add__(const PyObject *obj) const;
+	PyResult __len__() const;
+	PyResult __add__(const PyObject *obj) const;
 
-	PyObject *isalpha() const;
-	PyObject *isalnum() const;
-	PyObject *isascii() const;
-	PyObject *isdigit() const;
-	PyObject *islower() const;
-	PyObject *isupper() const;
+	PyResult isalpha() const;
+	PyResult isalnum() const;
+	PyResult isascii() const;
+	PyResult isdigit() const;
+	PyResult islower() const;
+	PyResult isupper() const;
 
-	PyString *capitalize() const;
-	PyString *casefold() const;
-	PyInteger *find(PyTuple *args, PyDict *kwargs) const;
-	PyInteger *count(PyTuple *args, PyDict *kwargs) const;
-	PyObject *endswith(PyTuple *args, PyDict *kwargs) const;
-	PyString *join(PyTuple *args, PyDict *kwargs) const;
-	PyString *lower() const;
-	PyString *upper() const;
+	PyResult capitalize() const;
+	PyResult casefold() const;
+	PyResult find(PyTuple *args, PyDict *kwargs) const;
+	PyResult count(PyTuple *args, PyDict *kwargs) const;
+	PyResult endswith(PyTuple *args, PyDict *kwargs) const;
+	PyResult join(PyTuple *args, PyDict *kwargs) const;
+	PyResult lower() const;
+	PyResult upper() const;
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;

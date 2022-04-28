@@ -193,21 +193,72 @@ struct NameConstant
 	}
 };
 
-std::optional<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+class BaseException;
 
-std::optional<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-std::optional<Value>
-	greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+class PyResult
+{
+	using PyResult_ = std::variant<py::Value, BaseException *>;
+	PyResult_ result;
+
+	PyResult(PyResult_ result_) : result(result_) {}
+
+  public:
+	static PyResult Ok(const py::Value &object) { return PyResult(object); }
+	static PyResult Err(BaseException *object) { return PyResult(object); }
+
+	bool is_ok() const { return std::holds_alternative<py::Value>(result); }
+	bool is_err() const { return !is_ok(); }
+
+	py::Value unwrap() const
+	{
+		ASSERT(is_ok());
+		return std::get<py::Value>(result);
+	}
+
+	template<typename T> auto unwrap_as() const
+	{
+		ASSERT(is_ok());
+		if constexpr (std::is_same_v<PyObject, T>) {
+			ASSERT(std::holds_alternative<PyObject *>(unwrap()));
+			return std::get<PyObject *>(unwrap());
+		} else if constexpr (std::is_base_of_v<PyObject, T>) {
+			ASSERT(std::holds_alternative<PyObject *>(unwrap()));
+			ASSERT(as<T>(std::get<PyObject *>(unwrap())))
+			return as<T>(std::get<PyObject *>(unwrap()));
+		} else {
+			return unwrap();
+		}
+	}
+
+	py::BaseException *unwrap_err() const
+	{
+		ASSERT(is_err());
+		return std::get<py::BaseException *>(result);
+	}
+
+	template<typename T, typename FunctorType> PyResult and_then(FunctorType &&op) const
+	{
+		if (is_ok()) {
+			return op(unwrap_as<T>());
+		} else {
+			return *this;
+		}
+	}
+};
+
+PyResult add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 bool is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 bool in(const Value &lhs, const Value &rhs, Interpreter &interpreter);

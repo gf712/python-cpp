@@ -3,12 +3,12 @@
 
 using namespace py;
 
-void CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &lhs = vm.reg(m_lhs);
 	const auto &rhs = vm.reg(m_rhs);
 
-	const auto result = [&]() -> std::optional<Value> {
+	const auto result = [&]() -> PyResult {
 		switch (m_comparisson) {
 		case Comparisson::Eq: {
 			return equals(lhs, rhs, interpreter);
@@ -29,25 +29,26 @@ void CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter) con
 			return greater_than_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Is: {
-			return NameConstant{ is(lhs, rhs, interpreter) };
+			return PyResult::Ok(NameConstant{ is(lhs, rhs, interpreter) });
 		} break;
 		case Comparisson::IsNot: {
-			return NameConstant{ !is(lhs, rhs, interpreter) };
+			return PyResult::Ok(NameConstant{ !is(lhs, rhs, interpreter) });
 		} break;
 		case Comparisson::In: {
-			return NameConstant{ in(lhs, rhs, interpreter) };
+			return PyResult::Ok(NameConstant{ in(lhs, rhs, interpreter) });
 		} break;
 		case Comparisson::NotIn: {
-			return NameConstant{ !in(lhs, rhs, interpreter) };
+			return PyResult::Ok(NameConstant{ !in(lhs, rhs, interpreter) });
 		} break;
 		}
 	}();
 
-	if (result) {
+	if (result.is_ok()) {
 		ASSERT(vm.registers().has_value())
 		ASSERT(vm.registers()->get().size() > m_dst)
-		vm.reg(m_dst) = *result;
+		vm.reg(m_dst) = result.unwrap();
 	}
+	return result;
 };
 
 std::vector<uint8_t> CompareOperation::serialize() const

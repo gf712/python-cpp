@@ -18,20 +18,16 @@ class PyMemberDescriptor : public PyBaseObject
 		std::function<PyObject *(PyObject *)> member);
 
   public:
-	static PyMemberDescriptor *create(PyString *name,
+	static PyResult create(PyString *name,
 		PyType *underlying_type,
-		std::function<PyObject *(PyObject *)> member)
-	{
-		return VirtualMachine::the().heap().allocate<PyMemberDescriptor>(
-			name, underlying_type, member);
-	}
+		std::function<PyObject *(PyObject *)> member);
 
 	PyString *name() { return m_name; }
 
 	std::string to_string() const override;
 
-	PyObject *__repr__() const;
-	PyObject *__get__(PyObject *, PyObject *) const;
+	PyResult __repr__() const;
+	PyResult __get__(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &visitor) override;
 

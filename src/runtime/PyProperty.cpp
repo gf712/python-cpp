@@ -12,20 +12,22 @@
 
 using namespace py;
 
-PyObject *PyProperty::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult PyProperty::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == property())
 	ASSERT(!kwargs || kwargs->map().empty())
 
-	auto *fget = [&]() -> PyObject * {
+	auto fget = [&]() -> PyResult {
 		if (args) {
 			ASSERT(args->size() == 1)
 			return PyObject::from(args->elements()[0]);
 		}
-		return nullptr;
+		return PyResult::Ok(py_none());
 	}();
 
-	return PyProperty::create(fget, nullptr, nullptr, nullptr);
+	if (fget.is_err()) { return fget; }
+
+	return PyProperty::create(fget.unwrap_as<PyObject>(), nullptr, nullptr, nullptr);
 }
 
 PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *name)
@@ -38,56 +40,58 @@ std::string PyProperty::to_string() const
 	return fmt::format("<property object at {}>", static_cast<const void *>(this));
 }
 
-PyProperty *PyProperty::create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *name)
+PyResult PyProperty::create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *name)
 {
-	return VirtualMachine::the().heap().allocate<PyProperty>(fget, fset, fdel, name);
+	auto *obj = VirtualMachine::the().heap().allocate<PyProperty>(fget, fset, fdel, name);
+	if (!obj) return PyResult::Err(memory_error(sizeof(PyProperty)));
+	return PyResult::Ok(obj);
 }
 
-PyObject *PyProperty::getter(PyTuple *args, PyDict *kwargs) const
+PyResult PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 {
 	(void)args;
 	(void)kwargs;
 	TODO();
-	return nullptr;
 }
 
-PyObject *PyProperty::setter(PyTuple *args, PyDict *kwargs) const
+PyResult PyProperty::setter(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->map().empty())
 	ASSERT(args)
 	ASSERT(args->size() == 1)
 
-	auto *fgets = PyObject::from(args->elements()[0]);
+	auto fgets = PyObject::from(args->elements()[0]);
 
-	return PyProperty::create(fgets, nullptr, nullptr, m_property_name);
+	if (fgets.is_err()) return fgets;
+
+	return PyProperty::create(fgets.unwrap_as<PyObject>(), nullptr, nullptr, m_property_name);
 }
 
-PyObject *PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
+PyResult PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
 {
 	(void)args;
 	(void)kwargs;
 	TODO();
-	return nullptr;
 }
 
-PyObject *PyProperty::__repr__() const { return PyString::create(PyProperty::to_string()); }
+PyResult PyProperty::__repr__() const { return PyString::create(PyProperty::to_string()); }
 
-PyObject *PyProperty::__get__(PyObject *instance, PyObject *) const
+PyResult PyProperty::__get__(PyObject *instance, PyObject *) const
 {
-	if (!instance || instance == py_none()) { return const_cast<PyProperty *>(this); }
+	if (!instance || instance == py_none()) { return PyResult::Ok(const_cast<PyProperty *>(this)); }
 
 	if (!m_getter) {
 		if (m_property_name) {
-			VirtualMachine::the().interpreter().raise_exception(
+			return PyResult::Err(
 				attribute_error("unreadable attribute {}", m_property_name->to_string()));
 		} else {
-			VirtualMachine::the().interpreter().raise_exception(
-				attribute_error("unreadable attribute"));
+			return PyResult::Err(attribute_error("unreadable attribute"));
 		}
-		return nullptr;
 	}
 
-	return m_getter->call(PyTuple::create(instance), nullptr);
+	auto args = PyTuple::create(instance);
+	if (args.is_err()) return args;
+	return m_getter->call(args.unwrap_as<PyTuple>(), nullptr);
 }
 
 void PyProperty::visit_graph(Visitor &visitor)

@@ -8,31 +8,38 @@
 #include <memory>
 #include <unordered_map>
 
+namespace py {
 
-class ExecutionFrame : public Cell
+class PyFrame : public PyBaseObject
 {
 	friend Heap;
 	friend Interpreter;
 
-	struct ExceptionInfo
+	struct ExceptionStackItem
 	{
 		py::PyObject *exception{ nullptr };
+		py::PyType *exception_type{ nullptr };
+		py::PyTraceback *traceback{ nullptr };
 	};
 
   protected:
-	size_t m_register_count;
+	// next outer frame object (this frame’s caller)
+	PyFrame *m_f_back{ nullptr };
+	// builtins namespace seen by this frame
 	py::PyModule *m_builtins;
+	// global namespace seen by this frame
 	py::PyDict *m_globals;
+	// local namespace seen by this frame
 	py::PyDict *m_locals;
+	size_t m_register_count;
 	const py::PyTuple *m_consts;
 	std::vector<py::PyCell *> m_freevars;
-	ExecutionFrame *m_parent{ nullptr };
 	py::PyObject *m_exception_to_catch{ nullptr };
-	std::optional<ExceptionInfo> m_exception;
-	std::optional<ExceptionInfo> m_stashed_exception;
+	std::vector<ExceptionStackItem> m_exception_stack;
+	std::optional<ExceptionStackItem> m_stashed_exception;
 
   public:
-	static ExecutionFrame *create(ExecutionFrame *parent,
+	static PyFrame *create(PyFrame *parent,
 		size_t register_count,
 		size_t freevar_count,
 		py::PyDict *globals,
@@ -42,7 +49,7 @@ class ExecutionFrame : public Cell
 	void put_local(const std::string &name, const py::Value &);
 	void put_global(const std::string &name, const py::Value &);
 
-	ExecutionFrame *parent() const { return m_parent; }
+	PyFrame *parent() const { return m_f_back; }
 
 	void set_exception(py::PyObject *exception);
 
@@ -50,9 +57,13 @@ class ExecutionFrame : public Cell
 
 	void stash_exception();
 
-	const std::optional<ExceptionInfo> &exception_info() const { return m_exception; }
+	std::optional<ExceptionStackItem> exception_info() const { 
+		ASSERT(m_exception_stack.size() <= 1)
+		if (m_exception_stack.empty()) return {};
+		return m_exception_stack.back();
+	}
 
-	const std::optional<ExceptionInfo> &stashed_exception_info() const
+	const std::optional<ExceptionStackItem> &stashed_exception_info() const
 	{
 		return m_stashed_exception;
 	}
@@ -61,7 +72,7 @@ class ExecutionFrame : public Cell
 
 	void set_exception_to_catch(py::PyObject *exception);
 
-	ExecutionFrame *exit();
+	PyFrame *exit();
 
 	py::PyDict *globals() const;
 	py::PyDict *locals() const;
@@ -73,6 +84,10 @@ class ExecutionFrame : public Cell
 	std::string to_string() const override;
 	void visit_graph(Visitor &) override;
 
+	static std::unique_ptr<TypePrototype> register_type();
+
   private:
-	ExecutionFrame();
+	PyFrame();
 };
+
+}// namespace py

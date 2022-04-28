@@ -10,23 +10,24 @@ class PyModule : public PyBaseObject
   public:
 	using MapType = std::unordered_map<PyString *, Value, ValueHash, ValueEqual>;
 
+	PyString *m_module_name;
+
   private:
 	friend class ::Heap;
 	friend class VM;
 
 	MapType m_symbol_table;
-	PyString *m_module_name;
 
 	std::unique_ptr<Program> m_program;
 
   public:
 	PyModule(PyString *module_name);
 
-	static PyModule *create(PyString *);
+	static PyResult create(PyString *);
 
 	void visit_graph(Visitor &visitor) override;
 
-	PyObject *__repr__() const;
+	PyResult __repr__() const;
 
 	std::string to_string() const override;
 

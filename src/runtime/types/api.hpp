@@ -7,6 +7,9 @@
 #include "runtime/PyType.hpp"
 
 namespace py {
+
+PyObject *py_none();
+
 template<typename T> struct klass
 {
 	std::unique_ptr<TypePrototype> type;
@@ -21,7 +24,9 @@ template<typename T> struct klass
 		klass(PyModule *module, std::string_view name, BaseType &&... bases)
 		: type(TypePrototype::create<T>(name)), m_module(module)
 	{
-		type->__bases__ = PyTuple::create(bases...);
+		auto bases_ = PyTuple::create(bases...);
+		if (bases_.is_err()) { TODO(); }
+		type->__bases__ = bases_.template unwrap_as<PyTuple>();
 	}
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
@@ -34,6 +39,7 @@ template<typename T> struct klass
 	{
 		type->add_member(MemberDefinition{
 			.name = std::string(name), .member_accessor = [member](PyObject *self) -> PyObject * {
+				if (!member) { return py_none(); }
 				return static_cast<T *>(self)->*member;
 			} });
 		return *this;
@@ -79,7 +85,7 @@ template<typename T> struct klass
 	}
 	{
 		type->add_method(MethodDefinition{
-			std::string(name), [F](PyObject *self, PyTuple *args, PyDict *kwargs) {
+			std::string(name), [F](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult {
 				return F(static_cast<T *>(self), args, kwargs);
 			} });
 		return *this;
@@ -88,7 +94,9 @@ template<typename T> struct klass
 	PyType *finalize()
 	{
 		auto *type_ = PyType::initialize(*type.release());
-		m_module->insert(PyString::create(type_->name()), type_);
+		auto name = PyString::create(type_->name());
+		if (name.is_err()) { TODO(); }
+		m_module->insert(name.template unwrap_as<PyString>(), type_);
 		return type_;
 	}
 };

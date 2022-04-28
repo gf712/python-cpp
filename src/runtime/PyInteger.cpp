@@ -1,4 +1,5 @@
 #include "PyInteger.hpp"
+#include "MemoryError.hpp"
 #include "PyFloat.hpp"
 #include "TypeError.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -23,20 +24,28 @@ template<> const PyInteger *py::as(const PyObject *obj)
 
 PyInteger::PyInteger(int64_t value) : PyNumber(Number{ value }, BuiltinTypes::the().integer()) {}
 
-PyInteger *PyInteger::create(int64_t value)
+PyResult PyInteger::create(int64_t value)
 {
 	auto &heap = VirtualMachine::the().heap();
-	return heap.allocate<PyInteger>(value);
+	auto *result = heap.allocate<PyInteger>(value);
+	if (!result) { return PyResult::Err(memory_error(sizeof(PyInteger))); }
+	return PyResult::Ok(result);
 }
 
-PyInteger *PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == integer());
 
 	ASSERT(!kwargs || kwargs->map().empty())
 	PyObject *value = nullptr;
 	PyObject *base = nullptr;
-	if (args->elements().size() > 0) { value = PyObject::from(args->elements()[0]); }
+	if (args->elements().size() > 0) {
+		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
+			value = obj.unwrap_as<PyObject>();
+		} else {
+			return obj;
+		}
+	}
 
 	if (args->elements().size() > 1) {
 		(void)base;
@@ -53,14 +62,12 @@ PyInteger *PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 		std::erase_if(str, [](const auto &c) { return std::isspace(c); });
 		double result = std::stod(str, &pos);
 		if (pos != str.size()) {
-			VirtualMachine::the().interpreter().raise_exception(
-				type_error("invalid literal for int(): '{}'", str));
-			return nullptr;
+			return PyResult::Err(type_error("invalid literal for int(): '{}'", str));
 		}
 		return PyInteger::create(static_cast<int64_t>(result));
 	}
 	TODO();
-	return nullptr;
+	return PyResult::Err(nullptr);
 }
 
 size_t PyInteger::as_i64() const

@@ -20,13 +20,14 @@ class BaseException : public PyBaseObject
 	BaseException(PyTuple *args);
 
 	std::string what() const;
-	PyObject *__repr__() const;
+	PyResult __repr__() const;
 
 	std::string to_string() const override;
 
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
+	static PyType *static_type();
 
 	void visit_graph(Visitor &) override;
 };

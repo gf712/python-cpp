@@ -16,7 +16,7 @@ class Instruction : NonCopyable
   public:
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
-	virtual void execute(VirtualMachine &, Interpreter &) const = 0;
+	virtual py::PyResult execute(VirtualMachine &, Interpreter &) const = 0;
 	virtual void relocate(codegen::BytecodeGenerator &, size_t) = 0;
 	virtual std::vector<uint8_t> serialize() const = 0;
 };
@@ -63,7 +63,7 @@ static constexpr uint8_t METHOD_CALL = 38;
 static constexpr uint8_t MOVE = 39;
 static constexpr uint8_t RAISE_VARARGS = 40;
 static constexpr uint8_t RETURN_VALUE = 41;
-static constexpr uint8_t SETUP_EXCECPTION_HANDLING = 42;
+static constexpr uint8_t SETUP_EXCEPTION_HANDLING = 42;
 static constexpr uint8_t STORE_ATTR = 43;
 static constexpr uint8_t STORE_DEREF = 44;
 static constexpr uint8_t STORE_FAST = 45;

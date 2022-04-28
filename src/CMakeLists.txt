@@ -69,7 +69,7 @@ set(LLVM_BACKEND_FILES # cmake-format: sortable
 
 set(INTERPRETER_SOURCE_FILES
     # cmake-format: sortable
-    interpreter/ExecutionFrame.cpp interpreter/Interpreter.cpp interpreter/InterpreterSession.cpp)
+    interpreter/Interpreter.cpp interpreter/InterpreterSession.cpp)
 
 set(MEMORY_SOURCE_FILES # cmake-format: sortable
                         memory/GarbageCollector.cpp memory/Heap.cpp)
@@ -87,7 +87,9 @@ set(RUNTIME_SOURCE_FILES
     runtime/AttributeError.cpp
     runtime/BaseException.cpp
     runtime/Exception.cpp
+    runtime/MemoryError.cpp
     runtime/NameError.cpp
+    runtime/NotImplemented.cpp
     runtime/PyBoundMethod.cpp
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
@@ -98,9 +100,11 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp
+    runtime/PyFrame.cpp
     runtime/PyFunction.cpp
     runtime/PyInteger.cpp
     runtime/PyList.cpp
+    runtime/PyLLVMFunction.cpp
     runtime/PyMemberDescriptor.cpp
     runtime/PyMethodDescriptor.cpp
     runtime/PyMemberDescriptor.cpp
@@ -109,12 +113,13 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyNumber.cpp
     runtime/PyObject.cpp
     runtime/PyRange.cpp
-    runtime/PyString.cpp
-    runtime/PyTuple.cpp
-    runtime/PyType.cpp
     runtime/PyProperty.cpp
     runtime/PySlotWrapper.cpp
+    runtime/PyString.cpp
     runtime/PyStaticMethod.cpp
+    runtime/PyTraceback.cpp
+    runtime/PyTuple.cpp
+    runtime/PyType.cpp
     runtime/RuntimeError.cpp
     runtime/StopIteration.cpp
     runtime/TypeError.cpp

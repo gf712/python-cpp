@@ -1,6 +1,10 @@
 #include "StoreSubscript.hpp"
 
-void StoreSubscript::execute(VirtualMachine &, Interpreter &) const { TODO(); }
+py::PyResult StoreSubscript::execute(VirtualMachine &, Interpreter &) const
+{
+	TODO();
+	return py::PyResult::Err(nullptr);
+}
 
 std::vector<uint8_t> StoreSubscript::serialize() const
 {

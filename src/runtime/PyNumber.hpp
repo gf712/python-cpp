@@ -13,26 +13,26 @@ class PyNumber : public PyBaseObject
 	Number m_value;
 
   public:
-	static PyNumber *create(const Number &number);
+	static PyResult create(const Number &number);
 	std::string to_string() const override;
 
-	PyObject *__add__(const PyObject *obj) const;
-	PyObject *__sub__(const PyObject *obj) const;
-	PyObject *__mod__(const PyObject *obj) const;
-	PyObject *__mul__(const PyObject *obj) const;
+	PyResult __add__(const PyObject *obj) const;
+	PyResult __sub__(const PyObject *obj) const;
+	PyResult __mod__(const PyObject *obj) const;
+	PyResult __mul__(const PyObject *obj) const;
 
-	PyObject *__abs__() const;
-	PyObject *__neg__() const;
-	PyObject *__pos__() const;
-	PyObject *__invert__() const;
+	PyResult __abs__() const;
+	PyResult __neg__() const;
+	PyResult __pos__() const;
+	PyResult __invert__() const;
 
-	PyObject *__repr__() const;
-	PyObject *__eq__(const PyObject *obj) const;
-	PyObject *__ne__(const PyObject *obj) const;
-	PyObject *__lt__(const PyObject *obj) const;
-	PyObject *__le__(const PyObject *obj) const;
-	PyObject *__gt__(const PyObject *obj) const;
-	PyObject *__ge__(const PyObject *obj) const;
+	PyResult __repr__() const;
+	PyResult __eq__(const PyObject *obj) const;
+	PyResult __ne__(const PyObject *obj) const;
+	PyResult __lt__(const PyObject *obj) const;
+	PyResult __le__(const PyObject *obj) const;
+	PyResult __gt__(const PyObject *obj) const;
+	PyResult __ge__(const PyObject *obj) const;
 
 	const Number &value() const { return m_value; }
 

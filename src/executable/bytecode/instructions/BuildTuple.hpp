@@ -18,7 +18,7 @@ class BuildTuple final : public Instruction
 		return fmt::format("BUILD_TUPLE     r{:<3} ({})", m_dst, m_size);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -16,17 +16,17 @@ class PyProperty : public PyBaseObject
 	PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *);
 
   public:
-	static PyProperty *create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *);
+	static PyResult create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *);
 
 	std::string to_string() const override;
 
-	static PyObject *__new__(const PyType *type, PyTuple *args, PyDict *kwargs);
-	PyObject *__repr__() const;
-	PyObject *__get__(PyObject *instance, PyObject *owner) const;
+	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult __repr__() const;
+	PyResult __get__(PyObject *instance, PyObject *owner) const;
 
-	PyObject *getter(PyTuple *args, PyDict *kwargs) const;
-	PyObject *setter(PyTuple *args, PyDict *kwargs) const;
-	PyObject *deleter(PyTuple *args, PyDict *kwargs) const;
+	PyResult getter(PyTuple *args, PyDict *kwargs) const;
+	PyResult setter(PyTuple *args, PyDict *kwargs) const;
+	PyResult deleter(PyTuple *args, PyDict *kwargs) const;
 
 	void visit_graph(Visitor &visitor) override;
 

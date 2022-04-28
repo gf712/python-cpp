@@ -34,7 +34,7 @@ class FunctionCallWithKeywords final : public Instruction
 			keyword_regs);
 	}
 
-	void execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

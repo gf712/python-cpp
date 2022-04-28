@@ -1,8 +1,10 @@
 #include "Move.hpp"
 
-void Move::execute(VirtualMachine &vm, Interpreter &) const
+py::PyResult Move::execute(VirtualMachine &vm, Interpreter &) const
 {
-	vm.reg(m_destination) = vm.reg(m_source);
+	auto result = vm.reg(m_source);
+	vm.reg(m_destination) = result;
+	return py::PyResult::Ok(result);
 }
 
 std::vector<uint8_t> Move::serialize() const

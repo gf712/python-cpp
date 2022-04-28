@@ -23,8 +23,24 @@ class PyCode : public PyBaseObject
 	PyTuple *m_consts = nullptr;
 	CodeFlags m_flags;
 
-  public:
 	PyCode(std::unique_ptr<Function> &&function,
+		std::vector<std::string> &&cellvars,
+		std::vector<std::string> &&varnames,
+		std::vector<std::string> &&freevars,
+		size_t stack_size,
+		std::string &&filename,
+		size_t first_line_number,
+		size_t arg_count,
+		size_t kwonly_arg_count,
+		std::vector<size_t> &&cell2arg,
+		size_t nlocals,
+		PyTuple *consts,
+		CodeFlags flags);
+
+  public:
+	~PyCode();
+
+	static PyResult create(std::unique_ptr<Function> &&function,
 		std::vector<std::string> cellvars,
 		std::vector<std::string> varnames,
 		std::vector<std::string> freevars,
@@ -37,8 +53,6 @@ class PyCode : public PyBaseObject
 		size_t nlocals,
 		PyTuple *consts,
 		CodeFlags flags);
-
-	~PyCode();
 
 	PyObject *call(PyTuple *args, PyDict *kwargs);
 	const std::vector<std::string> &varnames() const { return m_varnames; }
@@ -63,7 +77,7 @@ class PyCode : public PyBaseObject
 
 	std::vector<uint8_t> serialize() const;
 
-	static std::pair<PyCode *, size_t> deserialize(std::span<const uint8_t> &);
+	static std::pair<PyResult, size_t> deserialize(std::span<const uint8_t> &);
 };
 
 }// namespace py
