@@ -7,6 +7,7 @@
 #include "runtime/BaseException.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTraceback.hpp"
 
 #include <iostream>
 
@@ -50,58 +51,6 @@ VirtualMachine::VirtualMachine()
 void VirtualMachine::setup_call_stack(size_t register_count, size_t stack_size)
 {
 	push_frame(register_count, stack_size);
-}
-
-int VirtualMachine::call(const std::unique_ptr<Function> &function)
-{
-	ASSERT(function->backend() == FunctionExecutionBackend::BYTECODE)
-	const auto &first_block = static_cast<Bytecode *>(function.get())->begin();
-	const auto func_ip = first_block->begin();
-	int result = EXIT_SUCCESS;
-
-	const auto stack_depth = m_stack.size();
-	auto block_view = static_cast<Bytecode *>(function.get())->begin();
-	auto end_function_block = static_cast<Bytecode *>(function.get())->end();
-
-	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
-	//            What you can do is leave a block (and not the function) at any time and
-	//            start executing the next block from its first instruction
-	for (; block_view != end_function_block;) {
-		m_instruction_pointer = block_view->begin();
-		const auto end = block_view->end();
-		for (; m_instruction_pointer != end; ++m_instruction_pointer) {
-			const auto &instruction = *m_instruction_pointer;
-			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
-			auto result = instruction->execute(*this, interpreter());
-
-			if (m_stack.size() != stack_depth) { break; }
-
-			if (result.is_err()) {
-				interpreter().raise_exception(result.unwrap_err());
-
-				if (!m_state->catch_exception) {
-					interpreter().unwind();
-					// restore instruction pointer
-					m_instruction_pointer = func_ip;
-					return EXIT_FAILURE;
-				} else {
-					interpreter().execution_frame()->stash_exception();
-					interpreter().set_status(Interpreter::Status::OK);
-					m_state->catch_exception = false;
-					break;
-				}
-			}
-		}
-		if (m_state->jump_block_count.has_value()) {
-			ASSERT((block_view + *m_state->jump_block_count) < end_function_block)
-			block_view += *m_state->jump_block_count;
-			m_state->jump_block_count.reset();
-		} else {
-			block_view++;
-		}
-	}
-
-	return result;
 }
 
 void VirtualMachine::ret() { pop_frame(); }

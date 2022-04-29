@@ -41,6 +41,7 @@
 #include "executable/bytecode/instructions/MethodCall.hpp"
 #include "executable/bytecode/instructions/Move.hpp"
 #include "executable/bytecode/instructions/RaiseVarargs.hpp"
+#include "executable/bytecode/instructions/ReRaise.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
 #include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
 #include "executable/bytecode/instructions/StoreAttr.hpp"
@@ -1376,6 +1377,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		return allocate_block(m_function_id);
 	});
 
+	auto *finally_block_with_reraise = allocate_block(m_function_id);
 	auto *finally_block = allocate_block(m_function_id);
 
 	emit<SetupExceptionHandling>();
@@ -1407,8 +1409,16 @@ Value *BytecodeGenerator::visit(const Try *node)
 		idx++;
 	}
 
+	set_insert_point(finally_block_with_reraise);
+	for (const auto &statement : node->finalbody()) { generate(statement.get(), m_function_id); }
+	emit<ReRaise>();
+	emit<JumpForward>(2);
+
 	set_insert_point(finally_block);
 	for (const auto &statement : node->finalbody()) { generate(statement.get(), m_function_id); }
+
+	auto *next_block = allocate_block(m_function_id);
+	set_insert_point(next_block);
 
 	return nullptr;
 }

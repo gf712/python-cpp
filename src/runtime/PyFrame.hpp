@@ -17,7 +17,7 @@ class PyFrame : public PyBaseObject
 
 	struct ExceptionStackItem
 	{
-		py::PyObject *exception{ nullptr };
+		py::BaseException *exception{ nullptr };
 		py::PyType *exception_type{ nullptr };
 		py::PyTraceback *traceback{ nullptr };
 	};
@@ -34,9 +34,8 @@ class PyFrame : public PyBaseObject
 	size_t m_register_count;
 	const py::PyTuple *m_consts;
 	std::vector<py::PyCell *> m_freevars;
-	py::PyObject *m_exception_to_catch{ nullptr };
+	py::BaseException *m_exception_to_catch{ nullptr };
 	std::vector<ExceptionStackItem> m_exception_stack;
-	std::optional<ExceptionStackItem> m_stashed_exception;
 
   public:
 	static PyFrame *create(PyFrame *parent,
@@ -51,26 +50,18 @@ class PyFrame : public PyBaseObject
 
 	PyFrame *parent() const { return m_f_back; }
 
-	void set_exception(py::PyObject *exception);
+	void push_exception(py::BaseException *exception);
+	py::BaseException *pop_exception();
 
-	void clear_stashed_exception();
-
-	void stash_exception();
-
-	std::optional<ExceptionStackItem> exception_info() const { 
-		ASSERT(m_exception_stack.size() <= 1)
+	std::optional<ExceptionStackItem> exception_info() const
+	{
 		if (m_exception_stack.empty()) return {};
 		return m_exception_stack.back();
 	}
 
-	const std::optional<ExceptionStackItem> &stashed_exception_info() const
-	{
-		return m_stashed_exception;
-	}
-
 	bool catch_exception(py::PyObject *) const;
 
-	void set_exception_to_catch(py::PyObject *exception);
+	void set_exception_to_catch(py::BaseException *exception);
 
 	PyFrame *exit();
 

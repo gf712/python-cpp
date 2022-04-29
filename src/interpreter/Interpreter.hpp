@@ -42,10 +42,10 @@ class Interpreter
 	void set_status(Status status) { m_status = status; }
 	Status status() const { return m_status; }
 
-	template<typename... Ts> void raise_exception(py::PyObject *exception)
+	template<typename... Ts> void raise_exception(py::BaseException *exception)
 	{
 		m_status = Status::EXCEPTION;
-		m_current_frame->set_exception(std::move(exception));
+		m_current_frame->push_exception(std::move(exception));
 	}
 
 	py::PyFrame *execution_frame() const { return m_current_frame; }

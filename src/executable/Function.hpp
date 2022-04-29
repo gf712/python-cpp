@@ -46,4 +46,6 @@ class Function
 	virtual std::string to_string() const = 0;
 
 	virtual std::vector<uint8_t> serialize() const = 0;
+
+	virtual py::PyResult call(VirtualMachine &, Interpreter &) const = 0;
 };

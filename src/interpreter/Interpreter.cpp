@@ -100,12 +100,13 @@ void Interpreter::unwind()
 		// don't unwind beyond the main frame
 		if (!m_current_frame->parent()) {
 			// uncaught exception
-			std::cout << static_cast<const BaseException *>(raised_exception)->what() << '\n';
+			std::cout << static_cast<const BaseException *>(raised_exception)->format_traceback()
+					  << '\n';
 			break;
 		}
 		m_current_frame = m_current_frame->exit();
 	}
-	m_current_frame->set_exception(nullptr);
+	m_current_frame->pop_exception();
 }
 
 PyModule *Interpreter::get_imported_module(PyString *name) const
@@ -146,18 +147,12 @@ PyResult Interpreter::call(const std::unique_ptr<Function> &func, PyFrame *funct
 	auto &vm = VirtualMachine::the();
 	function_frame->m_f_back = m_current_frame;
 	m_current_frame = function_frame;
-	auto result = vm.call(func);
-	(void)result;
+	auto result = func->call(vm, *this);
 
 	// cleanup: the current_frame will be garbage collected
 	m_current_frame = m_current_frame->exit();
 
-	if (std::holds_alternative<PyObject *>(vm.reg(0))) {
-		auto *obj = std::get<PyObject *>(vm.reg(0));
-		if (!obj) return PyResult::Ok(py_none());
-		return PyResult::Ok(obj);
-	}
-	return PyObject::from(vm.reg(0));
+	return result;
 }
 
 PyResult Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs)

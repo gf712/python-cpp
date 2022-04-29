@@ -17,7 +17,8 @@ PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				// exit loop in error state and handle unwinding to interpreter
 				return PyResult::Err(static_cast<BaseException *>(last_exception));
 			} else {
-				interpreter.execution_frame()->set_exception(nullptr);
+				interpreter.execution_frame()->pop_exception();
+				if (interpreter.execution_frame()->exception_info().has_value()) { TODO(); }
 				interpreter.set_status(Interpreter::Status::OK);
 				// FIXME: subtract one since the vm will advance the ip by one.
 				//        is this always true?

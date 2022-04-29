@@ -74,6 +74,8 @@ std::string PyModule::to_string() const
 PyResult PyModule::create(PyString *name)
 {
 	auto &vm = VirtualMachine::the();
+	auto ip = VirtualMachine::the().instruction_pointer();
+
 	if (auto *module = vm.interpreter().get_imported_module(name)) { return PyResult::Ok(module); }
 
 	const auto filepath = resolve_path(name->value());
@@ -90,7 +92,9 @@ PyResult PyModule::create(PyString *name)
 	auto program =
 		codegen::BytecodeGenerator::compile(p.module(), {}, compiler::OptimizationLevel::None);
 
-	ASSERT(vm.execute(program) == EXIT_SUCCESS);
+	auto result = vm.execute(program);
+	vm.set_instruction_pointer(ip);
+	ASSERT(result == EXIT_SUCCESS);
 	auto *module_dict = vm.interpreter().execution_frame()->globals();
 
 	auto *module = vm.heap().allocate<PyModule>(name);

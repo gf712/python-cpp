@@ -1,7 +1,10 @@
 #include "BaseException.hpp"
+#include "MemoryError.hpp"
+#include "PyTraceback.hpp"
 #include "PyType.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -33,6 +36,28 @@ BaseException::BaseException(const TypePrototype &type, PyTuple *args)
 	: PyBaseObject(type), m_args(args)
 {}
 
+PyResult BaseException::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	auto *result = heap.allocate<BaseException>(args);
+	if (!result) { return PyResult::Err(memory_error(sizeof(BaseException))); }
+	return PyResult::Ok(static_cast<PyObject *>(result));
+}
+
+PyResult BaseException::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(type == s_base_exception_type)
+	ASSERT(!kwargs || kwargs->map().empty())
+	return BaseException::create(args);
+}
+
+std::optional<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(!kwargs || kwargs->map().empty())// takes no keyword arguments
+	m_args = args;
+	return 0;
+}
+
 PyType *BaseException::type() const
 {
 	ASSERT(s_base_exception_type)
@@ -51,6 +76,7 @@ void BaseException::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	if (m_args) visitor.visit(*m_args);
+	if (m_traceback) visitor.visit(*m_traceback);
 }
 
 std::string BaseException::to_string() const
@@ -66,6 +92,20 @@ std::string BaseException::to_string() const
 	} else {
 		return "";
 	}
+}
+
+std::string BaseException::format_traceback() const
+{
+	std::ostringstream out;
+	out << "Traceback (most recent call last):\n";
+	auto *tb = m_traceback;
+	while (tb) {
+		out << fmt::format("  File \"{}\", line {}, in {}\n", "TODO", tb->m_tb_lineno, "TODO");
+		out << "    TODO -> print line\n";
+		tb = tb->m_tb_next;
+	}
+	out << type()->name() << ": " << what() << "\n";
+	return out.str();
 }
 
 PyResult BaseException::__repr__() const

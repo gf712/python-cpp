@@ -16,13 +16,10 @@ class ValueError : public Exception
   private:
 	ValueError(PyTuple *args);
 
-	static ValueError *create(PyTuple *args)
-	{
-		auto &heap = VirtualMachine::the().heap();
-		return heap.allocate<ValueError>(args);
-	}
-
   public:
+	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult create(PyTuple *args);
+
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
@@ -35,7 +32,8 @@ inline BaseException *value_error(const std::string &message, Args &&... args)
 	ASSERT(msg.is_ok())
 	auto args_tuple = PyTuple::create(msg.template unwrap_as<PyString>());
 	ASSERT(args_tuple.is_ok())
-	return ValueError::create(args_tuple.template unwrap_as<PyTuple>());
+	return ValueError::create(args_tuple.template unwrap_as<PyTuple>())
+		.template unwrap_as<ValueError>();
 }
 
 }// namespace py

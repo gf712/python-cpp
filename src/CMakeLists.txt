@@ -47,6 +47,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/MethodCall.cpp
     executable/bytecode/instructions/Move.cpp
     executable/bytecode/instructions/RaiseVarargs.cpp
+    executable/bytecode/instructions/ReRaise.cpp
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/StoreAttr.cpp
@@ -204,7 +205,7 @@ if(LLVM_FOUND)
   set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)
 
   add_library(python-cpp-llvm-tests OBJECT "executable/llvm/LLVMGenerator_tests.cpp")
-  add_library(python-cpp-llvm-glue OBJECT "executable/llvm/LLVMPyUtils.cpp")
+  add_library(python-cpp-llvm-glue OBJECT "executable/llvm/LLVMPyUtils.cpp" "executable/llvm/LLVMFunction.cpp")
 
   target_link_libraries(python-cpp-llvm-glue PRIVATE llvm-interface)
   target_link_libraries(python-cpp-llvm PUBLIC llvm-interface)

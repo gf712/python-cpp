@@ -573,8 +573,22 @@ std::optional<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 	if (m_type_prototype.__init__.has_value()) {
 		auto result_ = call_slot(*m_type_prototype.__init__, this, args, kwargs);
 		ASSERT(result_.is_ok())
-		auto *result = result_.unwrap_as<PyObject>();
-		if (as<PyInteger>(result) || result == py_none()) { return 0; }
+		if (std::holds_alternative<PyObject *>(result_.unwrap())) {
+			auto *result = result_.unwrap_as<PyObject>();
+			if (result == py_none()) {
+				return 0;
+			} else if (as<PyInteger>(result)) {
+				return as<PyInteger>(result)->as_i64();
+			}
+		} else {
+			const auto &result = result_.unwrap();
+			if (std::holds_alternative<NameConstant>(result)) {
+				if (std::holds_alternative<NoneType>(std::get<NameConstant>(result).value)) {
+					return 0;
+				}
+			}
+		}
+		// should return type_error("__init__() should return None, not '{}'", result_type)
 		TODO();
 	}
 	return {};

@@ -5,6 +5,7 @@
 #include "interpreter/InterpreterSession.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyTraceback.hpp"
 #include "runtime/PyTuple.hpp"
 
 #include <numeric>
@@ -147,69 +148,13 @@ std::string BytecodeProgram::to_string() const
 
 int BytecodeProgram::execute(VirtualMachine *vm)
 {
-	const size_t register_count = main_stack_size();
-	// stack size in main frame is always zero (since we don't know how much it can grow at compile
-	// time)
-	const size_t stack_size = 0;
+	auto &interpreter = vm->interpreter_session()->start_new_interpreter(*this);
 
-	// push frame BEFORE setting the ip, so that we can save the return address
-	vm->push_frame(register_count, stack_size);
+	auto result = m_main_function->function()->call(*vm, interpreter);
 
-	const auto &begin_function_block = begin();
-	const auto &end_function_block = end();
+	if (result.is_err()) { std::cout << result.unwrap_err()->format_traceback() << std::endl; }
 
-	vm->set_instruction_pointer(begin_function_block->begin());
-	const auto stack_count = vm->stack().size();
-	// can only initialize interpreter after creating the initial stack frame
-	[[maybe_unused]] auto &interpreter = vm->interpreter_session()->start_new_interpreter(*this);
-	const auto initial_ip = vm->instruction_pointer();
-	auto block_view = begin_function_block;
-
-	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
-	//            What you can do is leave a block (and not the function) at any time and
-	//            start executing the next block from its first instruction
-	for (; block_view != end_function_block;) {
-		vm->set_instruction_pointer(block_view->begin());
-		const auto end = block_view->end();
-		for (; vm->instruction_pointer() != end;
-			 vm->set_instruction_pointer(std::next(vm->instruction_pointer()))) {
-			ASSERT((*vm->instruction_pointer()).get())
-			const auto &instruction = *vm->instruction_pointer();
-			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
-			auto result = instruction->execute(*vm, vm->interpreter());
-			// we left the current stack frame in the previous instruction
-			if (vm->stack().size() != stack_count) { break; }
-			// vm->dump();
-			if (result.is_err()) {
-				vm->interpreter().raise_exception(result.unwrap_err());
-
-				if (!vm->state().catch_exception) {
-					vm->interpreter().unwind();
-					// restore instruction pointer
-					vm->set_instruction_pointer(initial_ip);
-					return EXIT_FAILURE;
-				} else {
-					vm->interpreter().execution_frame()->stash_exception();
-					vm->interpreter().set_status(Interpreter::Status::OK);
-					vm->state().catch_exception = false;
-					break;
-				}
-			}
-		}
-		if (vm->state().jump_block_count.has_value()) {
-			// does it make sense to jump beyond the last block, i.e. to end_function_block
-			// meaning that we leave the function?
-			ASSERT((block_view + *vm->state().jump_block_count) < end_function_block)
-			block_view += *vm->state().jump_block_count;
-			vm->state().jump_block_count.reset();
-		} else {
-			block_view++;
-		}
-	}
-
-	// vm->interpreter_session()->shutdown(interpreter);
-
-	return EXIT_SUCCESS;
+	return result.is_ok() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,

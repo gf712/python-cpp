@@ -8,9 +8,9 @@
 
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
-#include <span>
 
 class Bytecode : public Function
 {
@@ -32,4 +32,6 @@ class Bytecode : public Function
 	std::vector<uint8_t> serialize() const override;
 
 	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer);
+
+	py::PyResult call(VirtualMachine &, Interpreter &) const override;
 };

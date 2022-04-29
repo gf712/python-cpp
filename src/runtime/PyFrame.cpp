@@ -1,4 +1,5 @@
 #include "PyFrame.hpp"
+#include "BaseException.hpp"
 #include "PyCell.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
@@ -47,28 +48,24 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	return new_frame;
 }
 
-void PyFrame::set_exception_to_catch(PyObject *exception) { m_exception_to_catch = exception; }
+void PyFrame::set_exception_to_catch(BaseException *exception) { m_exception_to_catch = exception; }
 
-void PyFrame::set_exception(PyObject *exception)
+void PyFrame::push_exception(BaseException *exception)
 {
+	ASSERT(exception)
 	if (exception) {
-		// make sure that we are not accidentally overriding an active exception with another
-		// exception
-		ASSERT(m_exception_stack.empty())
-		m_exception_stack.push_back(ExceptionStackItem{
-			.exception = exception, .exception_type = exception->type(), .traceback = nullptr });
-	} else {
-		// FIXME: create a PyFrame::clear_exception method instead
-		m_exception_stack.pop_back();
+		m_exception_stack.push_back(ExceptionStackItem{ .exception = exception,
+			.exception_type = exception->type(),
+			.traceback = exception->traceback() });
 	}
 }
 
-void PyFrame::clear_stashed_exception() { m_stashed_exception.reset(); }
-
-void PyFrame::stash_exception()
+BaseException *PyFrame::pop_exception()
 {
-	m_stashed_exception = m_exception_stack.back();
+	ASSERT(!m_exception_stack.empty())
+	auto exception = m_exception_stack.back().exception;
 	m_exception_stack.pop_back();
+	return exception;
 }
 
 bool PyFrame::catch_exception(PyObject *exception) const
@@ -126,7 +123,6 @@ void PyFrame::visit_graph(Visitor &visitor)
 		}
 		if (exception_stack_item.traceback) { visitor.visit(*exception_stack_item.traceback); }
 	}
-	if (m_stashed_exception.has_value()) visitor.visit(*m_stashed_exception->exception);
 	if (m_f_back) { visitor.visit(*m_f_back); }
 	for (const auto &freevar : m_freevars) {
 		if (freevar) { visitor.visit(*freevar); }
