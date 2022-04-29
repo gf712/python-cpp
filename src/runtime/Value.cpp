@@ -416,45 +416,44 @@ PyResult greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &)
 		rhs);
 }
 
-bool is(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult is(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	// TODO: Could probably be more efficient, but at least guarantees that Python singletons
 	//		 always are true in this comparisson when compared to the same singleton
 	auto lhs_ = PyObject::from(lhs);
-	ASSERT(lhs_.is_ok())
+	if (lhs_.is_err()) return lhs_;
 	auto rhs_ = PyObject::from(rhs);
-	ASSERT(rhs_.is_ok())
+	if (rhs_.is_err()) return rhs_;
 
-	return lhs_.unwrap_as<PyObject>() == rhs_.unwrap_as<PyObject>();
+	return PyResult::Ok(NameConstant{ lhs_.unwrap_as<PyObject>() == rhs_.unwrap_as<PyObject>() });
 }
 
-bool in(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult in(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	TODO();
 	(void)lhs;
 	(void)rhs;
-	return false;
+	return PyResult::Ok(NameConstant{ false });
 }
 
-bool truthy(const Value &value, Interpreter &)
+PyResult truthy(const Value &value, Interpreter &)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
-	return std::visit(overloaded{ [](const NameConstant &c) {
-									 if (std::holds_alternative<NoneType>(c.value)) {
-										 return false;
-									 } else {
-										 return std::get<bool>(c.value);
-									 }
-								 },
-						  [](const Number &number) { return number == Number{ int64_t{ 0 } }; },
-						  [](const String &str) { return !str.s.empty(); },
-						  [](const Bytes &bytes) { return !bytes.b.empty(); },
-						  [](const Ellipsis &) { return true; },
-						  [](PyObject *obj) {
-							  auto b = obj->bool_();
-							  ASSERT(b.is_ok())
-							  return b.unwrap_as<PyObject>() == py_true();
-						  } },
+	return std::visit(
+		overloaded{ [](const NameConstant &c) {
+					   if (std::holds_alternative<NoneType>(c.value)) {
+						   return PyResult::Ok(NameConstant{ false });
+					   } else {
+						   return PyResult::Ok(c);
+					   }
+				   },
+			[](const Number &number) {
+				return PyResult::Ok(NameConstant{ number != Number{ int64_t{ 0 } } });
+			},
+			[](const String &str) { return PyResult::Ok(NameConstant{ !str.s.empty() }); },
+			[](const Bytes &bytes) { return PyResult::Ok(NameConstant{ !bytes.b.empty() }); },
+			[](const Ellipsis &) { return PyResult::Ok(NameConstant{ true }); },
+			[](PyObject *obj) { return obj->bool_(); } },
 		value);
 }
 

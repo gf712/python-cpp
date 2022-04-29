@@ -1,5 +1,6 @@
 #include "ForIter.hpp"
 #include "runtime/PyNone.hpp"
+#include "runtime/PyTraceback.hpp"
 #include "runtime/StopIteration.hpp"
 
 using namespace py;
@@ -12,14 +13,25 @@ PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 		const auto &next_value = (*iterable_object)->next();
 		if (next_value.is_err()) {
 			auto *last_exception = next_value.unwrap_err();
+
+			// FIXME: this shold be done somewhere more centralized and where we can easily get the
+			// instruction index and line number
+			size_t tb_lineno = 0;
+			size_t tb_lasti = 0;
+			PyTraceback *tb_next = last_exception->traceback();
+			auto traceback =
+				PyTraceback::create(interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);
+			ASSERT(traceback.is_ok())
+			last_exception->set_traceback(traceback.unwrap_as<PyTraceback>());
+
 			interpreter.raise_exception(last_exception);
+
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
 				// exit loop in error state and handle unwinding to interpreter
 				return PyResult::Err(static_cast<BaseException *>(last_exception));
 			} else {
 				interpreter.execution_frame()->pop_exception();
 				if (interpreter.execution_frame()->exception_info().has_value()) { TODO(); }
-				interpreter.set_status(Interpreter::Status::OK);
 				// FIXME: subtract one since the vm will advance the ip by one.
 				//        is this always true?
 				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label->position() - 1);

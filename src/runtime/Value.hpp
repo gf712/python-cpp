@@ -260,9 +260,9 @@ PyResult less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter)
 PyResult greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
-bool is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-bool in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
-bool truthy(const Value &lhs, Interpreter &interpreter);
+PyResult truthy(const Value &lhs, Interpreter &interpreter);
 
 }// namespace py

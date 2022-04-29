@@ -7,6 +7,7 @@ namespace py {
 class BaseException : public PyBaseObject
 {
 	friend class ::Heap;
+	template<typename T> friend struct klass;
 
 	friend BaseException *as<>(PyObject *obj);
 	friend const BaseException *as<>(const PyObject *obj);
@@ -31,6 +32,8 @@ class BaseException : public PyBaseObject
 	PyResult __repr__() const;
 
 	std::string to_string() const override;
+
+	PyTuple *args() const { return m_args; }
 
 	PyTraceback *traceback() const { return m_traceback; }
 	void set_traceback(PyTraceback *tb) { m_traceback = tb; }

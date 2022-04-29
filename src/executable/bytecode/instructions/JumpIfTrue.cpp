@@ -1,29 +1,24 @@
 #include "JumpIfTrue.hpp"
 #include "runtime/PyBool.hpp"
+#include "runtime/PyNone.hpp"
 
 using namespace py;
 
-PyResult JumpIfTrue::execute(VirtualMachine &vm, Interpreter &) const
+PyResult JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto &result = vm.reg(m_test_register);
 
-	const auto test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult { return obj->bool_(); },
-					   [](const auto &) -> PyResult {
-						   TODO();
-						   return PyResult::Err(nullptr);
-					   },
-					   [](const NameConstant &value) -> PyResult {
-						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return PyResult::Ok(*bool_type ? py_true() : py_false());
-						   } else {
-							   return PyResult::Ok(py_false());
-						   }
-					   } },
-			result);
-	if (test_result.is_ok() && test_result.unwrap_as<PyObject>() == py_true()) {
-		const auto ip = vm.instruction_pointer() + m_label->position();
-		vm.set_instruction_pointer(ip);
+	const auto test_result = truthy(result, interpreter);
+	if (test_result.is_ok()) {
+		if ((std::holds_alternative<PyObject *>(test_result.unwrap())
+				&& test_result.unwrap_as<PyObject>() == py_true())
+			|| (std::holds_alternative<NameConstant>(test_result.unwrap())
+				&& std::get<bool>(std::get<NameConstant>(test_result.unwrap()).value))) {
+			{
+				const auto ip = vm.instruction_pointer() + m_label->position();
+				vm.set_instruction_pointer(ip);
+			}
+		}
 	}
 	return test_result;
 }

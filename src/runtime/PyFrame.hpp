@@ -35,7 +35,7 @@ class PyFrame : public PyBaseObject
 	const py::PyTuple *m_consts;
 	std::vector<py::PyCell *> m_freevars;
 	py::BaseException *m_exception_to_catch{ nullptr };
-	std::vector<ExceptionStackItem> m_exception_stack;
+	std::shared_ptr<std::vector<ExceptionStackItem>> m_exception_stack;
 
   public:
 	static PyFrame *create(PyFrame *parent,
@@ -55,8 +55,8 @@ class PyFrame : public PyBaseObject
 
 	std::optional<ExceptionStackItem> exception_info() const
 	{
-		if (m_exception_stack.empty()) return {};
-		return m_exception_stack.back();
+		if (m_exception_stack->empty()) return {};
+		return m_exception_stack->back();
 	}
 
 	bool catch_exception(py::PyObject *) const;

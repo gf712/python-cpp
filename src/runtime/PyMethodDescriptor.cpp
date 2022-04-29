@@ -66,7 +66,8 @@ PyResult PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 PyResult PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
 	if (!instance) { return PyResult::Ok(const_cast<PyMethodDescriptor *>(this)); }
-	if (instance->type() != m_underlying_type) {
+	if ((instance->type() != m_underlying_type)
+		&& !instance->type()->issubclass(m_underlying_type)) {
 		return PyResult::Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",

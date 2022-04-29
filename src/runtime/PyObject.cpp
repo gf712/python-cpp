@@ -630,7 +630,8 @@ PyResult PyObject::__getattribute__(PyObject *attribute) const
 
 	if (descriptor_has_get) { return descriptor->get(const_cast<PyObject *>(this), type()); }
 
-	if (descriptor) { return descriptor_; }
+	// PyType::lookup returns py_none if it doesn't find name in the objects in the MRO chain
+	if (descriptor != py_none()) { return descriptor_; }
 
 	return PyResult::Err(attribute_error(
 		"'{}' object has no attribute '{}'", m_type_prototype.__name__, name->to_string()));

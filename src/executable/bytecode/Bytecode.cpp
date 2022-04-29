@@ -96,8 +96,6 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 	// can only initialize interpreter after creating the initial stack frame
 	const auto initial_ip = vm.instruction_pointer();
 	auto block_view = begin_function_block;
-	size_t tb_lasti = 0;
-
 
 	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
 	//            What you can do is leave a block (and not the function) at any time and
@@ -108,8 +106,8 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 		for (; vm.instruction_pointer() != end;
 			 vm.set_instruction_pointer(std::next(vm.instruction_pointer()))) {
 			ASSERT((*vm.instruction_pointer()).get())
-			const auto &instruction = *vm.instruction_pointer();
-			tb_lasti++;
+			const auto &current_ip = vm.instruction_pointer();
+			const auto &instruction = *current_ip;
 			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 			auto result = instruction->execute(vm, vm.interpreter());
 			// we left the current stack frame in the previous instruction
@@ -117,29 +115,20 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 			// vm.dump();
 			if (result.is_err()) {
 				auto *exception = result.unwrap_err();
-				interpreter.raise_exception(result.unwrap_err());
 				size_t tb_lineno = 0;
+				size_t tb_lasti = std::distance(initial_ip, current_ip);
 				PyTraceback *tb_next = exception->traceback();
 				auto traceback = PyTraceback::create(
-					interpreter.execution_frame(), tb_lasti - 1, tb_lineno, tb_next);
+					interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);
 				ASSERT(traceback.is_ok())
 				exception->set_traceback(traceback.unwrap_as<PyTraceback>());
 
+				interpreter.raise_exception(exception);
+
 				if (!vm.state().catch_exception) {
-					// restore instruction pointer
-					// vm.set_instruction_pointer(initial_ip);
-					(void)initial_ip;
 					vm.ret();
 					return result;
 				} else {
-					// stash exception so that instructions such as JumpIfNotExceptionMatch can
-					// check if an except block exception matches
-
-					// vm.interpreter().execution_frame()->push_exception();
-					// if (vm.interpreter().execution_frame()->exception_info().has_value()) {
-					// 	TODO();
-					// }
-					// vm.interpreter().set_status(Interpreter::Status::OK);
 					vm.state().catch_exception = false;
 					break;
 				}

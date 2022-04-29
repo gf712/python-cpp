@@ -37,6 +37,7 @@ PyFrame *PyFrame::create(PyFrame *parent,
 
 	if (new_frame->m_f_back) {
 		new_frame->m_builtins = new_frame->m_f_back->m_builtins;
+		new_frame->m_exception_stack = new_frame->m_f_back->m_exception_stack;
 	} else {
 		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
 		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
@@ -44,6 +45,7 @@ PyFrame *PyFrame::create(PyFrame *parent,
 		// TODO: could this just return the builtin singleton?
 		new_frame->m_builtins =
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
+		new_frame->m_exception_stack = std::make_shared<std::vector<ExceptionStackItem>>();
 	}
 	return new_frame;
 }
@@ -53,18 +55,16 @@ void PyFrame::set_exception_to_catch(BaseException *exception) { m_exception_to_
 void PyFrame::push_exception(BaseException *exception)
 {
 	ASSERT(exception)
-	if (exception) {
-		m_exception_stack.push_back(ExceptionStackItem{ .exception = exception,
-			.exception_type = exception->type(),
-			.traceback = exception->traceback() });
-	}
+	m_exception_stack->push_back(ExceptionStackItem{ .exception = exception,
+		.exception_type = exception->type(),
+		.traceback = exception->traceback() });
 }
 
 BaseException *PyFrame::pop_exception()
 {
-	ASSERT(!m_exception_stack.empty())
-	auto exception = m_exception_stack.back().exception;
-	m_exception_stack.pop_back();
+	ASSERT(!m_exception_stack->empty())
+	auto exception = m_exception_stack->back().exception;
+	m_exception_stack->pop_back();
 	return exception;
 }
 
@@ -116,7 +116,7 @@ void PyFrame::visit_graph(Visitor &visitor)
 	if (m_globals) visitor.visit(*m_globals);
 	if (m_builtins) visitor.visit(*m_builtins);
 	if (m_exception_to_catch) visitor.visit(*m_exception_to_catch);
-	for (const auto &exception_stack_item : m_exception_stack) {
+	for (const auto &exception_stack_item : *m_exception_stack) {
 		if (exception_stack_item.exception) { visitor.visit(*exception_stack_item.exception); }
 		if (exception_stack_item.exception_type) {
 			visitor.visit(*exception_stack_item.exception_type);

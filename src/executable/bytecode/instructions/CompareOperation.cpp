@@ -1,4 +1,5 @@
 #include "CompareOperation.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/Value.hpp"
 
 using namespace py;
@@ -29,16 +30,44 @@ PyResult CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter)
 			return greater_than_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Is: {
-			return PyResult::Ok(NameConstant{ is(lhs, rhs, interpreter) });
+			return is(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::IsNot: {
-			return PyResult::Ok(NameConstant{ !is(lhs, rhs, interpreter) });
+			if (auto result = is(lhs, rhs, interpreter); result.is_ok()) {
+				if (std::holds_alternative<NameConstant>(result.unwrap())) {
+					ASSERT(
+						std::holds_alternative<bool>(std::get<NameConstant>(result.unwrap()).value))
+					return PyResult::Ok(NameConstant{
+						!std::get<bool>(std::get<NameConstant>(result.unwrap()).value) });
+				} else if (std::holds_alternative<PyObject *>(result.unwrap())) {
+					return PyResult::Ok(
+						result.unwrap_as<PyObject>() == py_false() ? py_true() : py_false());
+				} else {
+					TODO();
+				}
+			} else {
+				return result;
+			}
 		} break;
 		case Comparisson::In: {
-			return PyResult::Ok(NameConstant{ in(lhs, rhs, interpreter) });
+			return in(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::NotIn: {
-			return PyResult::Ok(NameConstant{ !in(lhs, rhs, interpreter) });
+			if (auto result = in(lhs, rhs, interpreter); result.is_ok()) {
+				if (std::holds_alternative<NameConstant>(result.unwrap())) {
+					ASSERT(
+						std::holds_alternative<bool>(std::get<NameConstant>(result.unwrap()).value))
+					return PyResult::Ok(NameConstant{
+						!std::get<bool>(std::get<NameConstant>(result.unwrap()).value) });
+				} else if (std::holds_alternative<PyObject *>(result.unwrap())) {
+					return PyResult::Ok(
+						result.unwrap_as<PyObject>() == py_false() ? py_true() : py_false());
+				} else {
+					TODO();
+				}
+			} else {
+				return result;
+			}
 		} break;
 		}
 	}();

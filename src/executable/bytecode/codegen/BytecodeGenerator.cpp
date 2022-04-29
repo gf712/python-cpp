@@ -52,6 +52,7 @@
 #include "executable/bytecode/instructions/StoreSubscript.hpp"
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
+#include "executable/bytecode/instructions/WithExceptStart.hpp"
 
 #include "ast/optimizers/ConstantFolding.hpp"
 #include "executable/FunctionBlock.hpp"
@@ -1259,33 +1260,39 @@ Value *BytecodeGenerator::visit(const Raise *node)
 
 Value *BytecodeGenerator::visit(const With *node)
 {
+	static size_t exit_label_count = 0;
+	auto exit_label = make_label(fmt::format("BOOL_OP_END_{}", exit_label_count++), m_function_id);
+
 	auto *body_block = allocate_block(m_function_id);
 	auto *cleanup_block = allocate_block(m_function_id);
 
 	if (node->items().size() > 1) { TODO(); }
 	std::vector<BytecodeValue *> with_item_results;
+
 	for (const auto &item : node->items()) {
 		with_item_results.push_back(
 			static_cast<BytecodeValue *>(generate(item.get(), m_function_id)));
 	}
 
+	emit<SetupExceptionHandling>();
+
 	set_insert_point(body_block);
 	for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
 
-	// TODO: pass exception type, value and traceback to __exit__, rather than None
 	set_insert_point(cleanup_block);
 	for (const auto &item : with_item_results) {
+		auto *exit_result = create_value();
 		auto *exit_method = create_value();
+
 		emit<LoadMethod>(exit_method->get_register(), item->get_register(), "__exit__");
-		auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
-		auto *none_value = create_value();
-		emit<LoadConst>(none_value->get_register(), none->get_index());
-		emit<MethodCall>(exit_method->get_register(),
-			"__exit__",
-			std::vector<Register>{ none_value->get_register(),
-				none_value->get_register(),
-				none_value->get_register() });
+		emit<WithExceptStart>(exit_result->get_register(), exit_method->get_register());
+		emit<JumpIfTrue>(exit_result->get_register(), exit_label);
 	}
+	emit<ReRaise>();
+
+	bind(*exit_label);
+	emit<ClearExceptionState>();
+
 	return nullptr;
 }
 

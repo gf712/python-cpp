@@ -21,9 +21,6 @@ class Interpreter
 	: NonCopyable
 	, NonMoveable
 {
-  public:
-	enum class Status { OK, EXCEPTION };
-
   private:
 	py::PyFrame *m_current_frame{ nullptr };
 	py::PyFrame *m_global_frame{ nullptr };
@@ -31,7 +28,6 @@ class Interpreter
 	py::PyModule *m_module;
 	py::PyModule *m_importlib;
 	py::PyObject *m_import_func;
-	Status m_status{ Status::OK };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
 	const Program *m_program;
@@ -39,12 +35,8 @@ class Interpreter
   public:
 	Interpreter();
 
-	void set_status(Status status) { m_status = status; }
-	Status status() const { return m_status; }
-
-	template<typename... Ts> void raise_exception(py::BaseException *exception)
+	void raise_exception(py::BaseException *exception)
 	{
-		m_status = Status::EXCEPTION;
 		m_current_frame->push_exception(std::move(exception));
 	}
 

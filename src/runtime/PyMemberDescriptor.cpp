@@ -57,7 +57,8 @@ PyResult PyMemberDescriptor::__repr__() const { return PyString::create(to_strin
 PyResult PyMemberDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
 	if (!instance) { return PyResult::Ok(const_cast<PyMemberDescriptor *>(this)); }
-	if (instance->type() != m_underlying_type) {
+	if ((instance->type() != m_underlying_type)
+		&& !instance->type()->issubclass(m_underlying_type)) {
 		return PyResult::Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",

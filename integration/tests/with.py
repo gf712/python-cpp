@@ -14,10 +14,17 @@ class Mock:
         print("Opening file")
         return self.wrapper
 
-    def __exit__(self, type, value, tb):
-        print("Exiting file", type, value, tb, sep=', ')
+    def __exit__(self, type_, value, tb):
+        print("Exiting file", type_, value, tb, sep=', ')
+        assert type_ == ValueError
+        assert type(value) == ValueError
+        assert value.args == ("can't see me!",)
+        return True
 
 with Mock("test.py") as f:
     a = f.readlines()
+    # raising an error here should be ignored since __exit__ returns a truthy value
+    raise ValueError("can't see me!")
 
+print(a)
 assert a == ["it works", "EOF"], "Expected Wrapper.readlines to return the list [it works, EOF]"

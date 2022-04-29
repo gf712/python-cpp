@@ -125,10 +125,19 @@ PyResult PyList::__eq__(const PyObject *other) const
 	const bool result = std::equal(m_elements.begin(),
 		m_elements.end(),
 		other_list->elements().begin(),
-		[&interpreter](const auto &lhs, const auto &rhs) {
+		[&interpreter](const auto &lhs, const auto &rhs) -> bool {
 			const auto &result = equals(lhs, rhs, interpreter);
 			ASSERT(result.is_ok())
-			return truthy(result.unwrap(), interpreter);
+			auto is_true = truthy(result.unwrap(), interpreter);
+			ASSERT(is_true.is_ok())
+			if (std::holds_alternative<NameConstant>(is_true.unwrap())) {
+				ASSERT(std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value))
+				return std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value);
+			} else if (std::holds_alternative<PyObject *>(is_true.unwrap())) {
+				return is_true.template unwrap_as<PyObject>() == py_true();
+			} else {
+				TODO();
+			}
 		});
 	return PyResult::Ok(result ? py_true() : py_false());
 }
@@ -137,7 +146,16 @@ void PyList::sort()
 {
 	std::sort(m_elements.begin(), m_elements.end(), [](const Value &lhs, const Value &rhs) -> bool {
 		if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
-			return ::truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+			auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+			ASSERT(is_true.is_ok())
+			if (std::holds_alternative<NameConstant>(is_true.unwrap())) {
+				ASSERT(std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value))
+				return std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value);
+			} else if (std::holds_alternative<PyObject *>(is_true.unwrap())) {
+				return is_true.template unwrap_as<PyObject>() == py_false();
+			} else {
+				TODO();
+			}
 		} else {
 			// VirtualMachine::the().interpreter().raise_exception("Failed to compare {} with {}",
 			// 	PyObject::from(lhs)->to_string(),

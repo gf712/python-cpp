@@ -116,7 +116,9 @@ PyResult BaseException::__repr__() const
 PyType *BaseException::register_type(PyModule *module)
 {
 	if (!s_base_exception_type) {
-		s_base_exception_type = klass<BaseException>(module, "BaseException").finalize();
+		s_base_exception_type = klass<BaseException>(module, "BaseException")
+									.attr("args", &BaseException::m_args)
+									.finalize();
 	}
 	return s_base_exception_type;
 }
