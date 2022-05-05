@@ -5,7 +5,7 @@
 
 using namespace py;
 
-PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto iterator = vm.reg(m_src);
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
@@ -22,13 +22,13 @@ PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 			auto traceback =
 				PyTraceback::create(interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);
 			ASSERT(traceback.is_ok())
-			last_exception->set_traceback(traceback.unwrap_as<PyTraceback>());
+			last_exception->set_traceback(traceback.unwrap());
 
 			interpreter.raise_exception(last_exception);
 
 			if (!interpreter.execution_frame()->catch_exception(last_exception)) {
 				// exit loop in error state and handle unwinding to interpreter
-				return PyResult::Err(static_cast<BaseException *>(last_exception));
+				return Err(static_cast<BaseException *>(last_exception));
 			} else {
 				interpreter.execution_frame()->pop_exception();
 				if (interpreter.execution_frame()->exception_info().has_value()) { TODO(); }
@@ -36,14 +36,15 @@ PyResult ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 				//        is this always true?
 				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label->position() - 1);
 			}
-			return PyResult::Ok(py_none());
+			return Ok(Value{ py_none() });
 		}
+		if (next_value.is_err()) return Err(next_value.unwrap_err());
 		if (next_value.is_ok()) { vm.reg(m_dst) = next_value.unwrap(); }
-		return next_value;
+		return Ok(Value{ next_value.unwrap() });
 	} else {
-		// this is probably always going to be something that went wrong
+		// this is probably always going to be something that went wrong internally
 		TODO();
-		return PyResult::Err(nullptr);
+		return Err(nullptr);
 	}
 }
 

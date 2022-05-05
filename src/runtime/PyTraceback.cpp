@@ -19,20 +19,20 @@ void PyTraceback::visit_graph(Visitor &visitor)
 	if (m_tb_next) visitor.visit(*m_tb_next);
 }
 
-PyResult PyTraceback::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyTraceback::__repr__() const { return PyString::create(to_string()); }
 
 PyTraceback::PyTraceback(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next)
 	: PyBaseObject(BuiltinTypes::the().traceback()), m_tb_frame(tb_frame), m_tb_lasti(tb_lasti),
 	  m_tb_lineno(tb_lineno), m_tb_next(tb_next)
 {}
 
-PyResult
+PyResult<PyTraceback *>
 	PyTraceback::create(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next)
 {
 	auto *obj =
 		VirtualMachine::the().heap().allocate<PyTraceback>(tb_frame, tb_lasti, tb_lineno, tb_next);
-	if (!obj) return PyResult::Err(memory_error(sizeof(PyTraceback)));
-	return PyResult::Ok(obj);
+	if (!obj) return Err(memory_error(sizeof(PyTraceback)));
+	return Ok(obj);
 }
 
 PyType *PyTraceback::type() const { return traceback(); }

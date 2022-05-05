@@ -2,7 +2,7 @@
 
 using namespace py;
 
-PyResult GetIter::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> GetIter::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto iterable_value = vm.reg(m_src);
 	auto result = [&]() {
@@ -12,7 +12,7 @@ PyResult GetIter::execute(VirtualMachine &vm, Interpreter &) const
 			return std::visit(
 				[](const auto &value) {
 					if (auto obj = PyObject::from(value); obj.is_ok()) {
-						return obj.template unwrap_as<PyObject>()->iter();
+						return obj.unwrap()->iter();
 					} else {
 						return obj;
 					}
@@ -20,8 +20,12 @@ PyResult GetIter::execute(VirtualMachine &vm, Interpreter &) const
 				iterable_value);
 		}
 	}();
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return result;
+	if (result.is_ok()) {
+		vm.reg(m_dst) = result.unwrap();
+		return Ok(Value{ result.unwrap() });
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 std::vector<uint8_t> GetIter::serialize() const

@@ -15,7 +15,7 @@ class MemoryError : public Exception
   private:
 	MemoryError(PyTuple *args);
 
-	static PyResult create(PyTuple *args)
+	static PyResult<MemoryError *> create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		auto result = heap.allocate<MemoryError>(args);
@@ -24,13 +24,13 @@ class MemoryError : public Exception
 			//       could force a GC run and try again?
 			TODO();
 		}
-		return PyResult::Ok(result);
+		return Ok(result);
 	}
 
   public:
 	static PyType *register_type(PyModule *);
 
-	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	PyType *type() const override;
 
@@ -48,9 +48,9 @@ inline BaseException *memory_error(size_t failed_allocation_size)
 	auto msg = PyString::create(
 		fmt::format("memory allocation failed, allocating {} bytes", failed_allocation_size));
 	if (msg.is_err()) { TODO(); }
-	auto args_tuple = PyTuple::create();
+	auto args_tuple = PyTuple::create(msg.unwrap());
 	if (args_tuple.is_err()) { TODO(); }
-	return MemoryError::create(args_tuple.unwrap_as<PyTuple>()).unwrap_as<MemoryError>();
+	return MemoryError::create(args_tuple.unwrap()).unwrap();
 }
 
 }// namespace py

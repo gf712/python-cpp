@@ -23,13 +23,13 @@ class BaseException : public PyBaseObject
 	BaseException(PyTuple *args);
 
   public:
-	static PyResult create(PyTuple *args);
+	static PyResult<BaseException *> create(PyTuple *args);
 
 	std::string what() const;
 
-	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
-	std::optional<int32_t> __init__(PyTuple *args, PyDict *kwargs);
-	PyResult __repr__() const;
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __repr__() const;
 
 	std::string to_string() const override;
 

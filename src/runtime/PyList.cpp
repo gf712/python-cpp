@@ -32,37 +32,37 @@ PyList::PyList() : PyBaseObject(BuiltinTypes::the().list()) {}
 
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
 
-PyResult PyList::create(std::vector<Value> elements)
+PyResult<PyList *> PyList::create(std::vector<Value> elements)
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyList>(elements);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyList))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyList))); }
+	return Ok(result);
 }
 
-PyResult PyList::create()
+PyResult<PyList *> PyList::create()
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyList>();
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyList))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyList))); }
+	return Ok(result);
 }
 
-PyResult PyList::append(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyList::append(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs || kwargs->map().size())
-	return PyObject::from(args->elements()[0]).and_then<PyObject>([this](auto *obj) {
+	return PyObject::from(args->elements()[0]).and_then([this](auto *obj) {
 		m_elements.push_back(obj);
-		return PyResult::Ok(py_none());
+		return Ok(py_none());
 	});
 }
 
-PyResult PyList::extend(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyList::extend(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs || kwargs->map().size())
 
 	// FIXME: should check if object it iterable and the iterate
-	return PyObject::from(args->elements()[0]).and_then<PyObject>([this](auto *iterable) {
+	return PyObject::from(args->elements()[0]).and_then([this](auto *iterable) {
 		if (as<PyTuple>(iterable)) {
 			for (const auto &el : as<PyTuple>(iterable)->elements()) { m_elements.push_back(el); }
 		} else if (as<PyList>(iterable)) {
@@ -70,7 +70,7 @@ PyResult PyList::extend(PyTuple *args, PyDict *kwargs)
 		} else {
 			TODO();
 		}
-		return PyResult::Ok(py_none());
+		return Ok(py_none());
 	});
 }
 
@@ -100,27 +100,27 @@ std::string PyList::to_string() const
 	return os.str();
 }
 
-PyResult PyList::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyList::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyList::__iter__() const
+PyResult<PyObject *> PyList::__iter__() const
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *it = heap.allocate<PyListIterator>(*this);
-	if (!it) { return PyResult::Err(memory_error(sizeof(PyListIterator))); }
-	return PyResult::Ok(it);
+	if (!it) { return Err(memory_error(sizeof(PyListIterator))); }
+	return Ok(it);
 }
 
-PyResult PyList::__len__() const { return PyInteger::create(m_elements.size()); }
+PyResult<size_t> PyList::__len__() const { return Ok(m_elements.size()); }
 
-PyResult PyList::__eq__(const PyObject *other) const
+PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
 {
-	if (!as<PyList>(other)) { return PyResult::Ok(py_false()); }
+	if (!as<PyList>(other)) { return Ok(py_false()); }
 
 	auto *other_list = as<PyList>(other);
 	// Value contains PyObject* so we can't just compare vectors with std::vector::operator==
 	// otherwise if we compare PyObject* with PyObject* we compare the pointers, rather
 	// than PyObject::__eq__(const PyObject*)
-	if (m_elements.size() != other_list->elements().size()) { return PyResult::Ok(py_false()); }
+	if (m_elements.size() != other_list->elements().size()) { return Ok(py_false()); }
 	auto &interpreter = VirtualMachine::the().interpreter();
 	const bool result = std::equal(m_elements.begin(),
 		m_elements.end(),
@@ -130,16 +130,9 @@ PyResult PyList::__eq__(const PyObject *other) const
 			ASSERT(result.is_ok())
 			auto is_true = truthy(result.unwrap(), interpreter);
 			ASSERT(is_true.is_ok())
-			if (std::holds_alternative<NameConstant>(is_true.unwrap())) {
-				ASSERT(std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value))
-				return std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value);
-			} else if (std::holds_alternative<PyObject *>(is_true.unwrap())) {
-				return is_true.template unwrap_as<PyObject>() == py_true();
-			} else {
-				TODO();
-			}
+			return is_true.unwrap();
 		});
-	return PyResult::Ok(result ? py_true() : py_false());
+	return Ok(result ? py_true() : py_false());
 }
 
 void PyList::sort()
@@ -148,14 +141,7 @@ void PyList::sort()
 		if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
 			auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
 			ASSERT(is_true.is_ok())
-			if (std::holds_alternative<NameConstant>(is_true.unwrap())) {
-				ASSERT(std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value))
-				return std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value);
-			} else if (std::holds_alternative<PyObject *>(is_true.unwrap())) {
-				return is_true.template unwrap_as<PyObject>() == py_false();
-			} else {
-				TODO();
-			}
+			return is_true.unwrap();
 		} else {
 			// VirtualMachine::the().interpreter().raise_exception("Failed to compare {} with {}",
 			// 	PyObject::from(lhs)->to_string(),
@@ -222,14 +208,14 @@ void PyListIterator::visit_graph(Visitor &visitor)
 	const_cast<PyList &>(m_pylist).visit_graph(visitor);
 }
 
-PyResult PyListIterator::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyListIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyListIterator::__next__()
+PyResult<PyObject *> PyListIterator::__next__()
 {
 	if (m_current_index < m_pylist.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pylist.elements()[m_current_index++]);
-	return PyResult::Err(stop_iteration(""));
+	return Err(stop_iteration(""));
 }
 
 PyType *PyListIterator::type() const { return list_iterator(); }

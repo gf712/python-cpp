@@ -21,12 +21,12 @@ template<> const PyBytes *as(const PyObject *obj)
 PyBytes::PyBytes(const Bytes &number) : PyBaseObject(BuiltinTypes::the().bytes()), m_value(number)
 {}
 
-PyResult PyBytes::create(const Bytes &value)
+PyResult<PyBytes *> PyBytes::create(const Bytes &value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *obj = heap.allocate<PyBytes>(value);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyBytes))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyBytes))); }
+	return Ok(obj);
 }
 
 std::string PyBytes::to_string() const
@@ -36,7 +36,7 @@ std::string PyBytes::to_string() const
 	return fmt::format("PyBytes {}", os.str());
 }
 
-PyResult PyBytes::__add__(const PyObject *) const { TODO(); }
+PyResult<PyObject *> PyBytes::__add__(const PyObject *) const { TODO(); }
 
 PyType *PyBytes::type() const { return bytes(); }
 

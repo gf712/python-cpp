@@ -157,266 +157,267 @@ bool NameConstant::operator==(const NameConstant &other) const
 
 namespace py {
 
-PyResult add(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> add(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value + rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->add(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value + rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->add(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult subtract(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value - rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->subtract(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value - rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->subtract(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult multiply(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value * rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->multiply(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value * rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->multiply(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult exp(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> exp(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value.exp(rhs_value));
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->exp(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value.exp(rhs_value));
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->exp(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult lshift(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value << rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->lshift(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value << rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->lshift(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult modulo(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value % rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->modulo(
-								  py_rhs.template unwrap_as<PyObject>());
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value % rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->modulo(py_rhs.unwrap());
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult true_divide(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-									 return PyResult::Ok(lhs_value / rhs_value);
-								 },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  (void)py_lhs;
-							  (void)py_rhs;
-							  // if (auto result = py_lhs->true_divide(py_rhs)) { return result; }
-							  TODO();
-							  return PyResult::Ok(nullptr);
-						  } },
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value / rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				(void)py_lhs;
+				(void)py_rhs;
+				// if (auto result = py_lhs->true_divide(py_rhs)) { return result; }
+				TODO();
+				return Ok(nullptr);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult equals(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value == rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value == rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value == rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_EQ);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value == rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value == rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value == rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_EQ);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult not_equals(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value != rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value != rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value != rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_NE);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value != rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value != rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value != rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_NE);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult less_than_equals(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value <= rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value <= rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value <= rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_LE);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value <= rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value <= rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value <= rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_LE);
+			} },
 		lhs,
 		rhs);
 }
 
 
-PyResult less_than(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value < rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value < rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value < rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_LT);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value < rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value < rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value < rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_LT);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult greater_than(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value > rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value > rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value > rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_GT);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value > rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value > rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value > rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_GT);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	return std::visit(overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult {
-									 return PyResult::Ok(NameConstant{ lhs_value >= rhs_value });
-								 },
-						  [](const auto &lhs_value, const NoneType &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value >= rhs_value });
-						  },
-						  [](const Number &lhs_value, const Number &rhs_value) -> PyResult {
-							  return PyResult::Ok(NameConstant{ lhs_value >= rhs_value });
-						  },
-						  [](const auto &lhs_value, const auto &rhs_value) -> PyResult {
-							  const auto py_lhs = PyObject::from(lhs_value);
-							  if (py_lhs.is_err()) return py_lhs;
-							  const auto py_rhs = PyObject::from(rhs_value);
-							  if (py_rhs.is_err()) return py_rhs;
-							  return py_lhs.template unwrap_as<PyObject>()->richcompare(
-								  py_rhs.template unwrap_as<PyObject>(), RichCompare::Py_GE);
-						  } },
+	return std::visit(
+		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+					   return Ok(NameConstant{ lhs_value >= rhs_value });
+				   },
+			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value >= rhs_value });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				return Ok(NameConstant{ lhs_value >= rhs_value });
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_GE);
+			} },
 		lhs,
 		rhs);
 }
 
-PyResult is(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	// TODO: Could probably be more efficient, but at least guarantees that Python singletons
 	//		 always are true in this comparisson when compared to the same singleton
@@ -425,35 +426,34 @@ PyResult is(const Value &lhs, const Value &rhs, Interpreter &)
 	auto rhs_ = PyObject::from(rhs);
 	if (rhs_.is_err()) return rhs_;
 
-	return PyResult::Ok(NameConstant{ lhs_.unwrap_as<PyObject>() == rhs_.unwrap_as<PyObject>() });
+	return Ok(lhs_.unwrap() == rhs_.unwrap());
 }
 
-PyResult in(const Value &lhs, const Value &rhs, Interpreter &)
+PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	TODO();
 	(void)lhs;
 	(void)rhs;
-	return PyResult::Ok(NameConstant{ false });
+	return Ok(false);
 }
 
-PyResult truthy(const Value &value, Interpreter &)
+PyResult<bool> truthy(const Value &value, Interpreter &)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
-	return std::visit(
-		overloaded{ [](const NameConstant &c) {
-					   if (std::holds_alternative<NoneType>(c.value)) {
-						   return PyResult::Ok(NameConstant{ false });
-					   } else {
-						   return PyResult::Ok(c);
-					   }
-				   },
-			[](const Number &number) {
-				return PyResult::Ok(NameConstant{ number != Number{ int64_t{ 0 } } });
-			},
-			[](const String &str) { return PyResult::Ok(NameConstant{ !str.s.empty() }); },
-			[](const Bytes &bytes) { return PyResult::Ok(NameConstant{ !bytes.b.empty() }); },
-			[](const Ellipsis &) { return PyResult::Ok(NameConstant{ true }); },
-			[](PyObject *obj) { return obj->bool_(); } },
+	return std::visit(overloaded{ [](const NameConstant &c) -> PyResult<bool> {
+									 if (std::holds_alternative<NoneType>(c.value)) {
+										 return Ok(false);
+									 } else {
+										 return Ok(std::get<bool>(c.value));
+									 }
+								 },
+						  [](const Number &number) -> PyResult<bool> {
+							  return Ok(number != Number{ int64_t{ 0 } });
+						  },
+						  [](const String &str) -> PyResult<bool> { return Ok(!str.s.empty()); },
+						  [](const Bytes &bytes) -> PyResult<bool> { return Ok(!bytes.b.empty()); },
+						  [](const Ellipsis &) -> PyResult<bool> { return Ok(true); },
+						  [](PyObject *obj) -> PyResult<bool> { return obj->bool_(); } },
 		value);
 }
 

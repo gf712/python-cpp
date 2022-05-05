@@ -14,8 +14,8 @@ class PyNone : public PyBaseObject
   public:
 	std::string to_string() const override;
 
-	PyResult __add__(const PyObject *obj) const;
-	PyResult __repr__() const;
+	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __repr__() const;
 
 	bool value() const { return m_value; }
 

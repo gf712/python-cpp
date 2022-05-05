@@ -4,7 +4,7 @@
 
 using namespace py;
 
-PyResult LoadAttr::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> LoadAttr::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto this_value = vm.reg(m_value_source);
 	spdlog::debug("This object: {}",
@@ -12,23 +12,27 @@ PyResult LoadAttr::execute(VirtualMachine &vm, Interpreter &) const
 			[](const auto &val) {
 				auto obj = PyObject::from(val);
 				ASSERT(obj.is_ok())
-				return obj.template unwrap_as<PyObject>()->to_string();
+				return obj.unwrap()->to_string();
 			},
 			this_value));
-	auto result = [&]() {
+	auto result = [&]() -> PyResult<Value> {
 		if (auto *this_obj = std::get_if<PyObject *>(&this_value)) {
 			// FIXME: is it worth unifying this?
 			if (auto module = as<PyModule>(*this_obj)) {
 				auto name = PyString::create(m_attr_name);
-				if (name.is_err()) { return name; }
-				return PyResult::Ok(module->symbol_table().at(name.unwrap_as<PyString>()));
+				if (name.is_err()) { return Err(name.unwrap_err()); }
+				return Ok(Value{ module->symbol_table().at(name.unwrap()) });
 			} else {
 				auto name = PyString::create(m_attr_name);
-				return (*this_obj)->get_attribute(name.unwrap_as<PyString>());
+				if (auto r = (*this_obj)->get_attribute(name.unwrap()); r.is_ok()) {
+					return Ok(Value{ r.unwrap() });
+				} else {
+					return Err(r.unwrap_err());
+				}
 			}
 		} else {
 			TODO();
-			return PyResult::Err(nullptr);
+			return Err(nullptr);
 		}
 	}();
 

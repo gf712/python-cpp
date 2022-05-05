@@ -16,7 +16,7 @@ class GetIter final : public Instruction
 		return fmt::format("GET_ITER        r{:<3} r{:<3}", m_dst, m_src);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

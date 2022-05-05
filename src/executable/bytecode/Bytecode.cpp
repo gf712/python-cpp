@@ -82,9 +82,9 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 		register_count, stack_size, function_name, std::move(instructions), block_views);
 }
 
-py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	std::optional<py::Value> value;
+	std::optional<Value> value;
 	// create main stack frame
 	if (vm.stack().empty()) { vm.setup_call_stack(m_register_count, m_stack_size); }
 
@@ -111,7 +111,7 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 			auto result = instruction->execute(vm, vm.interpreter());
 			// we left the current stack frame in the previous instruction
-			if (vm.stack().size() != stack_count) { return result; }
+			if (vm.stack().size() != stack_count) { return Ok(Value{ result.unwrap() }); }
 			// vm.dump();
 			if (result.is_err()) {
 				auto *exception = result.unwrap_err();
@@ -121,7 +121,7 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 				auto traceback = PyTraceback::create(
 					interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);
 				ASSERT(traceback.is_ok())
-				exception->set_traceback(traceback.unwrap_as<PyTraceback>());
+				exception->set_traceback(traceback.unwrap());
 
 				interpreter.raise_exception(exception);
 
@@ -150,5 +150,5 @@ py::PyResult Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 	// vm.interpreter_session()->shutdown(interpreter);
 
 	ASSERT(value.has_value())
-	return PyResult::Ok(*value);
+	return Ok(*value);
 }

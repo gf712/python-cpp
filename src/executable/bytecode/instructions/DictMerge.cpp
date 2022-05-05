@@ -4,7 +4,7 @@
 
 using namespace py;
 
-PyResult DictMerge::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &this_dict = vm.reg(m_this_dict);
 	auto &other_dict = vm.reg(m_other_dict);
@@ -21,9 +21,12 @@ PyResult DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(as<PyDict>(other_pydict))
 
 	auto args = PyTuple::create(other_pydict);
-	if (args.is_err()) { return args; }
-	return as<PyDict>(this_pydict)
-		->merge(as<PyTuple>(std::get<PyObject *>(args.unwrap())), nullptr);
+	if (args.is_err()) { return Err(args.unwrap_err()); }
+	if (auto result = as<PyDict>(this_pydict)->merge(args.unwrap(), nullptr); result.is_ok()) {
+		return Ok(Value{ result.unwrap() });
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 std::vector<uint8_t> DictMerge::serialize() const

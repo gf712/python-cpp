@@ -14,7 +14,7 @@ class JumpIfNotExceptionMatch final : public Instruction
 		return fmt::format("JUMP_IF_NOT_EXC r{}", m_exception_type_reg);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

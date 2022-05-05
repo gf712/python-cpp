@@ -6,7 +6,7 @@
 
 using namespace py;
 
-PyResult JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &exception_type = vm.reg(m_exception_type_reg);
 	ASSERT(std::holds_alternative<PyObject *>(exception_type))
@@ -21,7 +21,7 @@ PyResult JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &inter
 		// skip exception handler body block
 		vm.jump_blocks(2);
 	}
-	return PyResult::Ok(py_none());
+	return Ok(Value{ py_none() });
 }
 
 std::vector<uint8_t> JumpIfNotExceptionMatch::serialize() const

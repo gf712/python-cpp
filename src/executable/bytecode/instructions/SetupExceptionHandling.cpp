@@ -3,10 +3,10 @@
 
 using namespace py;
 
-PyResult SetupExceptionHandling::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> SetupExceptionHandling::execute(VirtualMachine &vm, Interpreter &) const
 {
 	vm.set_exception_handling();
-	return PyResult::Ok(py_none());
+	return Ok(Value{ py_none() });
 }
 
 std::vector<uint8_t> SetupExceptionHandling::serialize() const

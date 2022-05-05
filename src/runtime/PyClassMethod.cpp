@@ -23,23 +23,23 @@ template<> const PyClassMethod *as(const PyObject *obj)
 	return nullptr;
 }
 
-PyResult PyClassMethod::__new__(const PyType *type, PyTuple *, PyDict *)
+PyResult<PyObject *> PyClassMethod::__new__(const PyType *type, PyTuple *, PyDict *)
 {
 	ASSERT(type == classmethod())
 
 	return PyClassMethod::create();
 }
 
-std::optional<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
+PyResult<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs || kwargs->map().empty())
 
 	auto callable = PyObject::from(args->elements()[0]);
-	ASSERT(callable.is_ok())
-	m_callable = callable.unwrap_as<PyObject>();
+	if (callable.is_err()) return Err(callable.unwrap_err());
+	m_callable = callable.unwrap();
 
-	return 0;
+	return Ok(0);
 }
 
 PyClassMethod::PyClassMethod() : PyBaseObject(BuiltinTypes::the().classmethod()) {}
@@ -49,18 +49,21 @@ std::string PyClassMethod::to_string() const
 	return fmt::format("<classmethod object at {}>", static_cast<const void *>(this));
 }
 
-PyResult PyClassMethod::create()
+PyResult<PyClassMethod *> PyClassMethod::create()
 {
 	auto *obj = VirtualMachine::the().heap().allocate<PyClassMethod>();
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyClassMethod))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyClassMethod))); }
+	return Ok(obj);
 }
 
-PyResult PyClassMethod::__repr__() const { return PyString::create(PyClassMethod::to_string()); }
-
-PyResult PyClassMethod::__get__(PyObject *instance, PyObject *owner) const
+PyResult<PyObject *> PyClassMethod::__repr__() const
 {
-	if (!m_callable) { return PyResult::Err(runtime_error("uninitalized classmethod object")); }
+	return PyString::create(PyClassMethod::to_string());
+}
+
+PyResult<PyObject *> PyClassMethod::__get__(PyObject *instance, PyObject *owner) const
+{
+	if (!m_callable) { return Err(runtime_error("uninitalized classmethod object")); }
 
 	if (!owner) { owner = instance->type(); }
 

@@ -52,6 +52,6 @@ class LLVMFunction : public ::Function
 
 	std::vector<uint8_t> serialize() const override { TODO(); }
 
-	py::PyResult call(VirtualMachine &, Interpreter &) const override;
+	py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const override;
 };
 }// namespace codegen

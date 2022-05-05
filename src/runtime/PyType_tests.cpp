@@ -16,7 +16,7 @@ TEST(PyType, ObjectClassParent)
 
 	auto mro_ = object()->mro();
 	ASSERT_TRUE(mro_.is_ok());
-	auto *mro = mro_.unwrap_as<PyList>();
+	auto *mro = mro_.unwrap();
 	ASSERT_TRUE(mro);
 	EXPECT_EQ(mro->elements().size(), 1);
 
@@ -28,17 +28,17 @@ TEST(PyType, ObjectClassParent)
 TEST(PyType, InheritanceTriangle)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *B1 = PyType::initialize(TypePrototype{
-		.__name__ = "B1", .__bases__ = PyTuple::create(object()).unwrap_as<PyTuple>() });
-	PyType *B2 = PyType::initialize(TypePrototype{
-		.__name__ = "B2", .__bases__ = PyTuple::create(object()).unwrap_as<PyTuple>() });
+	PyType *B1 = PyType::initialize(
+		TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(object()).unwrap() });
+	PyType *B2 = PyType::initialize(
+		TypePrototype{ .__name__ = "B2", .__bases__ = PyTuple::create(object()).unwrap() });
 
-	PyType *C = PyType::initialize(TypePrototype{
-		.__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap_as<PyTuple>() });
+	PyType *C = PyType::initialize(
+		TypePrototype{ .__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap() });
 
 	auto C_mro_ = C->mro();
 	ASSERT_TRUE(C_mro_.is_ok());
-	auto *C_mro = C_mro_.unwrap_as<PyList>();
+	auto *C_mro = C_mro_.unwrap();
 	ASSERT_TRUE(C_mro);
 	EXPECT_EQ(C_mro->elements().size(), 4);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[0]), C);
@@ -50,18 +50,18 @@ TEST(PyType, InheritanceTriangle)
 TEST(PyType, InheritanceDiamond)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *A = PyType::initialize(TypePrototype{
-		.__name__ = "A", .__bases__ = PyTuple::create(object()).unwrap_as<PyTuple>() });
+	PyType *A = PyType::initialize(
+		TypePrototype{ .__name__ = "A", .__bases__ = PyTuple::create(object()).unwrap() });
 	PyType *B1 = PyType::initialize(
-		TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(A).unwrap_as<PyTuple>() });
+		TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(A).unwrap() });
 	PyType *B2 = PyType::initialize(
-		TypePrototype{ .__name__ = "B2", .__bases__ = PyTuple::create(A).unwrap_as<PyTuple>() });
-	PyType *C = PyType::initialize(TypePrototype{
-		.__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap_as<PyTuple>() });
+		TypePrototype{ .__name__ = "B2", .__bases__ = PyTuple::create(A).unwrap() });
+	PyType *C = PyType::initialize(
+		TypePrototype{ .__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap() });
 
 	auto C_mro_ = C->mro();
 	ASSERT_TRUE(C_mro_.is_ok());
-	auto *C_mro = C_mro_.unwrap_as<PyList>();
+	auto *C_mro = C_mro_.unwrap();
 	ASSERT_TRUE(C_mro);
 	EXPECT_EQ(C_mro->elements().size(), 5);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[0]), C);

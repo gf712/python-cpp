@@ -22,18 +22,18 @@ PyBool::PyBool(bool name) : PyBaseObject(BuiltinTypes::the().bool_()), m_value(n
 
 std::string PyBool::to_string() const { return m_value ? "True" : "False"; }
 
-PyResult PyBool::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyBool::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyBool::__add__(const PyObject *) const { TODO(); }
+PyResult<PyObject *> PyBool::__add__(const PyObject *) const { TODO(); }
 
-PyResult PyBool::__bool__() const { return PyResult::Ok(m_value ? py_true() : py_false()); }
+PyResult<bool> PyBool::__bool__() const { return Ok(m_value); }
 
-PyResult PyBool::create(bool value)
+PyResult<PyBool *> PyBool::create(bool value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate_static<PyBool>(value).get();
 	ASSERT(result)
-	return PyResult::Ok(result);
+	return Ok(result);
 }
 
 PyType *PyBool::type() const { return py::bool_(); }
@@ -42,7 +42,7 @@ PyObject *py_true()
 {
 	static PyObject *value = nullptr;
 
-	if (!value) { value = PyBool::create(true).unwrap_as<PyBool>(); }
+	if (!value) { value = PyBool::create(true).unwrap(); }
 
 	return value;
 }
@@ -51,7 +51,7 @@ PyObject *py_false()
 {
 	static PyObject *value = nullptr;
 
-	if (!value) { value = PyBool::create(false).unwrap_as<PyBool>(); }
+	if (!value) { value = PyBool::create(false).unwrap(); }
 
 	return value;
 }

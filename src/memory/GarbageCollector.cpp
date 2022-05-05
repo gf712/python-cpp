@@ -12,7 +12,7 @@
 
 using namespace py;
 
-MarkSweepGC::MarkSweepGC() : m_frequency(1) {}
+MarkSweepGC::MarkSweepGC() : m_frequency(10000) {}
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {

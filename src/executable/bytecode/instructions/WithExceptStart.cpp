@@ -9,7 +9,7 @@
 
 using namespace py;
 
-PyResult WithExceptStart::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &exit_method = vm.reg(m_exit_method);
 
@@ -28,8 +28,9 @@ PyResult WithExceptStart::execute(VirtualMachine &vm, Interpreter &interpreter) 
 		}
 	}();
 
-	auto result = args_tuple.and_then<PyTuple>(
-		[exit_method_obj](auto *args) { return exit_method_obj->call(args, nullptr); });
+	if (args_tuple.is_err()) return Err(args_tuple.unwrap_err());
+
+	auto result = exit_method_obj->call(args_tuple.unwrap(), nullptr);
 
 	if (result.is_ok()) {
 		vm.reg(m_result) = result.unwrap();
@@ -37,7 +38,7 @@ PyResult WithExceptStart::execute(VirtualMachine &vm, Interpreter &interpreter) 
 		vm.reg(m_result) = py_false();
 	}
 
-	return PyResult::Ok(vm.reg(m_result));
+	return Ok(vm.reg(m_result));
 }
 
 std::vector<uint8_t> WithExceptStart::serialize() const { TODO(); }

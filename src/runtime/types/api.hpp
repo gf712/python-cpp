@@ -26,7 +26,7 @@ template<typename T> struct klass
 	{
 		auto bases_ = PyTuple::create(bases...);
 		if (bases_.is_err()) { TODO(); }
-		type->__bases__ = bases_.template unwrap_as<PyTuple>();
+		type->__bases__ = bases_.unwrap();
 	}
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
@@ -84,8 +84,8 @@ template<typename T> struct klass
 		F(static_cast<T *>(self), args, kwargs);
 	}
 	{
-		type->add_method(MethodDefinition{
-			std::string(name), [F](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult {
+		type->add_method(MethodDefinition{ std::string(name),
+			[F](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 				return F(static_cast<T *>(self), args, kwargs);
 			} });
 		return *this;
@@ -96,7 +96,7 @@ template<typename T> struct klass
 		auto *type_ = PyType::initialize(*type.release());
 		auto name = PyString::create(type_->name());
 		if (name.is_err()) { TODO(); }
-		m_module->insert(name.template unwrap_as<PyString>(), type_);
+		m_module->insert(name.unwrap(), type_);
 		return type_;
 	}
 };

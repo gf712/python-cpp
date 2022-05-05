@@ -31,25 +31,25 @@ PyDict::PyDict(const MapType &map) : PyBaseObject(BuiltinTypes::the().dict()), m
 
 PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
 
-PyResult PyDict::create()
+PyResult<PyDict *> PyDict::create()
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyDict>();
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyDict))); }
+	return Ok(result);
 }
 
-PyResult PyDict::create(MapType &&map)
+PyResult<PyDict *> PyDict::create(MapType &&map)
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyDict>(std::move(map));
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyDict))); }
+	return Ok(result);
 }
 
-PyResult PyDict::create(const MapType &map)
+PyResult<PyDict *> PyDict::create(const MapType &map)
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyDict>(map);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyDict))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyDict))); }
+	return Ok(result);
 }
 
 std::string PyDict::to_string() const
@@ -64,7 +64,7 @@ std::string PyDict::to_string() const
 		std::visit(overloaded{ [&os](PyObject *key) {
 								  auto r = key->repr();
 								  ASSERT(r.is_ok())
-								  os << r.unwrap_as<PyObject>()->to_string();
+								  os << r.unwrap()->to_string();
 							  },
 					   [&os](const auto &key) { os << key; } },
 			it->first);
@@ -75,7 +75,7 @@ std::string PyDict::to_string() const
 								  } else {
 									  auto r = value->repr();
 									  ASSERT(r.is_ok())
-									  os << r.unwrap_as<PyObject>()->to_string();
+									  os << r.unwrap()->to_string();
 								  }
 							  },
 					   [&os](const auto &value) { os << value; } },
@@ -87,7 +87,7 @@ std::string PyDict::to_string() const
 	std::visit(overloaded{ [&os](PyObject *key) {
 							  auto r = key->repr();
 							  ASSERT(r.is_ok())
-							  os << r.unwrap_as<PyObject>()->to_string() << ": ";
+							  os << r.unwrap()->to_string() << ": ";
 						  },
 				   [&os](const auto &key) { os << key << ": "; } },
 		it->first);
@@ -97,7 +97,7 @@ std::string PyDict::to_string() const
 							  } else {
 								  auto r = value->repr();
 								  ASSERT(r.is_ok())
-								  os << r.unwrap_as<PyObject>()->to_string();
+								  os << r.unwrap()->to_string();
 							  }
 						  },
 				   [&os](const auto &value) { os << value; } },
@@ -107,13 +107,13 @@ std::string PyDict::to_string() const
 	return os.str();
 }
 
-PyResult PyDict::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyDict::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyDict::__eq__(const PyObject *other) const
+PyResult<PyObject *> PyDict::__eq__(const PyObject *other) const
 {
-	if (!as<PyDict>(other)) { return PyResult::Ok(py_false()); }
+	if (!as<PyDict>(other)) { return Ok(py_false()); }
 
-	return PyResult::Ok(m_map == as<PyDict>(other)->map() ? py_true() : py_false());
+	return Ok(m_map == as<PyDict>(other)->map() ? py_true() : py_false());
 }
 
 PyDictItems *PyDict::items() const
@@ -132,14 +132,14 @@ Value PyDict::operator[](Value key) const
 
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
 
-PyResult PyDict::merge(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyDict::merge(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs || kwargs->map().empty())
 
 	auto other_dict_ = PyObject::from(args->elements()[0]);
 	if (other_dict_.is_err()) return other_dict_;
-	auto *other_dict = other_dict_.unwrap_as<PyObject>();
+	auto *other_dict = other_dict_.unwrap();
 	ASSERT(as<PyDict>(other_dict))
 
 	auto map_copy = as<PyDict>(other_dict)->map();
@@ -149,7 +149,7 @@ PyResult PyDict::merge(PyTuple *args, PyDict *kwargs)
 		TODO();
 	}
 
-	return PyResult::Ok(py_none());
+	return Ok(py_none());
 }
 
 
@@ -169,17 +169,17 @@ void PyDict::visit_graph(Visitor &visitor)
 
 PyType *PyDict::type() const { return ::dict(); }
 
-PyResult PyDict::get(PyObject *key, PyObject *default_value) const
+PyResult<PyObject *> PyDict::get(PyObject *key, PyObject *default_value) const
 {
 	if (auto it = m_map.find(key); it != m_map.end()) {
 		return PyObject::from(it->second);
 	} else if (default_value) {
-		return PyResult::Ok(default_value);
+		return Ok(default_value);
 	}
-	return PyResult::Ok(py_none());
+	return Ok(py_none());
 }
 
-PyResult PyDict::update(PyDict *other)
+PyResult<PyObject *> PyDict::update(PyDict *other)
 {
 	for (const auto &[key, value] : other->map()) {
 		if (auto it = m_map.find(key); it != m_map.end()) {
@@ -189,7 +189,7 @@ PyResult PyDict::update(PyDict *other)
 		}
 	}
 
-	return PyResult::Ok(py_none());
+	return Ok(py_none());
 }
 
 namespace {
@@ -198,37 +198,36 @@ std::once_flag dict_flag;
 
 std::unique_ptr<TypePrototype> register_dict()
 {
-	return std::move(klass<PyDict>("dict")
-						 .def(
-							 "get",
-							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-								 ASSERT(args)
-								 ASSERT(!kwargs || kwargs->size() == 0)
-								 auto key_ = PyObject::from(args->elements()[0]);
-								 if (key_.is_err()) return key_;
-								 PyObject *key = key_.unwrap_as<PyObject>();
-								 PyObject *default_value = nullptr;
-								 if (args->elements().size() == 2) {
-									 auto default_value_ = PyObject::from(args->elements()[1]);
-									 if (default_value_.is_err()) return default_value_;
-									 default_value = default_value_.unwrap_as<PyObject>();
-								 }
-								 return self->get(key, default_value);
-							 })
-						 .def(
-							 "update",
-							 +[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-								 ASSERT(args)
-								 ASSERT(!kwargs || kwargs->size() == 0)
-								 auto other_ = PyObject::from(args->elements()[0]);
-								 if (other_.is_err()) return other_;
-								 auto *other = other_.unwrap_as<PyObject>();
-								 if (other->type() != dict()) {
-									 return PyResult::Err(runtime_error("TODO"));
-								 }
-								 return self->update(as<PyDict>(other));
-							 })
-						 .type);
+	return std::move(
+		klass<PyDict>("dict")
+			.def(
+				"get",
+				+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
+					ASSERT(args)
+					ASSERT(!kwargs || kwargs->size() == 0)
+					auto key_ = PyObject::from(args->elements()[0]);
+					if (key_.is_err()) return key_;
+					PyObject *key = key_.unwrap();
+					PyObject *default_value = nullptr;
+					if (args->elements().size() == 2) {
+						auto default_value_ = PyObject::from(args->elements()[1]);
+						if (default_value_.is_err()) return default_value_;
+						default_value = default_value_.unwrap();
+					}
+					return self->get(key, default_value);
+				})
+			.def(
+				"update",
+				+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+					ASSERT(args)
+					ASSERT(!kwargs || kwargs->size() == 0)
+					auto other_ = PyObject::from(args->elements()[0]);
+					if (other_.is_err()) return other_;
+					auto *other = other_.unwrap();
+					if (other->type() != dict()) { return Err(runtime_error("TODO")); }
+					return self->update(as<PyDict>(other));
+				})
+			.type);
 }
 }// namespace
 
@@ -321,16 +320,16 @@ std::string PyDictItemsIterator::to_string() const
 	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
 }
 
-PyResult PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyDictItemsIterator::__next__()
+PyResult<PyObject *> PyDictItemsIterator::__next__()
 {
 	if (m_current_iterator != m_pydictitems.m_pydict.map().end()) {
 		auto [key, value] = *m_current_iterator;
 		m_current_iterator++;
 		return PyTuple::create(key, value);
 	}
-	return PyResult::Err(stop_iteration(""));
+	return Err(stop_iteration(""));
 }
 
 bool PyDictItemsIterator::operator==(const PyDictItemsIterator &other) const

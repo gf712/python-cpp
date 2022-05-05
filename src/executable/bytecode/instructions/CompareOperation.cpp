@@ -4,12 +4,12 @@
 
 using namespace py;
 
-PyResult CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &lhs = vm.reg(m_lhs);
 	const auto &rhs = vm.reg(m_rhs);
 
-	const auto result = [&]() -> PyResult {
+	const auto result = [&]() -> PyResult<Value> {
 		switch (m_comparisson) {
 		case Comparisson::Eq: {
 			return equals(lhs, rhs, interpreter);
@@ -30,43 +30,31 @@ PyResult CompareOperation::execute(VirtualMachine &vm, Interpreter &interpreter)
 			return greater_than_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Is: {
-			return is(lhs, rhs, interpreter);
+			if (auto result = is(lhs, rhs, interpreter); result.is_ok()) {
+				return Ok(Value{ NameConstant{ result.unwrap() } });
+			} else {
+				return Err(result.unwrap_err());
+			}
 		} break;
 		case Comparisson::IsNot: {
 			if (auto result = is(lhs, rhs, interpreter); result.is_ok()) {
-				if (std::holds_alternative<NameConstant>(result.unwrap())) {
-					ASSERT(
-						std::holds_alternative<bool>(std::get<NameConstant>(result.unwrap()).value))
-					return PyResult::Ok(NameConstant{
-						!std::get<bool>(std::get<NameConstant>(result.unwrap()).value) });
-				} else if (std::holds_alternative<PyObject *>(result.unwrap())) {
-					return PyResult::Ok(
-						result.unwrap_as<PyObject>() == py_false() ? py_true() : py_false());
-				} else {
-					TODO();
-				}
+				return Ok(Value{ NameConstant{ !result.unwrap() } });
 			} else {
-				return result;
+				return Err(result.unwrap_err());
 			}
 		} break;
 		case Comparisson::In: {
-			return in(lhs, rhs, interpreter);
+			if (auto result = in(lhs, rhs, interpreter); result.is_ok()) {
+				return Ok(Value{ NameConstant{ result.unwrap() } });
+			} else {
+				return Err(result.unwrap_err());
+			}
 		} break;
 		case Comparisson::NotIn: {
 			if (auto result = in(lhs, rhs, interpreter); result.is_ok()) {
-				if (std::holds_alternative<NameConstant>(result.unwrap())) {
-					ASSERT(
-						std::holds_alternative<bool>(std::get<NameConstant>(result.unwrap()).value))
-					return PyResult::Ok(NameConstant{
-						!std::get<bool>(std::get<NameConstant>(result.unwrap()).value) });
-				} else if (std::holds_alternative<PyObject *>(result.unwrap())) {
-					return PyResult::Ok(
-						result.unwrap_as<PyObject>() == py_false() ? py_true() : py_false());
-				} else {
-					TODO();
-				}
+				return Ok(Value{ NameConstant{ !result.unwrap() } });
 			} else {
-				return result;
+				return Err(result.unwrap_err());
 			}
 		} break;
 		}

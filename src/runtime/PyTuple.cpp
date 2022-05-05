@@ -48,25 +48,25 @@ PyTuple::PyTuple() : PyTuple(std::vector<Value>{}) {}
 
 PyTuple::PyTuple(const std::vector<PyObject *> &elements) : PyTuple(make_value_vector(elements)) {}
 
-PyResult PyTuple::create()
+PyResult<PyTuple *> PyTuple::create()
 {
 	auto &heap = VirtualMachine::the().heap();
-	if (auto *obj = heap.allocate<PyTuple>()) { return PyResult::Ok(obj); }
-	return PyResult::Err(memory_error(sizeof(PyTuple)));
+	if (auto *obj = heap.allocate<PyTuple>()) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
 }
 
-PyResult PyTuple::create(std::vector<Value> &&elements)
+PyResult<PyTuple *> PyTuple::create(std::vector<Value> &&elements)
 {
 	auto &heap = VirtualMachine::the().heap();
-	if (auto *obj = heap.allocate<PyTuple>(std::move(elements))) { return PyResult::Ok(obj); }
-	return PyResult::Err(memory_error(sizeof(PyTuple)));
+	if (auto *obj = heap.allocate<PyTuple>(std::move(elements))) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
 }
 
-PyResult PyTuple::create(const std::vector<PyObject *> &elements)
+PyResult<PyTuple *> PyTuple::create(const std::vector<PyObject *> &elements)
 {
 	auto &heap = VirtualMachine::the().heap();
-	if (auto *obj = heap.allocate<PyTuple>(elements)) { return PyResult::Ok(obj); }
-	return PyResult::Err(memory_error(sizeof(PyTuple)));
+	if (auto *obj = heap.allocate<PyTuple>(elements)) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
 }
 
 std::string PyTuple::to_string() const
@@ -81,7 +81,7 @@ std::string PyTuple::to_string() const
 						   [&os](PyObject *value) {
 							   auto r = value->repr();
 							   ASSERT(r.is_ok())
-							   os << r.unwrap_as<PyObject>()->to_string();
+							   os << r.unwrap()->to_string();
 						   } },
 				*it);
 			std::advance(it, 1);
@@ -91,7 +91,7 @@ std::string PyTuple::to_string() const
 					   [&os](PyObject *value) {
 						   auto r = value->repr();
 						   ASSERT(r.is_ok())
-						   os << r.unwrap_as<PyObject>()->to_string();
+						   os << r.unwrap()->to_string();
 					   } },
 			*it);
 	}
@@ -101,27 +101,27 @@ std::string PyTuple::to_string() const
 	return os.str();
 }
 
-PyResult PyTuple::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyTuple::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyTuple::__iter__() const
+PyResult<PyObject *> PyTuple::__iter__() const
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *obj = heap.allocate<PyTupleIterator>(*this);
-	if (!obj) return PyResult::Err(memory_error(sizeof(PyTupleIterator)));
-	return PyResult::Ok(obj);
+	if (!obj) return Err(memory_error(sizeof(PyTupleIterator)));
+	return Ok(obj);
 }
 
-PyResult PyTuple::__len__() const { return PyInteger::create(m_elements.size()); }
+PyResult<size_t> PyTuple::__len__() const { return Ok(m_elements.size()); }
 
-PyResult PyTuple::__eq__(const PyObject *other) const
+PyResult<PyObject *> PyTuple::__eq__(const PyObject *other) const
 {
-	if (!as<PyTuple>(other)) { return PyResult::Ok(py_false()); }
+	if (!as<PyTuple>(other)) { return Ok(py_false()); }
 
 	auto *other_tuple = as<PyTuple>(other);
 	// Value contains PyObject* so we can't just compare vectors with std::vector::operator==
 	// otherwise if we compare PyObject* with PyObject* we compare the pointers, rather
 	// than PyObject::__eq__(const PyObject*)
-	if (m_elements.size() != other_tuple->elements().size()) { return PyResult::Ok(py_false()); }
+	if (m_elements.size() != other_tuple->elements().size()) { return Ok(py_false()); }
 	auto &interpreter = VirtualMachine::the().interpreter();
 	const bool result = std::equal(m_elements.begin(),
 		m_elements.end(),
@@ -131,23 +131,16 @@ PyResult PyTuple::__eq__(const PyObject *other) const
 			ASSERT(result.is_ok())
 			auto is_true = truthy(result.unwrap(), interpreter);
 			ASSERT(is_true.is_ok())
-			if (std::holds_alternative<NameConstant>(is_true.unwrap())) {
-				ASSERT(std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value))
-				return std::holds_alternative<bool>(std::get<NameConstant>(is_true.unwrap()).value);
-			} else if (std::holds_alternative<PyObject *>(is_true.unwrap())) {
-				return is_true.template unwrap_as<PyObject>() == py_true();
-			} else {
-				TODO();
-			}
+			return is_true.unwrap();
 		});
-	return PyResult::Ok(result ? py_true() : py_false());
+	return Ok(result ? py_true() : py_false());
 }
 
 PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
 
 PyTupleIterator PyTuple::end() const { return PyTupleIterator(*this, m_elements.size()); }
 
-PyResult PyTuple::operator[](size_t idx) const
+PyResult<PyObject *> PyTuple::operator[](size_t idx) const
 {
 	return std::visit([](const auto &value) { return PyObject::from(value); }, m_elements[idx]);
 }
@@ -196,14 +189,14 @@ std::string PyTupleIterator::to_string() const
 	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
 }
 
-PyResult PyTupleIterator::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyTupleIterator::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyTupleIterator::__next__()
+PyResult<PyObject *> PyTupleIterator::__next__()
 {
 	if (m_current_index < m_pytuple.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pytuple.elements()[m_current_index++]);
-	return PyResult::Err(stop_iteration(""));
+	return Err(stop_iteration(""));
 }
 
 bool PyTupleIterator::operator==(const PyTupleIterator &other) const
@@ -223,7 +216,7 @@ PyTupleIterator &PyTupleIterator::operator--()
 	return *this;
 }
 
-PyResult PyTupleIterator::operator*() const
+PyResult<PyObject *> PyTupleIterator::operator*() const
 {
 	return std::visit([](const auto &element) { return PyObject::from(element); },
 		m_pytuple.elements()[m_current_index]);

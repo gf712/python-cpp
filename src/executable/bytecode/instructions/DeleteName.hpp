@@ -11,7 +11,7 @@ class DeleteName final : public Instruction
 
 	std::string to_string() const final { return fmt::format("DELETE_NAME     r{:<3}", m_name); }
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

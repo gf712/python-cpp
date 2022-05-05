@@ -44,7 +44,7 @@ PyCode::PyCode(std::unique_ptr<Function> &&function,
 	  m_nlocals(nlocals), m_consts(consts), m_flags(flags)
 {}
 
-PyResult PyCode::create(std::unique_ptr<Function> &&function,
+PyResult<PyCode *> PyCode::create(std::unique_ptr<Function> &&function,
 	std::vector<std::string> cellvars,
 	std::vector<std::string> varnames,
 	std::vector<std::string> freevars,
@@ -71,8 +71,8 @@ PyResult PyCode::create(std::unique_ptr<Function> &&function,
 		nlocals,
 		consts,
 		flags);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyCode))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyCode))); }
+	return Ok(result);
 }
 
 PyCode::~PyCode() {}
@@ -125,7 +125,7 @@ std::vector<uint8_t> PyCode::serialize() const
 	return result;
 }
 
-std::pair<PyResult, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer)
+std::pair<PyResult<PyCode *>, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer)
 {
 	size_t serialized_function_size{ 0 };
 	for (size_t i = 0; i < sizeof(size_t); ++i) {
@@ -146,7 +146,7 @@ std::pair<PyResult, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 	const auto cell2arg = ::py::deserialize<std::vector<size_t>>(buffer);
 	const auto nlocals = ::py::deserialize<size_t>(buffer);
 	const auto consts = ::py::deserialize<PyTuple>(buffer);
-	if (consts.is_err()) { return { consts, 0 }; }
+	if (consts.is_err()) { return { Err(consts.unwrap_err()), 0 }; }
 	const auto flags = ::py::deserialize<uint8_t>(buffer);
 
 	return { PyCode::create(std::move(function),
@@ -160,7 +160,7 @@ std::pair<PyResult, size_t> PyCode::deserialize(std::span<const uint8_t> &buffer
 				 kwonly_arg_count,
 				 cell2arg,
 				 nlocals,
-				 consts.unwrap_as<PyTuple>(),
+				 consts.unwrap(),
 				 CodeFlags::from_byte(flags)),
 		0 };
 }

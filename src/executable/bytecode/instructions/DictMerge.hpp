@@ -18,7 +18,7 @@ class DictMerge final : public Instruction
 		return fmt::format("DICT_MERGE      r{:<3} r{:<3}", m_this_dict, m_other_dict);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -15,9 +15,9 @@ std::string PyLLVMFunction::to_string() const
 	return fmt::format("LLVM JIT function {} at {}", m_name, (void *)this);
 }
 
-PyResult PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs) { return (*this)(args, kwargs); }
+PyResult<PyObject*> PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs) { return (*this)(args, kwargs); }
 
-PyResult PyLLVMFunction::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject*> PyLLVMFunction::__repr__() const { return PyString::create(to_string()); }
 
 void PyLLVMFunction::visit_graph(Visitor &visitor)
 {

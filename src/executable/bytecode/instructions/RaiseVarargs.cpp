@@ -7,7 +7,7 @@
 
 using namespace py;
 
-PyResult RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 {
 	if (m_cause.has_value()) {
 		ASSERT(m_exception.has_value())
@@ -22,15 +22,15 @@ PyResult RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 		if (as<PyType>(exception_obj)) {
 			TODO();
 		} else if (!exception_obj->type()->issubclass(BaseException::static_type())) {
-			return PyResult::Err(type_error("exceptions must derive from BaseException"));
+			return Err(type_error("exceptions must derive from BaseException"));
 		}
-		return PyResult::Err(static_cast<BaseException*>(exception_obj));
+		return Err(static_cast<BaseException *>(exception_obj));
 	} else {
 		// reraise
 		TODO();
 	}
 	TODO();
-	return PyResult::Err(nullptr);
+	return Err(nullptr);
 }
 
 std::vector<uint8_t> RaiseVarargs::serialize() const

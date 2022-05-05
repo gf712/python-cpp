@@ -3,13 +3,13 @@
 
 using namespace py;
 
-PyResult StoreDeref::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> StoreDeref::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	ASSERT(interpreter.execution_frame()->freevars().size() > m_dst)
 	auto result = PyCell::create(vm.reg(m_src));
-	if (result.is_err()) { return result; }
-	interpreter.execution_frame()->freevars()[m_dst] = result.unwrap_as<PyCell>();
-	return result;
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+	interpreter.execution_frame()->freevars()[m_dst] = result.unwrap();
+	return Ok(Value{ result.unwrap() });
 }
 
 std::vector<uint8_t> StoreDeref::serialize() const

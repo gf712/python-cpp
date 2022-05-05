@@ -11,11 +11,15 @@ AssertionError::AssertionError(PyTuple *args)
 	: Exception(s_assertion_error->underlying_type(), args)
 {}
 
-PyResult AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_assertion_error)
 	ASSERT(!kwargs || kwargs->map().empty())
-	return AssertionError::create(args);
+	if (auto result = AssertionError::create(args); result.is_ok()) {
+		return Ok(static_cast<PyObject *>(result.unwrap()));
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 PyType *AssertionError::type() const
@@ -30,10 +34,7 @@ PyType *AssertionError::this_type()
 	return s_assertion_error;
 }
 
-std::string AssertionError::to_string() const
-{
-	return what();
-}
+std::string AssertionError::to_string() const { return what(); }
 
 PyType *AssertionError::register_type(PyModule *module)
 {

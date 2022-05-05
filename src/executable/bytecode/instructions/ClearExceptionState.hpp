@@ -8,7 +8,7 @@ class ClearExceptionState final : public Instruction
 	ClearExceptionState() = default;
 	std::string to_string() const final { return fmt::format("CLEAR_EXC"); }
 
-	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -15,9 +15,9 @@ class PyRange : public PyBaseObject
   public:
 	std::string to_string() const override;
 
-	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
-	PyResult __repr__() const;
-	PyResult __iter__() const;
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __iter__() const;
 
 	int64_t start() const { return m_start; }
 	int64_t stop() const { return m_stop; }
@@ -45,8 +45,8 @@ class PyRangeIterator : public PyBaseObject
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __next__();
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __next__();
 
 	static std::unique_ptr<TypePrototype> register_type();
 

@@ -2,11 +2,11 @@
 
 using namespace py;
 
-PyResult DeleteName::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value>DeleteName::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto obj = vm.reg(m_name);
 	TODO();
-	return PyResult::Err(nullptr);
+	return Err(nullptr);
 }
 
 std::vector<uint8_t> DeleteName::serialize() const

@@ -14,8 +14,8 @@ class PyEllipsis : public PyBaseObject
   public:
 	std::string to_string() const override { return fmt::format("PyEllipsis"); }
 
-	PyResult __add__(const PyObject *obj) const;
-	PyResult __repr__() const;
+	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __repr__() const;
 
 	const Ellipsis &value() const { return m_value; }
 
@@ -23,7 +23,7 @@ class PyEllipsis : public PyBaseObject
 	PyType *type() const override;
 
   private:
-	static PyResult create();
+	static PyResult<PyEllipsis *> create();
 	PyEllipsis();
 };
 

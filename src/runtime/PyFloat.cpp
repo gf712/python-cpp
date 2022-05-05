@@ -20,12 +20,12 @@ template<> const PyFloat *as(const PyObject *obj)
 
 PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
 
-PyResult PyFloat::create(double value)
+PyResult<PyFloat *> PyFloat::create(double value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *obj = heap.allocate<PyFloat>(value);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyFloat))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyFloat))); }
+	return Ok(obj);
 }
 
 PyType *PyFloat::type() const { return float_(); }

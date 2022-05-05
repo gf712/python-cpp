@@ -26,12 +26,12 @@ template<> const RuntimeError *as(const PyObject *obj)
 
 RuntimeError::RuntimeError(PyTuple *args) : Exception(s_runtime_error->underlying_type(), args) {}
 
-PyResult RuntimeError::create(PyTuple *args)
+PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *obj = heap.allocate<RuntimeError>(args);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(RuntimeError))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(RuntimeError))); }
+	return Ok(obj);
 }
 
 PyType *RuntimeError::type() const

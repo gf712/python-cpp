@@ -17,7 +17,7 @@ class JumpIfTrue final : public Instruction
 		return fmt::format("JUMP_IF_TRUE    position: {}", m_label->position());
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final;
 

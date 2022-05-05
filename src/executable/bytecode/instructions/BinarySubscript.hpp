@@ -18,7 +18,7 @@ class BinarySubscript final : public Instruction
 		return fmt::format("BINARY_SUBSCR   r{:<3} r{:<3} r{:<3}", m_dst, m_src, m_index);
 	}
 
-	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

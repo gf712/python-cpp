@@ -18,7 +18,7 @@ class WithExceptStart final : public Instruction
 		return fmt::format("WITH_EXCEPT_START r{:<3} r{:<3}", m_result, m_exit_method);
 	}
 
-	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

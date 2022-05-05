@@ -33,9 +33,9 @@ inline BaseException *type_error(const std::string &message, Args &&... args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())
-	auto args_tuple = PyTuple::create(msg.template unwrap_as<PyString>());
+	auto args_tuple = PyTuple::create(msg.unwrap());
 	ASSERT(args_tuple.is_ok())
-	return TypeError::create(args_tuple.template unwrap_as<PyTuple>());
+	return TypeError::create(args_tuple.unwrap());
 }
 
 }// namespace py

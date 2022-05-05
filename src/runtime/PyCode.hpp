@@ -40,7 +40,7 @@ class PyCode : public PyBaseObject
   public:
 	~PyCode();
 
-	static PyResult create(std::unique_ptr<Function> &&function,
+	static PyResult<PyCode *> create(std::unique_ptr<Function> &&function,
 		std::vector<std::string> cellvars,
 		std::vector<std::string> varnames,
 		std::vector<std::string> freevars,
@@ -77,7 +77,7 @@ class PyCode : public PyBaseObject
 
 	std::vector<uint8_t> serialize() const;
 
-	static std::pair<PyResult, size_t> deserialize(std::span<const uint8_t> &);
+	static std::pair<PyResult<PyCode *>, size_t> deserialize(std::span<const uint8_t> &);
 };
 
 }// namespace py

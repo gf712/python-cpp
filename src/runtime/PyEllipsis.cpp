@@ -9,17 +9,17 @@ using namespace py;
 
 PyEllipsis::PyEllipsis() : PyBaseObject(BuiltinTypes::the().ellipsis()) {}
 
-PyResult PyEllipsis::create()
+PyResult<PyEllipsis *> PyEllipsis::create()
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *obj = heap.allocate_static<PyEllipsis>().get();
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyEllipsis))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyEllipsis))); }
+	return Ok(obj);
 }
 
-PyResult PyEllipsis::__add__(const PyObject *) const { TODO(); }
+PyResult<PyObject *> PyEllipsis::__add__(const PyObject *) const { TODO(); }
 
-PyResult PyEllipsis::__repr__() const { return PyString::create("Ellipsis"); }
+PyResult<PyObject *> PyEllipsis::__repr__() const { return PyString::create("Ellipsis"); }
 
 PyType *PyEllipsis::type() const { return ellipsis(); }
 
@@ -29,7 +29,7 @@ PyObject *py::py_ellipsis()
 	if (!ellipsis) {
 		auto obj = PyEllipsis::create();
 		ASSERT(obj.is_ok())
-		ellipsis = obj.unwrap_as<PyObject>();
+		ellipsis = obj.unwrap();
 	}
 	return ellipsis;
 }

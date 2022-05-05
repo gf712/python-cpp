@@ -36,26 +36,30 @@ BaseException::BaseException(const TypePrototype &type, PyTuple *args)
 	: PyBaseObject(type), m_args(args)
 {}
 
-PyResult BaseException::create(PyTuple *args)
+PyResult<BaseException *> BaseException::create(PyTuple *args)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<BaseException>(args);
-	if (!result) { return PyResult::Err(memory_error(sizeof(BaseException))); }
-	return PyResult::Ok(static_cast<PyObject *>(result));
+	if (!result) { return Err(memory_error(sizeof(BaseException))); }
+	return Ok(result);
 }
 
-PyResult BaseException::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> BaseException::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_base_exception_type)
 	ASSERT(!kwargs || kwargs->map().empty())
-	return BaseException::create(args);
+	if (auto result = BaseException::create(args); result.is_ok()) {
+		return Ok(static_cast<PyObject *>(result.unwrap()));
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
-std::optional<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
+PyResult<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(!kwargs || kwargs->map().empty())// takes no keyword arguments
 	m_args = args;
-	return 0;
+	return Ok(0);
 }
 
 PyType *BaseException::type() const
@@ -85,7 +89,7 @@ std::string BaseException::to_string() const
 		if (m_args->size() == 1) {
 			auto obj_ = PyObject::from(m_args->elements()[0]);
 			ASSERT(obj_.is_ok())
-			return obj_.unwrap_as<PyObject>()->to_string();
+			return obj_.unwrap()->to_string();
 		} else {
 			return m_args->to_string();
 		}
@@ -108,9 +112,14 @@ std::string BaseException::format_traceback() const
 	return out.str();
 }
 
-PyResult BaseException::__repr__() const
+PyResult<PyObject *> BaseException::__repr__() const
 {
-	return PyString::create(fmt::format("{}({})", m_type_prototype.__name__, what()));
+	if (auto result = PyString::create(fmt::format("{}({})", m_type_prototype.__name__, what()));
+		result.is_ok()) {
+		return Ok(static_cast<PyObject *>(result.unwrap()));
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 PyType *BaseException::register_type(PyModule *module)

@@ -11,7 +11,7 @@
 
 using namespace py;
 
-PyResult MethodCall::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &maybe_self = vm.reg(m_caller);
 	auto *obj = std::get<PyObject *>(maybe_self);
@@ -21,14 +21,15 @@ PyResult MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }
 
 	auto args_tuple = PyTuple::create(args);
-	if (args_tuple.is_err()) { return args_tuple; }
+	if (args_tuple.is_err()) { return Err(args_tuple.unwrap_err()); }
 
 	// FIXME: process kwargs
 	PyDict *kwargs = nullptr;
 
-	auto result = obj->call(args_tuple.unwrap_as<PyTuple>(), kwargs);
-	if (result.is_ok()) { vm.reg(0) = result.unwrap(); }
-	return result;
+	auto result = obj->call(args_tuple.unwrap(), kwargs);
+	if (result.is_err()) return Err(result.unwrap_err());
+	vm.reg(0) = result.unwrap();
+	return Ok(Value{ result.unwrap() });
 }
 
 std::vector<uint8_t> MethodCall::serialize() const

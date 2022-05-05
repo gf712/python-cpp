@@ -24,27 +24,27 @@ class PyDict : public PyBaseObject
 	PyDict();
 
   public:
-	static PyResult create();
-	static PyResult create(MapType &&map);
-	static PyResult create(const MapType &map);
+	static PyResult<PyDict *> create();
+	static PyResult<PyDict *> create(MapType &&map);
+	static PyResult<PyDict *> create(const MapType &map);
 
 	PyDictItems *items() const;
 
 	size_t size() const { return m_map.size(); }
 
 	std::string to_string() const override;
-	PyResult __repr__() const;
-	PyResult __eq__(const PyObject *other) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
 	const MapType &map() const { return m_map; }
 
 	void insert(const Value &key, const Value &value);
-	PyResult merge(PyTuple *args, PyDict *kwargs);
-	PyResult update(PyDict *other);
+	PyResult<PyObject *> merge(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> update(PyDict *other);
 
 	Value operator[](Value key) const;
 
-	PyResult get(PyObject *, PyObject *) const;
+	PyResult<PyObject *> get(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &) override;
 
@@ -95,8 +95,8 @@ class PyDictItemsIterator : public PyBaseObject
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __next__();
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __next__();
 
 	bool operator==(const PyDictItemsIterator &) const;
 	value_type operator*() const;

@@ -20,7 +20,7 @@ class LoadDeref final : public Instruction
 			"LOAD_DEREF      r{:<3} f{:<3} \"{}\"", m_destination, m_source, m_object_name);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

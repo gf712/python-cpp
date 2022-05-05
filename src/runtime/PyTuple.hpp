@@ -21,20 +21,20 @@ class PyTuple : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
   public:
-	static PyResult create();
-	static PyResult create(std::vector<Value> &&elements);
-	static PyResult create(const std::vector<PyObject *> &elements);
-	template<typename... Args> static PyResult create(Args &&... args)
+	static PyResult<PyTuple *> create();
+	static PyResult<PyTuple *> create(std::vector<Value> &&elements);
+	static PyResult<PyTuple *> create(const std::vector<PyObject *> &elements);
+	template<typename... Args> static PyResult<PyTuple *> create(Args &&... args)
 	{
 		return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... });
 	}
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __iter__() const;
-	PyResult __len__() const;
-	PyResult __eq__(const PyObject *other) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __iter__() const;
+	PyResult<size_t> __len__() const;
+	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;
@@ -44,7 +44,7 @@ class PyTuple : public PyBaseObject
 
 	const std::vector<Value> &elements() const { return m_elements; }
 	size_t size() const { return m_elements.size(); }
-	PyResult operator[](size_t idx) const;
+	PyResult<PyObject *> operator[](size_t idx) const;
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
@@ -76,11 +76,11 @@ class PyTupleIterator : public PyBaseObject
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __next__();
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __next__();
 
 	bool operator==(const PyTupleIterator &) const;
-	PyResult operator*() const;
+	PyResult<PyObject *> operator*() const;
 	PyTupleIterator &operator++();
 	PyTupleIterator &operator--();
 

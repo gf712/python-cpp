@@ -18,7 +18,7 @@ class PyMemberDescriptor : public PyBaseObject
 		std::function<PyObject *(PyObject *)> member);
 
   public:
-	static PyResult create(PyString *name,
+	static PyResult<PyMemberDescriptor *> create(PyString *name,
 		PyType *underlying_type,
 		std::function<PyObject *(PyObject *)> member);
 
@@ -26,8 +26,8 @@ class PyMemberDescriptor : public PyBaseObject
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __get__(PyObject *, PyObject *) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __get__(PyObject *, PyObject *) const;
 
 	void visit_graph(Visitor &visitor) override;
 

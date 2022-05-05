@@ -17,18 +17,18 @@ class AssertionError : public Exception
   private:
 	AssertionError(PyTuple *args);
 
-	static PyResult create(PyTuple *args)
+	static PyResult<AssertionError *> create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		auto result = heap.allocate<AssertionError>(args);
-		if (!result) { return PyResult::Err(memory_error(sizeof(AssertionError))); }
-		return PyResult::Ok(result);
+		if (!result) { return Err(memory_error(sizeof(AssertionError))); }
+		return Ok(result);
 	}
 
   public:
 	static PyType *register_type(PyModule *);
 
-	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	PyType *type() const override;
 
@@ -42,6 +42,6 @@ inline BaseException *assertion_error(const std::string &message, Args &&... arg
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));
-	return AssertionError::create(args_tuple).template unwrap_as<AssertionError>();
+	return AssertionError::create(args_tuple).unwrap();
 }
 }// namespace py

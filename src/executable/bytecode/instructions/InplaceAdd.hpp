@@ -16,7 +16,7 @@ class InplaceAdd : public Instruction
 		return fmt::format("INPLACE_ADD     r{:<3} r{:<3}", m_lhs, m_rhs);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final
 	{
 		auto &lhs = vm.reg(m_lhs);
 		const auto &rhs = vm.reg(m_rhs);

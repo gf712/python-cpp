@@ -3,35 +3,35 @@
 
 using namespace py;
 
-PyResult JumpIfTrueOrPop::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> JumpIfTrueOrPop::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
 	const auto test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult {
+		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult<bool> {
 								  ASSERT(obj)
 								  return obj->bool_();
 							  },
-					   [](const auto &) -> PyResult {
+					   [](const auto &) -> PyResult<bool> {
 						   TODO();
-						   return PyResult::Ok(py_false());
+						   return Ok(false);
 					   },
-					   [](const NameConstant &value) -> PyResult {
+					   [](const NameConstant &value) -> PyResult<bool> {
 						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return PyResult::Ok(*bool_type ? py_true() : py_false());
+							   return Ok(*bool_type);
 						   } else {
-							   return PyResult::Ok(py_false());
+							   return Ok(false);
 						   }
 					   } },
 			result);
 
-	if (test_result.is_err()) { return test_result; }
-	if (test_result.unwrap_as<PyObject>() == py_true()) {
+	if (test_result.is_err()) { return Err(test_result.unwrap_err()); }
+	if (test_result.unwrap()) {
 		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
-	vm.reg(m_result_register) = test_result.unwrap();
-	return test_result;
+	vm.reg(m_result_register) = NameConstant{ test_result.unwrap() };
+	return Ok(Value{ NameConstant{ test_result.unwrap() } });
 }
 
 void JumpIfTrueOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)

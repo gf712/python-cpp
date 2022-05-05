@@ -4,11 +4,11 @@
 using namespace py;
 
 
-PyResult ClearExceptionState::execute(VirtualMachine &, Interpreter &interpreter) const
+PyResult<Value> ClearExceptionState::execute(VirtualMachine &, Interpreter &interpreter) const
 {
 	interpreter.execution_frame()->pop_exception();
 
-	return PyResult::Ok(py_none());
+	return Ok(Value{ py_none() });
 }
 
 std::vector<uint8_t> ClearExceptionState::serialize() const { return { CLEAR_EXCEPTION_STATE }; }

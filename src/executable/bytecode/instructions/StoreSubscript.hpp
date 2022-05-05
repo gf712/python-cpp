@@ -19,7 +19,7 @@ class StoreSubscript final : public Instruction
 		return fmt::format("STORE_SUBSCRIPT r{:<3} r{:<3} r{:<3}", m_obj, m_slice, m_src);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

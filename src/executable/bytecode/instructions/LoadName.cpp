@@ -4,13 +4,13 @@
 
 using namespace py;
 
-PyResult LoadName::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> LoadName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	if (auto result = interpreter.get_object(m_object_name); result.is_ok()) {
 		vm.reg(m_destination) = result.unwrap();
-		return result;
+		return Ok(Value{ result.unwrap() });
 	} else {
-		return result;
+		return Err(result.unwrap_err());
 	}
 }
 

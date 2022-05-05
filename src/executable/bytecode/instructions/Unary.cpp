@@ -5,61 +5,73 @@
 using namespace py;
 
 namespace {
-PyResult unary_positive(const Value &val)
+PyResult<Value> unary_positive(const Value &val)
 {
 	return std::visit(
-		overloaded{ [](const Number &val) -> PyResult { return PyResult::Ok(val); },
-			[](const String &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary +: 'str'"));
+		overloaded{ [](const Number &val) -> PyResult<Value> { return Ok(Value{ val }); },
+			[](const String &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary +: 'str'"));
 			},
-			[](const Bytes &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary +: 'bytes'"));
+			[](const Bytes &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary +: 'bytes'"));
 			},
-			[](const Ellipsis &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary +: 'ellipsis'"));
+			[](const Ellipsis &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary +: 'ellipsis'"));
 			},
-			[](const NameConstant &c) -> PyResult {
+			[](const NameConstant &c) -> PyResult<Value> {
 				if (std::holds_alternative<NoneType>(c.value)) {
-					return PyResult::Err(type_error("bad operand type for unary +: 'NoneType'"));
+					return Err(type_error("bad operand type for unary +: 'NoneType'"));
 				}
-				return PyResult::Ok(c);
+				return Ok(Value{ c });
 			},
-			[](PyObject *obj) -> PyResult { return obj->pos(); } },
+			[](PyObject *obj) -> PyResult<Value> {
+				if (auto r = obj->pos(); r.is_ok()) {
+					return Ok(Value{ r.unwrap() });
+				} else {
+					return Err(r.unwrap_err());
+				}
+			} },
 		val);
 }
 
-PyResult unary_negative(const Value &val)
+PyResult<Value> unary_negative(const Value &val)
 {
 	return std::visit(
-		overloaded{ [](const Number &val) -> PyResult {
-					   return PyResult::Ok(
-						   std::visit([](const auto &v) { return Number{ -v }; }, val.value));
+		overloaded{ [](const Number &val) -> PyResult<Value> {
+					   return Ok(std::visit(
+						   [](const auto &v) { return Value{ Number{ -v } }; }, val.value));
 				   },
-			[](const String &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary -: 'str'"));
+			[](const String &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary -: 'str'"));
 			},
-			[](const Bytes &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary -: 'bytes'"));
+			[](const Bytes &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary -: 'bytes'"));
 			},
-			[](const Ellipsis &) -> PyResult {
-				return PyResult::Err(type_error("bad operand type for unary -: 'ellipsis'"));
+			[](const Ellipsis &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary -: 'ellipsis'"));
 			},
-			[](const NameConstant &c) -> PyResult {
+			[](const NameConstant &c) -> PyResult<Value> {
 				if (std::holds_alternative<NoneType>(c.value)) {
-					return PyResult::Err(type_error("bad operand type for unary -: 'NoneType'"));
+					return Err(type_error("bad operand type for unary -: 'NoneType'"));
 				}
-				if (std::get<bool>(c.value)) { return PyResult::Ok(Number{ int64_t{ -1 } }); }
-				return PyResult::Ok(Number{ int64_t{ 0 } });
+				if (std::get<bool>(c.value)) { return Ok(Value{ Number{ int64_t{ -1 } } }); }
+				return Ok(Value{ Number{ int64_t{ 0 } } });
 			},
-			[](PyObject *obj) -> PyResult { return obj->neg(); } },
+			[](PyObject *obj) -> PyResult<Value> {
+				if (auto r = obj->neg(); r.is_ok()) {
+					return Ok(Value{ r.unwrap() });
+				} else {
+					return Err(r.unwrap_err());
+				}
+			} },
 		val);
 }
 }// namespace
 
-PyResult Unary::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &val = vm.reg(m_source);
-	auto result = [&]() -> PyResult {
+	auto result = [&]() -> PyResult<Value> {
 		switch (m_operation) {
 		case Operation::POSITIVE: {
 			return unary_positive(val);

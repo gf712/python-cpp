@@ -21,19 +21,19 @@ template<> const PyCell *as(const PyObject *obj)
 PyCell::PyCell(const Value &content) : PyBaseObject(BuiltinTypes::the().cell()), m_content(content)
 {}
 
-PyResult PyCell::create()
+PyResult<PyCell *> PyCell::create()
 {
 	auto *obj = VirtualMachine::the().heap().allocate<PyCell>(nullptr);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyCell))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyCell))); }
+	return Ok(obj);
 }
 
-PyResult PyCell::create(const Value &content)
+PyResult<PyCell *> PyCell::create(const Value &content)
 {
 	if (std::holds_alternative<PyObject *>(content)) { ASSERT(std::get<PyObject *>(content)) }
 	auto *obj = VirtualMachine::the().heap().allocate<PyCell>(content);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyCell))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyCell))); }
+	return Ok(obj);
 }
 
 std::string PyCell::to_string() const
@@ -50,7 +50,7 @@ std::string PyCell::to_string() const
 	} else {
 		return fmt::format("<cell at {}: {} object at {}>",
 			(void *)this,
-			PyObject::from(m_content).unwrap_as<PyObject>()->type()->to_string(),
+			PyObject::from(m_content).unwrap()->type()->to_string(),
 			(void *)&m_content);
 	}
 }
@@ -67,7 +67,7 @@ PyType *PyCell::type() const { return cell(); }
 
 const Value &PyCell::content() const { return m_content; }
 
-PyResult PyCell::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyCell::__repr__() const { return PyString::create(to_string()); }
 
 namespace {
 	std::once_flag cell_flag;

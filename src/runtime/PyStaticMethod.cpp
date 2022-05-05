@@ -28,9 +28,9 @@ void PyStaticMethod::visit_graph(Visitor &visitor)
 	if (m_static_method) { visitor.visit(*m_static_method); }
 }
 
-PyResult PyStaticMethod::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyStaticMethod::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(m_static_method->is_callable())
 	return m_static_method->call(args, kwargs);
@@ -42,20 +42,18 @@ PyStaticMethod::PyStaticMethod(PyString *name, PyType *underlying_type, PyObject
 {}
 
 
-PyResult PyStaticMethod::create(PyString *name, PyObject *function)
+PyResult<PyStaticMethod *> PyStaticMethod::create(PyString *name, PyObject *function)
 {
 	auto result = VirtualMachine::the().heap().allocate<PyStaticMethod>(name, nullptr, function);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyStaticMethod))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyStaticMethod))); }
+	return Ok(result);
 }
 
-PyResult PyStaticMethod::__get__(PyObject * /*instance*/, PyObject * /*owner*/) const
+PyResult<PyObject *> PyStaticMethod::__get__(PyObject * /*instance*/, PyObject * /*owner*/) const
 {
 	// this check is probably not needed, but it is still here because CPython can raise this error
-	if (!m_static_method) {
-		return PyResult::Err(runtime_error("uninitialized staticmethod object"));
-	}
-	return PyResult::Ok(m_static_method);
+	if (!m_static_method) { return Err(runtime_error("uninitialized staticmethod object")); }
+	return Ok(m_static_method);
 }
 
 PyType *PyStaticMethod::type() const { return ::static_method(); }

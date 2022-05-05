@@ -24,15 +24,15 @@ template<> const PyInteger *py::as(const PyObject *obj)
 
 PyInteger::PyInteger(int64_t value) : PyNumber(Number{ value }, BuiltinTypes::the().integer()) {}
 
-PyResult PyInteger::create(int64_t value)
+PyResult<PyInteger *> PyInteger::create(int64_t value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<PyInteger>(value);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyInteger))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyInteger))); }
+	return Ok(result);
 }
 
-PyResult PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == integer());
 
@@ -41,7 +41,7 @@ PyResult PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 	PyObject *base = nullptr;
 	if (args->elements().size() > 0) {
 		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
-			value = obj.unwrap_as<PyObject>();
+			value = obj.unwrap();
 		} else {
 			return obj;
 		}
@@ -61,13 +61,11 @@ PyResult PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 		auto str = str_value->value();
 		std::erase_if(str, [](const auto &c) { return std::isspace(c); });
 		double result = std::stod(str, &pos);
-		if (pos != str.size()) {
-			return PyResult::Err(type_error("invalid literal for int(): '{}'", str));
-		}
+		if (pos != str.size()) { return Err(type_error("invalid literal for int(): '{}'", str)); }
 		return PyInteger::create(static_cast<int64_t>(result));
 	}
 	TODO();
-	return PyResult::Err(nullptr);
+	return Err(nullptr);
 }
 
 size_t PyInteger::as_i64() const

@@ -34,15 +34,15 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> &defaults() const { return m_defaults; }
 	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
-	PyResult call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
 
-	PyResult __call__(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs);
 	PyString *function_name() const { return m_name; }
 
 	PyDict *globals() const { return m_globals; }
 
-	PyResult __repr__() const;
-	PyResult __get__(PyObject *instance, PyObject *owner) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __get__(PyObject *instance, PyObject *owner) const;
 
 	void visit_graph(Visitor &) override;
 
@@ -54,7 +54,7 @@ class PyFunction : public PyBaseObject
 class PyNativeFunction : public PyBaseObject
 {
 	friend class ::Heap;
-	using FunctionType = std::function<PyResult(PyTuple *, PyDict *)>;
+	using FunctionType = std::function<PyResult<PyObject *>(PyTuple *, PyDict *)>;
 
 	std::string m_name;
 	FunctionType m_function;
@@ -72,23 +72,26 @@ class PyNativeFunction : public PyBaseObject
 
   public:
 	template<typename... Args>
-	static PyResult create(std::string name,
-		std::function<PyResult(PyTuple *, PyDict *)> function,
+	static PyResult<PyNativeFunction *> create(std::string name,
+		std::function<PyResult<PyObject *>(PyTuple *, PyDict *)> function,
 		Args &&... args)
 	{
 		auto *result = VirtualMachine::the().heap().allocate<PyNativeFunction>(
 			std::move(name), std::move(function), std::forward<Args>(args)...);
-		if (!result) { return PyResult::Err(memory_error(sizeof(PyNativeFunction))); }
-		return PyResult::Ok(result);
+		if (!result) { return Err(memory_error(sizeof(PyNativeFunction))); }
+		return Ok(result);
 	}
 
-	PyResult operator()(PyTuple *args, PyDict *kwargs) { return m_function(args, kwargs); }
+	PyResult<PyObject *> operator()(PyTuple *args, PyDict *kwargs)
+	{
+		return m_function(args, kwargs);
+	}
 
 	std::string to_string() const override;
 
 	const std::string &name() const { return m_name; }
-	PyResult __call__(PyTuple *args, PyDict *kwargs);
-	PyResult __repr__() const;
+	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __repr__() const;
 
 	void visit_graph(Visitor &) override;
 

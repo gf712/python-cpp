@@ -18,7 +18,7 @@ class FunctionCall final : public Instruction
 		return fmt::format("CALL            r{:<3} ({})", m_function_name, m_size);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &interpreter) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

@@ -22,12 +22,12 @@ class PyTraceback : public PyBaseObject
 	PyTraceback(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next);
 
   public:
-	static PyResult
+	static PyResult<PyTraceback *>
 		create(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next);
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
+	PyResult<PyObject *> __repr__() const;
 
 	void visit_graph(Visitor &visitor) override;
 

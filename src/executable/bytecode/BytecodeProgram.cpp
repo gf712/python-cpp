@@ -68,12 +68,12 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		main_func.metadata.kwonly_arg_count,
 		main_func.metadata.cell2arg,
 		main_func.metadata.nlocals,
-		consts.unwrap_as<PyTuple>(),
+		consts.unwrap(),
 		main_func.metadata.flags);
 
 	if (main_function.is_err()) { TODO(); }
 
-	m_main_function = main_function.unwrap_as<PyCode>();
+	m_main_function = main_function.unwrap();
 
 	for (size_t i = 1; i < func_blocks.functions.size(); ++i) {
 		auto &func = *std::next(func_blocks.functions.begin(), i);
@@ -108,12 +108,12 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			func.metadata.kwonly_arg_count,
 			func.metadata.cell2arg,
 			func.metadata.nlocals,
-			consts.unwrap_as<PyTuple>(),
+			consts.unwrap(),
 			func.metadata.flags);
 
 		if (code.is_err()) { TODO(); }
 
-		m_functions.emplace_back(code.unwrap_as<PyCode>());
+		m_functions.emplace_back(code.unwrap());
 	}
 }
 
@@ -247,12 +247,12 @@ std::unique_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<
 	auto span = std::span{ buffer };
 	auto deserialized_result = PyCode::deserialize(span);
 	ASSERT(deserialized_result.first.is_ok())
-	program->m_main_function = deserialized_result.first.unwrap_as<PyCode>();
+	program->m_main_function = deserialized_result.first.unwrap();
 
 	while (!span.empty()) {
 		deserialized_result = PyCode::deserialize(span);
 		ASSERT(deserialized_result.first.is_ok())
-		program->m_functions.push_back(deserialized_result.first.unwrap_as<PyCode>());
+		program->m_functions.push_back(deserialized_result.first.unwrap());
 	}
 
 	return program;

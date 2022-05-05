@@ -5,7 +5,7 @@
 
 using namespace py;
 
-PyResult MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	std::vector<Value> default_values;
 	default_values.reserve(m_defaults_size);
@@ -29,7 +29,7 @@ PyResult MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) con
 		if (m_captures_tuple) {
 			auto value_ = PyObject::from(vm.reg(*m_captures_tuple));
 			if (value_.is_err()) { return value_.unwrap_err(); }
-			auto *value = value_.unwrap_as<PyObject>();
+			auto *value = value_.unwrap();
 			ASSERT(as<PyTuple>(value))
 			std::vector<PyCell *> cells;
 			cells.reserve(as<PyTuple>(value)->size());
@@ -45,7 +45,7 @@ PyResult MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) con
 	}();
 
 	if (std::holds_alternative<BaseException *>(closure)) {
-		return PyResult::Err(std::get<BaseException *>(closure));
+		return Err(std::get<BaseException *>(closure));
 	}
 
 	const auto &function_name_value = vm.reg(m_name);
@@ -58,7 +58,7 @@ PyResult MakeFunction::execute(VirtualMachine &vm, Interpreter &interpreter) con
 	// const std::string demangled_name =
 	// Mangler::default_mangler().function_demangle(function_name);
 	vm.reg(m_dst) = func;
-	return PyResult::Ok(func);
+	return Ok(Value{ func });
 }
 
 std::vector<uint8_t> MakeFunction::serialize() const

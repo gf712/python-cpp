@@ -25,11 +25,15 @@ template<> const MemoryError *as(const PyObject *obj)
 
 MemoryError::MemoryError(PyTuple *args) : Exception(s_memory_error->underlying_type(), args) {}
 
-PyResult MemoryError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_memory_error)
 	ASSERT(!kwargs || kwargs->map().empty())
-	return MemoryError::create(args);
+	if (auto result = MemoryError::create(args); result.is_ok()) {
+		return Ok(static_cast<PyObject *>(result.unwrap()));
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 PyType *MemoryError::type() const

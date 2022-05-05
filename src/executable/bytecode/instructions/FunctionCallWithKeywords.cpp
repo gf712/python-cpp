@@ -6,7 +6,7 @@
 
 using namespace py;
 
-PyResult FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto func = vm.reg(m_function_name);
 	ASSERT(std::get_if<PyObject *>(&func));
@@ -16,7 +16,7 @@ PyResult FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) co
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }
 	auto args_tuple = PyTuple::create(args);
 
-	if (args_tuple.is_err()) { return args_tuple; }
+	if (args_tuple.is_err()) { return Err(args_tuple.unwrap_err()); }
 	ASSERT(args_tuple.is_ok());
 
 	PyDict::MapType map;
@@ -28,13 +28,16 @@ PyResult FunctionCallWithKeywords::execute(VirtualMachine &vm, Interpreter &) co
 	}
 
 	auto kwargs_dict = PyDict::create(map);
-	if (kwargs_dict.is_err()) { return kwargs_dict; }
+	if (kwargs_dict.is_err()) { return Err(kwargs_dict.unwrap_err()); }
 	ASSERT(kwargs_dict.is_ok());
 
-	auto result =
-		function_object->call(args_tuple.unwrap_as<PyTuple>(), kwargs_dict.unwrap_as<PyDict>());
-	if (result.is_ok()) { vm.reg(0) = result.unwrap(); }
-	return result;
+	if (auto result = function_object->call(args_tuple.unwrap(), kwargs_dict.unwrap());
+		result.is_ok()) {
+		vm.reg(0) = result.unwrap();
+		return Ok(Value{ result.unwrap() });
+	} else {
+		return Err(result.unwrap_err());
+	}
 }
 
 std::vector<uint8_t> FunctionCallWithKeywords::serialize() const

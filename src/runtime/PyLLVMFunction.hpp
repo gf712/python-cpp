@@ -8,7 +8,7 @@ namespace py {
 
 // Essentially the same as PyNativeFunction, but wraps around a std::function
 // with return type PyObject*, instead of PyResult. This makes it easier to interop
-// between Python and LLVM, since PyResult is not an interop type (it's a variant, 
+// between Python and LLVM, since PyResult is not an interop type (it's a variant,
 // and it doesn't make sense to force all functions to return PyResult by pointer).
 class PyLLVMFunction : public PyBaseObject
 {
@@ -31,25 +31,26 @@ class PyLLVMFunction : public PyBaseObject
 
   public:
 	template<typename... Args>
-	static PyResult create(std::string name, FunctionType &&function, Args &&... args)
+	static PyResult<PyLLVMFunction *>
+		create(std::string name, FunctionType &&function, Args &&... args)
 	{
 		auto *result = VirtualMachine::the().heap().allocate<PyLLVMFunction>(
 			std::move(name), std::move(function), std::forward<Args>(args)...);
-		if (!result) { return PyResult::Err(memory_error(sizeof(PyLLVMFunction))); }
-		return PyResult::Ok(result);
+		if (!result) { return Err(memory_error(sizeof(PyLLVMFunction))); }
+		return Ok(result);
 	}
 
-	PyResult operator()(PyTuple *args, PyDict *kwargs)
+	PyResult<PyObject *> operator()(PyTuple *args, PyDict *kwargs)
 	{
 		// TODO: deal with exceptions in llvm land
-		return PyResult::Ok(m_function(args, kwargs));
+		return Ok(m_function(args, kwargs));
 	}
 
 	std::string to_string() const override;
 
 	const std::string &name() const { return m_name; }
-	PyResult __call__(PyTuple *args, PyDict *kwargs);
-	PyResult __repr__() const;
+	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __repr__() const;
 
 	void visit_graph(Visitor &) override;
 

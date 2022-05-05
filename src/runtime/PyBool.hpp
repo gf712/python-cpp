@@ -19,15 +19,15 @@ class PyBool : public PyBaseObject
 
 	void visit_graph(Visitor &) override {}
 
-	PyResult __add__(const PyObject *obj) const;
-	PyResult __repr__() const;
-	PyResult __bool__() const;
+	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<bool> __bool__() const;
 
 	static std::unique_ptr<TypePrototype> register_type();
 	PyType *type() const override;
 
   private:
-	static PyResult create(bool);
+	static PyResult<PyBool *> create(bool);
 
 	PyBool(bool name);
 };

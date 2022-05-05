@@ -19,10 +19,10 @@ class StoreFast final : public Instruction
 			"STORE_FAST       {} (\"{}\") r{:<3}", m_stack_index, m_object_name, m_src);
 	}
 
-	py::PyResult execute(VirtualMachine &vm, Interpreter &) const final
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &) const final
 	{
 		vm.stack_local(m_stack_index) = vm.reg(m_src);
-		return py::PyResult::Ok(vm.stack_local(m_stack_index));
+		return py::Ok(vm.stack_local(m_stack_index));
 	}
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}

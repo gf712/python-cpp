@@ -1,9 +1,11 @@
 #include "StoreSubscript.hpp"
 
-py::PyResult StoreSubscript::execute(VirtualMachine &, Interpreter &) const
+using namespace py;
+
+PyResult<Value> StoreSubscript::execute(VirtualMachine &, Interpreter &) const
 {
 	TODO();
-	return py::PyResult::Err(nullptr);
+	return Err(nullptr);
 }
 
 std::vector<uint8_t> StoreSubscript::serialize() const

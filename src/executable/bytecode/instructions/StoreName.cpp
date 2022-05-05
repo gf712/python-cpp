@@ -5,11 +5,11 @@
 
 using namespace py;
 
-PyResult StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &value = vm.reg(m_source);
 	interpreter.store_object(m_object_name, value);
-	return PyResult::Ok(py_none());
+	return Ok(Value{ py_none() });
 }
 
 std::vector<uint8_t> StoreName::serialize() const

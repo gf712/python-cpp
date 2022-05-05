@@ -3,11 +3,11 @@
 
 using namespace py;
 
-PyResult Jump::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> Jump::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto ip = vm.instruction_pointer() + m_label->position();
 	vm.set_instruction_pointer(ip);
-	return PyResult::Ok(py_none());
+	return Ok(Value{ py_none() });
 };
 
 

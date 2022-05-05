@@ -4,23 +4,19 @@
 
 using namespace py;
 
-PyResult JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter) const
+PyResult<Value> JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto &result = vm.reg(m_test_register);
 
 	const auto test_result = truthy(result, interpreter);
 	if (test_result.is_ok()) {
-		if ((std::holds_alternative<PyObject *>(test_result.unwrap())
-				&& test_result.unwrap_as<PyObject>() == py_true())
-			|| (std::holds_alternative<NameConstant>(test_result.unwrap())
-				&& std::get<bool>(std::get<NameConstant>(test_result.unwrap()).value))) {
-			{
-				const auto ip = vm.instruction_pointer() + m_label->position();
-				vm.set_instruction_pointer(ip);
-			}
+		if (test_result.unwrap()) {
+			const auto ip = vm.instruction_pointer() + m_label->position();
+			vm.set_instruction_pointer(ip);
 		}
+		return Ok(Value{ NameConstant{ test_result.unwrap() } });
 	}
-	return test_result;
+	return Err(test_result.unwrap_err());
 }
 
 void JumpIfTrue::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)

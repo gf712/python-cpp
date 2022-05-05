@@ -22,13 +22,13 @@ class PyType : public PyBaseObject
 
 	const std::string &name() const { return m_underlying_type.__name__; }
 
-	PyResult __call__(PyTuple *args, PyDict *kwargs) const;
-	PyResult __repr__() const;
-	PyResult __getattribute__(PyObject *attribute) const;
+	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
 
-	PyResult new_(PyTuple *args, PyDict *kwargs) const override;
+	PyResult<PyObject *> new_(PyTuple *args, PyDict *kwargs) const override;
 
-	static PyResult __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	std::string to_string() const override;
 
@@ -40,21 +40,21 @@ class PyType : public PyBaseObject
 
 	PyType *type() const override;
 
-	PyResult mro();
+	PyResult<PyList *> mro();
 
 	bool issubclass(const PyType *);
 
-	PyResult lookup(PyObject *name) const;
+	PyResult<PyObject *> lookup(PyObject *name) const;
 
   protected:
-	PyResult mro_internal() const;
+	PyResult<PyTuple *> mro_internal() const;
 
   private:
 	void initialize(PyDict *ns);
 	void update_methods_and_class_attributes(PyDict *ns);
 	bool update_if_special(const std::string &name, const Value &value);
 
-	static PyResult build_type(PyString *type_name, PyTuple *bases, PyDict *ns);
+	static PyResult<PyType *> build_type(PyString *type_name, PyTuple *bases, PyDict *ns);
 };
 
 }// namespace py

@@ -31,7 +31,7 @@ template<> PyObject *from(int64_t value)
 {
 	auto obj = PyObject::from(Number{ value });
 	ASSERT(obj.is_ok())
-	return obj.unwrap_as<PyObject>();
+	return obj.unwrap();
 }
 
 PyObject *create_llvm_function(const std::string &name,
@@ -39,7 +39,7 @@ PyObject *create_llvm_function(const std::string &name,
 {
 	auto obj = PyLLVMFunction::create(name, std::move(func));
 	ASSERT(obj.is_ok())
-	return obj.unwrap_as<PyObject>();
+	return obj.unwrap();
 }
 
 int64_t from_args_i64(uint8_t *args, int64_t idx)

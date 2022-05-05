@@ -38,19 +38,20 @@ std::string PyBuiltInMethod::to_string() const
 		static_cast<void *>(m_self));
 }
 
-PyResult PyBuiltInMethod::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyBuiltInMethod::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
 {
 	return m_builtin_method(args, kwargs);
 }
 
-PyResult PyBuiltInMethod::create(std::string name, FunctionType &&builtin_method, PyObject *self)
+PyResult<PyBuiltInMethod *>
+	PyBuiltInMethod::create(std::string name, FunctionType &&builtin_method, PyObject *self)
 {
 	auto *obj = VirtualMachine::the().heap().allocate<PyBuiltInMethod>(
 		name, std::move(builtin_method), self);
-	if (!obj) { return PyResult::Err(memory_error(sizeof(PyBuiltInMethod))); }
-	return PyResult::Ok(obj);
+	if (!obj) { return Err(memory_error(sizeof(PyBuiltInMethod))); }
+	return Ok(obj);
 }
 
 PyType *PyBuiltInMethod::type() const { return py::builtin_method(); }

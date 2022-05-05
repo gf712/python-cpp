@@ -3,29 +3,30 @@
 
 using namespace py;
 
-PyResult JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> JumpIfFalse::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &result = vm.reg(m_test_register);
 
 	const auto test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult { return obj->bool_(); },
-					   [](const auto &) -> PyResult {
+		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult<bool> { return obj->bool_(); },
+					   [](const auto &) -> PyResult<bool> {
 						   TODO();
-						   return PyResult::Err(nullptr);
+						   return Err(nullptr);
 					   },
-					   [](const NameConstant &value) -> PyResult {
+					   [](const NameConstant &value) -> PyResult<bool> {
 						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return PyResult::Ok(*bool_type ? py_true() : py_false());
+							   return Ok(*bool_type);
 						   } else {
-							   return PyResult::Ok(py_false());
+							   return Ok(false);
 						   }
 					   } },
 			result);
-	if (test_result.is_ok() && test_result.unwrap_as<PyObject>() == py_false()) {
+	if (test_result.is_ok() && test_result.unwrap() == false) {
 		const auto ip = vm.instruction_pointer() + m_label->position();
 		vm.set_instruction_pointer(ip);
 	}
-	return test_result;
+	if (test_result.is_err()) return Err(test_result.unwrap_err());
+	return Ok(Value{ NameConstant{ test_result.unwrap() } });
 };
 
 

@@ -47,7 +47,7 @@ class Interpreter
 
 	void store_object(const std::string &name, const py::Value &value);
 
-	py::PyResult get_object(const std::string &name);
+	py::PyResult<py::Value> get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
 	py::PyObject *allocate_object(const std::string &name, Args &&... args)
@@ -80,9 +80,11 @@ class Interpreter
 		const std::vector<py::PyCell *> &closure) const;
 
 	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
-	py::PyResult call(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
+	py::PyResult<py::PyObject *> call(const std::unique_ptr<Function> &,
+		py::PyFrame *function_frame);
 
-	py::PyResult call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
+	py::PyResult<py::PyObject *>
+		call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
 	const Program *program() const { return m_program; }
 

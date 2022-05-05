@@ -1,7 +1,9 @@
 #include "InplaceSub.hpp"
 #include "runtime/Value.hpp"
 
-py::PyResult InplaceSub::execute(VirtualMachine &vm, Interpreter &interpreter) const
+using namespace py;
+
+PyResult<Value> InplaceSub::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	auto &lhs = vm.reg(m_lhs);
 	const auto &rhs = vm.reg(m_rhs);

@@ -45,9 +45,9 @@ std::string PyMethodDescriptor::to_string() const
 		"<method '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
 }
 
-PyResult PyMethodDescriptor::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyMethodDescriptor::__repr__() const { return PyString::create(to_string()); }
 
-PyResult PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 {
 	// split args tuple -> (args[0], args[1:])
 	// since args[0] is self (hopefully)
@@ -55,20 +55,20 @@ PyResult PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 	new_args_vector.reserve(args->size() - 1);
 	auto self_ = PyObject::from(args->elements()[0]);
 	if (self_.is_err()) return self_;
-	auto *self = self_.unwrap_as<PyObject>();
+	auto *self = self_.unwrap();
 	for (size_t i = 1; i < args->size(); ++i) { new_args_vector.push_back(args->elements()[i]); }
 	auto args_ = PyTuple::create(new_args_vector);
 	if (args_.is_err()) return args_;
-	args = args_.unwrap_as<PyTuple>();
+	args = args_.unwrap();
 	return m_method_descriptor(self, args, kwargs);
 }
 
-PyResult PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
+PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
-	if (!instance) { return PyResult::Ok(const_cast<PyMethodDescriptor *>(this)); }
+	if (!instance) { return Ok(const_cast<PyMethodDescriptor *>(this)); }
 	if ((instance->type() != m_underlying_type)
 		&& !instance->type()->issubclass(m_underlying_type)) {
-		return PyResult::Err(
+		return Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",
 				m_name->value(),
@@ -77,7 +77,7 @@ PyResult PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) c
 	}
 	return PyNativeFunction::create(
 		m_name->value(),
-		[this, instance](PyTuple *args, PyDict *kwargs) {
+		[this, instance](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 			std::vector<Value> new_args_vector;
 			new_args_vector.reserve(args->size() + 1);
 			new_args_vector.push_back(instance);
@@ -85,7 +85,7 @@ PyResult PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) c
 				new_args_vector.end(), args->elements().begin(), args->elements().end());
 			auto args_ = PyTuple::create(new_args_vector);
 			if (args_.is_err()) return args_;
-			args = args_.unwrap_as<PyTuple>();
+			args = args_.unwrap();
 			return const_cast<PyMethodDescriptor *>(this)->__call__(args, kwargs);
 		},
 		const_cast<PyMethodDescriptor *>(this),

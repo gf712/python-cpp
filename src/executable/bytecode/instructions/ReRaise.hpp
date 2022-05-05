@@ -8,7 +8,7 @@ class ReRaise final : public Instruction
 	ReRaise() = default;
 	std::string to_string() const final { return std::string("RERAISE"); }
 
-	py::PyResult execute(VirtualMachine &, Interpreter &) const final;
+	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 

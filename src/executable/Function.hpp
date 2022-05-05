@@ -47,5 +47,5 @@ class Function
 
 	virtual std::vector<uint8_t> serialize() const = 0;
 
-	virtual py::PyResult call(VirtualMachine &, Interpreter &) const = 0;
+	virtual py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const = 0;
 };

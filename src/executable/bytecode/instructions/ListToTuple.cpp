@@ -4,7 +4,7 @@
 
 using namespace py;
 
-PyResult ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &list = vm.reg(m_list);
 
@@ -14,8 +14,11 @@ PyResult ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(as<PyList>(pylist))
 
 	auto result = PyTuple::create(as<PyList>(pylist)->elements());
-	if (result.is_ok()) { vm.reg(m_tuple) = result.unwrap(); }
-	return result;
+	if (result.is_ok()) {
+		vm.reg(m_tuple) = result.unwrap();
+		return Ok(Value{ result.unwrap() });
+	}
+	return Err(result.unwrap_err());
 }
 
 std::vector<uint8_t> ListToTuple::serialize() const

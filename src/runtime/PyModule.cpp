@@ -27,7 +27,7 @@ std::optional<std::string> resolve_path(std::string module_name)
 
 	auto path_pystr_ = PyString::create("path");
 	if (path_pystr_.is_err()) return {};
-	auto *path_pystr = path_pystr_.unwrap_as<PyString>();
+	auto *path_pystr = path_pystr_.unwrap();
 
 	auto *search_paths = std::get<PyObject *>(sysmodule->symbol_table().at(path_pystr));
 
@@ -48,10 +48,10 @@ std::optional<std::string> resolve_path(std::string module_name)
 PyModule::PyModule(PyString *module_name)
 	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(std::move(module_name))
 {
-	m_attributes = PyDict::create().unwrap_as<PyDict>();
+	m_attributes = PyDict::create().unwrap();
 }
 
-PyResult PyModule::__repr__() const
+PyResult<PyObject *> PyModule::__repr__() const
 {
 	return PyString::create(fmt::format("<module '{}'>", m_module_name->to_string()));
 }
@@ -71,18 +71,17 @@ std::string PyModule::to_string() const
 	return fmt::format("<module '{}'>", m_module_name->to_string());
 }
 
-PyResult PyModule::create(PyString *name)
+PyResult<PyModule *> PyModule::create(PyString *name)
 {
 	auto &vm = VirtualMachine::the();
 	auto ip = VirtualMachine::the().instruction_pointer();
 
-	if (auto *module = vm.interpreter().get_imported_module(name)) { return PyResult::Ok(module); }
+	if (auto *module = vm.interpreter().get_imported_module(name)) { return Ok(module); }
 
 	const auto filepath = resolve_path(name->value());
 	if (!filepath.has_value()) {
 		// FIXME: should throw ModuleNotFoundError, not ValueError
-		return PyResult::Err(
-			value_error("ModuleNotFoundError: No module named '{}'", name->value()));
+		return Err(value_error("ModuleNotFoundError: No module named '{}'", name->value()));
 	}
 
 	auto lexer = Lexer::create(*filepath);
@@ -98,7 +97,7 @@ PyResult PyModule::create(PyString *name)
 	auto *module_dict = vm.interpreter().execution_frame()->globals();
 
 	auto *module = vm.heap().allocate<PyModule>(name);
-	if (!module) { return PyResult::Err(memory_error(sizeof(PyModule))); }
+	if (!module) { return Err(memory_error(sizeof(PyModule))); }
 
 	// hold on to the program until the module is destructed
 	// This is important to keep the instruction vector alive
@@ -113,8 +112,8 @@ PyResult PyModule::create(PyString *name)
 			}
 		} else if (std::holds_alternative<String>(k)) {
 			auto symbol_name = PyString::create(std::get<String>(k).s);
-			if (symbol_name.is_err()) { return symbol_name; }
-			module->m_symbol_table[symbol_name.unwrap_as<PyString>()] = v;
+			if (symbol_name.is_err()) { return Err(symbol_name.unwrap_err()); }
+			module->m_symbol_table[symbol_name.unwrap()] = v;
 		} else {
 			TODO();
 		}
@@ -122,7 +121,7 @@ PyResult PyModule::create(PyString *name)
 
 	// clean up the interpreter now that we have obtained all the global data we needed
 	vm.shutdown_interpreter(vm.interpreter());
-	return PyResult::Ok(module);
+	return Ok(module);
 }
 
 void PyModule::insert(PyString *key, const Value &value)
@@ -130,7 +129,7 @@ void PyModule::insert(PyString *key, const Value &value)
 	m_symbol_table.insert_or_assign(key, value);
 	auto obj = PyObject::from(value);
 	ASSERT(obj.is_ok())
-	m_attributes->insert(key, obj.unwrap_as<PyObject>());
+	m_attributes->insert(key, obj.unwrap());
 }
 
 PyType *PyModule::type() const { return module(); }

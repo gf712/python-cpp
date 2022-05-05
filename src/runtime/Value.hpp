@@ -195,74 +195,126 @@ struct NameConstant
 
 class BaseException;
 
-class PyResult
+template<typename T> struct Ok
 {
-	using PyResult_ = std::variant<py::Value, BaseException *>;
-	PyResult_ result;
-
-	PyResult(PyResult_ result_) : result(result_) {}
-
-  public:
-	static PyResult Ok(const py::Value &object) { return PyResult(object); }
-	static PyResult Err(BaseException *object) { return PyResult(object); }
-
-	bool is_ok() const { return std::holds_alternative<py::Value>(result); }
-	bool is_err() const { return !is_ok(); }
-
-	py::Value unwrap() const
-	{
-		ASSERT(is_ok());
-		return std::get<py::Value>(result);
-	}
-
-	template<typename T> auto unwrap_as() const
-	{
-		ASSERT(is_ok());
-		if constexpr (std::is_same_v<PyObject, T>) {
-			ASSERT(std::holds_alternative<PyObject *>(unwrap()));
-			return std::get<PyObject *>(unwrap());
-		} else if constexpr (std::is_base_of_v<PyObject, T>) {
-			ASSERT(std::holds_alternative<PyObject *>(unwrap()));
-			ASSERT(as<T>(std::get<PyObject *>(unwrap())))
-			return as<T>(std::get<PyObject *>(unwrap()));
-		} else {
-			return unwrap();
-		}
-	}
-
-	py::BaseException *unwrap_err() const
-	{
-		ASSERT(is_err());
-		return std::get<py::BaseException *>(result);
-	}
-
-	template<typename T, typename FunctorType> PyResult and_then(FunctorType &&op) const
-	{
-		if (is_ok()) {
-			return op(unwrap_as<T>());
-		} else {
-			return *this;
-		}
-	}
+	T value;
+	Ok(T value_) : value(value_) {}
 };
 
-PyResult add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+template<typename T> Ok(T) -> Ok<T>;
 
-PyResult is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
-PyResult in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+struct Err
+{
+	BaseException *exc;
+	Err(BaseException *value_) : exc(value_) {}
+};
 
-PyResult truthy(const Value &lhs, Interpreter &interpreter);
+template<typename T> class PyResult;
+
+namespace detail {
+	template<typename> struct is_ok : std::false_type
+	{
+	};
+
+	template<typename T> struct is_ok<Ok<T>> : std::true_type
+	{
+		using type = T;
+	};
+
+	template<typename> struct is_pyresult : std::false_type
+	{
+	};
+
+	template<typename T> struct is_pyresult<PyResult<T>> : std::true_type
+	{
+		using type = T;
+	};
+}// namespace detail
+
+
+template<typename T> class PyResult
+{
+  public:
+	using OkType = T;
+	using ErrType = BaseException *;
+	using StorageType = std::variant<Ok<T>, Err>;
+
+  private:
+	StorageType result;
+
+  public:
+	PyResult(Ok<T> result_) : result(result_) {}
+	template<typename U> PyResult(Ok<U> result_) : result(Ok<T>(result_.value))
+	{
+		static_assert(std::is_convertible_v<U, T>);
+	}
+	PyResult(Err result_) : result(result_) {}
+
+	template<typename U> PyResult(const PyResult<U> &other) : result(Err(nullptr))
+	{
+		static_assert(std::is_convertible_v<U, T>);
+		if (other.is_ok()) {
+			result = Ok<T>(other.unwrap());
+		} else {
+			result = Err(other.unwrap_err());
+		}
+	}
+
+	bool is_ok() const { return std::holds_alternative<Ok<T>>(result); }
+	bool is_err() const { return !is_ok(); }
+
+	T unwrap() const
+	{
+		ASSERT(is_ok());
+		return std::get<Ok<T>>(result).value;
+	}
+
+	BaseException *unwrap_err() const
+	{
+		ASSERT(is_err());
+		return std::get<Err>(result).exc;
+	}
+
+	template<typename FunctorType,
+		typename PyResultType =
+			std::conditional_t<detail::is_ok<typename std::result_of_t<FunctorType(T)>>{},
+				typename detail::is_ok<typename std::result_of_t<FunctorType(T)>>::type,
+				typename detail::is_pyresult<typename std::result_of_t<FunctorType(T)>>::type>>
+	PyResult<PyResultType> and_then(FunctorType &&op) const;
+};
+
+template<typename T>
+template<typename FunctorType, typename PyResultType>
+PyResult<PyResultType> PyResult<T>::and_then(FunctorType &&op) const
+{
+	using ResultType = typename std::result_of_t<FunctorType(T)>;
+	static_assert(detail::is_ok<ResultType>{} || detail::is_pyresult<ResultType>{},
+		"Return type of function must be of type Ok<U> or PyResult<U>");
+	if (is_ok()) {
+		return op(unwrap());
+	} else {
+		return PyResult<PyResultType>(Err(unwrap_err()));
+	}
+}
+
+
+PyResult<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+
+PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+
+PyResult<bool> truthy(const Value &lhs, Interpreter &interpreter);
 
 }// namespace py

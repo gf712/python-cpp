@@ -10,7 +10,7 @@ namespace py {
 
 template<typename T>
 inline auto deserialize(std::span<const uint8_t> &buffer)
-	-> std::conditional_t<std::is_base_of_v<PyObject, T>, PyResult, T>
+	-> std::conditional_t<std::is_base_of_v<PyObject, T>, PyResult<T *>, T>
 {
 	if constexpr (std::is_same_v<T, std::string>) {
 		const size_t string_size = deserialize<size_t>(buffer);

@@ -15,16 +15,16 @@ class PyStaticMethod : public PyBaseObject
 	PyStaticMethod(PyString *name, PyType *underlying_type, PyObject *function);
 
   public:
-	static PyResult create(PyString *name, PyObject *function);
+	static PyResult<PyStaticMethod *> create(PyString *name, PyObject *function);
 
 	PyString *static_method_name() { return m_name; }
 	PyObject *static_method() { return m_static_method; }
 
 	std::string to_string() const override;
 
-	PyResult __repr__() const;
-	PyResult __get__(PyObject *instance, PyObject *owner) const;
-	PyResult call_static_method(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __get__(PyObject *instance, PyObject *owner) const;
+	PyResult<PyObject *> call_static_method(PyTuple *args, PyDict *kwargs);
 
 	void visit_graph(Visitor &visitor) override;
 

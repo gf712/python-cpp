@@ -70,15 +70,15 @@ int32_t codepoint(const char *str, size_t length)
 
 }// namespace utf8
 
-PyResult PyString::create(const std::string &value)
+PyResult<PyString *> PyString::create(const std::string &value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<PyString>(value);
-	if (!result) { return PyResult::Err(memory_error(sizeof(PyString))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(PyString))); }
+	return Ok(result);
 }
 
-PyResult PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a
 	// String
@@ -98,46 +98,46 @@ PyResult PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 PyString::PyString(std::string s) : PyBaseObject(BuiltinTypes::the().str()), m_value(std::move(s))
 {}
 
-PyResult PyString::__hash__() const { return PyInteger::create(std::hash<std::string>{}(m_value)); }
+PyResult<size_t> PyString::__hash__() const { return Ok(std::hash<std::string>{}(m_value)); }
 
-PyResult PyString::__repr__() const { return PyString::create(m_value); }
+PyResult<PyObject *> PyString::__repr__() const { return PyString::create(m_value); }
 
-PyResult PyString::__add__(const PyObject *obj) const
+PyResult<PyObject *> PyString::__add__(const PyObject *obj) const
 {
 	if (auto rhs = as<PyString>(obj)) {
 		return PyString::create(m_value + rhs->value());
 	} else {
-		return PyResult::Err(type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		return Err(type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
 			type()->name(),
 			obj->type()->name()));
 	}
 }
 
-PyResult PyString::__eq__(const PyObject *obj) const
+PyResult<PyObject *> PyString::__eq__(const PyObject *obj) const
 {
-	if (this == obj) return PyResult::Ok(py_true());
+	if (this == obj) return Ok(py_true());
 	if (auto obj_string = as<PyString>(obj)) {
-		return PyResult::Ok(m_value == obj_string->value() ? py_true() : py_false());
+		return Ok(m_value == obj_string->value() ? py_true() : py_false());
 	} else {
-		return PyResult::Err(type_error("'==' not supported between instances of '{}' and '{}'",
+		return Err(type_error("'==' not supported between instances of '{}' and '{}'",
 			type()->name(),
 			obj->type()->name()));
 	}
 }
 
-PyResult PyString::__lt__(const PyObject *obj) const
+PyResult<PyObject *> PyString::__lt__(const PyObject *obj) const
 {
-	if (this == obj) return PyResult::Ok(py_true());
+	if (this == obj) return Ok(py_true());
 	if (auto obj_string = as<PyString>(obj)) {
-		return PyResult::Ok(m_value < obj_string->value() ? py_true() : py_false());
+		return Ok(m_value < obj_string->value() ? py_true() : py_false());
 	} else {
-		return PyResult::Err(type_error("'==' not supported between instances of '{}' and '{}'",
+		return Err(type_error("'==' not supported between instances of '{}' and '{}'",
 			type()->name(),
 			obj->type()->name()));
 	}
 }
 
-PyResult PyString::__len__() const
+PyResult<size_t> PyString::__len__() const
 {
 	size_t size{ 0 };
 	for (auto it = m_value.begin(); it != m_value.end();) {
@@ -145,11 +145,11 @@ PyResult PyString::__len__() const
 		size++;
 		it += codepoint_byte_size;
 	}
-	return PyObject::from(Number{ static_cast<int64_t>(size) });
+	return Ok(size);
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::capitalize() const
+PyResult<PyObject *> PyString::capitalize() const
 {
 	auto new_string = m_value;
 	new_string[0] = std::toupper(new_string[0]);
@@ -157,7 +157,7 @@ PyResult PyString::capitalize() const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::casefold() const
+PyResult<PyObject *> PyString::casefold() const
 {
 	auto new_string = m_value;
 	std::transform(new_string.begin(),
@@ -168,85 +168,85 @@ PyResult PyString::casefold() const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::isalnum() const
+PyResult<PyObject *> PyString::isalnum() const
 {
-	if (m_value.empty()) { return PyResult::Ok(py_false()); }
+	if (m_value.empty()) { return Ok(py_false()); }
 
 	auto it = std::find_if_not(
 		m_value.begin(), m_value.end(), [](const unsigned char c) { return std::isalnum(c); });
 	if (it == m_value.end()) {
-		return PyResult::Ok(py_true());
+		return Ok(py_true());
 	} else {
-		return PyResult::Ok(py_false());
+		return Ok(py_false());
 	}
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::isalpha() const
+PyResult<PyObject *> PyString::isalpha() const
 {
-	if (m_value.empty()) { return PyResult::Ok(py_false()); }
+	if (m_value.empty()) { return Ok(py_false()); }
 
 	auto it = std::find_if_not(
 		m_value.begin(), m_value.end(), [](const unsigned char c) { return std::isalpha(c); });
 	if (it == m_value.end()) {
-		return PyResult::Ok(py_true());
+		return Ok(py_true());
 	} else {
-		return PyResult::Ok(py_false());
+		return Ok(py_false());
 	}
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::isdigit() const
+PyResult<PyObject *> PyString::isdigit() const
 {
-	if (m_value.empty()) { return PyResult::Ok(py_false()); }
+	if (m_value.empty()) { return Ok(py_false()); }
 
 	auto it = std::find_if_not(
 		m_value.begin(), m_value.end(), [](const unsigned char c) { return std::isdigit(c); });
 	if (it == m_value.end()) {
-		return PyResult::Ok(py_true());
+		return Ok(py_true());
 	} else {
-		return PyResult::Ok(py_false());
+		return Ok(py_false());
 	}
 }
 
-PyResult PyString::isascii() const
+PyResult<PyObject *> PyString::isascii() const
 {
 	for (size_t i = 0; i < m_value.size();) {
 		int length = utf8::codepoint_length(m_value[i]);
 		const auto codepoint = utf8::codepoint(m_value.c_str(), length);
-		if (codepoint > 0x7F) { return PyResult::Ok(py_false()); }
+		if (codepoint > 0x7F) { return Ok(py_false()); }
 		i += length;
 	}
-	return PyResult::Ok(py_true());
+	return Ok(py_true());
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::islower() const
+PyResult<PyObject *> PyString::islower() const
 {
-	if (m_value.empty()) { return PyResult::Ok(py_false()); }
+	if (m_value.empty()) { return Ok(py_false()); }
 
 	auto it = std::find_if_not(m_value.begin(), m_value.end(), [](const unsigned char c) {
 		return !std::isalpha(c) || std::islower(c);
 	});
 	if (it == m_value.end()) {
-		return PyResult::Ok(py_true());
+		return Ok(py_true());
 	} else {
-		return PyResult::Ok(py_false());
+		return Ok(py_false());
 	}
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::isupper() const
+PyResult<PyObject *> PyString::isupper() const
 {
-	if (m_value.empty()) { return PyResult::Ok(py_false()); }
+	if (m_value.empty()) { return Ok(py_false()); }
 
 	auto it = std::find_if_not(m_value.begin(), m_value.end(), [](const unsigned char c) {
 		return !std::isalpha(c) || std::isupper(c);
 	});
 	if (it == m_value.end()) {
-		return PyResult::Ok(py_true());
+		return Ok(py_true());
 	} else {
-		return PyResult::Ok(py_false());
+		return Ok(py_false());
 	}
 }
 
@@ -261,14 +261,14 @@ size_t PyString::get_position_from_slice(int64_t pos) const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::find(PyTuple *args, PyDict *kwargs) const
+PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
-	PyString *pattern = pattern_.unwrap_as<PyString>();
+	PyString *pattern = as<PyString>(pattern_.unwrap());
 	PyInteger *start = nullptr;
 	PyInteger *end = nullptr;
 	size_t result{ std::string::npos };
@@ -276,14 +276,14 @@ PyResult PyString::find(PyTuple *args, PyDict *kwargs) const
 	if (args->size() >= 2) {
 		auto start_ = PyObject::from(args->elements()[1]);
 		if (start_.is_err()) return start_;
-		start = start_.unwrap_as<PyInteger>();
+		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
-		end = end_.unwrap_as<PyInteger>();
+		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -313,14 +313,14 @@ PyResult PyString::find(PyTuple *args, PyDict *kwargs) const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::count(PyTuple *args, PyDict *kwargs) const
+PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
-	PyString *pattern = pattern_.unwrap_as<PyString>();
+	PyString *pattern = as<PyString>(pattern_.unwrap());
 	PyInteger *start = nullptr;
 	PyInteger *end = nullptr;
 	size_t result{ 0 };
@@ -328,14 +328,14 @@ PyResult PyString::count(PyTuple *args, PyDict *kwargs) const
 	if (args->size() >= 2) {
 		auto start_ = PyObject::from(args->elements()[1]);
 		if (start_.is_err()) return start_;
-		start = start_.unwrap_as<PyInteger>();
+		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
-		end = end_.unwrap_as<PyInteger>();
+		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -386,14 +386,14 @@ PyResult PyString::count(PyTuple *args, PyDict *kwargs) const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::endswith(PyTuple *args, PyDict *kwargs) const
+PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
 	auto suffix_ = PyObject::from(args->elements()[0]);
 	if (suffix_.is_err()) return suffix_;
-	PyString *suffix = suffix_.unwrap_as<PyString>();
+	PyString *suffix = as<PyString>(suffix_.unwrap());
 	PyInteger *start = nullptr;
 	PyInteger *end = nullptr;
 	bool result{ false };
@@ -401,14 +401,14 @@ PyResult PyString::endswith(PyTuple *args, PyDict *kwargs) const
 	if (args->size() >= 2) {
 		auto start_ = PyObject::from(args->elements()[1]);
 		if (start_.is_err()) return start_;
-		start = start_.unwrap_as<PyInteger>();
+		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
 		ASSERT(start)
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
-		end = end_.unwrap_as<PyInteger>();
+		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
 		ASSERT(end)
 	}
@@ -432,17 +432,17 @@ PyResult PyString::endswith(PyTuple *args, PyDict *kwargs) const
 		result = substring.ends_with(suffix->value());
 	}
 
-	return PyResult::Ok(result ? py_true() : py_false());
+	return Ok(result ? py_true() : py_false());
 }
 
-PyResult PyString::join(PyTuple *args, PyDict *kwargs) const
+PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() == 1)
 	ASSERT(!kwargs)
 
 	auto string_list_ = PyObject::from(args->elements()[0]);
 	if (string_list_.is_err()) return string_list_;
-	auto *string_list = string_list_.unwrap_as<PyList>();
+	auto *string_list = as<PyList>(string_list_.unwrap());
 	ASSERT(string_list)
 	if (string_list->elements().empty()) { return PyString::create(""); }
 
@@ -484,7 +484,7 @@ PyResult PyString::join(PyTuple *args, PyDict *kwargs) const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::lower() const
+PyResult<PyObject *> PyString::lower() const
 {
 	auto new_string = m_value;
 	std::transform(new_string.begin(),
@@ -495,7 +495,7 @@ PyResult PyString::lower() const
 }
 
 // FIXME: assumes string only has ASCII characters
-PyResult PyString::upper() const
+PyResult<PyObject *> PyString::upper() const
 {
 	auto new_string = m_value;
 	std::transform(new_string.begin(),

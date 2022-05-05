@@ -23,11 +23,11 @@ class PyModule : public PyBaseObject
   public:
 	PyModule(PyString *module_name);
 
-	static PyResult create(PyString *);
+	static PyResult<PyModule *> create(PyString *);
 
 	void visit_graph(Visitor &visitor) override;
 
-	PyResult __repr__() const;
+	PyResult<PyObject *> __repr__() const;
 
 	std::string to_string() const override;
 

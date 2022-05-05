@@ -25,15 +25,15 @@ template<> const ValueError *as(const PyObject *obj)
 
 ValueError::ValueError(PyTuple *args) : Exception(s_value_error->underlying_type(), args) {}
 
-PyResult ValueError::create(PyTuple *args)
+PyResult<ValueError *> ValueError::create(PyTuple *args)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto result = heap.allocate<ValueError>(args);
-	if (!result) { return PyResult::Err(memory_error(sizeof(ValueError))); }
-	return PyResult::Ok(result);
+	if (!result) { return Err(memory_error(sizeof(ValueError))); }
+	return Ok(result);
 }
 
-PyResult ValueError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> ValueError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_value_error)
 	ASSERT(!kwargs || kwargs->map().empty())
