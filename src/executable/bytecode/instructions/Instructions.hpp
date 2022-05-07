@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ast/AST.hpp"
 #include "executable/Label.hpp"
 #include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "forward.hpp"
@@ -19,6 +18,7 @@ class Instruction : NonCopyable
 	virtual py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const = 0;
 	virtual void relocate(codegen::BytecodeGenerator &, size_t) = 0;
 	virtual std::vector<uint8_t> serialize() const = 0;
+	virtual uint8_t id() const = 0;
 };
 
 static constexpr uint8_t BINARY_OPERATION = 0;
@@ -72,5 +72,7 @@ static constexpr uint8_t STORE_NAME = 47;
 static constexpr uint8_t STORE_SUBSCRIPT = 48;
 static constexpr uint8_t UNARY = 49;
 static constexpr uint8_t UNPACK_SEQUENCE = 50;
+static constexpr uint8_t RERAISE = 52;
+static constexpr uint8_t WITH_EXCEPT_START = 53;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

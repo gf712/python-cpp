@@ -35,4 +35,6 @@ class StoreFast final : public Instruction
 			m_src,
 		};
 	}
+
+	uint8_t id() const final { return STORE_FAST; }
 };

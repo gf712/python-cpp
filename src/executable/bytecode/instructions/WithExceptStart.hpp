@@ -23,4 +23,6 @@ class WithExceptStart final : public Instruction
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 
 	std::vector<uint8_t> serialize() const final;
+
+	uint8_t id() const final { return WITH_EXCEPT_START; }
 };

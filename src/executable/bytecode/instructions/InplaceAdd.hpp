@@ -35,4 +35,6 @@ class InplaceAdd : public Instruction
 			m_rhs,
 		};
 	}
+
+	uint8_t id() const final { return INPLACE_ADD; }
 };

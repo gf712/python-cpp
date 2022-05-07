@@ -37,4 +37,6 @@ class LoadConst final : public Instruction
 			static_cast<u_int8_t>(m_static_value_index),
 		};
 	}
+
+	uint8_t id() const final { return LOAD_CONST; }
 };

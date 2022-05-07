@@ -41,4 +41,6 @@ class LoadFast final : public Instruction
 			m_stack_index,
 		};
 	}
+
+	uint8_t id() const final { return LOAD_FAST; }
 };
