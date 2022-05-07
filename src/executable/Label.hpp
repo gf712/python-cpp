@@ -5,36 +5,39 @@
 #include <optional>
 #include <string>
 
+namespace codegen {
+class BytecodeGenerator;
+}
+
 class Label
 	: NonCopyable
 	, NonMoveable
 {
+	friend codegen::BytecodeGenerator;
+
 	std::string m_label_name;
 	size_t m_function_id;
 	mutable std::optional<int64_t> m_position;
-	bool m_immutable{ false };
+
+  protected:
+	void set_position(int64_t position) const
+	{
+		ASSERT(!m_position.has_value())
+		m_position = position;
+	}
 
   public:
 	Label(std::string name, int64_t function_id)
 		: m_label_name(std::move(name)), m_function_id(function_id)
 	{}
 
-	Label(int64_t position) : m_position(position), m_immutable(true) {}
-
-	void set_position(int64_t position) const
-	{
-		// a hack to make sure multiple instructions cannot relocate a
-		// shared label
-		if (!m_immutable) { m_position = position; }
-	}
+	Label(int64_t position) : m_position(position) {}
 
 	int64_t position() const
 	{
 		ASSERT(m_position.has_value());
 		return *m_position;
 	}
-
-	void immutable() { m_immutable = true; }
 
 	size_t function_id() const { return m_function_id; }
 

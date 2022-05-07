@@ -7,6 +7,7 @@ using namespace py;
 
 PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
+	ASSERT(m_offset.has_value())
 	auto iterator = vm.reg(m_src);
 	interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
@@ -34,7 +35,7 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) c
 				if (interpreter.execution_frame()->exception_info().has_value()) { TODO(); }
 				// FIXME: subtract one since the vm will advance the ip by one.
 				//        is this always true?
-				vm.set_instruction_pointer(vm.instruction_pointer() + m_exit_label->position() - 1);
+				vm.set_instruction_pointer(vm.instruction_pointer() + *m_offset);
 			}
 			return Ok(Value{ py_none() });
 		}
@@ -50,7 +51,7 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &interpreter) c
 
 void ForIter::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 {
-	m_exit_label->set_position(m_exit_label->position() - instruction_idx);
+	m_offset = m_exit_label->position() - instruction_idx - 1;
 }
 
 std::vector<uint8_t> ForIter::serialize() const

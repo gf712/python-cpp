@@ -859,6 +859,7 @@ Value *BytecodeGenerator::visit(const For *node)
 	emit<GetIter>(iterator_register, iterator_func->get_register());
 
 	bind(*forloop_start_label);
+	auto previous_label = m_ctx.set_current_loop_start_label(forloop_start_label);
 	emit<ForIter>(iter_variable->get_register(), iterator_register, forloop_end_label);
 
 	// call the __next__ implementation

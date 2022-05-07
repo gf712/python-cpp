@@ -85,10 +85,8 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	} break;
 	case JUMP_IF_TRUE: {
 		const auto test_register = deserialize<uint8_t>(instruction_buffer);
-		const auto label_position = deserialize<uint8_t>(instruction_buffer);
 		const auto offset = deserialize<uint8_t>(instruction_buffer);
-		(void)offset;
-		return std::make_unique<JumpIfTrue>(test_register, std::make_shared<Label>(label_position));
+		return std::make_unique<JumpIfTrue>(test_register, offset);
 	} break;
 	case RAISE_VARARGS: {
 		const auto exception = [&]() -> std::optional<Register> {

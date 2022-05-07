@@ -7,6 +7,7 @@ class ForIter final : public Instruction
 	Register m_dst;
 	Register m_src;
 	std::shared_ptr<Label> m_exit_label;
+	std::optional<size_t> m_offset;
 
   public:
 	ForIter(Register dst, Register src, std::shared_ptr<Label> exit_label)
