@@ -71,6 +71,15 @@ def fixture10():
     assert acc_even == 2450, "ForLoopAccumulateEvenAndOddNumbers_even (fixture10) failed"
     assert acc_odd == 2500, "ForLoopAccumulateEvenAndOddNumbers_odd (fixture10) failed"
 
+def fixture11():
+    acc = 0
+    for x in range(10):
+        if x == 1:
+            acc += 10
+            continue
+        acc += x
+    assert acc == 54, "For loop with continue (fixture11) failed"
+
 fixture1()
 fixture2()
 fixture3()
@@ -81,3 +90,4 @@ fixture7()
 fixture8()
 fixture9()
 fixture10()
+fixture11()

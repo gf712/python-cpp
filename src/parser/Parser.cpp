@@ -3491,8 +3491,9 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ContinueKeywordPattern>>;
 		if (pattern11::match(p)) {
 			DEBUG_LOG("continue");
-			spdlog::error("'continue' not implemented");
-			TODO();
+			const auto start_token = p.lexer().peek_token(p.token_position());
+			p.push_to_stack(std::make_shared<Continue>(
+				SourceLocation{ start_token->start(), start_token->end() }));
 			return true;
 		}
 		using pattern12 = PatternMatch<GlobalStatementPattern>;

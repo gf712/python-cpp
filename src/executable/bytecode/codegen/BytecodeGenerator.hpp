@@ -99,6 +99,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	{
 		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
 		std::vector<const ast::ASTNode *> m_parent_nodes;
+		std::shared_ptr<Label> m_current_loop_start_label;
 
 	  public:
 		void push_local_args(std::shared_ptr<ast::Arguments> args)
@@ -106,14 +107,24 @@ class BytecodeGenerator : public ast::CodeGenerator
 			m_local_args.push(std::move(args));
 		}
 		void pop_local_args() { m_local_args.pop(); }
-
 		bool has_local_args() const { return !m_local_args.empty(); }
+		const std::shared_ptr<ast::Arguments> &local_args() const { return m_local_args.top(); }
 
 		void push_node(const ast::ASTNode *node) { m_parent_nodes.push_back(node); }
 		void pop_node() { m_parent_nodes.pop_back(); }
-
-		const std::shared_ptr<ast::Arguments> &local_args() const { return m_local_args.top(); }
 		const std::vector<const ast::ASTNode *> &parent_nodes() const { return m_parent_nodes; }
+
+		std::shared_ptr<Label> set_current_loop_start_label(std::shared_ptr<Label> label)
+		{
+			m_current_loop_start_label.swap(label);
+			return label;
+		}
+
+		const std::shared_ptr<Label> &get_current_loop_start_label() const
+		{
+			ASSERT(m_current_loop_start_label)
+			return m_current_loop_start_label;
+		}
 	};
 
 	struct Scope

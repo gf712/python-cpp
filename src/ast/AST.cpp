@@ -619,6 +619,11 @@ void BoolOp::print_this_node(const std::string &indent) const
 
 void Pass::print_this_node(const std::string &indent) const { spdlog::debug("{}Pass", indent); }
 
+void Continue::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Continue", indent);
+}
+
 void Global::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Globals [{}:{}-{}:{}]",

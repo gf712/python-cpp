@@ -889,6 +889,14 @@ Value *BytecodeGenerator::visit(const For *node)
 	bind(*forloop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
+	m_ctx.set_current_loop_start_label(previous_label);
+
+	return nullptr;
+}
+
+Value *BytecodeGenerator::visit(const Continue *)
+{
+	emit<Jump>(m_ctx.get_current_loop_start_label());
 	return nullptr;
 }
 
@@ -905,6 +913,7 @@ Value *BytecodeGenerator::visit(const While *node)
 
 	// test
 	bind(*while_loop_start_label);
+	auto previous_label = m_ctx.set_current_loop_start_label(while_loop_start_label);
 	const auto *test_result = generate(node->test().get(), m_function_id);
 	emit<JumpIfFalse>(test_result->get_register(), while_loop_end_label);
 
@@ -915,6 +924,8 @@ Value *BytecodeGenerator::visit(const While *node)
 	// orelse
 	bind(*while_loop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
+
+	m_ctx.set_current_loop_start_label(previous_label);
 
 	return nullptr;
 }

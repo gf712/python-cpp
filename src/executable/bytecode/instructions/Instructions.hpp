@@ -72,6 +72,7 @@ static constexpr uint8_t STORE_NAME = 47;
 static constexpr uint8_t STORE_SUBSCRIPT = 48;
 static constexpr uint8_t UNARY = 49;
 static constexpr uint8_t UNPACK_SEQUENCE = 50;
+static constexpr uint8_t CONTINUE = 51;
 static constexpr uint8_t RERAISE = 52;
 static constexpr uint8_t WITH_EXCEPT_START = 53;
 

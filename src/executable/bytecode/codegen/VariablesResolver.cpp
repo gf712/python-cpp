@@ -533,3 +533,5 @@ Value *VariablesResolver::visit(const JoinedStr *node)
 	(void)node;
 	return nullptr;
 }
+
+Value *VariablesResolver::visit(const Continue *) { return nullptr; }

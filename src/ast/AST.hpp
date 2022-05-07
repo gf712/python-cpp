@@ -33,6 +33,7 @@ namespace ast {
 	__AST_NODE_TYPE(BoolOp)             \
 	__AST_NODE_TYPE(Call)               \
 	__AST_NODE_TYPE(ClassDefinition)    \
+	__AST_NODE_TYPE(Continue)           \
 	__AST_NODE_TYPE(Compare)            \
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(Delete)             \
@@ -1163,6 +1164,17 @@ class Pass : public ASTNode
 {
   public:
 	Pass(SourceLocation source_location) : ASTNode(ASTNodeType::Pass, source_location) {}
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class Continue : public ASTNode
+{
+  public:
+	Continue(SourceLocation source_location) : ASTNode(ASTNodeType::Continue, source_location) {}
 
 	Value *codegen(CodeGenerator *) const override;
 
