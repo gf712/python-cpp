@@ -28,12 +28,10 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			}));
 	}
 
-	const auto instruction_count =
-		std::accumulate(functions_instruction_count.begin(), functions_instruction_count.end(), 0u);
 	// have to reserve instruction vector to avoid relocations
 	// since the iterators depend on the vector memory layout
 	InstructionVector main_instructions;
-	main_instructions.reserve(instruction_count);
+	main_instructions.reserve(functions_instruction_count[0]);
 
 	auto &main_func = func_blocks.functions.front();
 
@@ -79,7 +77,7 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		auto &func = *std::next(func_blocks.functions.begin(), i);
 		std::vector<View> func_blocks_view;
 		InstructionVector func_instructions;
-		func_instructions.reserve(func.blocks.size());
+		func_instructions.reserve(functions_instruction_count[i]);
 		for (size_t start_idx = 0; auto &block : func.blocks) {
 			// ASSERT(!block.empty())
 			if (block.empty()) { continue; }
