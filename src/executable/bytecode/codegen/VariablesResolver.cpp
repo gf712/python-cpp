@@ -210,10 +210,12 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 	const std::string &class_name = Mangler::default_mangler().class_mangle(
 		m_current_scope->get().namespace_, node->name(), node->source_location());
 
-	const auto &ns = m_current_scope->get().namespace_ + "." + node->name();
+	auto ns = m_current_scope->get().namespace_ + "." + node->name();
+
+	ASSERT(!m_visibility.contains(class_name))
 
 	m_visibility[class_name] = std::unique_ptr<Scope>(new Scope{ .name = class_name,
-		.namespace_ = ns,
+		.namespace_ = std::move(ns),
 		.type = Scope::Type::CLASS,
 		.parent = &m_current_scope->get() });
 	m_current_scope = std::ref(*m_visibility.at(class_name));
@@ -280,23 +282,25 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 	const std::string &function_name = Mangler::default_mangler().function_mangle(
 		m_current_scope->get().namespace_, node->name(), node->source_location());
 
-	const auto &ns = m_current_scope->get().namespace_ + "." + node->name();
+	auto ns = m_current_scope->get().namespace_ + "." + node->name();
 
 	for (const auto &default_ : node->args()->defaults()) {
 		// load default values using the outer scope
 		default_->codegen(this);
 	}
 
+	ASSERT(!m_visibility.contains(function_name))
+
 	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
-			.namespace_ = ns,
+			.namespace_ = std::move(ns),
 			.type = Scope::Type::CLOSURE,
 			.parent = &caller->get() });
 		m_current_scope = std::ref(*m_visibility.at(function_name));
 		caller->get().visibility[node->name()] = Visibility::LOCAL;
 	} else {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
-			.namespace_ = ns,
+			.namespace_ = std::move(ns),
 			.type = Scope::Type::FUNCTION,
 			.parent = &caller->get() });
 		m_current_scope = std::ref(*m_visibility.at(function_name));
@@ -388,10 +392,14 @@ Value *VariablesResolver::visit(const List *node)
 Value *VariablesResolver::visit(const Module *node)
 {
 	const auto &module_name = fs::path(node->filename()).stem();
-	const auto ns = module_name;
+	auto ns = module_name;
 
-	m_visibility[module_name] = std::unique_ptr<Scope>(new Scope{
-		.name = module_name, .namespace_ = ns, .type = Scope::Type::MODULE, .parent = nullptr });
+	ASSERT(!m_visibility.contains(module_name))
+
+	m_visibility[module_name] = std::unique_ptr<Scope>(new Scope{ .name = module_name,
+		.namespace_ = std::move(ns),
+		.type = Scope::Type::MODULE,
+		.parent = nullptr });
 	m_current_scope = std::ref(*m_visibility.at(module_name));
 
 	for (const auto &statement : node->body()) {

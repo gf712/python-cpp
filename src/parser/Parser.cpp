@@ -4000,7 +4000,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 		BlockScope scope{ p };
 		// function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
-		const auto &start = p.lexer().peek_token(0)->start();
+		const auto &start = p.lexer().peek_token(p.token_position())->start();
 		if (pattern1::match(p)) {
 			DEBUG_LOG("function_def_raw: function_def");
 			auto name = p.pop_front();
@@ -4029,7 +4029,7 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
 			}
 
-			const auto &end = p.lexer().peek_token(0)->end();
+			const auto &end = body.back()->source_location().end;
 			ASSERT(as<Constant>(name));
 			ASSERT(as<Arguments>(args));
 			auto function = std::make_shared<FunctionDefinition>(
