@@ -673,7 +673,8 @@ std::tuple<PyResult<PyObject *>, LookupAttrResult> PyObject::lookup_attribute(Py
 		}
 	}();
 
-	if (std::get<0>(result).unwrap_err()->type() == AttributeError::static_type()) {
+	if (std::get<0>(result).is_err()
+		&& (std::get<0>(result).unwrap_err()->type() == AttributeError::static_type())) {
 		return { Ok(py_none()), LookupAttrResult::NOT_FOUND };
 	} else {
 		return result;
