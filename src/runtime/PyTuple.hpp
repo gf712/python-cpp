@@ -6,7 +6,7 @@ namespace py {
 
 class PyTupleIterator;
 
-class PyTuple : public PyBaseObject
+class PyTuple : public PyBaseObject, PySequence
 {
 	friend class ::Heap;
 	friend class PyTupleIterator;
@@ -24,7 +24,7 @@ class PyTuple : public PyBaseObject
 	static PyResult<PyTuple *> create();
 	static PyResult<PyTuple *> create(std::vector<Value> &&elements);
 	static PyResult<PyTuple *> create(const std::vector<PyObject *> &elements);
-	template<typename... Args> static PyResult<PyTuple *> create(Args &&... args)
+	template<typename... Args> static PyResult<PyTuple *> create(Args &&...args)
 	{
 		return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... });
 	}
@@ -34,7 +34,9 @@ class PyTuple : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 	PyResult<size_t> __len__() const;
+	PyResult<PyObject *> __add__(const PyObject *other) const;
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
+	PyResult<PyObject *> __getitem__(PyObject *key);
 
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;
@@ -46,7 +48,7 @@ class PyTuple : public PyBaseObject
 	size_t size() const { return m_elements.size(); }
 	PyResult<PyObject *> operator[](size_t idx) const;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 
@@ -84,7 +86,7 @@ class PyTupleIterator : public PyBaseObject
 	PyTupleIterator &operator++();
 	PyTupleIterator &operator--();
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

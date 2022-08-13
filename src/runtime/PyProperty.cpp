@@ -27,10 +27,10 @@ PyResult<PyObject *> PyProperty::__new__(const PyType *type, PyTuple *args, PyDi
 
 	if (fget.is_err()) { return fget; }
 
-	return PyProperty::create(fget.unwrap(), nullptr, nullptr, nullptr);
+	return PyProperty::create(fget.unwrap(), py_none(), py_none(), py_none());
 }
 
-PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *name)
+PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
 	: PyBaseObject(BuiltinTypes::the().property()), m_getter(fget), m_setter(fset), m_deleter(fdel),
 	  m_property_name(name)
 {}
@@ -41,7 +41,7 @@ std::string PyProperty::to_string() const
 }
 
 PyResult<PyProperty *>
-	PyProperty::create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *name)
+	PyProperty::create(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
 {
 	auto *obj = VirtualMachine::the().heap().allocate<PyProperty>(fget, fset, fdel, name);
 	if (!obj) return Err(memory_error(sizeof(PyProperty)));
@@ -50,9 +50,18 @@ PyResult<PyProperty *>
 
 PyResult<PyObject *> PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 {
-	(void)args;
-	(void)kwargs;
-	TODO();
+	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(args)
+	ASSERT(args->size() == 1)
+
+	auto getter_ = PyObject::from(args->elements()[0]);
+
+	if (getter_.is_err()) return getter_;
+
+	return PyProperty::create(getter_.unwrap(),
+		m_setter == py_none() ? py_none() : m_setter,
+		m_deleter == py_none() ? py_none() : m_deleter,
+		m_property_name);
 }
 
 PyResult<PyObject *> PyProperty::setter(PyTuple *args, PyDict *kwargs) const
@@ -61,18 +70,30 @@ PyResult<PyObject *> PyProperty::setter(PyTuple *args, PyDict *kwargs) const
 	ASSERT(args)
 	ASSERT(args->size() == 1)
 
-	auto fgets = PyObject::from(args->elements()[0]);
+	auto setter_ = PyObject::from(args->elements()[0]);
 
-	if (fgets.is_err()) return fgets;
+	if (setter_.is_err()) return setter_;
 
-	return PyProperty::create(fgets.unwrap(), nullptr, nullptr, m_property_name);
+	return PyProperty::create(m_getter == py_none() ? py_none() : m_getter,
+		setter_.unwrap(),
+		m_deleter == py_none() ? py_none() : m_deleter,
+		m_property_name);
 }
 
 PyResult<PyObject *> PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
 {
-	(void)args;
-	(void)kwargs;
-	TODO();
+	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(args)
+	ASSERT(args->size() == 1)
+
+	auto deleter_ = PyObject::from(args->elements()[0]);
+
+	if (deleter_.is_err()) return deleter_;
+
+	return PyProperty::create(m_setter == py_none() ? py_none() : m_setter,
+		m_setter == py_none() ? py_none() : m_setter,
+		deleter_.unwrap(),
+		m_property_name);
 }
 
 PyResult<PyObject *> PyProperty::__repr__() const
@@ -96,6 +117,30 @@ PyResult<PyObject *> PyProperty::__get__(PyObject *instance, PyObject *) const
 		[&](auto *args) { return m_getter->call(args, nullptr); });
 }
 
+PyResult<std::monostate> PyProperty::__set__(PyObject *obj, PyObject *value)
+{
+	auto func = [this, value] {
+		if (value == nullptr) {
+			return m_deleter;
+		} else {
+			return m_setter;
+		}
+	}();
+
+	if (!func) {
+		if (!value) {
+			return Err(attribute_error("can't delete attribute"));
+		} else {
+			return Err(attribute_error("can't set attribute"));
+		}
+	}
+
+	auto args = PyTuple::create(obj, value);
+	if (args.is_err()) return Err(args.unwrap_err());
+
+	return func->call(args.unwrap(), nullptr).and_then([](auto *) { return Ok(std::monostate{}); });
+}
+
 void PyProperty::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
@@ -117,15 +162,20 @@ std::unique_ptr<TypePrototype> register_property()
 						 .def("getter", &PyProperty::getter)
 						 .def("deleter", &PyProperty::deleter)
 						 .def("setter", &PyProperty::setter)
+						 .attr("fget", &PyProperty::m_getter)
+						 .attr("fset", &PyProperty::m_setter)
+						 .attr("fdel", &PyProperty::m_deleter)
 						 .type);
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyProperty::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyProperty::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(property_flag, []() { type = ::register_property(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(property_flag, []() { type = ::register_property(); });
+		return std::move(type);
+	};
 }
 
 template<> PyProperty *py::as(PyObject *obj)

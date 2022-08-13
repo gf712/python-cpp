@@ -6,9 +6,11 @@
 #include "PyInteger.hpp"
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
+#include "PySlice.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
 #include "StopIteration.hpp"
+#include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -110,6 +112,45 @@ PyResult<PyObject *> PyList::__iter__() const
 	return Ok(it);
 }
 
+PyResult<PyObject *> PyList::__getitem__(PyObject *index)
+{
+	if (auto index_int = as<PyInteger>(index)) {
+		const auto i = index_int->as_i64();
+		if (i >= 0) {
+			if (static_cast<size_t>(i) >= m_elements.size()) {
+				// FIXME: should be IndexError
+				return Err(value_error("list index out of range"));
+			}
+			return PyObject::from(m_elements[i]);
+		} else {
+			TODO();
+		}
+	} else if (auto slice = as<PySlice>(index)) {
+		auto indices_ = slice->unpack();
+		if (indices_.is_err()) return Err(indices_.unwrap_err());
+		const auto [start_, end_, step] = indices_.unwrap();
+
+		const auto [start, end, slice_length] =
+			PySlice::adjust_indices(start_, end_, step, m_elements.size());
+
+		if (slice_length == 0) { return PyList::create(); }
+		if (start == 0 && end == static_cast<int64_t>(m_elements.size()) && step == 1) {
+			return Ok(this);
+		}
+
+		auto new_list = PyList::create();
+		if (new_list.is_err()) return new_list;
+
+		for (int64_t idx = start, i = 0; i < slice_length; idx += step, ++i) {
+			new_list.unwrap()->elements().push_back(m_elements[idx]);
+		}
+		return new_list;
+	} else {
+		return Err(
+			type_error("list indices must be integers or slices, not {}", index->type()->name()));
+	}
+}
+
 PyResult<size_t> PyList::__len__() const { return Ok(m_elements.size()); }
 
 PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
@@ -182,11 +223,13 @@ std::unique_ptr<TypePrototype> register_list()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyList::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyList::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(list_flag, []() { type = ::register_list(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(list_flag, []() { type = ::register_list(); });
+		return std::move(type);
+	};
 }
 
 
@@ -230,9 +273,11 @@ std::unique_ptr<TypePrototype> register_list_iterator()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyListIterator::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
+		return std::move(type);
+	};
 }

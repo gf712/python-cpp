@@ -1,6 +1,7 @@
 #include "DictMerge.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -32,7 +33,7 @@ PyResult<Value> DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 std::vector<uint8_t> DictMerge::serialize() const
 {
 	return {
-		MERGE_DICT,
+		DICT_MERGE,
 		m_this_dict,
 		m_other_dict,
 	};

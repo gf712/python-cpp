@@ -1,14 +1,14 @@
 #include "LoadClosure.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/PyCell.hpp"
+#include "runtime/PyFrame.hpp"
+#include "vm/VM.hpp"
 
 
 using namespace py;
 
 PyResult<Value> LoadClosure::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	// size_t freevars_stack_offset =
-	// 	vm.stack_locals()->get().size() - interpreter.execution_frame()->freevars().size();
-	// const auto &value = vm.stack_local(freevars_stack_offset + m_source);
 	auto result = interpreter.execution_frame()->freevars()[m_source];
 	vm.reg(m_destination) = result;
 	return Ok(Value{ result });
@@ -16,7 +16,6 @@ PyResult<Value> LoadClosure::execute(VirtualMachine &vm, Interpreter &interprete
 
 std::vector<uint8_t> LoadClosure::serialize() const
 {
-	TODO();
 	return {
 		LOAD_CLOSURE,
 		m_destination,

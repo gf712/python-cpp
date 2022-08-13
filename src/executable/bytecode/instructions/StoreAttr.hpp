@@ -7,11 +7,11 @@ class StoreAttr final : public Instruction
 {
 	Register m_dst;
 	Register m_src;
-	const std::string m_attr_name;
+	Register m_attr_name;
 
   public:
-	StoreAttr(Register destination, Register value_source, std::string attr_name)
-		: m_dst(destination), m_src(value_source), m_attr_name(std::move(attr_name))
+	StoreAttr(Register destination, Register value_source, Register attr_name)
+		: m_dst(destination), m_src(value_source), m_attr_name(attr_name)
 	{}
 
 	std::string to_string() const final

@@ -7,9 +7,10 @@ namespace py {
 class PyNumber : public PyBaseObject
 {
 	friend class ::Heap;
-	friend class PyInteger;
+	friend Interface<PyNumber, PyInteger>;
 	friend class PyFloat;
 
+  protected:
 	Number m_value;
 
   public:
@@ -33,6 +34,8 @@ class PyNumber : public PyBaseObject
 	PyResult<PyObject *> __le__(const PyObject *obj) const;
 	PyResult<PyObject *> __gt__(const PyObject *obj) const;
 	PyResult<PyObject *> __ge__(const PyObject *obj) const;
+
+	PyResult<bool> __bool__() const;
 
 	const Number &value() const { return m_value; }
 

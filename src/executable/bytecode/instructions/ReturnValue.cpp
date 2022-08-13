@@ -1,4 +1,6 @@
 #include "ReturnValue.hpp"
+#include "vm/VM.hpp"
+
 
 using namespace py;
 

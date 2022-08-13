@@ -1,5 +1,6 @@
 #include "BuildTuple.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

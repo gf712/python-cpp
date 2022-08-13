@@ -49,6 +49,18 @@ class BytecodeStaticValue : public ast::Value
 	virtual bool is_function() const { return false; }
 };
 
+class BytecodeNameValue : public ast::Value
+{
+	size_t m_index;
+
+  public:
+	BytecodeNameValue(const std::string &name, size_t index) : ast::Value(name), m_index(index) {}
+
+	size_t get_index() const { return m_index; }
+
+	virtual bool is_function() const { return false; }
+};
+
 class BytecodeStackValue : public ast::Value
 {
 	Register m_stack_index;
@@ -100,6 +112,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
 		std::vector<const ast::ASTNode *> m_parent_nodes;
 		std::shared_ptr<Label> m_current_loop_start_label;
+		std::shared_ptr<Label> m_current_loop_end_label;
 
 	  public:
 		void push_local_args(std::shared_ptr<ast::Arguments> args)
@@ -120,10 +133,22 @@ class BytecodeGenerator : public ast::CodeGenerator
 			return label;
 		}
 
+		std::shared_ptr<Label> set_current_loop_end_label(std::shared_ptr<Label> label)
+		{
+			m_current_loop_end_label.swap(label);
+			return label;
+		}
+
 		const std::shared_ptr<Label> &get_current_loop_start_label() const
 		{
 			ASSERT(m_current_loop_start_label)
 			return m_current_loop_start_label;
+		}
+
+		const std::shared_ptr<Label> &get_current_loop_end_label() const
+		{
+			ASSERT(m_current_loop_end_label)
+			return m_current_loop_end_label;
 		}
 	};
 
@@ -135,6 +160,63 @@ class BytecodeGenerator : public ast::CodeGenerator
 		std::unordered_map<std::string,
 			std::variant<BytecodeValue *, BytecodeStackValue *, BytecodeFreeValue *>>
 			locals;
+	};
+
+	struct ScopedClearExceptionBeforeReturn
+	{
+		ScopedClearExceptionBeforeReturn(BytecodeGenerator &generator_, size_t function_id_)
+			: generator(generator_), function_id(function_id_)
+		{
+			if (!generator.m_clear_exception_before_return_functions.contains(function_id)) {
+				requires_cleanup = true;
+			}
+			generator.m_clear_exception_before_return_functions.insert(function_id);
+		}
+
+		~ScopedClearExceptionBeforeReturn()
+		{
+			if (requires_cleanup) {
+				generator.m_clear_exception_before_return_functions.erase(function_id);
+			}
+		}
+
+	  private:
+		BytecodeGenerator &generator;
+		const size_t function_id;
+		bool requires_cleanup{ false };
+	};
+
+	struct ScopedWithStatement
+	{
+		ScopedWithStatement(BytecodeGenerator &generator_,
+			std::function<void(bool)> return_transform,
+			size_t function_id_)
+			: generator(generator_), function_id(function_id_)
+		{
+			generator.m_return_transform[function_id].push_back(std::move(return_transform));
+			generator.m_current_exception_depth[function_id]++;
+		}
+
+		~ScopedWithStatement()
+		{
+			ASSERT(generator.m_current_exception_depth[function_id] > 0);
+
+			generator.m_return_transform[function_id].pop_back();
+			generator.m_current_exception_depth[function_id]--;
+		}
+
+	  protected:
+		BytecodeGenerator &generator;
+		const size_t function_id;
+	};
+
+	struct ScopedTryStatement : ScopedWithStatement
+	{
+		ScopedTryStatement(BytecodeGenerator &generator_,
+			std::function<void(bool)> return_transform,
+			size_t function_id_)
+			: ScopedWithStatement(generator_, return_transform, function_id_)
+		{}
 	};
 
   public:
@@ -165,8 +247,12 @@ class BytecodeGenerator : public ast::CodeGenerator
 	ASTContext m_ctx;
 	std::stack<Scope> m_stack;
 
+	std::set<size_t> m_clear_exception_before_return_functions;
+	std::unordered_map<size_t, std::vector<std::function<void(bool)>>> m_return_transform;
+	std::unordered_map<size_t, size_t> m_current_exception_depth;
+
   public:
-	static std::unique_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
+	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
 		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
 
@@ -174,7 +260,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeGenerator();
 	~BytecodeGenerator();
 
-	template<typename OpType, typename... Args> void emit(Args &&... args)
+	template<typename OpType, typename... Args> void emit(Args &&...args)
 	{
 		ASSERT(m_current_block)
 		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
@@ -195,7 +281,15 @@ class BytecodeGenerator : public ast::CodeGenerator
 	const InstructionBlock &function(size_t idx, size_t block) const
 	{
 		ASSERT(idx < m_functions.functions.size())
-		auto f = std::next(m_functions.functions.begin(), idx);
+		const auto f = std::next(m_functions.functions.begin(), idx);
+		ASSERT(block < f->blocks.size())
+		return *std::next(f->blocks.begin(), block);
+	}
+
+	InstructionBlock &function(size_t idx, size_t block)
+	{
+		ASSERT(idx < m_functions.functions.size())
+		const auto f = std::next(m_functions.functions.begin(), idx);
 		ASSERT(block < f->blocks.size())
 		return *std::next(f->blocks.begin(), block);
 	}
@@ -217,7 +311,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		if (auto it = std::find(m_labels.begin(), m_labels.end(), &l); it != m_labels.end()) {
 			return **it;
 		} else {
-			ASSERT_NOT_REACHED()
+			ASSERT_NOT_REACHED();
 		}
 	}
 
@@ -233,6 +327,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 			});
 		const size_t current_instruction_position = instructions_size;
 		label.set_position(current_instruction_position);
+		spdlog::debug("bound label {}", label.name());
 	}
 
 	size_t register_count() const { return m_frame_register_count.back(); }
@@ -242,6 +337,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	Register allocate_register()
 	{
 		spdlog::debug("New register: {}", m_frame_register_count.back());
+		ASSERT(m_frame_register_count.back() < std::numeric_limits<Register>::max());
 		return m_frame_register_count.back()++;
 	}
 
@@ -271,14 +367,17 @@ class BytecodeGenerator : public ast::CodeGenerator
 	void exit_function(size_t function_id);
 
 	void store_name(const std::string &, BytecodeValue *);
-	BytecodeValue *load_name(const std::string &);
+	BytecodeValue *load_var(const std::string &);
+	void delete_var(const std::string &);
 
 	BytecodeStaticValue *load_const(const py::Value &, size_t);
+	BytecodeNameValue *load_name(const std::string &, size_t);
 
 	std::tuple<size_t, size_t> move_to_stack(const std::vector<Register> &args);
 	BytecodeValue *build_dict(const std::vector<Register> &, const std::vector<Register> &);
 	BytecodeValue *build_list(const std::vector<Register> &);
 	BytecodeValue *build_tuple(const std::vector<Register> &);
+	BytecodeValue *build_set(const std::vector<Register> &);
 	void emit_call(Register func, const std::vector<Register> &);
 	void make_function(Register,
 		const std::string &,
@@ -337,7 +436,14 @@ class BytecodeGenerator : public ast::CodeGenerator
 		return static_cast<BytecodeFreeValue *>(m_values.back().get());
 	}
 
-	std::unique_ptr<Program> generate_executable(std::string, std::vector<std::string>);
+	BytecodeFreeValue *create_free_value(std::string name)
+	{
+		m_values.push_back(
+			std::make_unique<BytecodeFreeValue>(std::move(name), allocate_free_value()));
+		return static_cast<BytecodeFreeValue *>(m_values.back().get());
+	}
+
+	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
 	void relocate_labels(const FunctionBlocks &functions);
 
 	void set_insert_point(InstructionBlock *block) { m_current_block = block; }
@@ -345,5 +451,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::string mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const;
 
 	void create_nested_scope(const std::string &name, const std::string &mangled_name);
+	std::tuple<std::shared_ptr<Label>, std::shared_ptr<Label>, BytecodeValue *> visit_comprehension(
+		const ast::Comprehension *node,
+		std::function<BytecodeValue *()> container_builder);
 };
 }// namespace codegen

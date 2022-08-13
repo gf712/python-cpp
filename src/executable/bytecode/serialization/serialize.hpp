@@ -20,7 +20,8 @@ template<typename T> struct is_vector<std::vector<T>> : std::true_type
 
 template<typename T> inline constexpr bool is_vector_v = is_vector<T>::value;
 
-template<typename T> concept Vector = is_vector_v<T>;
+template<typename T>
+concept Vector = is_vector_v<T>;
 
 enum class ValueType {
 	INT64 = 0,
@@ -46,6 +47,11 @@ template<> inline void serialize<bool>(const bool &value, std::vector<uint8_t> &
 	result.push_back(value ? 1 : 0);
 }
 
+template<> inline void serialize<std::byte>(const std::byte &value, std::vector<uint8_t> &result)
+{
+	result.push_back(bit_cast<uint8_t>(value));
+}
+
 template<>
 inline void serialize<std::string>(const std::string &value, std::vector<uint8_t> &result)
 {
@@ -60,8 +66,7 @@ inline void serialize(const VectorType &value, std::vector<uint8_t> &result)
 	for (const auto &el : value) { serialize(el, result); }
 }
 
-template<>
-inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<uint8_t> &result)
+template<> inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<uint8_t> &result)
 {
 	serialize(value->size(), result);
 	for (const auto &el : value->elements()) {
@@ -83,7 +88,10 @@ inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<uint8_t> &re
 					serialize(static_cast<uint8_t>(ValueType::STRING), result);
 					serialize(val.s, result);
 				},
-				[&](const Bytes &) { TODO(); },
+				[&](const Bytes &bytes) {
+					serialize(static_cast<uint8_t>(ValueType::BYTES), result);
+					serialize(bytes.b, result);
+				},
 				[&](const Ellipsis &) {
 					serialize(static_cast<uint8_t>(ValueType::ELLIPSIS), result);
 				},

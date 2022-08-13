@@ -38,7 +38,7 @@ void VariablesResolver::annotate_free_and_cell_variables(const std::string &name
 	ASSERT(child);
 
 	if (!top_node) {
-		child->visibility[name] = Visibility::LOCAL;
+		child->visibility[name] = Visibility::GLOBAL;
 		return;
 	}
 	auto *parent = child->parent;
@@ -171,7 +171,7 @@ Value *VariablesResolver::visit(const Assert *node)
 
 Value *VariablesResolver::visit(const AugAssign *node)
 {
-	node->value()->codegen(this);
+	node->target()->codegen(this);
 	node->value()->codegen(this);
 	return nullptr;
 }
@@ -289,6 +289,11 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 		default_->codegen(this);
 	}
 
+	for (const auto &default_ : node->args()->kw_defaults()) {
+		// load default values using the outer scope
+		if (default_) { default_->codegen(this); }
+	}
+
 	ASSERT(!m_visibility.contains(function_name))
 
 	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
@@ -360,10 +365,36 @@ Value *VariablesResolver::visit(const IfExpr *node)
 
 Value *VariablesResolver::visit(const Import *node)
 {
-	if (node->asname().has_value()) {
-		store(*node->asname(), node->source_location());
-	} else {
-		store(node->names()[0], node->source_location());
+	for (const auto &name : node->names()) {
+		if (!name.asname.empty()) {
+			store(name.asname, node->source_location());
+		} else {
+			auto idx = name.name.find('.');
+			if (idx != std::string::npos) {
+				std::string imported_name = name.name.substr(idx + 1);
+				store(imported_name, node->source_location());
+			} else {
+				store(name.name, node->source_location());
+			}
+		}
+	}
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const ImportFrom *node)
+{
+	for (const auto &name : node->names()) {
+		if (!name.asname.empty()) {
+			store(name.asname, node->source_location());
+		} else {
+			auto idx = name.name.find('.');
+			if (idx != std::string::npos) {
+				std::string imported_name = name.name.substr(idx + 1);
+				store(imported_name, node->source_location());
+			} else {
+				store(name.name, node->source_location());
+			}
+		}
 	}
 	return nullptr;
 }
@@ -384,6 +415,12 @@ Value *VariablesResolver::visit(const Keyword *node)
 }
 
 Value *VariablesResolver::visit(const List *node)
+{
+	for (const auto &el : node->elements()) { el->codegen(this); }
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const Set *node)
 {
 	for (const auto &el : node->elements()) { el->codegen(this); }
 	return nullptr;
@@ -434,6 +471,8 @@ Value *VariablesResolver::visit(const Name *node)
 }
 
 Value *VariablesResolver::visit(const Pass *) { return nullptr; }
+
+Value *VariablesResolver::visit(const Break *) { return nullptr; }
 
 Value *VariablesResolver::visit(const Raise *node)
 {
@@ -539,6 +578,140 @@ Value *VariablesResolver::visit(const FormattedValue *node)
 Value *VariablesResolver::visit(const JoinedStr *node)
 {
 	(void)node;
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const Comprehension *node)
+{
+	if (node->target()->node_type() == ASTNodeType::Name) {
+		auto name = std::static_pointer_cast<Name>(node->target());
+		ASSERT(name->ids().size() == 1)
+		m_current_scope->get().visibility[name->ids()[0]] = Visibility::LOCAL;
+	}
+
+	for (auto &if_ : node->ifs()) { if_->codegen(this); }
+
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const ListComp *node)
+{
+	auto caller = m_current_scope;
+
+	store("<listcomp>", node->source_location());
+	for (const auto &generator : node->generators()) { generator->iter()->codegen(this); }
+
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		m_current_scope->get().namespace_, "<listcomp>", node->source_location());
+
+	auto ns = m_current_scope->get().namespace_ + "." + "<listcomp>";
+
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::CLOSURE,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<listcomp>"] = Visibility::LOCAL;
+	} else {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::FUNCTION,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<listcomp>"] = Visibility::NAME;
+	}
+
+	caller->get().children.push_back(*m_current_scope);
+
+	for (const auto &generator : node->generators()) {
+		m_to_visit.emplace_back(*m_current_scope, generator);
+	}
+	m_to_visit.emplace_back(*m_current_scope, node->elt());
+
+	m_current_scope = caller;
+
+	return nullptr;
+}
+
+
+Value *VariablesResolver::visit(const GeneratorExp *node)
+{
+	auto caller = m_current_scope;
+
+	store("<genexpr>", node->source_location());
+	for (const auto &generator : node->generators()) { generator->iter()->codegen(this); }
+
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		m_current_scope->get().namespace_, "<genexpr>", node->source_location());
+
+	auto ns = m_current_scope->get().namespace_ + "." + "<genexpr>";
+
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::CLOSURE,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<genexpr>"] = Visibility::LOCAL;
+	} else {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::FUNCTION,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<genexpr>"] = Visibility::NAME;
+	}
+
+	caller->get().children.push_back(*m_current_scope);
+
+	for (const auto &generator : node->generators()) {
+		m_to_visit.emplace_back(*m_current_scope, generator);
+	}
+	m_to_visit.emplace_back(*m_current_scope, node->elt());
+
+	m_current_scope = caller;
+
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const SetComp *node)
+{
+	auto caller = m_current_scope;
+
+	store("<setcomp>", node->source_location());
+	for (const auto &generator : node->generators()) { generator->iter()->codegen(this); }
+
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		m_current_scope->get().namespace_, "<setcomp>", node->source_location());
+
+	auto ns = m_current_scope->get().namespace_ + "." + "<setcomp>";
+
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::CLOSURE,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<setcomp>"] = Visibility::LOCAL;
+	} else {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::FUNCTION,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<setcomp>"] = Visibility::NAME;
+	}
+
+	caller->get().children.push_back(*m_current_scope);
+
+	for (const auto &generator : node->generators()) {
+		m_to_visit.emplace_back(*m_current_scope, generator);
+	}
+	m_to_visit.emplace_back(*m_current_scope, node->elt());
+
+	m_current_scope = caller;
+
 	return nullptr;
 }
 

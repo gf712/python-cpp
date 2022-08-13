@@ -1,6 +1,10 @@
 #include "JumpIfTrue.hpp"
+#include "executable/Label.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyNone.hpp"
+#include "vm/VM.hpp"
+
+#include "../serialization/serialize.hpp"
 
 using namespace py;
 
@@ -28,11 +32,13 @@ void JumpIfTrue::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
 std::vector<uint8_t> JumpIfTrue::serialize() const
 {
 	ASSERT(m_offset.has_value())
-	ASSERT(m_offset < std::numeric_limits<uint8_t>::max())
 
-	return {
+	std::vector<uint8_t> result{
 		JUMP_IF_TRUE,
 		m_test_register,
-		static_cast<uint8_t>(*m_offset),
 	};
+
+	::serialize(*m_offset, result);
+
+	return result;
 }

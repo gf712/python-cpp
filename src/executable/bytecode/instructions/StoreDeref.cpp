@@ -1,5 +1,8 @@
 #include "StoreDeref.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/PyCell.hpp"
+#include "runtime/PyFrame.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

@@ -42,9 +42,28 @@ inline auto deserialize(std::span<const uint8_t> &buffer)
 		}
 		buffer = buffer.subspan(sizeof(int64_t));
 		return result;
+	} else if constexpr (std::is_same_v<T, int32_t>) {
+		int32_t result;
+		for (size_t i = 0; i < sizeof(int32_t); ++i) {
+			reinterpret_cast<uint8_t *>(&result)[i] = buffer[i];
+		}
+		buffer = buffer.subspan(sizeof(int32_t));
+		return result;
+	} else if constexpr (std::is_same_v<T, uint32_t>) {
+		uint32_t result;
+		for (size_t i = 0; i < sizeof(uint32_t); ++i) {
+			reinterpret_cast<uint8_t *>(&result)[i] = buffer[i];
+		}
+		buffer = buffer.subspan(sizeof(uint32_t));
+		return result;
 	} else if constexpr (std::is_same_v<T, uint8_t>) {
 		uint8_t result = buffer.front();
 		buffer = buffer.subspan(sizeof(uint8_t));
+		return result;
+	} else if constexpr (std::is_same_v<T, std::byte>) {
+		static_assert(sizeof(std::byte) == sizeof(uint8_t));
+		std::byte result = bit_cast<std::byte>(buffer.front());
+		buffer = buffer.subspan(sizeof(std::byte));
 		return result;
 	} else if constexpr (std::is_same_v<T, bool>) {
 		bool result = buffer.front() == uint8_t{ 1 };
@@ -77,7 +96,7 @@ inline auto deserialize(std::span<const uint8_t> &buffer)
 			return String{ deserialize<std::string>(buffer) };
 		} break;
 		case ValueType::BYTES: {
-			TODO();
+			return Bytes{ deserialize<std::vector<std::byte>>(buffer) };
 		} break;
 		case ValueType::ELLIPSIS: {
 			return Ellipsis{};

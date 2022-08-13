@@ -24,17 +24,20 @@ template<> const PyMemberDescriptor *as(const PyObject *obj)
 
 PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 	PyType *underlying_type,
-	std::function<PyObject *(PyObject *)> member)
+	std::function<PyObject *(PyObject *)> member,
+	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> setter)
 	: PyBaseObject(BuiltinTypes::the().member_descriptor()), m_name(std::move(name)),
-	  m_underlying_type(underlying_type), m_member_accessor(std::move(member))
+	  m_underlying_type(underlying_type), m_member_accessor(std::move(member)),
+	  m_member_setter(std::move(setter))
 {}
 
 PyResult<PyMemberDescriptor *> PyMemberDescriptor::create(PyString *name,
 	PyType *underlying_type,
-	std::function<PyObject *(PyObject *)> member)
+	std::function<PyObject *(PyObject *)> member,
+	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> setter)
 {
-	auto *obj =
-		VirtualMachine::the().heap().allocate<PyMemberDescriptor>(name, underlying_type, member);
+	auto *obj = VirtualMachine::the().heap().allocate<PyMemberDescriptor>(
+		name, underlying_type, member, setter);
 	if (!obj) { return Err(memory_error(sizeof(PyMemberDescriptor))); }
 	return Ok(obj);
 }
@@ -70,6 +73,19 @@ PyResult<PyObject *> PyMemberDescriptor::__get__(PyObject *instance, PyObject * 
 	return Ok(m_member_accessor(instance));
 }
 
+PyResult<std::monostate> PyMemberDescriptor::__set__(PyObject *obj, PyObject *value)
+{
+	if (obj->type() != m_underlying_type && !obj->type()->issubclass(m_underlying_type)) {
+		return Err(type_error("descriptor '{}' for '{}' objects doesn't apply to a '{}' object",
+			m_name->value(),
+			m_underlying_type->underlying_type().__name__,
+			obj->type()->underlying_type().__name__));
+	}
+
+	return m_member_setter(obj, value);
+}
+
+
 PyType *PyMemberDescriptor::type() const { return member_descriptor(); }
 
 namespace {
@@ -82,11 +98,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyMemberDescriptor::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyMemberDescriptor::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(method_wrapper_flag, []() { type = register_member_descriptor(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(method_wrapper_flag, []() { type = register_member_descriptor(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

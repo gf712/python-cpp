@@ -7,8 +7,8 @@ gtest_add_tests(TARGET integration-tests_)
 # cmake-format: off
 add_custom_target(
   integration-tests
-  COMMAND $<TARGET_FILE:integration-tests_>
-          && echo "------------------------"
+  COMMAND # $<TARGET_FILE:integration-tests_>
+             echo "------------------------"
           && echo "Running python scripts:"
           && echo "------------------------"
           && echo ""

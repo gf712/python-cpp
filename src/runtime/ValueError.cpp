@@ -51,6 +51,8 @@ PyType *ValueError::register_type(PyModule *module)
 	if (!s_value_error) {
 		s_value_error =
 			klass<ValueError>(module, "ValueError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("ValueError").unwrap(), s_value_error);
 	}
 	return s_value_error;
 }

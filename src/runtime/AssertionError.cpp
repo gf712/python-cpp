@@ -41,6 +41,8 @@ PyType *AssertionError::register_type(PyModule *module)
 	if (!s_assertion_error) {
 		s_assertion_error =
 			klass<AssertionError>(module, "AssertionError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("AssertionError").unwrap(), s_assertion_error);
 	}
 	return s_assertion_error;
 }

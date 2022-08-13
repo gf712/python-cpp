@@ -50,11 +50,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyTraceback::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyTraceback::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(traceback_flag, []() { type = register_traceback(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(traceback_flag, []() { type = register_traceback(); });
+		return std::move(type);
+	};
 }
 
 template<> PyTraceback *as(PyObject *obj)

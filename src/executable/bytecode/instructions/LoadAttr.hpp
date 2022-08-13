@@ -7,12 +7,11 @@ class LoadAttr final : public Instruction
 {
 	Register m_destination;
 	Register m_value_source;
-	const std::string m_attr_name;
+	Register m_attr_name;
 
   public:
-	LoadAttr(Register destination, Register value_source, std::string attr_name)
-		: m_destination(destination), m_value_source(value_source),
-		  m_attr_name(std::move(attr_name))
+	LoadAttr(Register destination, Register value_source, Register attr_name)
+		: m_destination(destination), m_value_source(value_source), m_attr_name(attr_name)
 	{}
 
 	std::string to_string() const final

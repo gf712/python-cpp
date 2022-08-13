@@ -10,9 +10,14 @@ class Jump final : public Instruction
 
   public:
 	Jump(std::shared_ptr<Label> label) : m_label(std::move(label)) {}
+
+	Jump(int32_t offset) : m_offset(offset) {}
+
 	std::string to_string() const final
 	{
-		return fmt::format("JUMP            position: {}", m_label->position());
+		const std::string position =
+			m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
+		return fmt::format("JUMP            position: {}", position);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

@@ -1,15 +1,27 @@
 #include "BinarySubscript.hpp"
+#include "runtime/Value.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
 PyResult<Value> BinarySubscript::execute(VirtualMachine &vm, Interpreter &) const
 {
-	auto object = vm.reg(m_src);
-	auto slice = vm.reg(m_index);
-	(void)object;
-	(void)slice;
-	TODO();
-	return Err(nullptr);
+	auto object_value = vm.reg(m_src);
+	auto object = PyObject::from(object_value);
+	if (object.is_err()) return object;
+
+	auto subscript_value = vm.reg(m_index);
+	auto subscript = PyObject::from(subscript_value);
+	if (subscript.is_err()) return subscript;
+
+	return object.unwrap()
+		->as_mapping()
+		.and_then(
+			[&subscript](PyMappingWrapper mapping) { return mapping.getitem(subscript.unwrap()); })
+		.and_then([&vm, this](PyObject *value) {
+			vm.reg(m_dst) = value;
+			return Ok(value);
+		});
 }
 
 std::vector<uint8_t> BinarySubscript::serialize() const

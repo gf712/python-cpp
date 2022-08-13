@@ -18,15 +18,43 @@ template<> const PyBool *as(const PyObject *node)
 	return nullptr;
 }
 
-PyBool::PyBool(bool name) : PyBaseObject(BuiltinTypes::the().bool_()), m_value(name) {}
+PyBool::PyBool(bool value) : PyInteger(BuiltinTypes::the().bool_(), value) {}
 
-std::string PyBool::to_string() const { return m_value ? "True" : "False"; }
+std::string PyBool::to_string() const
+{
+	ASSERT(std::holds_alternative<int64_t>(m_value.value));
+	return std::get<int64_t>(m_value.value) ? "True" : "False";
+}
+
+bool PyBool::value() const
+{
+	ASSERT(std::holds_alternative<int64_t>(m_value.value));
+	return std::get<int64_t>(m_value.value);
+}
+
+PyResult<PyObject *> PyBool::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(!kwargs || kwargs->map().size() == 0)
+	ASSERT(args && args->size() == 1)
+	ASSERT(type == py::bool_())
+
+	const auto &value = PyObject::from(args->elements()[0]);
+
+	if (value.is_err()) return value;
+
+	if (value.unwrap()->type() == py::bool_()) return value;
+
+	return value.unwrap()->bool_().and_then(
+		[](const auto &v) { return Ok(v ? py_true() : py_false()); });
+}
 
 PyResult<PyObject *> PyBool::__repr__() const { return PyString::create(to_string()); }
 
-PyResult<PyObject *> PyBool::__add__(const PyObject *) const { TODO(); }
-
-PyResult<bool> PyBool::__bool__() const { return Ok(m_value); }
+PyResult<bool> PyBool::__bool__() const
+{
+	ASSERT(std::holds_alternative<int64_t>(m_value.value));
+	return Ok(static_cast<bool>(std::get<int64_t>(m_value.value)));
+}
 
 PyResult<PyBool *> PyBool::create(bool value)
 {
@@ -60,13 +88,22 @@ namespace {
 
 	std::once_flag bool_flag;
 
-	std::unique_ptr<TypePrototype> register_bool() { return std::move(klass<PyBool>("bool").type); }
+	std::unique_ptr<TypePrototype> register_bool()
+	{
+		return std::move(klass<PyBool>("bool", integer()).type);
+	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyBool::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyBool::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(bool_flag, []() { type = register_bool(); });
-	return std::move(type);
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(bool_flag, []() { type = register_bool(); });
+		return std::move(type);
+	};
 }
+
+static_assert(std::is_same_v<PyBool::_InterfaceT, PyNumber>);
+static_assert(std::is_same_v<PyBool::_InterfacingT, PyInteger>);
+static_assert(!concepts::HasInterface<PyBool>);
 }// namespace py

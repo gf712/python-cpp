@@ -14,6 +14,8 @@ PyResult<PyObject *> PyNone::__repr__() const { return PyString::create(to_strin
 
 PyResult<PyObject *> PyNone::__add__(const PyObject *) const { TODO(); }
 
+PyResult<bool> PyNone::__bool__() const { return Ok(false); }
+
 PyNone *PyNone::create()
 {
 	auto &heap = VirtualMachine::the().heap();
@@ -29,11 +31,13 @@ std::once_flag none_flag;
 std::unique_ptr<TypePrototype> register_none() { return std::move(klass<PyNone>("NoneType").type); }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyNone::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyNone::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(none_flag, []() { type = ::register_none(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(none_flag, []() { type = ::register_none(); });
+		return std::move(type);
+	};
 }
 
 PyObject *py::py_none()

@@ -7,6 +7,7 @@
 #include <memory>
 #include <string_view>
 #include <tuple>
+#include <unordered_set>
 #include <variant>
 
 namespace parser {
@@ -19,6 +20,25 @@ class Parser
 	std::deque<std::deque<std::shared_ptr<ast::ASTNode>>> m_stack;
 	Lexer &m_lexer;
 	size_t m_token_position{ 0 };
+
+  public:
+	struct CacheLine
+	{
+		std::tuple<std::array<void *, 10>, size_t> type_matcher_ids;
+		Token token;
+	};
+
+	struct CacheHash
+	{
+		size_t operator()(const CacheLine &cache) const;
+	};
+
+	struct CacheEqual
+	{
+		bool operator()(const CacheLine &lhs, const CacheLine &rhs) const;
+	};
+
+	std::unordered_set<CacheLine, CacheHash, CacheEqual> m_cache;
 
   public:
 	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>(l.filename())), m_lexer(l)
@@ -74,10 +94,10 @@ class Parser
 
 	void commit()
 	{
-		while (m_token_position > 0) {
-			m_lexer.next_token();
-			m_token_position--;
-		}
+		// while (m_token_position > 0) {
+		// 	m_lexer.next_token();
+		// 	m_token_position--;
+		// }
 	}
 
 	void parse();

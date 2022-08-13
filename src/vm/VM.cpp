@@ -1,10 +1,12 @@
 #include "VM.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
+#include "executable/bytecode/BytecodeProgram.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "interpreter/InterpreterSession.hpp"
 #include "runtime/BaseException.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTraceback.hpp"
@@ -40,8 +42,7 @@ StackFrame::~StackFrame()
 	if (vm) { spdlog::debug("Popping frame. New stack size: {}", vm->m_stack.size()); }
 }
 
-VirtualMachine::VirtualMachine()
-	: m_heap(Heap::the()), m_interpreter_session(std::make_unique<InterpreterSession>())
+VirtualMachine::VirtualMachine() : m_heap(Heap::the())
 {
 	uintptr_t *rbp;
 	asm volatile("movq %%rbp, %0" : "=r"(rbp));
@@ -53,16 +54,46 @@ void VirtualMachine::setup_call_stack(size_t register_count, size_t stack_size)
 	push_frame(register_count, stack_size);
 }
 
-void VirtualMachine::ret() { pop_frame(); }
+void VirtualMachine::ret()
+{
+	if (m_state->cleanup.top().has_value()
+		&& m_state->cleanup.top()->first == State::CleanupLogic::WITH_EXIT) {
+		m_state->cleanup.pop();
+		ret();
+	} else if (m_state->cleanup.top().has_value()
+			   && m_state->cleanup.top()->first == State::CleanupLogic::CATCH_EXCEPTION) {
+		if (auto exc = m_interpreter->execution_frame()->exception_info(); exc.has_value()) {
+			// Make sure that we don't leave the current frame in an exception state when we have
+			// exception handlers
+			ASSERT(exc->traceback->m_tb_frame != m_interpreter->execution_frame());
+		}
+		m_state->cleanup.pop();
+		ret();
+	} else {
+		ASSERT(m_state->cleanup.size() == 1)
+		pop_frame();
+	}
+}
 
-int VirtualMachine::execute(std::unique_ptr<Program> &program) { return program->execute(this); }
+int VirtualMachine::execute(std::shared_ptr<Program> program) { return program->execute(this); }
 
-Interpreter &VirtualMachine::interpreter() { return m_interpreter_session->interpreter(); }
+Interpreter &VirtualMachine::initialize_interpreter(std::shared_ptr<Program> &&program)
+{
+	m_interpreter = std::make_unique<Interpreter>();
+	m_interpreter->setup_main_interpreter(std::static_pointer_cast<BytecodeProgram>(program));
+	return *m_interpreter;
+}
 
+Interpreter &VirtualMachine::interpreter()
+{
+	ASSERT(m_interpreter)
+	return *m_interpreter;
+}
 
 const Interpreter &VirtualMachine::interpreter() const
 {
-	return m_interpreter_session->interpreter();
+	ASSERT(m_interpreter)
+	return *m_interpreter;
 }
 
 
@@ -138,24 +169,23 @@ void VirtualMachine::dump() const
 
 void VirtualMachine::clear()
 {
-	while (!m_interpreter_session->interpreters().empty()) {
-		m_interpreter_session->shutdown(m_interpreter_session->interpreter());
-	}
 	m_heap.reset();
 	while (!m_stack.empty()) m_stack.pop();
 	// should instruction pointer be optional?
 	// m_instruction_pointer = nullptr;
 }
 
-
-void VirtualMachine::shutdown_interpreter(Interpreter &interpreter)
+void VirtualMachine::set_cleanup(State::CleanupLogic cleanup_type,
+	InstructionVector::const_iterator exit_instruction)
 {
-	m_interpreter_session->shutdown(interpreter);
+	m_state->cleanup.push(std::make_pair(cleanup_type, exit_instruction));
 }
 
-void VirtualMachine::jump_blocks(size_t block_count) { m_state->jump_block_count = block_count; }
-
-void VirtualMachine::set_exception_handling() { m_state->catch_exception = true; }
+void VirtualMachine::leave_cleanup_handling()
+{
+	ASSERT(m_state->cleanup.size() > 1)
+	m_state->cleanup.pop();
+}
 
 void VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 {
@@ -169,6 +199,8 @@ void VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 		const auto return_address = m_instruction_pointer;
 		m_stack.push(StackFrame{ register_count, stack_size, return_address, this });
 	}
+	spdlog::debug("Pushing frame. New stack size: {}", m_stack.size());
+
 	// set a new state for this stack frame
 	m_state = m_stack.top().state.get();
 
@@ -197,7 +229,8 @@ void VirtualMachine::pop_frame()
 		m_stack_objects.pop_back();
 	} else {
 		// FIXME: this is an ugly way to keep the state of the interpreter
-		// m_stack.pop();
+		m_stack.pop();
+		m_stack_objects.pop_back();
 	}
 }
 

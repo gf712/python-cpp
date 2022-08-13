@@ -19,6 +19,682 @@ AST_NODE_TYPES
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
+void NodeVisitor::dispatch(ASTNode *node)
+{
+#define __AST_NODE_TYPE(NodeType)             \
+	case ASTNodeType::NodeType: {             \
+		visit(static_cast<NodeType *>(node)); \
+	} break;
+	switch (node->node_type()) {
+		AST_NODE_TYPES
+	}
+#undef __AST_NODE_TYPE
+}
+
+#define __AST_NODE_TYPE(NodeType) \
+	void NodeVisitor::dispatch(NodeType *node) { visit(node); }
+AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+
+void NodeVisitor::visit(Constant *) {}
+
+void NodeVisitor::visit(Expression *node) { dispatch(node->value().get()); }
+
+void NodeVisitor::visit(List *node)
+{
+	for (auto &el : node->elements()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Tuple *node)
+{
+	for (auto &el : node->elements()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Dict *node)
+{
+	for (auto &el : node->keys()) { dispatch(el.get()); }
+	for (auto &el : node->values()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Set *node)
+{
+	for (auto &el : node->elements()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Name *) {}
+
+void NodeVisitor::visit(Assign *node)
+{
+	for (const auto &target : node->targets()) { dispatch(target.get()); }
+	if (node->value()) dispatch(node->value().get());
+}
+
+void NodeVisitor::visit(BinaryExpr *node)
+{
+	dispatch(node->lhs().get());
+	dispatch(node->rhs().get());
+}
+
+void NodeVisitor::visit(AugAssign *node)
+{
+	dispatch(node->target().get());
+	dispatch(node->value().get());
+}
+
+void NodeVisitor::visit(Return *node) { dispatch(node->value().get()); }
+
+void NodeVisitor::visit(Argument *node)
+{
+	if (node->annotation()) dispatch(node->annotation().get());
+}
+
+void NodeVisitor::visit(Arguments *node)
+{
+	for (auto &el : node->posonlyargs()) { dispatch(el.get()); }
+	for (auto &el : node->args()) { dispatch(el.get()); }
+	if (node->vararg()) dispatch(node->vararg().get());
+	for (auto &el : node->kwonlyargs()) { dispatch(el.get()); }
+	for (auto &el : node->kw_defaults()) { dispatch(el.get()); }
+	if (node->kwarg()) dispatch(node->kwarg().get());
+	for (auto &el : node->defaults()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(FunctionDefinition *node)
+{
+	dispatch(node->args().get());
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->decorator_list()) { dispatch(el.get()); }
+	dispatch(node->returns().get());
+}
+
+void NodeVisitor::visit(Keyword *node) { dispatch(node->value().get()); }
+
+void NodeVisitor::visit(ClassDefinition *node)
+{
+	for (auto &el : node->bases()) { dispatch(el.get()); };
+	for (auto &el : node->keywords()) { dispatch(el.get()); };
+	for (auto &el : node->body()) { dispatch(el.get()); };
+	for (auto &el : node->decorator_list()) { dispatch(el.get()); };
+}
+
+void NodeVisitor::visit(Call *node)
+{
+	dispatch(node->function().get());
+	for (auto &el : node->args()) { dispatch(el.get()); };
+	for (auto &el : node->keywords()) { dispatch(el.get()); };
+}
+
+void NodeVisitor::visit(Module *node)
+{
+	for (auto &el : node->body()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(If *node)
+{
+	dispatch(node->test().get());
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->orelse()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(For *node)
+{
+	dispatch(node->target().get());
+	dispatch(node->iter().get());
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->orelse()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(While *node)
+{
+	dispatch(node->test().get());
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->orelse()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Compare *node)
+{
+	dispatch(node->lhs().get());
+	dispatch(node->rhs().get());
+}
+
+void NodeVisitor::visit(Attribute *node) { dispatch(node->value().get()); }
+
+void NodeVisitor::visit(Import *) {}
+
+void NodeVisitor::visit(ImportFrom *) {}
+
+void NodeVisitor::visit(Subscript *node)
+{
+	dispatch(node->value().get());
+	std::visit(overloaded{ [this](const Subscript::Index &val) { dispatch(val.value.get()); },
+				   [this](const Subscript::Slice &val) {
+					   if (val.lower) dispatch(val.lower.get());
+					   if (val.upper) dispatch(val.upper.get());
+					   if (val.step) dispatch(val.step.get());
+				   },
+				   [this](const Subscript::ExtSlice &val) {
+					   for (auto &dim : val.dims) {
+						   std::visit(overloaded{
+										  [this](const Subscript::Index &val) {
+											  dispatch(val.value.get());
+										  },
+										  [this](const Subscript::Slice &val) {
+											  if (val.lower) dispatch(val.lower.get());
+											  if (val.upper) dispatch(val.upper.get());
+											  if (val.step) dispatch(val.step.get());
+										  },
+									  },
+							   dim);
+					   }
+				   } },
+		node->slice());
+}
+
+void NodeVisitor::visit(Raise *node)
+{
+	if (node->exception()) { dispatch(node->exception().get()); }
+	if (node->cause()) { dispatch(node->cause().get()); }
+}
+
+void NodeVisitor::visit(ExceptHandler *node)
+{
+	if (node->type()) { dispatch(node->type().get()); }
+	for (auto &el : node->body()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Try *node)
+{
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->handlers()) { dispatch(el.get()); }
+	for (auto &el : node->orelse()) { dispatch(el.get()); }
+	for (auto &el : node->finalbody()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Assert *node)
+{
+	if (node->test()) { dispatch(node->test().get()); }
+	if (node->msg()) { dispatch(node->msg().get()); }
+}
+
+void NodeVisitor::visit(UnaryExpr *node) { dispatch(node->operand().get()); }
+
+void NodeVisitor::visit(BoolOp *node)
+{
+	for (auto &el : node->values()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(Pass *) {}
+
+void NodeVisitor::visit(Continue *) {}
+
+void NodeVisitor::visit(Break *) {}
+
+void NodeVisitor::visit(Global *) {}
+
+void NodeVisitor::visit(Delete *node)
+{
+	for (auto &el : node->targets()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(With *node)
+{
+	for (auto &el : node->items()) { dispatch(el.get()); }
+	for (auto &el : node->body()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(WithItem *node)
+{
+	dispatch(node->context_expr().get());
+	if (node->optional_vars()) dispatch(node->optional_vars().get());
+}
+
+void NodeVisitor::visit(IfExpr *node)
+{
+	dispatch(node->test().get());
+	dispatch(node->body().get());
+	dispatch(node->orelse().get());
+}
+
+void NodeVisitor::visit(Starred *node) { dispatch(node->value().get()); }
+
+void NodeVisitor::visit(NamedExpr *node)
+{
+	dispatch(node->target().get());
+	dispatch(node->value().get());
+}
+
+void NodeVisitor::visit(JoinedStr *node)
+{
+	for (auto &el : node->values()) { dispatch(el.get()); }
+}
+
+void NodeVisitor::visit(FormattedValue *node)
+{
+	dispatch(node->value().get());
+	dispatch(node->format_spec().get());
+}
+
+
+void NodeVisitor::visit(Comprehension *node)
+{
+	dispatch(node->target().get());
+	dispatch(node->iter().get());
+	for (auto &if_ : node->ifs()) { dispatch(if_.get()); }
+}
+
+void NodeVisitor::visit(ListComp *node)
+{
+	dispatch(node->elt().get());
+	for (auto &generator : node->generators()) { dispatch(generator.get()); }
+}
+
+void NodeVisitor::visit(GeneratorExp *node)
+{
+	dispatch(node->elt().get());
+	for (auto &generator : node->generators()) { dispatch(generator.get()); }
+}
+
+void NodeVisitor::visit(SetComp *node)
+{
+	dispatch(node->elt().get());
+	for (auto &generator : node->generators()) { dispatch(generator.get()); }
+}
+
+void NodeTransformVisitor::transform_single_node(std::shared_ptr<ASTNode> node)
+{
+	m_can_return_multiple_nodes = false;
+#define __AST_NODE_TYPE(NodeType)                                        \
+	case ASTNodeType::NodeType: {                                        \
+		auto new_node = visit(std::static_pointer_cast<NodeType>(node)); \
+		if (new_node.empty()) break;                                     \
+		ASSERT(new_node.size() == 1);                                    \
+		node.swap(new_node[0]);                                          \
+	} break;
+	switch (node->node_type()) {
+		AST_NODE_TYPES
+	}
+#undef __AST_NODE_TYPE
+}
+
+void NodeTransformVisitor::transform_multiple_nodes(std::vector<std::shared_ptr<ASTNode>> &nodes)
+{
+	std::vector<std::shared_ptr<ASTNode>> new_node_vector;
+	for (auto &node : nodes) {
+		m_can_return_multiple_nodes = true;
+		auto new_nodes = [node, this]() -> std::vector<std::shared_ptr<ASTNode>> {
+#define __AST_NODE_TYPE(NodeType)                               \
+	case ASTNodeType::NodeType: {                               \
+		return visit(std::static_pointer_cast<NodeType>(node)); \
+	}
+			switch (node->node_type()) {
+				AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+			}
+			ASSERT_NOT_REACHED();
+		}();
+		new_node_vector.insert(new_node_vector.end(), new_nodes.begin(), new_nodes.end());
+	}
+	nodes = std::move(new_node_vector);
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Constant> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Expression> node)
+{
+	transform_single_node(node->value());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<List> node)
+{
+	for (auto &el : node->elements()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Tuple> node)
+{
+	for (auto &el : node->elements()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Dict> node)
+{
+	for (auto &el : node->keys()) { transform_single_node(el); }
+	for (auto &el : node->values()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Set> node)
+{
+	for (auto &el : node->elements()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Name> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Assign> node)
+{
+	for (const auto &target : node->targets()) { transform_single_node(target); }
+	if (node->value()) transform_single_node(node->value());
+
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<BinaryExpr> node)
+{
+	transform_single_node(node->lhs());
+	transform_single_node(node->rhs());
+
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<AugAssign> node)
+{
+	transform_single_node(node->target());
+	transform_single_node(node->value());
+
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Return> node)
+{
+	transform_single_node(node->value());
+
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Argument> node)
+{
+	if (node->annotation()) transform_single_node(node->annotation());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Arguments> node)
+{
+	for (auto &el : node->posonlyargs()) { transform_single_node(el); }
+	for (auto &el : node->args()) { transform_single_node(el); }
+	if (node->vararg()) transform_single_node(node->vararg());
+	for (auto &el : node->kwonlyargs()) { transform_single_node(el); }
+	for (auto &el : node->kw_defaults()) { transform_single_node(el); }
+	if (node->kwarg()) transform_single_node(node->kwarg());
+	for (auto &el : node->defaults()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<FunctionDefinition> node)
+{
+	transform_single_node(node->args());
+	transform_multiple_nodes(node->body());
+	for (auto &el : node->decorator_list()) { transform_single_node(el); }
+	transform_single_node(node->returns());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Keyword> node)
+{
+	transform_single_node(node->value());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<ClassDefinition> node)
+{
+	for (auto &el : node->bases()) { transform_single_node(el); };
+	for (auto &el : node->keywords()) { transform_single_node(el); };
+	transform_multiple_nodes(node->body());
+	for (auto &el : node->decorator_list()) { transform_single_node(el); };
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Call> node)
+{
+	transform_single_node(node->function());
+	for (auto &el : node->args()) { transform_single_node(el); };
+	for (auto &el : node->keywords()) { transform_single_node(el); };
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Module> node)
+{
+	transform_multiple_nodes(node->body());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<If> node)
+{
+	transform_single_node(node->test());
+	transform_multiple_nodes(node->body());
+	transform_multiple_nodes(node->orelse());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<For> node)
+{
+	transform_single_node(node->target());
+	transform_single_node(node->iter());
+	transform_multiple_nodes(node->body());
+	transform_multiple_nodes(node->orelse());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<While> node)
+{
+	transform_single_node(node->test());
+	transform_multiple_nodes(node->body());
+	transform_multiple_nodes(node->orelse());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Compare> node)
+{
+	transform_single_node(node->lhs());
+	transform_single_node(node->rhs());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Attribute> node)
+{
+	transform_single_node(node->value());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Import> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<ImportFrom> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Subscript> node)
+{
+	transform_single_node(node->value());
+	std::visit(
+		overloaded{ [this](const Subscript::Index &val) { transform_single_node(val.value); },
+			[this](const Subscript::Slice &val) {
+				if (val.lower) transform_single_node(val.lower);
+				if (val.upper) transform_single_node(val.upper);
+				if (val.step) transform_single_node(val.step);
+			},
+			[this](const Subscript::ExtSlice &val) {
+				for (auto &dim : val.dims) {
+					std::visit(overloaded{
+								   [this](const Subscript::Index &val) {
+									   transform_single_node(val.value);
+								   },
+								   [this](const Subscript::Slice &val) {
+									   if (val.lower) transform_single_node(val.lower);
+									   if (val.upper) transform_single_node(val.upper);
+									   if (val.step) transform_single_node(val.step);
+								   },
+							   },
+						dim);
+				}
+			} },
+		node->slice());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Raise> node)
+{
+	if (node->exception()) { transform_single_node(node->exception()); }
+	if (node->cause()) { transform_single_node(node->cause()); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<ExceptHandler> node)
+{
+	if (node->type()) { transform_single_node(node->type()); }
+	transform_multiple_nodes(node->body());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Try> node)
+{
+	transform_multiple_nodes(node->body());
+	for (auto &el : node->handlers()) { transform_single_node(el); }
+	transform_multiple_nodes(node->orelse());
+	transform_multiple_nodes(node->finalbody());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Assert> node)
+{
+	if (node->test()) { transform_single_node(node->test()); }
+	if (node->msg()) { transform_single_node(node->msg()); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<UnaryExpr> node)
+{
+	transform_single_node(node->operand());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<BoolOp> node)
+{
+	for (auto &el : node->values()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Pass> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Continue> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Break> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Global> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Delete> node)
+{
+	for (auto &el : node->targets()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<With> node)
+{
+	for (auto &el : node->items()) { transform_single_node(el); }
+	transform_multiple_nodes(node->body());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<WithItem> node)
+{
+	transform_single_node(node->context_expr());
+	if (node->optional_vars()) transform_single_node(node->optional_vars());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<IfExpr> node)
+{
+	transform_single_node(node->test());
+	transform_single_node(node->body());
+	transform_single_node(node->orelse());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Starred> node)
+{
+	transform_single_node(node->value());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<NamedExpr> node)
+{
+	transform_single_node(node->target());
+	transform_single_node(node->value());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<JoinedStr> node)
+{
+	for (auto &el : node->values()) { transform_single_node(el); }
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<FormattedValue> node)
+{
+	transform_single_node(node->value());
+	transform_single_node(node->format_spec());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<Comprehension> node)
+{
+	transform_single_node(node->target());
+	transform_single_node(node->iter());
+	transform_multiple_nodes(node->ifs());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<ListComp> node)
+{
+	transform_single_node(node->elt());
+	TODO();
+	// transform_multiple_nodes(node->generators());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<GeneratorExp> node)
+{
+	transform_single_node(node->elt());
+	TODO();
+	// transform_multiple_nodes(node->generators());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<SetComp> node)
+{
+	transform_single_node(node->elt());
+	TODO();
+	// transform_multiple_nodes(node->generators());
+	return { node };
+}
 
 Constant::Constant(double value, SourceLocation source_location)
 	: ASTNode(ASTNodeType::Constant, source_location),
@@ -117,6 +793,20 @@ void Dict::print_this_node(const std::string &indent) const
 	for (const auto &el : m_keys) { el->print_node(new_indent); }
 	spdlog::debug("{}  values:", indent);
 	for (const auto &el : m_values) { el->print_node(new_indent); }
+}
+
+void Set::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Set [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	spdlog::debug("{}  context: {}", indent, static_cast<int>(m_ctx));
+	spdlog::debug("{}  elements:", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	for (const auto &el : m_elements) { el->print_node(new_indent); }
 }
 
 void Name::print_this_node(const std::string &indent) const
@@ -438,13 +1128,28 @@ void Import::print_this_node(const std::string &indent) const
 		source_location().start.column + 1,
 		source_location().end.row + 1,
 		source_location().end.column + 1);
-	std::string new_indent = indent + std::string(6, ' ');
-	if (m_asname.has_value()) {
-		spdlog::debug("{}  - asname: \"{}\"", indent, *m_asname);
-	} else {
-		spdlog::debug("{}  - asname: null", indent);
+	for (const auto &name : m_names) {
+		spdlog::debug("{}  - alias:", indent);
+		spdlog::debug("{}        asname: {}", indent, name.asname);
+		spdlog::debug("{}        name: {}", indent, name.name);
 	}
-	spdlog::debug("{}  - name: {}", indent, dotted_name());
+}
+
+void ImportFrom::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}ImportFrom [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	spdlog::debug("{}  - level: {}", indent, m_level);
+	spdlog::debug("{}  - module: {}", indent, m_module);
+	for (const auto &name : m_names) {
+		spdlog::debug("{}  - alias:", indent);
+		spdlog::debug("{}        asname: {}", indent, name.asname);
+		spdlog::debug("{}        name: {}", indent, name.name);
+	}
 }
 
 void Subscript::Index::print(const std::string &indent) const
@@ -624,6 +1329,8 @@ void Continue::print_this_node(const std::string &indent) const
 	spdlog::debug("{}Continue", indent);
 }
 
+void Break::print_this_node(const std::string &indent) const { spdlog::debug("{}Break", indent); }
+
 void Global::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Globals [{}:{}-{}:{}]",
@@ -744,4 +1451,46 @@ void FormattedValue::print_this_node(const std::string &indent) const
 	if (m_format_spec) m_format_spec->print_node(new_indent);
 }
 
+void Comprehension::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Comprehension", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - target: ", indent);
+	m_target->print_node(new_indent);
+	spdlog::debug("{}  - iter: ", indent);
+	m_iter->print_node(new_indent);
+	spdlog::debug("{}  - ifs: ", indent);
+	for (const auto &if_ : m_ifs) { if_->print_node(new_indent); }
+	spdlog::debug("{}  - is_async: {}", indent, m_is_async);
+}
+
+void ListComp::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}ListComp", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - elt: ", indent);
+	m_elt->print_node(new_indent);
+	spdlog::debug("{}  - generators: ", indent);
+	for (const auto &generator : m_generators) { generator->print_node(new_indent); }
+}
+
+void GeneratorExp::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}GeneratorExp", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - elt: ", indent);
+	m_elt->print_node(new_indent);
+	spdlog::debug("{}  - generators: ", indent);
+	for (const auto &generator : m_generators) { generator->print_node(new_indent); }
+}
+
+void SetComp::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}SetComp", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - elt: ", indent);
+	m_elt->print_node(new_indent);
+	spdlog::debug("{}  - generators: ", indent);
+	for (const auto &generator : m_generators) { generator->print_node(new_indent); }
+}
 }// namespace ast

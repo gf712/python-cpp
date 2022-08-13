@@ -1,6 +1,7 @@
 #include "Unary.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/TypeError.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -66,6 +67,32 @@ PyResult<Value> unary_negative(const Value &val)
 			} },
 		val);
 }
+
+PyResult<Value> unary_not(const Value &val)
+{
+	return std::visit(
+		overloaded{ [](const Number &val) -> PyResult<Value> {
+					   return Ok(
+						   std::visit([](const auto &v) { return NameConstant{ !v }; }, val.value));
+				   },
+			[](const String &s) -> PyResult<Value> { return Ok(NameConstant{ !s.s.empty() }); },
+			[](const Bytes &) -> PyResult<Value> { TODO(); },
+			[](const Ellipsis &) -> PyResult<Value> { return Ok(NameConstant{ false }); },
+			[](const NameConstant &c) -> PyResult<Value> {
+				if (std::holds_alternative<NoneType>(c.value)) { return Ok(NameConstant{ true }); }
+				if (std::get<bool>(c.value)) { return Ok(NameConstant{ false }); }
+				return Ok(NameConstant{ true });
+			},
+			[](PyObject *obj) -> PyResult<Value> {
+				if (auto r = obj->bool_(); r.is_ok()) {
+					return Ok(NameConstant{ !r.unwrap() });
+				} else {
+					return Err(r.unwrap_err());
+				}
+			} },
+		val);
+}
+
 }// namespace
 
 PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &) const
@@ -83,7 +110,7 @@ PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &) const
 			TODO();
 		} break;
 		case Operation::NOT: {
-			TODO();
+			return unary_not(val);
 		} break;
 		}
 	}();

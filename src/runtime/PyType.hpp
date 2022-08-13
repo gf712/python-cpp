@@ -11,16 +11,21 @@ class PyType : public PyBaseObject
 	friend class PyObject;
 
   private:
-	// FIXME: this is mutable to enable some caching behaviour
-	// 		  for example MRO is only computed the first time it is requested
-	mutable TypePrototype m_underlying_type;
-
-	PyType(TypePrototype type_prototype);
+	std::variant<std::reference_wrapper<TypePrototype>, std::unique_ptr<TypePrototype>>
+		m_underlying_type;
 
   public:
-	static PyType *initialize(TypePrototype type_prototype);
+	PyTuple *__mro__{ nullptr };
 
-	const std::string &name() const { return m_underlying_type.__name__; }
+  private:
+	PyType(TypePrototype &type_prototype);
+	PyType(std::unique_ptr<TypePrototype> &&type_prototype);
+
+  public:
+	static PyType *initialize(TypePrototype &type_prototype);
+	static PyType *initialize(std::unique_ptr<TypePrototype> &&type_prototype);
+
+	const std::string &name() const { return underlying_type().__name__; }
 
 	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> __repr__() const;
@@ -32,11 +37,27 @@ class PyType : public PyBaseObject
 
 	std::string to_string() const override;
 
-	const TypePrototype &underlying_type() const { return m_underlying_type; }
+	const TypePrototype &underlying_type() const
+	{
+		if (std::holds_alternative<std::reference_wrapper<TypePrototype>>(m_underlying_type)) {
+			return std::get<std::reference_wrapper<TypePrototype>>(m_underlying_type).get();
+		} else {
+			return *std::get<std::unique_ptr<TypePrototype>>(m_underlying_type);
+		}
+	}
+
+	TypePrototype &underlying_type()
+	{
+		if (std::holds_alternative<std::reference_wrapper<TypePrototype>>(m_underlying_type)) {
+			return std::get<std::reference_wrapper<TypePrototype>>(m_underlying_type).get();
+		} else {
+			return *std::get<std::unique_ptr<TypePrototype>>(m_underlying_type);
+		}
+	}
 
 	void visit_graph(Visitor &visitor) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *type() const override;
 
@@ -45,6 +66,8 @@ class PyType : public PyBaseObject
 	bool issubclass(const PyType *);
 
 	PyResult<PyObject *> lookup(PyObject *name) const;
+
+	PyDict *dict() { return m_attributes; }
 
   protected:
 	PyResult<PyTuple *> mro_internal() const;

@@ -15,6 +15,9 @@ class BinaryOperation : public Instruction
 		FLOORDIV = 6,
 		LEFTSHIFT = 7,
 		RIGHTSHIFT = 8,
+		AND = 9,
+		OR = 10,
+		XOR = 11,
 	};
 
   private:

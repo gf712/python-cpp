@@ -1,6 +1,7 @@
 #include "LoadAssertionError.hpp"
 #include "runtime/AssertionError.hpp"
 #include "runtime/PyType.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

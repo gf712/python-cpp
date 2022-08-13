@@ -1,5 +1,7 @@
 #include "BaseException.hpp"
 #include "MemoryError.hpp"
+#include "PyCode.hpp"
+#include "PyFrame.hpp"
 #include "PyTraceback.hpp"
 #include "PyType.hpp"
 #include "types/api.hpp"
@@ -104,7 +106,10 @@ std::string BaseException::format_traceback() const
 	out << "Traceback (most recent call last):\n";
 	auto *tb = m_traceback;
 	while (tb) {
-		out << fmt::format("  File \"{}\", line {}, in {}\n", "TODO", tb->m_tb_lineno, "TODO");
+		out << fmt::format("  File \"{}\", line {}, in {}\n",
+			"TODO",
+			tb->m_tb_lineno,
+			tb->m_tb_frame->code()->name());
 		out << "    TODO -> print line\n";
 		tb = tb->m_tb_next;
 	}
@@ -114,7 +119,7 @@ std::string BaseException::format_traceback() const
 
 PyResult<PyObject *> BaseException::__repr__() const
 {
-	if (auto result = PyString::create(fmt::format("{}({})", m_type_prototype.__name__, what()));
+	if (auto result = PyString::create(fmt::format("{}({})", type()->name(), what()));
 		result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
 	} else {
@@ -128,6 +133,8 @@ PyType *BaseException::register_type(PyModule *module)
 		s_base_exception_type = klass<BaseException>(module, "BaseException")
 									.attr("args", &BaseException::m_args)
 									.finalize();
+	} else {
+		module->add_symbol(PyString::create("BaseException").unwrap(), s_base_exception_type);
 	}
 	return s_base_exception_type;
 }

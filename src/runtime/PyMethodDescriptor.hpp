@@ -8,33 +8,32 @@ namespace py {
 
 class PyMethodDescriptor : public PyBaseObject
 {
-	using FunctionType = std::function<PyResult<PyObject *>(PyObject *, PyTuple *, PyDict *)>;
 	PyString *m_name;
 	PyType *m_underlying_type;
-	FunctionType m_method_descriptor;
+	MethodDefinition &m_method;
 	std::vector<PyObject *> m_captures;
 
 	friend class ::Heap;
 
 	PyMethodDescriptor(PyString *name,
 		PyType *underlying_type,
-		FunctionType &&function,
+		MethodDefinition &method,
 		std::vector<PyObject *> &&captures);
 
   public:
 	template<typename... Args>
 	static PyResult<PyMethodDescriptor *>
-		create(PyString *name, PyType *underlying_type, FunctionType &&function, Args &&... args)
+		create(PyString *name, PyType *underlying_type, MethodDefinition &method, Args &&...args)
 	{
 		auto *obj = VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
-			name, underlying_type, std::move(function), std::vector<PyObject *>{ args... });
+			name, underlying_type, method, std::vector<PyObject *>{ args... });
 		if (!obj) { return Err(memory_error(sizeof(PyMethodDescriptor))); }
 		return Ok(obj);
 	}
 
 	PyString *name() { return m_name; }
 
-	const FunctionType &method_descriptor() { return m_method_descriptor; }
+	const MethodDefinition &method_descriptor() const { return m_method; }
 
 	std::string to_string() const override;
 
@@ -44,7 +43,7 @@ class PyMethodDescriptor : public PyBaseObject
 
 	void visit_graph(Visitor &visitor) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

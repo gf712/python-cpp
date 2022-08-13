@@ -1,11 +1,14 @@
 #include "WithExceptStart.hpp"
 
 #include "executable/bytecode/serialization/serialize.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/BaseException.hpp"
 #include "runtime/PyBool.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyTraceback.hpp"
 #include "runtime/PyType.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -33,7 +36,15 @@ PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interp
 	auto result = exit_method_obj->call(args_tuple.unwrap(), nullptr);
 
 	if (result.is_ok()) {
-		vm.reg(m_result) = result.unwrap();
+		if (auto r = truthy(result.unwrap(), interpreter); r.is_ok()) {
+			if (!r.unwrap()) {
+				const auto active_exception =
+					interpreter.execution_frame()->exception_info().has_value();
+				vm.reg(m_result) = active_exception ? py_false() : py_true();
+			} else {
+				vm.reg(m_result) = py_true();
+			}
+		}
 	} else {
 		vm.reg(m_result) = py_false();
 	}
@@ -41,4 +52,11 @@ PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interp
 	return Ok(vm.reg(m_result));
 }
 
-std::vector<uint8_t> WithExceptStart::serialize() const { TODO(); }
+std::vector<uint8_t> WithExceptStart::serialize() const
+{
+	return {
+		WITH_EXCEPT_START,
+		m_result,
+		m_exit_method,
+	};
+}

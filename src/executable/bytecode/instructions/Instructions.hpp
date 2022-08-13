@@ -1,14 +1,10 @@
 #pragma once
 
-#include "executable/Label.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "forward.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "parser/Parser.hpp"
 #include "utilities.hpp"
-#include "vm/VM.hpp"
 
 #include <span>
+#include <string>
 
 class Instruction : NonCopyable
 {
@@ -36,8 +32,6 @@ static constexpr uint8_t FUNCTION_CALL_EX = 11;
 static constexpr uint8_t FUNCTION_CALL_WITH_KW = 12;
 static constexpr uint8_t GET_ITER = 13;
 static constexpr uint8_t IMPORT_NAME = 14;
-static constexpr uint8_t INPLACE_ADD = 15;
-static constexpr uint8_t INPLACE_SUB = 16;
 static constexpr uint8_t JUMP = 17;
 static constexpr uint8_t JUMP_FORWARD = 18;
 static constexpr uint8_t JUMP_IF_FALSE = 19;
@@ -58,7 +52,6 @@ static constexpr uint8_t LOAD_GLOBAL = 33;
 static constexpr uint8_t LOAD_METHOD = 34;
 static constexpr uint8_t LOAD_NAME = 35;
 static constexpr uint8_t MAKE_FUNCTION = 36;
-static constexpr uint8_t MERGE_DICT = 37;
 static constexpr uint8_t METHOD_CALL = 38;
 static constexpr uint8_t MOVE = 39;
 static constexpr uint8_t RAISE_VARARGS = 40;
@@ -75,5 +68,15 @@ static constexpr uint8_t UNPACK_SEQUENCE = 50;
 static constexpr uint8_t CONTINUE = 51;
 static constexpr uint8_t RERAISE = 52;
 static constexpr uint8_t WITH_EXCEPT_START = 53;
+static constexpr uint8_t LEAVE_EXCEPTION_HANDLING = 54;
+static constexpr uint8_t DELETE_SUBSCRIPT = 55;
+static constexpr uint8_t SETUP_WITH = 56;
+static constexpr uint8_t CLEAR_TOP_CLEANUP = 57;
+static constexpr uint8_t LIST_APPEND = 58;
+static constexpr uint8_t SET_ADD = 59;
+static constexpr uint8_t BUILD_SET = 60;
+static constexpr uint8_t IMPORT_FROM = 61;
+static constexpr uint8_t BUILD_SLICE = 62;
+static constexpr uint8_t INPLACE_OP = 63;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

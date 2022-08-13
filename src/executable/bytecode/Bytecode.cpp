@@ -2,6 +2,8 @@
 #include "instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/BaseException.hpp"
+#include "runtime/PyFrame.hpp"
+#include "runtime/PyModule.hpp"
 #include "runtime/PyTraceback.hpp"
 #include "serialization/deserialize.hpp"
 #include "serialization/serialize.hpp"
@@ -12,8 +14,13 @@ Bytecode::Bytecode(size_t register_count,
 	size_t stack_size,
 	std::string function_name,
 	InstructionVector &&instructions,
-	std::vector<View> block_views)
-	: Function(register_count, stack_size, function_name, FunctionExecutionBackend::BYTECODE),
+	std::vector<View> block_views,
+	std::shared_ptr<Program> program)
+	: Function(register_count,
+		stack_size,
+		function_name,
+		FunctionExecutionBackend::BYTECODE,
+		std::move(program)),
 	  m_instructions(std::move(instructions)), m_block_views(block_views)
 {}
 
@@ -47,6 +54,7 @@ std::vector<uint8_t> Bytecode::serialize() const
 		py::serialize(block_size, result);
 
 		for (const auto &ins : block) {
+			std::cout << ins->to_string() << std::endl;
 			auto serialized_instruction = ins->serialize();
 			result.insert(
 				result.end(), serialized_instruction.begin(), serialized_instruction.end());
@@ -55,7 +63,8 @@ std::vector<uint8_t> Bytecode::serialize() const
 	return result;
 }
 
-std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer)
+std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer,
+	std::shared_ptr<Program> program)
 {
 	const auto register_count = py::deserialize<size_t>(buffer);
 	const auto stack_size = py::deserialize<size_t>(buffer);
@@ -65,6 +74,7 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 
 	InstructionVector instructions;
 	std::vector<View> block_views;
+	std::vector<std::pair<size_t, size_t>> block_bounds;
 	const auto block_count = py::deserialize<size_t>(buffer);
 
 	for (size_t i = 0, ins_index_in_block_count = 0; i < block_count; ++i) {
@@ -72,37 +82,68 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 		for (size_t ins_index_in_block = 0; ins_index_in_block < block_size; ++ins_index_in_block) {
 			instructions.push_back(::deserialize(buffer));
 		}
-		InstructionVector::const_iterator start = instructions.begin() + ins_index_in_block_count;
-		InstructionVector::const_iterator end = instructions.end();
-		block_views.emplace_back(start, end);
+		block_bounds.emplace_back(ins_index_in_block_count, ins_index_in_block_count + block_size);
 		ins_index_in_block_count = instructions.size();
 	}
 
-	return std::make_unique<Bytecode>(
-		register_count, stack_size, function_name, std::move(instructions), block_views);
+	for (const auto &block_bound : block_bounds) {
+		InstructionVector::const_iterator start = instructions.begin() + block_bound.first;
+		InstructionVector::const_iterator end = instructions.begin() + block_bound.second;
+		block_views.emplace_back(start, end);
+	}
+
+	return std::make_unique<Bytecode>(register_count,
+		stack_size,
+		function_name,
+		std::move(instructions),
+		block_views,
+		std::move(program));
 }
 
 PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	std::optional<Value> value;
 	// create main stack frame
 	if (vm.stack().empty()) { vm.setup_call_stack(m_register_count, m_stack_size); }
 
 	const auto &begin_function_block = begin();
+	vm.set_instruction_pointer(begin_function_block->begin());
+
+	return eval_loop(vm, interpreter);
+}
+
+py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &interpreter) const
+{
+	std::optional<Value> value;
+
+	auto find_block = [this, &vm]() {
+		std::optional<std::vector<View>::const_iterator> block_view_;
+		for (size_t idx = 0; const auto &block : m_block_views) {
+			const auto &begin = block.begin();
+			const auto &end = block.end();
+			if ((vm.instruction_pointer() >= begin) && (vm.instruction_pointer() <= (end - 1))) {
+				block_view_ = this->begin() + idx;
+				break;
+			}
+			idx++;
+		}
+		ASSERT(block_view_.has_value())
+		return *block_view_;
+	};
+
+	auto block_view = find_block();
 	const auto &end_function_block = end();
 
-	vm.set_instruction_pointer(begin_function_block->begin());
-	const auto stack_count = vm.stack().size();
-	// can only initialize interpreter after creating the initial stack frame
+	const auto stack_depth = vm.stack().size();
 	const auto initial_ip = vm.instruction_pointer();
-	auto block_view = begin_function_block;
 
-	// IMPORTANT: this assumes you will not jump from a block to the middle of another.
-	//            What you can do is leave a block (and not the function) at any time and
-	//            start executing the next block from its first instruction
+	bool requires_block_jump = false;
+
 	for (; block_view != end_function_block;) {
-		vm.set_instruction_pointer(block_view->begin());
+		const auto begin = block_view->begin();
 		const auto end = block_view->end();
+		spdlog::debug("begin={} end={}", (void *)begin->get(), (void *)end->get());
+		if (!requires_block_jump) vm.set_instruction_pointer(begin);
+		requires_block_jump = false;
 		for (; vm.instruction_pointer() != end;
 			 vm.set_instruction_pointer(std::next(vm.instruction_pointer()))) {
 			ASSERT((*vm.instruction_pointer()).get())
@@ -111,7 +152,10 @@ PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) con
 			spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 			auto result = instruction->execute(vm, vm.interpreter());
 			// we left the current stack frame in the previous instruction
-			if (vm.stack().size() != stack_count) { return Ok(Value{ result.unwrap() }); }
+			if (vm.stack().size() != stack_depth) {
+				ASSERT(result.is_ok())
+				return result;
+			}
 			// vm.dump();
 			if (result.is_err()) {
 				auto *exception = result.unwrap_err();
@@ -125,29 +169,31 @@ PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) con
 
 				interpreter.raise_exception(exception);
 
-				if (!vm.state().catch_exception) {
+				ASSERT(vm.state().cleanup.size() > 0);
+				if (!vm.state().cleanup.top()) {
 					vm.ret();
 					return result;
 				} else {
-					vm.state().catch_exception = false;
-					break;
+					auto [exit_cleanup_type, exit_ins] = *vm.state().cleanup.top();
+					vm.leave_cleanup_handling();
+					vm.set_instruction_pointer(exit_ins);
 				}
 			} else {
 				value = result.unwrap();
 			}
+
+			if ((vm.instruction_pointer() < begin) || (vm.instruction_pointer() > (end - 1))) {
+				requires_block_jump = true;
+				break;
+			}
 		}
-		if (vm.state().jump_block_count.has_value()) {
-			// does it make sense to jump beyond the last block, i.e. to end_function_block
-			// meaning that we leave the function?
-			ASSERT((block_view + *vm.state().jump_block_count) < end_function_block)
-			block_view += *vm.state().jump_block_count;
-			vm.state().jump_block_count.reset();
-		} else {
+		if (!requires_block_jump)
 			block_view++;
+		else {
+			vm.set_instruction_pointer(vm.instruction_pointer() + 1);
+			block_view = find_block();
 		}
 	}
-
-	// vm.interpreter_session()->shutdown(interpreter);
 
 	ASSERT(value.has_value())
 	return Ok(*value);

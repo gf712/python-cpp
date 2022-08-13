@@ -6,10 +6,10 @@
 class LoadGlobal final : public Instruction
 {
 	Register m_destination;
-	std::string m_object_name;
+	Register m_object_name;
 
   public:
-	LoadGlobal(Register destination, std::string object_name)
+	LoadGlobal(Register destination, Register object_name)
 		: m_destination(destination), m_object_name(std::move(object_name))
 	{}
 

@@ -15,9 +15,11 @@ assert f(10, 20, 30, 40) == (30, 40)
 def f1(a, *args, **kwargs):
     return kwargs
 
+arg0 = 1
 assert f1(10, 20) == {}
 assert f1(10, 20, b=30) == {'b': 30}
 assert f1(10, 20, b=30, c=40) == {'b': 30, 'c': 40}
+assert f1(10, 20, b=30, c=40, d=arg0) == {'b': 30, 'c': 40, 'd': arg0}
 
 def f2(a, b=10, c=20):
     return a + b + c
@@ -37,6 +39,11 @@ try:
     assert False, "Should not be able to call keyword only argument with positional parameter"
 except TypeError:
     assert True, ""
+
+def f4(arg0, *args, kwarg0=1):
+    return arg0, args, kwarg0
+
+assert f4(0, 1, 2, kwarg0=3) == (0, (1, 2), 3)
 
 def new_bar():
     return 21

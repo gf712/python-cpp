@@ -696,3 +696,42 @@ TEST(Lexer, FString)
 	};
 	assert_generates_tokens(program, expected_tokens);
 }
+
+TEST(Lexer, Bytes)
+{
+	constexpr std::string_view program = "b\"hello\"\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::STRING,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER,
+	};
+
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, LiteralSingleQuote)
+{
+	constexpr std::string_view program = "\'doesn\\'t\'\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::STRING,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER,
+	};
+
+	assert_generates_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, TripleDoubleQuoteStringWithQuotes)
+{
+	constexpr std::string_view program = "\"\"\"Verify arguments are \"sane\".\"\"\"\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::STRING,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER,
+	};
+
+	assert_generates_tokens(program, expected_tokens);
+}

@@ -6,24 +6,28 @@ namespace py {
 
 class PyProperty : public PyBaseObject
 {
-	PyObject *m_getter;
-	PyObject *m_setter;
-	PyObject *m_deleter;
-	PyString *m_property_name;
+  public:
+	PyObject *m_getter{ nullptr };
+	PyObject *m_setter{ nullptr };
+	PyObject *m_deleter{ nullptr };
+
+  private:
+	PyObject *m_property_name{ nullptr };
 
 	friend class ::Heap;
 
-	PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *);
+	PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *);
 
   public:
 	static PyResult<PyProperty *>
-		create(PyObject *fget, PyObject *fset, PyObject *fdel, PyString *);
+		create(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *);
 
 	std::string to_string() const override;
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __get__(PyObject *instance, PyObject *owner) const;
+	PyResult<std::monostate> __set__(PyObject *obj, PyObject *value);
 
 	PyResult<PyObject *> getter(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> setter(PyTuple *args, PyDict *kwargs) const;
@@ -31,7 +35,7 @@ class PyProperty : public PyBaseObject
 
 	void visit_graph(Visitor &visitor) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

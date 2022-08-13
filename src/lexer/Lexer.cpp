@@ -431,46 +431,241 @@ bool Lexer::try_read_number()
 	return true;
 }
 
-bool Lexer::try_read_string()
+std::optional<size_t> Lexer::single_quote_string(size_t n) const
 {
-	const Position original_position = m_position;
+	// [^'\\]*(?:\\.[^'\\]*)*'
 
-	if ((peek(0) == 'f' || peek(0) == 'F') && (peek(1) == '\'' || peek(1) == '\"')) { advance(1); }
+	// [^'\\]*
+	while (peek(n) != '\\' && peek(n) != '\'') { n++; }
 
-	auto is_triple_quote = [this]() {
-		return (peek(0) == '\"' || peek(0) == '\'') && (peek(1) == '\"' || peek(1) == '\'')
-			   && (peek(2) == '\"' || peek(2) == '\'');
+	auto advance = [this](size_t n) -> std::optional<size_t> {
+		// (?:\\.[^'\\]*)
+		if (peek(n++) != '\\') return {};
+		if (peek(n++) == '\n') return {};
+		while (peek(n) != '\\' && peek(n) != '\'') { n++; }
+		return n;
 	};
 
-	if (is_triple_quote()) {
-		advance(3);
-		while (!is_triple_quote()) {
-			if (peek(0) == '\n') {
-				advance(1);
-				increment_row_position();
-			} else {
-				advance(1);
-			}
-		}
-		advance(3);
-		push_token(Token::TokenType::STRING, original_position, m_position);
-	} else if (!(peek(0) == '\"' || peek(0) == '\'')) {
-		return false;
-	} else {
-		const bool double_quote = peek(0) == '\"';
-
-		size_t position = 1;
-
-		if (double_quote) {
-			while (!(peek(position) == '\"')) { position++; }
+	// (?:\\.[^'\\]*)*
+	while (true) {
+		if (auto inc = advance(n); inc.has_value()) {
+			n = *inc;
 		} else {
-			while (!(peek(position) == '\'')) { position++; }
+			break;
 		}
-		advance(position + 1);
-
-		push_token(Token::TokenType::STRING, original_position, m_position);
 	}
-	return true;
+
+	// '
+	if (peek(n) != '\'') { return {}; }
+
+	return n + 1;
+}
+
+std::optional<size_t> Lexer::double_quote_string(size_t n) const
+{
+	// [^"\\]*(?:\\.[^"\\]*)*"
+
+	// [^"\\]*
+	while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+
+	auto advance = [this](size_t n) -> std::optional<size_t> {
+		// (?:\\.[^"\\]*)
+		if (peek(n++) != '\\') return {};
+		if (peek(n++) == '\n') return {};
+		while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+		return n;
+	};
+
+	// (?:\\.[^"\\]*)*
+	while (true) {
+		if (auto inc = advance(n); inc.has_value()) {
+			n = *inc;
+		} else {
+			break;
+		}
+	}
+
+	// "
+	if (peek(n) != '\"') { return {}; }
+
+	return n + 1;
+}
+
+
+std::optional<size_t> Lexer::single_triple_quote_string(size_t n) const
+{
+	// [^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''
+
+	// [^'\\]*
+	while (peek(n) != '\\' && peek(n) != '\'') { n++; }
+
+	auto advance = [this](size_t n) -> std::optional<size_t> {
+		// (?:\\.|'(?!''))
+
+		if (peek(n) == '\\' && peek(n + 1) != '\n') {
+			// \\.
+			return n + 2;
+		} else {
+			// '(?!'')
+
+			// '
+			if (peek(n) != '\'') return {};
+			n++;
+
+			// (?!'')
+			if (peek(n) == '\'' && peek(n + 1) == '\'') return {};
+
+			return n;
+		}
+	};
+
+	// (?:(?:\\.|'(?!''))[^'\\]*)*
+	while (true) {
+		if (auto inc = advance(n); inc.has_value()) {
+			n = *inc;
+			while (peek(n) != '\\' && peek(n) != '\'') { n++; }
+		} else {
+			break;
+		}
+	}
+
+	// '''
+	if (peek(n) != '\'' || peek(n + 1) != '\'' || peek(n + 2) != '\'') { return {}; }
+
+	return n + 3;
+}
+
+std::optional<size_t> Lexer::double_triple_quote_string(size_t n) const
+{
+	// [^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""
+
+	// [^"\\]*
+	while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+
+	auto advance = [this](size_t n) -> std::optional<size_t> {
+		// (?:\\.|"(?!""))
+
+		if (peek(n) == '\\' && peek(n + 1) != '\n') {
+			// \\.
+			return n + 2;
+		} else {
+			// "(?!"")
+
+			// "
+			if (peek(n) != '\"') return {};
+			n++;
+
+			// (?!"")
+			if (peek(n) == '\"' && peek(n + 1) == '\"') return {};
+
+			return n;
+		}
+	};
+
+	// (?:(?:\\.|"(?!""))[^"\\]*)*
+	while (true) {
+		if (auto inc = advance(n); inc.has_value()) {
+			n = *inc;
+			while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+		} else {
+			break;
+		}
+	}
+
+	// """
+	if (peek(n) != '\"' || peek(n + 1) != '\"' || peek(n + 2) != '\"') { return {}; }
+
+	return n + 3;
+}
+
+bool Lexer::try_read_string()
+{
+	static constexpr std::array<std::string_view, 25> string_possible_prefixes = { "",
+		"br",
+		"f",
+		"rB",
+		"u",
+		"rF",
+		"U",
+		"fr",
+		"RF",
+		"fR",
+		"BR",
+		"RB",
+		"bR",
+		"rb",
+		"F",
+		"rf",
+		"Fr",
+		"R",
+		"b",
+		"Br",
+		"B",
+		"r",
+		"FR",
+		"Rf",
+		"Rb" };
+
+	const Position original_position = m_position;
+
+	size_t idx = 0;
+
+	const auto it = std::find_if(string_possible_prefixes.begin(),
+		string_possible_prefixes.end(),
+		[this, idx](std::string_view el) {
+			for (size_t i = idx; i < el.size(); ++i) {
+				if (peek(i) != el[i]) return false;
+			}
+			return peek(idx + el.size()) == '\'' || peek(idx + el.size()) == '\"';
+		});
+
+	if (it == string_possible_prefixes.end()) { return false; }
+
+	idx += it->size();
+
+	auto is_triple_quote = [this, idx](const char quote) {
+		ASSERT(quote == '\'' || quote == '\"');
+		return peek(idx) == quote && peek(idx + 1) == quote && peek(idx + 2) == quote;
+	};
+
+	if (is_triple_quote('\'')) {
+		idx += 3;
+		if (auto end = single_triple_quote_string(idx)) {
+			advance(*end);
+			push_token(Token::TokenType::STRING, original_position, m_position);
+			return true;
+		} else {
+			return false;
+		}
+	} else if (is_triple_quote('\"')) {
+		idx += 3;
+		if (auto end = double_triple_quote_string(idx)) {
+			advance(*end);
+			push_token(Token::TokenType::STRING, original_position, m_position);
+			return true;
+		} else {
+			return false;
+		}
+	} else if (peek(idx) == '\'') {
+		idx += 1;
+		if (auto end = single_quote_string(idx)) {
+			advance(*end);
+			push_token(Token::TokenType::STRING, original_position, m_position);
+			return true;
+		} else {
+			return false;
+		}
+	} else if (peek(idx) == '\"') {
+		idx += 1;
+		if (auto end = double_quote_string(idx)) {
+			advance(*end);
+			push_token(Token::TokenType::STRING, original_position, m_position);
+			return true;
+		} else {
+			return false;
+		}
+	}
+	return false;
 }
 
 std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()

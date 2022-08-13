@@ -29,18 +29,60 @@ enum class RichCompare {
 
 class PyObject;
 
+class MethodFlags
+{
+	std::bitset<10> m_flags;
+
+  public:
+	enum class Flag {
+		VARARGS = 0,
+		KEYWORDS = 1,
+		NOARGS = 2,
+		O = 3,
+		CLASSMETHOD = 4,
+		STATICMETHOD = 5,
+		COEXIST = 6,
+		FASTCALL = 7,
+		STACKLESS = 8,
+		METHOD = 9,
+	};
+
+  public:
+	template<typename... Args> static MethodFlags create(Args... args)
+	{
+		MethodFlags f;
+		(f.m_flags.set(static_cast<uint8_t>(args)), ...);
+		return f;
+	}
+
+	bool is_set(Flag f) const { return m_flags.test(static_cast<size_t>(f)); }
+
+	const std::bitset<10> &flags() const { return m_flags; }
+};
+
 struct MethodDefinition
 {
 	std::string name;
-	std::function<
-		PyResult<PyObject *>(PyObject * /* self */, PyTuple * /* args */, PyDict * /* kwargs */)>
+	std::function<PyResult<PyObject *>(PyObject * /* self or cls */,
+		PyTuple * /* args */,
+		PyDict * /* kwargs */)>
 		method;
+	MethodFlags flags;
+	std::string doc;
 };
 
 struct MemberDefinition
 {
 	std::string name;
 	std::function<PyObject *(PyObject *)> member_accessor;
+	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> member_setter;
+};
+
+struct PropertyDefinition
+{
+	std::string name;
+	std::optional<std::function<PyObject *(PyObject *)>> member_getter;
+	std::optional<std::function<PyResult<std::monostate>(PyObject *, PyObject *)>> member_setter;
 };
 
 using CallSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyTuple *, PyDict *)>;
@@ -57,8 +99,14 @@ using GetSlotFunctionType =
 using SetSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
 
+using GetItemSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
+using SetItemSlotFunctionType =
+	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
+using DelItemSlotFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
+
 using LenSlotFunctionType = std::function<PyResult<size_t>(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyResult<bool>(const PyObject *)>;
+using ContainsSlotFunctionType = std::function<PyResult<bool>(PyObject *, PyObject *)>;
 using ReprSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *)>;
 using IterSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *)>;
 using NextSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *)>;
@@ -78,19 +126,90 @@ using LeftShiftSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
+using AndSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 
-using HashSlotFunctionType = std::function<PyResult<size_t>(const PyObject *)>;
+using HashSlotFunctionType = std::function<PyResult<int64_t>(const PyObject *)>;
 using CompareSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 
 using TraverseFunctionType = std::function<void(PyObject *, Cell::Visitor &)>;
 
+struct NumberTypePrototype
+{
+};
+
+struct MappingTypePrototype
+{
+	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
+	std::optional<std::variant<GetItemSlotFunctionType, PyObject *>> __getitem__;
+	std::optional<std::variant<SetItemSlotFunctionType, PyObject *>> __setitem__;
+	std::optional<std::variant<DelItemSlotFunctionType, PyObject *>> __delitem__;
+};
+
+struct SequenceTypePrototype
+{
+	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
+	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __concat__;
+	std::optional<std::variant<ContainsSlotFunctionType, PyObject *>> __contains__;
+};
+
+struct PyBuffer
+{
+	Bytes buf;
+	PyObject *obj;
+	int64_t len;
+	int64_t itemsize;
+	int readonly;
+	int ndim;
+	std::string format;
+	std::vector<int64_t> shape;
+	std::vector<int64_t> strides;
+	std::vector<int64_t> suboffsets;
+	void *internal;
+
+	bool is_ccontiguous() const { return len == 0 || strides.empty(); }
+
+	bool is_contiguous(char order) const
+	{
+		if (!suboffsets.empty()) return false;
+		if (order == 'C') {
+			return is_ccontiguous();
+		} else {
+			TODO();
+		}
+		return false;
+	}
+};
+
+struct PyBufferProcs
+{
+	std::function<PyResult<std::monostate>(PyObject *, PyBuffer &, int)> getbuffer;
+	std::function<PyResult<std::monostate>(PyObject *, PyBuffer &)> releasebuffer;
+};
+
 struct TypePrototype
 {
+  private:
+	TypePrototype(const TypePrototype &) = default;
+	TypePrototype &operator=(const TypePrototype &) = default;
+
+  public:
+	TypePrototype() = default;
+
+	std::unique_ptr<TypePrototype> clone() const
+	{
+		return std::unique_ptr<TypePrototype>(new TypePrototype{ *this });
+	}
+
+  public:
 	std::string __name__;
 	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
 	std::optional<std::variant<InitSlotFunctionType, PyObject *>> __init__;
 	PyType *__class__{ nullptr };
+
+	std::optional<NumberTypePrototype> number_type_protocol;
+	std::optional<MappingTypePrototype> mapping_type_protocol;
+	std::optional<SequenceTypePrototype> sequence_type_protocol;
 
 	std::optional<std::variant<GetAttroFunctionType, PyObject *>> __getattribute__;
 	std::optional<std::variant<SetAttroFunctionType, PyObject *>> __setattribute__;
@@ -104,6 +223,7 @@ struct TypePrototype
 	std::optional<std::variant<ExpSlotFunctionType, PyObject *>> __exp__;
 	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
 	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
+	std::optional<std::variant<AndSlotFunctionType, PyObject *>> __and__;
 
 	std::optional<std::variant<AbsSlotFunctionType, PyObject *>> __abs__;
 	std::optional<std::variant<NegSlotFunctionType, PyObject *>> __neg__;
@@ -111,7 +231,6 @@ struct TypePrototype
 	std::optional<std::variant<InvertSlotFunctionType, PyObject *>> __invert__;
 
 	std::optional<std::variant<CallSlotFunctionType, PyObject *>> __call__;
-	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
 	std::optional<std::variant<BoolSlotFunctionType, PyObject *>> __bool__;
 	std::optional<std::variant<ReprSlotFunctionType, PyObject *>> __repr__;
 	std::optional<std::variant<IterSlotFunctionType, PyObject *>> __iter__;
@@ -125,7 +244,10 @@ struct TypePrototype
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __lt__;
 	std::optional<std::variant<CompareSlotFunctionType, PyObject *>> __ne__;
 
+	std::optional<PyBufferProcs> as_buffer;
+
 	std::vector<MemberDefinition> __members__;
+	std::vector<PropertyDefinition> __getset__;
 	std::vector<MethodDefinition> __methods__;
 
 	PyDict *__dict__{ nullptr };
@@ -137,6 +259,7 @@ struct TypePrototype
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
 	void add_member(MemberDefinition &&member) { __members__.push_back(std::move(member)); }
+	void add_property(PropertyDefinition &&property) { __getset__.push_back(std::move(property)); }
 	void add_method(MethodDefinition &&method) { __methods__.push_back(std::move(method)); }
 };
 
@@ -158,6 +281,33 @@ namespace {
 
 enum class LookupAttrResult { NOT_FOUND = 0, FOUND = 1 };
 
+class PyMappingWrapper
+{
+	PyObject *m_object;
+
+  public:
+	PyMappingWrapper(PyObject *object) : m_object(object) {}
+	PyResult<size_t> len();
+	PyResult<PyObject *> getitem(PyObject *);
+	PyResult<std::monostate> setitem(PyObject *, PyObject *);
+	PyResult<std::monostate> delitem(PyObject *);
+};
+
+struct PySequence
+{
+};
+
+class PySequenceWrapper
+{
+	PyObject *m_object;
+
+  public:
+	PySequenceWrapper(PyObject *object) : m_object(object) {}
+	PyResult<size_t> len();
+	PyResult<PyObject *> concat(PyObject *other);
+	PyResult<bool> contains(PyObject *);
+};
+
 class PyObject : public Cell
 {
 	struct NotImplemented_
@@ -165,14 +315,18 @@ class PyObject : public Cell
 	};
 
 	friend class ::Heap;
+	friend PyMappingWrapper;
+	friend PySequenceWrapper;
+
+	std::variant<std::reference_wrapper<const TypePrototype>, PyType *> m_type;
 
   protected:
-	const TypePrototype &m_type_prototype;
 	PyDict *m_attributes{ nullptr };
 
   public:
 	PyObject() = delete;
 	PyObject(const TypePrototype &type);
+	PyObject(PyType *type);
 
 	virtual ~PyObject() = default;
 
@@ -181,6 +335,12 @@ class PyObject : public Cell
 	template<typename T> static PyResult<PyObject *> from(const T &value);
 
 	void visit_graph(Visitor &) override;
+
+	PyResult<PyMappingWrapper> as_mapping();
+	PyResult<PySequenceWrapper> as_sequence();
+	PyResult<PyBufferProcs> as_buffer();
+
+	PyResult<std::monostate> get_buffer(PyBuffer &, int flags);
 
 	PyResult<PyObject *> getattribute(PyObject *attribute) const;
 	PyResult<std::monostate> setattribute(PyObject *attribute, PyObject *value);
@@ -192,6 +352,10 @@ class PyObject : public Cell
 	PyResult<PyObject *> exp(const PyObject *other) const;
 	PyResult<PyObject *> lshift(const PyObject *other) const;
 	PyResult<PyObject *> modulo(const PyObject *other) const;
+	PyResult<PyObject *> and_(PyObject *other);
+
+	PyResult<bool> contains(PyObject *value);
+	PyResult<std::monostate> delete_item(PyObject *key);
 
 	PyResult<PyObject *> neg() const;
 	PyResult<PyObject *> pos() const;
@@ -200,7 +364,7 @@ class PyObject : public Cell
 
 	PyResult<PyObject *> repr() const;
 
-	PyResult<size_t> hash() const;
+	PyResult<int64_t> hash() const;
 
 	PyResult<PyObject *> richcompare(const PyObject *other, RichCompare) const;
 	PyResult<PyObject *> eq(const PyObject *other) const;
@@ -211,7 +375,6 @@ class PyObject : public Cell
 	PyResult<PyObject *> ne(const PyObject *other) const;
 
 	PyResult<bool> bool_() const;
-	PyResult<size_t> len() const;
 	PyResult<PyObject *> iter() const;
 	PyResult<PyObject *> next();
 
@@ -226,19 +389,19 @@ class PyObject : public Cell
 	PyResult<std::monostate> __setattribute__(PyObject *attribute, PyObject *value);
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 	PyResult<PyObject *> __repr__() const;
-	PyResult<size_t> __hash__() const;
+	PyResult<int64_t> __hash__() const;
 	PyResult<bool> __bool__() const;
 
 	bool is_pyobject() const override { return true; }
 	bool is_callable() const;
 	const std::string &name() const;
-	const TypePrototype &type_prototype() const { return m_type_prototype; }
+	const TypePrototype &type_prototype() const;
 	const PyDict &attributes() const { return *m_attributes; }
 	PyResult<PyObject *> get_method(PyObject *name) const;
 	PyResult<PyObject *> get_attribute(PyObject *name) const;
 	std::tuple<PyResult<PyObject *>, LookupAttrResult> lookup_attribute(PyObject *name) const;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	std::string to_string() const override;
 };
@@ -273,7 +436,7 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		};
 	}
 	if constexpr (HasHash<Type>) {
-		type_prototype->__hash__ = +[](const PyObject *self) -> PyResult<size_t> {
+		type_prototype->__hash__ = +[](const PyObject *self) -> PyResult<int64_t> {
 			return static_cast<const Type *>(self)->__hash__();
 		};
 	}
@@ -324,15 +487,97 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		};
 	}
 	if constexpr (HasLength<Type>) {
-		type_prototype->__len__ = +[](const PyObject *self) -> PyResult<size_t> {
-			return static_cast<const Type *>(self)->__len__();
-		};
+		if (!type_prototype->mapping_type_protocol.has_value()) {
+			type_prototype->mapping_type_protocol =
+				MappingTypePrototype{ .__len__ = +[](const PyObject *self) -> PyResult<size_t> {
+					return static_cast<const Type *>(self)->__len__();
+				} };
+		} else {
+			type_prototype->mapping_type_protocol->__len__ =
+				+[](const PyObject *self) -> PyResult<size_t> {
+				return static_cast<const Type *>(self)->__len__();
+			};
+		}
 	}
-	if constexpr (HasAdd<Type>) {
-		type_prototype->__add__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__add__(other);
-		};
+	if constexpr (HasSetItem<Type>) {
+		if (!type_prototype->mapping_type_protocol.has_value()) {
+			type_prototype->mapping_type_protocol =
+				MappingTypePrototype{ .__setitem__ =
+										  +[](PyObject *self,
+											   PyObject *name,
+											   PyObject *value) -> PyResult<std::monostate> {
+					return static_cast<Type *>(self)->__setitem__(name, value);
+				} };
+		} else {
+			type_prototype->mapping_type_protocol->__setitem__ =
+				+[](PyObject *self, PyObject *name, PyObject *value) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__setitem__(name, value);
+			};
+		}
+	}
+	if constexpr (HasGetItem<Type>) {
+		if (!type_prototype->mapping_type_protocol.has_value()) {
+			type_prototype->mapping_type_protocol = MappingTypePrototype{
+				.__getitem__ = +[](PyObject *self, PyObject *name) -> PyResult<PyObject *> {
+					return static_cast<Type *>(self)->__getitem__(name);
+				}
+			};
+		} else {
+			type_prototype->mapping_type_protocol->__getitem__ =
+				+[](PyObject *self, PyObject *name) -> PyResult<PyObject *> {
+				return static_cast<Type *>(self)->__getitem__(name);
+			};
+		}
+	}
+	if constexpr (HasDelItem<Type>) {
+		if (!type_prototype->mapping_type_protocol.has_value()) {
+			type_prototype->mapping_type_protocol = MappingTypePrototype{
+				.__delitem__ = +[](PyObject *self, PyObject *name) -> PyResult<std::monostate> {
+					return static_cast<Type *>(self)->__delitem__(name);
+				}
+			};
+		} else {
+			type_prototype->mapping_type_protocol->__delitem__ =
+				+[](PyObject *self, PyObject *name) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__delitem__(name);
+			};
+		}
+	}
+	if constexpr (HasContains<Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol =
+				SequenceTypePrototype{ .__contains__ =
+										   +[](PyObject *self, PyObject *value) -> PyResult<bool> {
+					return static_cast<Type *>(self)->__contains__(value);
+				} };
+		} else {
+			type_prototype->sequence_type_protocol->__contains__ =
+				+[](PyObject *self, PyObject *value) -> PyResult<bool> {
+				return static_cast<Type *>(self)->__contains__(value);
+			};
+		}
+	}
+	if constexpr (std::is_base_of_v<PySequence, Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol = SequenceTypePrototype{
+				.__concat__ =
+					+[](const PyObject *self, const PyObject *value) -> PyResult<PyObject *> {
+					return static_cast<const Type *>(self)->__add__(value);
+				}
+			};
+		} else {
+			type_prototype->sequence_type_protocol->__concat__ =
+				+[](const PyObject *self, const PyObject *value) -> PyResult<PyObject *> {
+				return static_cast<const Type *>(self)->__add__(value);
+			};
+		}
+	} else {
+		if constexpr (HasAdd<Type>) {
+			type_prototype->__add__ =
+				+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
+				return static_cast<const Type *>(self)->__add__(other);
+			};
+		}
 	}
 	if constexpr (HasSub<Type>) {
 		type_prototype->__sub__ =
@@ -362,6 +607,11 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		type_prototype->__mod__ =
 			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__mod__(other);
+		};
+	}
+	if constexpr (HasAnd<Type>) {
+		type_prototype->__and__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__and__(other);
 		};
 	}
 	if constexpr (HasAbs<Type>) {
@@ -407,6 +657,12 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 			return static_cast<const Type *>(self)->__get__(instance, owner);
 		};
 	}
+	if constexpr (HasSet<Type>) {
+		type_prototype->__set__ =
+			+[](PyObject *self, PyObject *attribute, PyObject *value) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__set__(attribute, value);
+		};
+	}
 
 	type_prototype->traverse =
 		+[](PyObject *self, Cell::Visitor &visitor) { self->visit_graph(visitor); };
@@ -419,6 +675,7 @@ class PyBaseObject : public PyObject
 {
   public:
 	PyBaseObject(const TypePrototype &type) : PyObject(type) {}
+	PyBaseObject(PyType *type) : PyObject(type) {}
 };
 
 struct ValueHash

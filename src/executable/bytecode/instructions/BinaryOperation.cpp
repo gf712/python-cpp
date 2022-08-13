@@ -1,5 +1,6 @@
 #include "BinaryOperation.hpp"
 #include "runtime/Value.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -35,6 +36,15 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 			return lshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::RIGHTSHIFT: {
+			TODO();
+		} break;
+		case Operation::AND: {
+			return and_(lhs, rhs, interpreter);
+		} break;
+		case Operation::OR: {
+			TODO();
+		} break;
+		case Operation::XOR: {
 			TODO();
 		} break;
 		}

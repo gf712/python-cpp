@@ -12,13 +12,14 @@ class JumpIfTrue final : public Instruction
 		: m_test_register(test_register), m_label(std::move(label))
 	{}
 
-	JumpIfTrue(Register test_register, uint8_t offset)
+	JumpIfTrue(Register test_register, int32_t offset)
 		: m_test_register(test_register), m_offset(offset)
 	{}
 
 	std::string to_string() const final
 	{
-		const std::string position = m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
+		const std::string position =
+			m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
 		return fmt::format("JUMP_IF_TRUE    position: {}", position);
 	}
 

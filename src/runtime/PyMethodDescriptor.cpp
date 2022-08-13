@@ -23,10 +23,10 @@ template<> const PyMethodDescriptor *as(const PyObject *obj)
 
 PyMethodDescriptor::PyMethodDescriptor(PyString *name,
 	PyType *underlying_type,
-	FunctionType &&function,
+	MethodDefinition &method_definition,
 	std::vector<PyObject *> &&captures)
 	: PyBaseObject(BuiltinTypes::the().method_wrapper()), m_name(std::move(name)),
-	  m_underlying_type(underlying_type), m_method_descriptor(std::move(function)),
+	  m_underlying_type(underlying_type), m_method(method_definition),
 	  m_captures(std::move(captures))
 {}
 
@@ -60,7 +60,8 @@ PyResult<PyObject *> PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 	auto args_ = PyTuple::create(new_args_vector);
 	if (args_.is_err()) return args_;
 	args = args_.unwrap();
-	return m_method_descriptor(self, args, kwargs);
+
+	return m_method.method(self, args, kwargs);
 }
 
 PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
@@ -105,11 +106,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyMethodDescriptor::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyMethodDescriptor::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(method_wrapper_flag, []() { type = register_method_wrapper(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(method_wrapper_flag, []() { type = register_method_wrapper(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

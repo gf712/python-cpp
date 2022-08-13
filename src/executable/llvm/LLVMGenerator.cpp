@@ -98,7 +98,7 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 	// 	return nullptr;
 	// }
 
-	return std::make_shared<LLVMProgram>(std::move(generator.m_ctx->module),
+	return LLVMProgram::create(std::move(generator.m_ctx->module),
 		std::move(generator.m_ctx->ctx),
 		module->filename(),
 		argv);
@@ -203,6 +203,15 @@ ast::Value *LLVMGenerator::visit(const ast::BinaryExpr *node)
 		TODO();
 	} break;
 	case ast::BinaryOpType::RIGHTSHIFT: {
+		TODO();
+	} break;
+	case ast::BinaryOpType::AND: {
+		TODO();
+	} break;
+	case ast::BinaryOpType::OR: {
+		TODO();
+	} break;
+	case ast::BinaryOpType::XOR: {
 		TODO();
 	} break;
 	}
@@ -399,9 +408,13 @@ ast::Value *LLVMGenerator::visit(const ast::If *node)
 
 ast::Value *LLVMGenerator::visit(const ast::Import *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::ImportFrom *node) { TODO(); }
+
 ast::Value *LLVMGenerator::visit(const ast::Keyword *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::List *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::Set *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Module *node)
 {
@@ -441,6 +454,8 @@ ast::Value *LLVMGenerator::visit(const ast::Name *node)
 
 ast::Value *LLVMGenerator::visit(const ast::Pass *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::Break *node) { TODO(); }
+
 ast::Value *LLVMGenerator::visit(const ast::Raise *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Return *node)
@@ -466,6 +481,14 @@ ast::Value *LLVMGenerator::visit(const ast::FormattedValue *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::JoinedStr *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::Comprehension *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::ListComp *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::GeneratorExp *node) { TODO(); }
+
+ast::Value *LLVMGenerator::visit(const ast::SetComp *node) { TODO(); }
+
 template<typename... Args>
 void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)
 {
@@ -473,8 +496,8 @@ void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)
 	m_ctx->state.status = Context::State::Status::ERROR;
 }
 
-LLVMFunction::LLVMFunction(const llvm::Function &f)
-	: Function(0, 0, f.getName().str(), FunctionExecutionBackend::LLVM), m_function(f)
+LLVMFunction::LLVMFunction(const llvm::Function &f, std::shared_ptr<Program> program)
+	: Function(0, 0, f.getName().str(), FunctionExecutionBackend::LLVM, program), m_function(f)
 {}
 
 std::string LLVMFunction::to_string() const

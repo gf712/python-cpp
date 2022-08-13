@@ -14,10 +14,11 @@ class BytecodeProgram : public Program
 
 	BytecodeProgram() {}
 
+	BytecodeProgram(std::string filename, std::vector<std::string> argv);
+
   public:
-	BytecodeProgram(FunctionBlocks &&func_blocks,
-		std::string filename,
-		std::vector<std::string> argv);
+	static std::shared_ptr<BytecodeProgram>
+		create(FunctionBlocks &&func_blocks, std::string filename, std::vector<std::string> argv);
 
 	std::vector<View>::const_iterator begin() const;
 
@@ -36,7 +37,7 @@ class BytecodeProgram : public Program
 
 	const auto &functions() const { return m_functions; }
 
-	const auto &main_function() const { return m_main_function; }
+	py::PyObject *main_function() override;
 
 	void add_backend(std::shared_ptr<Program>);
 
@@ -44,5 +45,5 @@ class BytecodeProgram : public Program
 
 	std::vector<uint8_t> serialize() const final;
 
-	static std::unique_ptr<BytecodeProgram> deserialize(const std::vector<uint8_t> &);
+	static std::shared_ptr<BytecodeProgram> deserialize(const std::vector<uint8_t> &);
 };

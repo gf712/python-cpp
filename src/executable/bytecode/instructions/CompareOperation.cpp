@@ -1,6 +1,7 @@
 #include "CompareOperation.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/Value.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

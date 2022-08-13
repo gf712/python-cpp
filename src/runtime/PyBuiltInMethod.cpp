@@ -19,9 +19,8 @@ template<> const PyBuiltInMethod *as(const PyObject *node)
 	return nullptr;
 }
 
-PyBuiltInMethod::PyBuiltInMethod(std::string name, FunctionType &&builtin_method, PyObject *self)
-	: PyBaseObject(BuiltinTypes::the().builtin_method()), m_name(std::move(name)),
-	  m_builtin_method(std::move(builtin_method)), m_self(self)
+PyBuiltInMethod::PyBuiltInMethod(MethodDefinition &method_definition, PyObject *self)
+	: PyBaseObject(BuiltinTypes::the().builtin_method()), m_ml(method_definition), m_self(self)
 {}
 
 void PyBuiltInMethod::visit_graph(Visitor &visitor)
@@ -33,23 +32,28 @@ void PyBuiltInMethod::visit_graph(Visitor &visitor)
 std::string PyBuiltInMethod::to_string() const
 {
 	return fmt::format("<built-in method '{}' of '{}' object at {}>",
-		m_name,
+		m_ml.name,
 		m_self->type()->name(),
-		static_cast<void *>(m_self));
+		static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyBuiltInMethod::__repr__() const { return PyString::create(to_string()); }
 
 PyResult<PyObject *> PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
 {
-	return m_builtin_method(args, kwargs);
+	if (m_ml.flags.flags() == MethodFlags::create().flags()) {
+		return m_ml.method(m_self, args, kwargs);
+	} else if (m_ml.flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
+		return m_ml.method(m_self->type(), args, kwargs);
+	} else {
+		TODO();
+	}
 }
 
-PyResult<PyBuiltInMethod *>
-	PyBuiltInMethod::create(std::string name, FunctionType &&builtin_method, PyObject *self)
+PyResult<PyBuiltInMethod *> PyBuiltInMethod::create(MethodDefinition &method_definition,
+	PyObject *self)
 {
-	auto *obj = VirtualMachine::the().heap().allocate<PyBuiltInMethod>(
-		name, std::move(builtin_method), self);
+	auto *obj = VirtualMachine::the().heap().allocate<PyBuiltInMethod>(method_definition, self);
 	if (!obj) { return Err(memory_error(sizeof(PyBuiltInMethod))); }
 	return Ok(obj);
 }
@@ -66,11 +70,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyBuiltInMethod::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyBuiltInMethod::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(builtin_method_flag, []() { type = register_builtin_method(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(builtin_method_flag, []() { type = register_builtin_method(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

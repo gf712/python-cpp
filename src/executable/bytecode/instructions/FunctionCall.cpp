@@ -2,6 +2,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -23,6 +24,7 @@ PyResult<Value> FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 	auto args_tuple = PyTuple::create(args);
 	if (args_tuple.is_err()) { return Err(args_tuple.unwrap_err()); }
 	spdlog::debug("args_tuple: {}", (void *)args_tuple.unwrap());
+	spdlog::debug("calling function: \'{}\'", callable_object->to_string());
 
 	auto result = callable_object->call(args_tuple.unwrap(), nullptr);
 	if (result.is_ok()) {

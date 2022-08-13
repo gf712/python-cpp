@@ -24,7 +24,11 @@ class Unary final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("UNARY  r{:<3} r{:<3}", m_destination, m_source, m_operation);
+		std::array op_str{ "+", "-", "~", "!" };
+		return fmt::format("UNARY  r{:<3} r{:<3} ({})",
+			m_destination,
+			m_source,
+			op_str[static_cast<uint8_t>(m_operation)]);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

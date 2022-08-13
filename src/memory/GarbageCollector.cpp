@@ -2,7 +2,9 @@
 #include "interpreter/Interpreter.hpp"
 #include "interpreter/InterpreterSession.hpp"
 #include "memory/Heap.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyType.hpp"
@@ -51,6 +53,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 			if (std::holds_alternative<PyObject *>(*val)) {
 				auto *obj = std::get<PyObject *>(*val);
 				if (obj) {
+					spdlog::trace("adding root {}", (void *)obj);
 					spdlog::trace("adding root {}@{}", obj->type()->name(), (void *)obj);
 					roots.insert(obj);
 				}
@@ -58,25 +61,22 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 		}
 	}
 
-	for (const auto &interpreter : VirtualMachine::the().interpreter_session()->interpreters()) {
-		auto *execution_frame = interpreter->execution_frame();
-		if (execution_frame) { roots.insert(execution_frame); }
-		for (const auto &module : interpreter->get_available_modules()) {
-			ASSERT(module)
-			roots.insert(module);
-		}
-		struct AddRoot : Cell::Visitor
+	const auto &interpreter = VirtualMachine::the().interpreter();
+	auto *execution_frame = interpreter.execution_frame();
+	if (execution_frame) { roots.insert(execution_frame); }
+	ASSERT(interpreter.modules())
+	roots.insert(interpreter.modules());
+	struct AddRoot : Cell::Visitor
+	{
+		std::unordered_set<Cell *> &roots_;
+		AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
+		void visit(Cell &cell)
 		{
-			std::unordered_set<Cell *> &roots_;
-			AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
-			void visit(Cell &cell)
-			{
-				spdlog::debug("Adding root {}", (void *)&cell);
-				roots_.insert(&cell);
-			}
-		} visitor{ roots };
-		if (auto *program = interpreter->program()) { program->visit_functions(visitor); }
-	}
+			spdlog::debug("Adding root {}", (void *)&cell);
+			roots_.insert(&cell);
+		}
+	} visitor{ roots };
+	interpreter.execution_frame()->code()->program()->visit_functions(visitor);
 	return roots;
 }
 

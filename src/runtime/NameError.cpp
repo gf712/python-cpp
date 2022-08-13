@@ -20,6 +20,8 @@ PyType *NameError::register_type(PyModule *module)
 	if (!s_name_error) {
 		s_name_error =
 			klass<Exception>(module, "NameError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("NameError").unwrap(), s_name_error);
 	}
 	return s_name_error;
 }

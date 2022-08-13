@@ -44,9 +44,11 @@ std::unique_ptr<TypePrototype> register_ellipsis()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyEllipsis::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyEllipsis::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(ellipsis_flag, []() { type = ::register_ellipsis(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(ellipsis_flag, []() { type = ::register_ellipsis(); });
+		return std::move(type);
+	};
 }

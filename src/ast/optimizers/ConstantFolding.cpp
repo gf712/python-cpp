@@ -22,31 +22,41 @@ namespace optimizer {
 					*lhs,
 					*rhs);
 				if (result) { return *result; }
-				break;
-			}
+
+			} break;
 			case BinaryOpType::MINUS: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::MULTIPLY: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::EXP: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::MODULO: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::SLASH: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::FLOORDIV: {
 				TODO();
-			}
+			} break;
 			case BinaryOpType::LEFTSHIFT: {
 				TODO();
-			}
-			case BinaryOpType::RIGHTSHIFT:
+			} break;
+			case BinaryOpType::RIGHTSHIFT: {
 				TODO();
+			} break;
+			case BinaryOpType::AND: {
+				TODO();
+			} break;
+			case BinaryOpType::OR: {
+				TODO();
+			} break;
+			case BinaryOpType::XOR: {
+				TODO();
+			} break;
 			}
 		}
 

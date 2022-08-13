@@ -45,6 +45,8 @@ PyType *RuntimeError::register_type(PyModule *module)
 	if (!s_runtime_error) {
 		s_runtime_error =
 			klass<RuntimeError>(module, "RuntimeError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("RuntimeError").unwrap(), s_runtime_error);
 	}
 	return s_runtime_error;
 }

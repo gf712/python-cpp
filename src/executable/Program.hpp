@@ -50,7 +50,9 @@ class CodeFlags
 	std::bitset<6> bits() const { return m_flags; };
 };
 
-class Program : NonCopyable
+class Program
+	: NonCopyable
+	, public std::enable_shared_from_this<Program>
 {
 	std::string m_filename;
 	std::vector<std::string> m_argv;
@@ -75,6 +77,8 @@ class Program : NonCopyable
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const = 0;
+
+	virtual py::PyObject *main_function() = 0;
 
 	virtual void visit_functions(Cell::Visitor &) const = 0;
 

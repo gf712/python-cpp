@@ -16,12 +16,13 @@ class PyNone : public PyBaseObject
 
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
 	PyResult<PyObject *> __repr__() const;
+	PyResult<bool> __bool__() const;
 
 	bool value() const { return m_value; }
 
 	void visit_graph(Visitor &) override {}
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:

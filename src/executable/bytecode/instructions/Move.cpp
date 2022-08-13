@@ -1,4 +1,5 @@
 #include "Move.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

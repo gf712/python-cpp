@@ -24,23 +24,11 @@ class LoadFast final : public Instruction
 	Register stack_index() const { return m_stack_index; }
 	const std::string &object_name() const { return m_object_name; }
 
-	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &) const final
-	{
-		auto result = vm.stack_local(m_stack_index);
-		vm.reg(m_destination) = result;
-		return py::Ok(result);
-	}
+	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &) const final;
 
 	void relocate(codegen::BytecodeGenerator &, size_t) final {}
 
-	std::vector<uint8_t> serialize() const final
-	{
-		return {
-			LOAD_FAST,
-			m_destination,
-			m_stack_index,
-		};
-	}
+	std::vector<uint8_t> serialize() const final;
 
 	uint8_t id() const final { return LOAD_FAST; }
 };

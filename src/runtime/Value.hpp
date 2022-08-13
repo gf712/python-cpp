@@ -117,17 +117,15 @@ struct String
 struct Bytes
 {
 	std::vector<std::byte> b;
+
+	static Bytes from_unescaped_string(const std::string &);
+
 	friend std::ostream &operator<<(std::ostream &os, const Bytes &bytes)
 	{
 		return os << bytes.to_string();
 	}
 
-	std::string to_string() const
-	{
-		std::ostringstream os;
-		for (const auto &byte_ : b) { os << std::to_integer<uint8_t>(byte_); }
-		return os.str();
-	}
+	std::string to_string() const;
 
 	bool operator==(const Bytes &rhs) const
 	{
@@ -281,6 +279,8 @@ template<typename T> class PyResult
 				typename detail::is_ok<typename std::result_of_t<FunctorType(T)>>::type,
 				typename detail::is_pyresult<typename std::result_of_t<FunctorType(T)>>::type>>
 	PyResult<PyResultType> and_then(FunctorType &&op) const;
+
+	template<typename FunctorType> PyResult<T> or_else(FunctorType &&op) const;
 };
 
 template<typename T>
@@ -297,6 +297,19 @@ PyResult<PyResultType> PyResult<T>::and_then(FunctorType &&op) const
 	}
 }
 
+template<typename T>
+template<typename FunctorType>
+PyResult<T> PyResult<T>::or_else(FunctorType &&op) const
+{
+	using ResultType = typename std::result_of_t<FunctorType(ErrType)>;
+	static_assert(detail::is_ok<ResultType>{} || detail::is_pyresult<ResultType>{},
+		"Return type of function must be of type Ok<U> or PyResult<U>");
+	if (is_err()) {
+		return op(unwrap_err());
+	} else {
+		return PyResult<T>(Ok(unwrap()));
+	}
+}
 
 PyResult<Value> add(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> subtract(const Value &lhs, const Value &rhs, Interpreter &interpreter);
@@ -311,6 +324,7 @@ PyResult<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter
 PyResult<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &interpreter);

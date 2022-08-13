@@ -1,6 +1,10 @@
 #include "MakeFunction.hpp"
 #include "executable/Mangler.hpp"
+#include "interpreter/Interpreter.hpp"
+#include "runtime/PyCode.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 
 using namespace py;
@@ -25,10 +29,10 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 		}
 	}
 
-	auto closure = [&]() -> std::variant<std::vector<PyCell *>, BaseException *> {
+	auto closure = [&]() -> PyResult<std::vector<PyCell *>> {
 		if (m_captures_tuple) {
 			auto value_ = PyObject::from(vm.reg(*m_captures_tuple));
-			if (value_.is_err()) { return value_.unwrap_err(); }
+			if (value_.is_err()) { return Err(value_.unwrap_err()); }
 			auto *value = value_.unwrap();
 			ASSERT(as<PyTuple>(value))
 			std::vector<PyCell *> cells;
@@ -38,22 +42,20 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 				ASSERT(as<PyCell>(std::get<PyObject *>(el)))
 				cells.push_back(as<PyCell>(std::get<PyObject *>(el)));
 			}
-			return cells;
+			return Ok(cells);
 		} else {
-			return std::vector<PyCell *>{};
+			return Ok(std::vector<PyCell *>{});
 		}
 	}();
 
-	if (std::holds_alternative<BaseException *>(closure)) {
-		return Err(std::get<BaseException *>(closure));
-	}
+	if (closure.is_err()) { return Err(closure.unwrap_err()); }
 
 	const auto &function_name_value = vm.reg(m_name);
 	ASSERT(std::holds_alternative<String>(function_name_value));
 	const auto function_name = std::get<String>(function_name_value).s;
 
-	auto *func = interpreter.make_function(
-		function_name, default_values, kw_default_values, std::get<std::vector<PyCell *>>(closure));
+	auto *func = interpreter.execution_frame()->code()->make_function(
+		function_name, default_values, kw_default_values, closure.unwrap());
 	ASSERT(func)
 	// const std::string demangled_name =
 	// Mangler::default_mangler().function_demangle(function_name);

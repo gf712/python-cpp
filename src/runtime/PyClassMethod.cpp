@@ -90,10 +90,12 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyClassMethod::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyClassMethod::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(classmethod_flag, []() { type = register_classmethod(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(classmethod_flag, []() { type = register_classmethod(); });
+		return std::move(type);
+	};
 }
 }// namespace py

@@ -145,7 +145,7 @@ uint8_t *Heap::allocate_gc(uint8_t *ptr) const
 void Heap::log_allocation(PyObject *obj) const
 {
 	spdlog::debug(
-		"Allocated type \'{}\' on the heap @{}", obj->m_type_prototype.__name__, (void *)obj);
+		"Allocated type \'{}\' on the heap @{}", obj->type_prototype().__name__, (void *)obj);
 	// spdlog::debug("Allocated type \'{}\' ({}) on the heap @{}",
 	// 	obj->m_type_prototype.__name__,
 	// 	obj->to_string(),

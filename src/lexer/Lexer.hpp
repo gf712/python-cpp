@@ -155,7 +155,7 @@ class Token
 			ENUMERATE_TOKENS
 #undef __TOKEN
 		}
-		ASSERT_NOT_REACHED()
+		ASSERT_NOT_REACHED();
 	}
 };
 
@@ -204,17 +204,17 @@ class Lexer
 
 	const std::string &filename() const { return m_filename; }
 
-	std::optional<Token> next_token()
-	{
-		if (!m_tokens_to_emit.empty()) return pop_front();
-		if (read_more_tokens()) { return pop_front(); }
-		if (m_tokens_to_emit.empty() && m_cursor > m_program.size()) { return {}; }
-		if (m_tokens_to_emit.empty()) {
-			spdlog::error("Failed to parse program at position {}", m_position);
-			std::abort();
-		}
-		ASSERT_NOT_REACHED();
-	}
+	// std::optional<Token> next_token()
+	// {
+	// 	if (!m_tokens_to_emit.empty()) return pop_front();
+	// 	if (read_more_tokens()) { return pop_front(); }
+	// 	if (m_tokens_to_emit.empty() && m_cursor > m_program.size()) { return {}; }
+	// 	if (m_tokens_to_emit.empty()) {
+	// 		spdlog::error("Failed to parse program at position {}", m_position);
+	// 		std::abort();
+	// 	}
+	// 	ASSERT_NOT_REACHED();
+	// }
 
 	std::optional<Token> peek_token(size_t positions)
 	{
@@ -284,6 +284,11 @@ class Lexer
 	std::optional<size_t> exp_float_number(size_t) const;
 	std::optional<size_t> float_number(size_t) const;
 	std::optional<size_t> imag_number(size_t) const;
+
+	std::optional<size_t> single_quote_string(size_t) const;
+	std::optional<size_t> double_quote_string(size_t) const;
+	std::optional<size_t> single_triple_quote_string(size_t) const;
+	std::optional<size_t> double_triple_quote_string(size_t) const;
 
 	template<typename FunctorType>
 	std::optional<size_t> parse_digits(size_t n, FunctorType &&f) const;

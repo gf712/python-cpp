@@ -4,6 +4,7 @@
 #include "executable/Mangler.hpp"
 #include "interpreter/InterpreterSession.hpp"
 #include "runtime/PyCode.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTraceback.hpp"
 #include "runtime/PyTuple.hpp"
@@ -12,11 +13,16 @@
 
 using namespace py;
 
-BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
+BytecodeProgram::BytecodeProgram(std::string filename, std::vector<std::string> argv)
+	: Program(std::move(filename), std::move(argv))
+{}
+
+std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_blocks,
 	std::string filename,
 	std::vector<std::string> argv)
-	: Program(std::move(filename), std::move(argv))
 {
+	auto program = std::shared_ptr<BytecodeProgram>(new BytecodeProgram{ filename, argv });
+
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
 	std::vector<size_t> functions_instruction_count;
@@ -52,26 +58,30 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
 		std::move(main_instructions),
-		main_blocks);
+		main_blocks,
+		program);
 	auto consts = PyTuple::create(main_func.metadata.consts);
 	if (consts.is_err()) { TODO(); }
 	auto main_function = PyCode::create(std::move(main_bytecode),
+		main_func.metadata.cell2arg,
+		main_func.metadata.arg_count,
 		main_func.metadata.cellvars,
-		main_func.metadata.varnames,
-		main_func.metadata.freevars,
-		main_func.metadata.stack_size,
+		consts.unwrap(),
 		main_func.metadata.filename,
 		main_func.metadata.first_line_number,
-		main_func.metadata.arg_count,
+		main_func.metadata.flags,
+		main_func.metadata.freevars,
+		main_func.metadata.positional_arg_count,
 		main_func.metadata.kwonly_arg_count,
-		main_func.metadata.cell2arg,
+		main_func.metadata.stack_size,
+		main_func.metadata.function_name,
+		main_func.metadata.names,
 		main_func.metadata.nlocals,
-		consts.unwrap(),
-		main_func.metadata.flags);
+		main_func.metadata.varnames);
 
 	if (main_function.is_err()) { TODO(); }
 
-	m_main_function = main_function.unwrap();
+	program->m_main_function = main_function.unwrap();
 
 	for (size_t i = 1; i < func_blocks.functions.size(); ++i) {
 		auto &func = *std::next(func_blocks.functions.begin(), i);
@@ -92,27 +102,33 @@ BytecodeProgram::BytecodeProgram(FunctionBlocks &&func_blocks,
 			func.metadata.stack_size,
 			func.metadata.function_name,
 			std::move(func_instructions),
-			func_blocks_view);
+			func_blocks_view,
+			program);
 		consts = PyTuple::create(func.metadata.consts);
 		if (consts.is_err()) { TODO(); }
 		auto code = PyCode::create(std::move(bytecode),
+			func.metadata.cell2arg,
+			func.metadata.arg_count,
 			func.metadata.cellvars,
-			func.metadata.varnames,
-			func.metadata.freevars,
-			func.metadata.stack_size,
+			consts.unwrap(),
 			func.metadata.filename,
 			func.metadata.first_line_number,
-			func.metadata.arg_count,
+			func.metadata.flags,
+			func.metadata.freevars,
+			func.metadata.positional_arg_count,
 			func.metadata.kwonly_arg_count,
-			func.metadata.cell2arg,
+			func.metadata.stack_size,
+			func.metadata.function_name,
+			func.metadata.names,
 			func.metadata.nlocals,
-			consts.unwrap(),
-			func.metadata.flags);
+			func.metadata.varnames);
 
 		if (code.is_err()) { TODO(); }
 
-		m_functions.emplace_back(code.unwrap());
+		program->m_functions.emplace_back(code.unwrap());
 	}
+
+	return program;
 }
 
 size_t BytecodeProgram::main_stack_size() const { return m_main_function->register_count(); }
@@ -146,7 +162,7 @@ std::string BytecodeProgram::to_string() const
 
 int BytecodeProgram::execute(VirtualMachine *vm)
 {
-	auto &interpreter = vm->interpreter_session()->start_new_interpreter(*this);
+	auto &interpreter = vm->initialize_interpreter(shared_from_this());
 
 	auto result = m_main_function->function()->call(*vm, interpreter);
 
@@ -155,15 +171,15 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 		ASSERT(exception == result.unwrap_err())
 		std::cout << exception->format_traceback() << std::endl;
 
-		if (interpreter.execution_frame()->exception_info().has_value()) {
-			std::cout << "During handling of the above exception, another exception occurred:\n\n";
-			exception = interpreter.execution_frame()->pop_exception();
-			std::cout << exception->format_traceback() << std::endl;
-			if (interpreter.execution_frame()->exception_info().has_value()) {
-				// how many exceptions is one meant to expect? :(
-				TODO();
-			}
-		}
+		// if (interpreter.execution_frame()->exception_info().has_value()) {
+		// 	std::cout << "During handling of the above exception, another exception occurred:\n\n";
+		// 	exception = interpreter.execution_frame()->pop_exception();
+		// 	std::cout << exception->format_traceback() << std::endl;
+		// 	if (interpreter.execution_frame()->exception_info().has_value()) {
+		// 		// how many exceptions is one meant to expect? :(
+		// 		TODO();
+		// 	}
+		// }
 	}
 
 	return result.is_ok() ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -196,6 +212,8 @@ PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 	}
 	return nullptr;
 }
+
+PyObject *BytecodeProgram::main_function() { return m_main_function; }
 
 void BytecodeProgram::add_backend(std::shared_ptr<Program> other)
 {
@@ -237,20 +255,25 @@ std::vector<uint8_t> BytecodeProgram::serialize() const
 	return result;
 }
 
-std::unique_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<uint8_t> &buffer)
+std::shared_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<uint8_t> &buffer)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	auto program = std::unique_ptr<BytecodeProgram>(new BytecodeProgram);
+	auto program = std::shared_ptr<BytecodeProgram>(new BytecodeProgram);
 
 	auto span = std::span{ buffer };
-	auto deserialized_result = PyCode::deserialize(span);
+	auto deserialized_result = PyCode::deserialize(span, program);
 	ASSERT(deserialized_result.first.is_ok())
 	program->m_main_function = deserialized_result.first.unwrap();
+	spdlog::debug(
+		"Deserialized main function:\n{}\n\n", program->m_main_function->function()->to_string());
 
 	while (!span.empty()) {
-		deserialized_result = PyCode::deserialize(span);
+		deserialized_result = PyCode::deserialize(span, program);
 		ASSERT(deserialized_result.first.is_ok())
 		program->m_functions.push_back(deserialized_result.first.unwrap());
+		spdlog::debug("Deserialized function {}:\n{}\n\n",
+			program->m_functions.back()->function()->function_name(),
+			program->m_functions.back()->function()->to_string());
 	}
 
 	return program;
