@@ -1,7 +1,9 @@
 #include "StoreName.hpp"
 
 #include "executable/bytecode/serialization/serialize.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/PyNone.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

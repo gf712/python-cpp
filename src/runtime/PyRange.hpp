@@ -23,7 +23,7 @@ class PyRange : public PyBaseObject
 	int64_t stop() const { return m_stop; }
 	int64_t step() const { return m_step; }
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:
@@ -48,7 +48,7 @@ class PyRangeIterator : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __next__();
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	void visit_graph(Visitor &) override;
 

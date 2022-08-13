@@ -1,17 +1,28 @@
+#pragma once
+
 #include "Instructions.hpp"
+
 
 class JumpForward final : public Instruction
 {
-	size_t m_block_count;
+	std::shared_ptr<Label> m_label;
+	std::optional<uint32_t> m_offset;
 
   public:
-	JumpForward(size_t block_count) : m_block_count(block_count) {}
+	JumpForward(std::shared_ptr<Label> label) : m_label(std::move(label)) {}
 
-	std::string to_string() const final { return fmt::format("JUMP_FORWARD    {}", m_block_count); }
+	JumpForward(uint32_t offset) : m_offset(offset) {}
+
+	std::string to_string() const final
+	{
+		const std::string position =
+			m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
+		return fmt::format("JUMP_FORWARD    position: {}", position);
+	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+	void relocate(codegen::BytecodeGenerator &, size_t) final;
 
 	std::vector<uint8_t> serialize() const final;
 

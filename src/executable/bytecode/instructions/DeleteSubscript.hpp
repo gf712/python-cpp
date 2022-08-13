@@ -2,18 +2,17 @@
 
 #include "Instructions.hpp"
 
-
-class InplaceSub : public Instruction
+class DeleteSubscript final : public Instruction
 {
-	Register m_lhs;
-	Register m_rhs;
+	Register m_value;
+	Register m_index;
 
   public:
-	InplaceSub(Register lhs, Register rhs) : m_lhs(lhs), m_rhs(rhs) {}
+	DeleteSubscript(Register value, Register index) : m_value(value), m_index(index) {}
 
 	std::string to_string() const final
 	{
-		return fmt::format("INPLACE_SUB     r{:<3} r{:<3}", m_lhs, m_rhs);
+		return fmt::format("DELETE_SUBSCRIPT r{:<3} r{:<3}", m_value, m_index);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
@@ -22,5 +21,5 @@ class InplaceSub : public Instruction
 
 	std::vector<uint8_t> serialize() const final;
 
-	uint8_t id() const final { return INPLACE_SUB; }
+	uint8_t id() const final { return DELETE_SUBSCRIPT; }
 };

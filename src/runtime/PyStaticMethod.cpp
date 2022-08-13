@@ -68,11 +68,13 @@ std::unique_ptr<TypePrototype> register_static_method()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyStaticMethod::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyStaticMethod::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(static_method_flag, []() { type = ::register_static_method(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(static_method_flag, []() { type = ::register_static_method(); });
+		return std::move(type);
+	};
 }
 
 template<> PyStaticMethod *py::as(PyObject *obj)

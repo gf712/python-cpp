@@ -1,5 +1,6 @@
 #include "BuildDict.hpp"
 #include "runtime/PyDict.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

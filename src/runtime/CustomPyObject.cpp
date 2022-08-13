@@ -22,6 +22,7 @@ PyType *CustomPyObject::type() const
 	return const_cast<PyType *>(m_type_obj);
 }
 
-std::string CustomPyObject::to_string() const {
+std::string CustomPyObject::to_string() const
+{
 	return fmt::format("CustomPyObject of type \"{}\"", type()->to_string());
 }

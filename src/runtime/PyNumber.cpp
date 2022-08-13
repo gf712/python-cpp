@@ -1,9 +1,11 @@
 #include "PyNumber.hpp"
+#include "PyBool.hpp"
 #include "PyFloat.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
 #include "TypeError.hpp"
+#include "types/builtin.hpp"
 
 #include "interpreter/Interpreter.hpp"
 
@@ -22,10 +24,10 @@ PyResult<PyObject *> PyNumber::__repr__() const { return PyString::create(to_str
 
 const PyNumber *PyNumber::as_number(const PyObject *obj)
 {
-	if (auto *num = as<PyFloat>(obj)) {
-		return num;
-	} else if (auto *num = as<PyInteger>(obj)) {
-		return num;
+	if (obj->type()->issubclass(py::float_())) {
+		return static_cast<const PyFloat *>(obj);
+	} else if (obj->type()->issubclass(py::integer())) {
+		return static_cast<const PyInteger *>(obj);
 	}
 	return nullptr;
 }
@@ -166,6 +168,15 @@ PyResult<PyObject *> PyNumber::__ge__(const PyObject *other) const
 	return Err(type_error("'>=' not supported between instances of '{}' and '{}'",
 		type()->name(),
 		other->type()->name()));
+}
+
+PyResult<bool> PyNumber::__bool__() const
+{
+	if (std::holds_alternative<double>(m_value.value)) {
+		return Ok(std::fpclassify(std::get<double>(m_value.value)) != FP_ZERO);
+	} else {
+		return Ok(std::get<int64_t>(m_value.value) != int64_t{ 0 });
+	}
 }
 
 PyResult<PyNumber *> PyNumber::create(const Number &number)

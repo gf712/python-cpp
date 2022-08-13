@@ -15,9 +15,12 @@ std::string PyLLVMFunction::to_string() const
 	return fmt::format("LLVM JIT function {} at {}", m_name, (void *)this);
 }
 
-PyResult<PyObject*> PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs) { return (*this)(args, kwargs); }
+PyResult<PyObject *> PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs)
+{
+	return (*this)(args, kwargs);
+}
 
-PyResult<PyObject*> PyLLVMFunction::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyLLVMFunction::__repr__() const { return PyString::create(to_string()); }
 
 void PyLLVMFunction::visit_graph(Visitor &visitor)
 {
@@ -36,11 +39,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyLLVMFunction::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyLLVMFunction::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(llvm_function_flag, []() { type = register_llvm_function(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(llvm_function_flag, []() { type = register_llvm_function(); });
+		return std::move(type);
+	};
 }
 
 template<> PyLLVMFunction *as(PyObject *node)

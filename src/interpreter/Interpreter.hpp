@@ -1,8 +1,6 @@
 #pragma once
 
-
 #include "forward.hpp"
-#include "runtime/PyFrame.hpp"
 #include "runtime/forward.hpp"
 #include "vm/VM.hpp"
 
@@ -24,21 +22,24 @@ class Interpreter
   private:
 	py::PyFrame *m_current_frame{ nullptr };
 	py::PyFrame *m_global_frame{ nullptr };
-	std::vector<py::PyModule *> m_available_modules;
-	py::PyModule *m_module;
-	py::PyModule *m_importlib;
-	py::PyObject *m_import_func;
+	py::PyDict *m_modules{ nullptr };
+	py::PyModule *m_module{ nullptr };
+	py::PyModule *m_builtins{ nullptr };
+	py::PyModule *m_importlib{ nullptr };
+	py::PyObject *m_import_func{ nullptr };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
-	const Program *m_program;
+
+  public:
+	struct Config
+	{
+		bool requires_importlib;
+	};
 
   public:
 	Interpreter();
 
-	void raise_exception(py::BaseException *exception)
-	{
-		m_current_frame->push_exception(std::move(exception));
-	}
+	void raise_exception(py::BaseException *exception);
 
 	py::PyFrame *execution_frame() const { return m_current_frame; }
 	py::PyFrame *global_execution_frame() const { return m_global_frame; }
@@ -62,22 +63,24 @@ class Interpreter
 	}
 
 	py::PyModule *get_imported_module(py::PyString *) const;
-	const std::vector<py::PyModule *> &get_available_modules() const { return m_available_modules; }
+
+	py::PyDict *modules() const { return m_modules; }
+
+	py::PyModule *importlib() const { return m_importlib; }
+
+	py::PyObject *importfunc() const { return m_import_func; }
+
+	py::PyModule *builtins() const { return m_builtins; }
 
 	py::PyModule *module() const { return m_module; }
 
 	void unwind();
 
-	void setup(const BytecodeProgram &program);
-	void setup_main_interpreter(const BytecodeProgram &program);
+	void setup(std::shared_ptr<BytecodeProgram> &&program);
+	void setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program);
 
 	const std::string &entry_script() const { return m_entry_script; }
 	const std::vector<std::string> &argv() const { return m_argv; }
-
-	py::PyObject *make_function(const std::string &function_name,
-		const std::vector<py::Value> &default_values,
-		const std::vector<py::Value> &kw_default_values,
-		const std::vector<py::PyCell *> &closure) const;
 
 	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
 	py::PyResult<py::PyObject *> call(const std::unique_ptr<Function> &,
@@ -86,12 +89,13 @@ class Interpreter
 	py::PyResult<py::PyObject *>
 		call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
-	const Program *program() const { return m_program; }
-
   private:
 	void internal_setup(const std::string &name,
 		std::string entry_script,
 		std::vector<std::string> argv,
 		size_t local_registers,
-		const py::PyTuple *consts);
+		const py::PyTuple *consts,
+		const std::vector<std::string> &names,
+		Config &&,
+		std::shared_ptr<Program> &&);
 };

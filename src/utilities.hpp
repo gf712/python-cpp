@@ -3,7 +3,7 @@
 #include "spdlog/spdlog.h"
 #include <bit>
 
-#define TODO();                                                      \
+#define TODO()                                                      \
 	do {                                                            \
 		spdlog::error("Not implemented {}:{}", __FILE__, __LINE__); \
 		std::abort();                                               \
@@ -15,10 +15,12 @@
 		std::abort();                                                               \
 	}
 
-#define ASSERT_NOT_REACHED()                                            \
-	spdlog::error("Reached unexpected line {}:{}", __FILE__, __LINE__); \
-	__builtin_unreachable();
-
+#define ASSERT_NOT_REACHED()                                                \
+	do {                                                                    \
+		spdlog::error("Reached unexpected line {}:{}", __FILE__, __LINE__); \
+		__builtin_unreachable();                                            \
+		std::abort();                                                       \
+	} while (0)
 template<class... Ts> struct overloaded : Ts...
 {
 	using Ts::operator()...;
@@ -39,6 +41,23 @@ struct NonMoveable
 	NonMoveable(NonMoveable &&) = delete;
 	NonMoveable &operator=(NonMoveable &&) = delete;
 };
+
+
+namespace detail {
+template<class T> struct member_pointer_helper : std::false_type
+{
+};
+
+template<class T, class U> struct member_pointer_helper<T U::*> : std::true_type
+{
+	using type = T;
+};
+}// namespace detail
+
+template<class T> struct member_pointer : detail::member_pointer_helper<typename std::remove_cv<T>::type>
+{
+};
+
 
 #if !defined(STL_SUPPORTS_BIT_CAST)
 template<class To, class From>

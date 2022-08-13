@@ -2,11 +2,12 @@
 #include "codegen/BytecodeGenerator.hpp"
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
+#include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
 
 namespace {
-std::unique_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
+std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_bytecode_program_tests_.py");
 	parser::Parser p{ lexer };
@@ -15,9 +16,8 @@ std::unique_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	return std::unique_ptr<BytecodeProgram>(static_cast<BytecodeProgram *>(
-		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None)
-			.release()));
+	return std::static_pointer_cast<BytecodeProgram>(
+		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None));
 }
 }// namespace
 
@@ -49,8 +49,7 @@ TEST_F(BytecodeProgramRun, DeserializesMainFunction)
 	auto bytecode_program = generate_bytecode(program);
 	auto serialized_bytecode = bytecode_program->serialize();
 	auto deserialized_bytecode = BytecodeProgram::deserialize(serialized_bytecode);
-	auto executable = std::unique_ptr<Program>(deserialized_bytecode.release());
-	ASSERT_EQ(VirtualMachine::the().execute(executable), EXIT_SUCCESS);
+	ASSERT_EQ(VirtualMachine::the().execute(deserialized_bytecode), EXIT_SUCCESS);
 }
 
 TEST_F(BytecodeProgramRun, DeserializesMultipleFunctions)
@@ -66,6 +65,5 @@ TEST_F(BytecodeProgramRun, DeserializesMultipleFunctions)
 	auto bytecode_program = generate_bytecode(program);
 	auto serialized_bytecode = bytecode_program->serialize();
 	auto deserialized_bytecode = BytecodeProgram::deserialize(serialized_bytecode);
-	auto executable = std::unique_ptr<Program>(deserialized_bytecode.release());
-	ASSERT_EQ(VirtualMachine::the().execute(executable), EXIT_SUCCESS);
+	ASSERT_EQ(VirtualMachine::the().execute(deserialized_bytecode), EXIT_SUCCESS);
 }

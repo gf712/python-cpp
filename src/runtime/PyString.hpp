@@ -29,12 +29,17 @@ class PyString : public PyBaseObject
 	std::optional<int32_t> codepoint() const;
 
 	std::string to_string() const override { return m_value; }
+	size_t size() const;
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
-	PyResult<size_t> __hash__() const;
+	PyResult<int64_t> __hash__() const;
 	PyResult<PyObject *> __eq__(const PyObject *obj) const;
+	PyResult<PyObject *> __ne__(const PyObject *obj) const;
 	PyResult<PyObject *> __lt__(const PyObject *obj) const;
+	PyResult<bool> __bool__() const;
+	PyResult<PyObject *> __iter__() const;
+	PyResult<PyObject *> __getitem__(PyObject *index);
 
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
@@ -49,19 +54,46 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> capitalize() const;
 	PyResult<PyObject *> casefold() const;
 	PyResult<PyObject *> find(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> rfind(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> count(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> startswith(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> endswith(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> join(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> lower() const;
 	PyResult<PyObject *> upper() const;
+	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> rstrip(PyTuple *args, PyDict *kwargs) const;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	PyResult<PyObject *> format(PyTuple *args, PyDict *kwargs) const;
+
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:
 	PyString(std::string s);
 
 	size_t get_position_from_slice(int64_t) const;
+};
+
+class PyStringIterator : public PyBaseObject
+{
+	friend class ::Heap;
+
+	const PyString &m_pystring;
+	size_t m_current_index{ 0 };
+
+  public:
+	PyStringIterator(const PyString &pystring);
+
+	std::string to_string() const override;
+
+	void visit_graph(Visitor &) override;
+
+	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __next__();
+
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
+	PyType *type() const override;
 };
 
 }// namespace py

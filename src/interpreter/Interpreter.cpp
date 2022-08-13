@@ -1,9 +1,11 @@
 #include "Interpreter.hpp"
 
 #include "runtime/BaseException.hpp"
+#include "runtime/Import.hpp"
 #include "runtime/NameError.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
@@ -11,6 +13,7 @@
 #include "runtime/PyString.hpp"
 #include "runtime/Value.hpp"
 #include "runtime/modules/Modules.hpp"
+#include "runtime/modules/config.hpp"
 
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -22,75 +25,112 @@
 namespace fs = std::filesystem;
 using namespace py;
 
-static PyString *s_main__ = nullptr;
-static PyString *s_sys__ = nullptr;
-
-
 Interpreter::Interpreter() {}
 
 void Interpreter::internal_setup(const std::string &name,
 	std::string entry_script,
 	std::vector<std::string> argv,
 	size_t local_registers,
-	const PyTuple *consts)
+	const PyTuple *consts,
+	const std::vector<std::string> &names,
+	Config &&config,
+	std::shared_ptr<Program> &&program)
 {
+	m_modules = PyDict::create().unwrap();
 	m_entry_script = std::move(entry_script);
 	m_argv = std::move(argv);
 
-	auto &heap = VirtualMachine::the().heap();
-
 	// initialize the standard types by initializing the builtins module
-	auto *builtins = builtins_module(*this);
+	m_builtins = builtins_module(*this);
+	auto *sys = sys_module(*this);
 
 	auto name_ = PyString::create(name);
 	if (name_.is_err()) { TODO(); }
-	auto *main_module = heap.allocate<PyModule>(name_.unwrap());
+	auto *main_module =
+		PyModule::create(PyDict::create().unwrap(), name_.unwrap(), PyString::create("").unwrap())
+			.unwrap();
 	if (!main_module) { TODO(); }
+	main_module->set_program(std::move(program));
 	m_module = main_module;
-	m_available_modules.push_back(main_module);
-	m_available_modules.push_back(builtins);
-	m_available_modules.push_back(sys_module(*this));
 
-	if (!s_sys__) { s_sys__ = heap.allocate<PyString>("sys"); }
-	PyDict::MapType global_map = { { String{ "__name__" }, name_.unwrap() },
-		{ String{ "__doc__" }, py_none() },
-		{ String{ "__package__" }, py_none() } };
+	auto code = PyCode::create(main_module->program());
+	if (code.is_err()) { TODO(); }
 
-	for (auto *module : m_available_modules) { global_map[module->name()] = module; }
+	m_modules->insert(name_.unwrap(), main_module);
+	m_modules->insert(String{ "builtins" }, m_builtins);
+	m_modules->insert(String{ "sys" }, sys);
+	for (const auto &[name, module_factory] : builtin_modules) {
+		if (module_factory) { m_modules->insert(String{ std::string{ name } }, module_factory()); }
+	}
 
-	auto *globals = VirtualMachine::the().heap().allocate<PyDict>(global_map);
+	main_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
+	auto *globals = main_module->symbol_table();
 	auto *locals = globals;
-	m_current_frame = PyFrame::create(nullptr, local_registers, 0, globals, locals, consts);
+	m_current_frame =
+		PyFrame::create(nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names);
 	m_global_frame = m_current_frame;
 
-	m_importlib = nullptr;
-	m_import_func = nullptr;
+	if (config.requires_importlib) {
+		auto *_imp = imp_module();
+		auto importlib_name = PyString::create("_frozen_importlib").unwrap();
+		auto importlib = import_frozen_module(importlib_name);
+		ASSERT(importlib.is_ok())
+		m_importlib = importlib.unwrap();
+		m_modules->insert(String{ "_frozen_importlib" }, m_importlib);
+
+		m_import_func =
+			PyObject::from(m_builtins->symbol_table()->map().at(String{ "__import__" })).unwrap();
+		auto install = m_importlib->get_method(PyString::create("_install").unwrap());
+		if (install.is_err()) { TODO(); }
+
+		auto args = PyTuple::create(sys, _imp);
+		if (args.is_err()) { TODO(); }
+		auto result = install.unwrap()->call(args.unwrap(), nullptr);
+		if (result.is_err()) { TODO(); }
+
+		auto install_external =
+			m_importlib->get_method(PyString::create("_install_external_importers").unwrap());
+		if (install_external.is_err()) { TODO(); }
+
+		result = install_external.unwrap()->call(PyTuple::create().unwrap(), nullptr);
+		if (result.is_err()) { TODO(); }
+	}
 }
 
-void Interpreter::setup(const BytecodeProgram &program)
+void Interpreter::setup(std::shared_ptr<BytecodeProgram> &&program)
 {
-	m_program = static_cast<const Program *>(&program);
-
-	const auto name = fs::path(program.filename()).stem();
+	const auto name = fs::path(program->filename()).stem();
+	auto *code = as<PyCode>(program->main_function());
+	ASSERT(code)
 	internal_setup(name,
-		program.filename(),
-		program.argv(),
-		program.main_stack_size(),
-		program.main_function()->consts());
+		program->filename(),
+		program->argv(),
+		program->main_stack_size(),
+		code->consts(),
+		code->names(),
+		Config{ .requires_importlib = false },
+		std::move(program));
 }
 
-void Interpreter::setup_main_interpreter(const BytecodeProgram &program)
+void Interpreter::setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program)
 {
-	m_program = static_cast<const Program *>(&program);
-	auto &heap = VirtualMachine::the().heap();
-
+	auto *code = as<PyCode>(program->main_function());
+	ASSERT(code)
 	internal_setup("__main__",
-		program.filename(),
-		program.argv(),
-		program.main_stack_size(),
-		program.main_function()->consts());
-	if (!s_main__) { s_main__ = heap.allocate<PyString>("__main__"); }
+		program->filename(),
+		program->argv(),
+		program->main_stack_size(),
+		code->consts(),
+		code->names(),
+		Config{ .requires_importlib = true },
+		std::move(program));
 }
+
+void Interpreter::raise_exception(py::BaseException *exception)
+{
+	m_current_frame->push_exception(exception);
+}
+
 
 void Interpreter::unwind()
 {
@@ -111,20 +151,10 @@ void Interpreter::unwind()
 
 PyModule *Interpreter::get_imported_module(PyString *name) const
 {
-	for (auto *module : m_available_modules) {
-		if (module->name()->value() == name->value()) { return module; }
+	if (auto it = m_modules->map().find(name); it != m_modules->map().end()) {
+		return as<PyModule>(PyObject::from(it->second).unwrap());
 	}
 	return nullptr;
-}
-
-PyObject *Interpreter::make_function(const std::string &function_name,
-	const std::vector<py::Value> &default_values,
-	const std::vector<py::Value> &kw_default_values,
-	const std::vector<py::PyCell *> &closure) const
-{
-	auto *f = m_program->as_pyfunction(function_name, default_values, kw_default_values, closure);
-	ASSERT(f)
-	return f;
 }
 
 ScopedStack::~ScopedStack()
@@ -159,14 +189,11 @@ PyResult<PyObject *> Interpreter::call(const std::unique_ptr<Function> &func,
 PyResult<PyObject *> Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs)
 {
 	auto &vm = VirtualMachine::the();
-	auto result = native_func->operator()(args, kwargs);
-
-	if (result.is_err()) { return result; }
-
-	spdlog::debug("Native function return value: {}", result.unwrap()->to_string());
-
-	vm.reg(0) = result.unwrap();
-	return result;
+	return native_func->operator()(args, kwargs).and_then([&vm](PyObject *result) {
+		spdlog::debug("Native function return value: {}", result->to_string());
+		vm.reg(0) = result;
+		return Ok(result);
+	});
 }
 
 void Interpreter::store_object(const std::string &name, const Value &value)
@@ -183,11 +210,7 @@ void Interpreter::store_object(const std::string &name, const Value &value)
 				value),
 			(void *)m_current_frame);
 	}
-	if (m_current_frame == m_global_frame) {
-		m_current_frame->put_global(name, value);
-	} else {
-		m_current_frame->put_local(name, value);
-	}
+	m_current_frame->put_local(name, value);
 }
 
 PyResult<Value> Interpreter::get_object(const std::string &name)
@@ -198,7 +221,7 @@ PyResult<Value> Interpreter::get_object(const std::string &name)
 
 	const auto &locals = execution_frame()->locals()->map();
 	const auto &globals = execution_frame()->globals()->map();
-	const auto &builtins = execution_frame()->builtins()->symbol_table();
+	const auto &builtins = execution_frame()->builtins()->symbol_table()->map();
 
 	return [&]() -> PyResult<Value> {
 		const auto &name_value = String{ name };

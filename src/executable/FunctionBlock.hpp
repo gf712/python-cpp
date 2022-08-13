@@ -20,9 +20,11 @@ struct FunctionMetaData
 	std::vector<std::string> cellvars;
 	std::vector<std::string> varnames;
 	std::vector<std::string> freevars;
+	std::vector<std::string> names;
 	std::string filename;
 	size_t first_line_number;
 	size_t arg_count;
+	size_t positional_arg_count;
 	size_t kwonly_arg_count;
 	size_t nlocals;
 	std::vector<size_t> cell2arg;

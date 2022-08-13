@@ -18,6 +18,7 @@ class PyList : public PyBaseObject
 
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
+	PyResult<PyObject *> __getitem__(PyObject *index);
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
@@ -31,7 +32,7 @@ class PyList : public PyBaseObject
 
 	void sort();
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:
@@ -57,7 +58,7 @@ class PyListIterator : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __next__();
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

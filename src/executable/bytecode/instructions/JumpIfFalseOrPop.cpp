@@ -1,5 +1,9 @@
 #include "JumpIfFalseOrPop.hpp"
+#include "executable/Label.hpp"
 #include "runtime/PyBool.hpp"
+#include "vm/VM.hpp"
+
+#include "../serialization/serialize.hpp"
 
 using namespace py;
 
@@ -13,6 +17,7 @@ PyResult<Value> JumpIfFalseOrPop::execute(VirtualMachine &vm, Interpreter &) con
 								  ASSERT(obj)
 								  return obj->bool_();
 							  },
+					   [](const String &str) -> PyResult<bool> { return Ok(!str.s.empty()); },
 					   [](const auto &) -> PyResult<bool> {
 						   TODO();
 						   return Ok(false);
@@ -27,12 +32,14 @@ PyResult<Value> JumpIfFalseOrPop::execute(VirtualMachine &vm, Interpreter &) con
 			result);
 
 	if (test_result.is_err()) { return Err(test_result.unwrap_err()); }
-	if (test_result.unwrap() == false) {
+	if (!test_result.unwrap()) {
 		const auto ip = vm.instruction_pointer() + *m_offset;
 		vm.set_instruction_pointer(ip);
-		vm.reg(m_result_register) = NameConstant{ test_result.unwrap() };
+		vm.reg(m_result_register) = result;
+		return Ok(result);
+	} else {
+		return Ok(nullptr);
 	}
-	return Ok(Value{ NameConstant{ test_result.unwrap() } });
 };
 
 void JumpIfFalseOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
@@ -43,12 +50,14 @@ void JumpIfFalseOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction
 std::vector<uint8_t> JumpIfFalseOrPop::serialize() const
 {
 	ASSERT(m_offset.has_value())
-	ASSERT(m_offset < std::numeric_limits<uint8_t>::max())
 
-	return {
+	std::vector<uint8_t> result{
 		JUMP_IF_FALSE_OR_POP,
 		m_test_register,
 		m_result_register,
-		static_cast<uint8_t>(*m_offset),
 	};
+
+	::serialize(*m_offset, result);
+
+	return result;
 }

@@ -1,9 +1,18 @@
 #include "Modules.hpp"
 #include "runtime/AssertionError.hpp"
 #include "runtime/AttributeError.hpp"
+#include "runtime/Import.hpp"
+#include "runtime/ImportError.hpp"
+#include "runtime/KeyError.hpp"
+#include "runtime/ModuleNotFoundError.hpp"
 #include "runtime/NameError.hpp"
+#include "runtime/NotImplementedError.hpp"
+#include "runtime/OSError.hpp"
 #include "runtime/PyBool.hpp"
+#include "runtime/PyBytes.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
@@ -25,40 +34,24 @@
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
+
 #include "interpreter/Interpreter.hpp"
+
+#include "lexer/Lexer.hpp"
+
 #include "memory/GarbageCollector.hpp"
+
+#include "parser/Parser.hpp"
+
 #include "vm/VM.hpp"
 
 #include "utilities.hpp"
-
-#include <iostream>
 
 using namespace py;
 
 static PyModule *s_builtin_module = nullptr;
 
 namespace {
-// PyFunction *make_function(const std::string &function_name,
-// 	int64_t function_id,
-// 	const std::vector<std::string> &argnames,
-// 	size_t argcount,
-// 	PyModule *module,
-// 	PyDict *globals)
-// {
-// 	auto &vm = VirtualMachine::the();
-// 	auto function = std::static_pointer_cast<Bytecode>(vm.interpreter().function(function_name));
-// 	PyCode *code = vm.heap().allocate<PyCode>(function,
-// 		function_id,
-// 		argnames,
-// 		std::vector<Value>{},
-// 		std::vector<Value>{},
-// 		argcount,
-// 		0,
-// 		PyCode::CodeFlags::create(),
-// 		module);
-// 	return vm.heap().allocate<PyFunction>(function_name, code, globals);
-// }
-
 
 PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
@@ -172,7 +165,8 @@ PyResult<PyObject *>
 			// auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
 			// FIXME: what should be the module for this?
-			auto *f = interpreter.make_function(mangled_class_name_as_string, {}, {}, {});
+			auto *f = interpreter.execution_frame()->code()->make_function(
+				mangled_class_name_as_string, {}, {}, {});
 			ASSERT(as<PyFunction>(f))
 			return Ok(as<PyFunction>(f));
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {
@@ -181,8 +175,6 @@ PyResult<PyObject *>
 			return Err(type_error("__build_class__: func must be callable"));
 		}
 	}();
-
-	ASSERT(callable.is_ok())
 
 	if (callable.is_err()) { TODO(); }
 
@@ -234,7 +226,8 @@ PyResult<PyObject *>
 	auto kwargs_ = PyDict::create();
 	if (kwargs_.is_err()) { return Err(kwargs_.unwrap_err()); }
 	auto *empty_kwargs = kwargs_.unwrap();
-	callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
+	auto result = callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
+	if (result.is_err()) { TODO(); }
 
 	const std::string class_name_str =
 		Mangler::default_mangler().class_demangle(mangled_class_name_as_string);
@@ -275,7 +268,9 @@ PyResult<PyObject *> len(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	}
 
 	return PyObject::from(args->elements()[0]).and_then([](PyObject *o) -> PyResult<PyObject *> {
-		if (auto r = o->len(); r.is_ok()) {
+		auto mapping = o->as_mapping();
+		if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
+		if (auto r = mapping.unwrap().len(); r.is_ok()) {
 			return PyInteger::create(r.unwrap());
 		} else {
 			return Err(r.unwrap_err());
@@ -289,6 +284,89 @@ PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
 	auto obj = args->operator[](0);
 	if (obj.is_err()) return obj;
 	return PyInteger::create(static_cast<int64_t>(bit_cast<intptr_t>(obj.unwrap())));
+}
+
+PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
+{
+	// TODO: support globals, locals, fromlist and level
+	ASSERT(args->size() > 0)
+	auto arg0 = args->operator[](0);
+	if (arg0.is_err()) return arg0;
+	auto *name = arg0.unwrap();
+
+	if (!as<PyString>(name)) {
+		return Err(
+			type_error("__import__(): name must be a string, not {}", name->type()->to_string()));
+	}
+
+	auto arg1 = [args]() -> PyResult<PyObject *> {
+		if (args->size() > 1) {
+			auto arg1 = args->operator[](1);
+			if (arg1.is_err()) return arg1;
+			auto *globals = arg1.unwrap();
+			if (!as<PyDict>(globals) && globals != py_none()) {
+				return Err(type_error("__import__(): globals must be a dict or None, not {}",
+					globals->type()->to_string()));
+			}
+			return Ok(globals);
+		} else {
+			return Ok(py_none());
+		}
+	}();
+	if (arg1.is_err()) return arg1;
+	auto *globals = arg1.unwrap();
+
+	auto arg2 = [args]() -> PyResult<PyObject *> {
+		if (args->size() > 2) {
+			auto arg2 = args->operator[](2);
+			if (arg2.is_err()) return arg2;
+			auto *locals = arg2.unwrap();
+			return Ok(locals);
+		} else {
+			return Ok(py_none());
+		}
+	}();
+
+	if (arg2.is_err()) return arg2;
+	auto *locals = arg2.unwrap();
+
+	auto arg3 = [args]() -> PyResult<PyObject *> {
+		if (args->size() > 3) {
+			auto arg3 = args->operator[](3);
+			if (arg3.is_err()) return arg3;
+			auto *fromlist = arg3.unwrap();
+			return Ok(fromlist);
+		} else {
+			return PyTuple::create();
+		}
+	}();
+
+	if (arg3.is_err()) return arg3;
+	auto *fromlist = arg3.unwrap();
+
+	auto arg4 = [args]() -> PyResult<PyObject *> {
+		if (args->size() > 1) {
+			auto arg4 = args->operator[](4);
+			if (arg4.is_err()) return arg4;
+			auto *level = arg4.unwrap();
+			if (!as<PyInteger>(level)) {
+				return Err(type_error(
+					"__import__(): level must be an int, not {}", level->type()->to_string()));
+			}
+			return Ok(level);
+		} else {
+			return PyInteger::create(0);
+		}
+	}();
+	if (arg4.is_err()) return arg4;
+	auto *level = arg4.unwrap();
+
+
+	return import_module_level_object(as<PyString>(name),
+		as<PyDict>(globals),
+		locals,
+		fromlist,
+		as<PyInteger>(level)->as_size_t());
 }
 
 PyResult<PyObject *> hasattr(const PyTuple *args, const PyDict *, Interpreter &)
@@ -328,7 +406,9 @@ PyResult<PyObject *> getattr(const PyTuple *args, const PyDict *, Interpreter &)
 	if (!as<PyString>(name)) { return Err(type_error("getattr(): attribute name must be string")); }
 
 	if (args->size() == 2) {
-		return obj->getattribute(name);
+		auto result = obj->getattribute(name);
+		if (result.is_ok()) { ASSERT(result.unwrap()); }
+		return result;
 	} else {
 		auto default_value_ = PyObject::from(args->elements()[2]);
 		if (default_value_.is_err()) return default_value_;
@@ -339,8 +419,10 @@ PyResult<PyObject *> getattr(const PyTuple *args, const PyDict *, Interpreter &)
 		if (attr_value.is_err()) { return attr_value; }
 
 		if (found_status == LookupAttrResult::FOUND) {
+			if (attr_value.is_ok()) { ASSERT(attr_value.unwrap()); }
 			return attr_value;
 		} else {
+			ASSERT(default_value);
 			return Ok(default_value);
 		}
 	}
@@ -357,7 +439,7 @@ PyResult<PyObject *> setattr(const PyTuple *args, const PyDict *, Interpreter &)
 	auto name_ = PyObject::from(args->elements()[1]);
 	if (name_.is_err()) return name_;
 	auto *name = name_.unwrap();
-	auto value_ = PyObject::from(args->elements()[1]);
+	auto value_ = PyObject::from(args->elements()[2]);
 	if (value_.is_err()) return value_;
 	auto *value = value_.unwrap();
 
@@ -401,7 +483,9 @@ PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
 		if (auto codepoint = pystr->codepoint()) {
 			return PyObject::from(Number{ static_cast<int64_t>(*codepoint) });
 		} else {
-			auto size = pystr->len();
+			auto mapping = pystr->as_mapping();
+			if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
+			auto size = mapping.unwrap().len();
 			if (size.is_err()) { return Err(size.unwrap_err()); }
 			return Err(type_error(
 				"ord() expected a character, but string of length {} found", size.unwrap()));
@@ -430,7 +514,7 @@ PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &inter
 		// If the object is a module object, the list contains the names of the module’s attributes.
 		if (std::holds_alternative<PyObject *>(arg) && as<PyModule>(std::get<PyObject *>(arg))) {
 			auto *pymodule = as<PyModule>(std::get<PyObject *>(arg));
-			for (const auto &[k, _] : pymodule->symbol_table()) {
+			for (const auto &[k, _] : pymodule->symbol_table()->map()) {
 				dir_list->elements().push_back(k);
 			}
 		}
@@ -470,6 +554,55 @@ PyResult<PyObject *> abs(const PyTuple *args, const PyDict *kwargs, Interpreter 
 		return Err(type_error("abs() takes no keyword arguments"));
 	}
 	return PyObject::from(args->elements()[0]).and_then([](auto *obj) { return obj->abs(); });
+}
+
+PyResult<PyObject *> max(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (!args || args->size() == 0) { return Err(type_error("")); }
+
+	if (kwargs && kwargs->size() > 0) { TODO(); }
+
+	if (args->size() == 1) {
+		auto iterable = PyObject::from(args->elements()[0]);
+		if (iterable.is_err()) return Err(iterable.unwrap_err());
+
+		auto iterator = iterable.unwrap()->iter();
+		if (iterator.is_err()) return Err(iterator.unwrap_err());
+
+		auto value = iterator.unwrap()->next();
+		if (value.is_err()) return value;
+		auto *max_value = value.unwrap();
+
+		while (value.is_ok()) {
+			auto cmp = value.unwrap()->richcompare(max_value, RichCompare::Py_GT);
+			if (cmp.is_err()) return cmp;
+			if (cmp.unwrap() == py_true()) { max_value = value.unwrap(); }
+			value = iterator.unwrap()->next();
+		}
+
+		if (value.unwrap_err()->type() != stop_iteration("")->type()) {
+			return Err(value.unwrap_err());
+		}
+
+		return Ok(max_value);
+	} else {
+		std::optional<Value> max_value;
+		for (const auto &el : args->elements()) {
+			if (max_value.has_value()) {
+				auto cmp = greater_than(el, *max_value, interpreter);
+				if (cmp.is_err()) return Err(cmp.unwrap_err());
+				auto r = truthy(cmp.unwrap(), interpreter);
+				if (r.is_err()) return Err(r.unwrap_err());
+				if (r.unwrap()) { max_value = el; }
+			} else {
+				max_value = el;
+			}
+		}
+
+		ASSERT(max_value.has_value());
+
+		return PyObject::from(*max_value);
+	}
 }
 
 PyResult<PyObject *> staticmethod(const PyTuple *args, const PyDict *kwargs, Interpreter &)
@@ -512,24 +645,28 @@ PyResult<PyObject *> isinstance(const PyTuple *args, const PyDict *kwargs, Inter
 	if (classinfo_.is_err()) return classinfo_;
 	auto *classinfo = classinfo_.unwrap();
 
+	std::vector<PyType *> types;
 	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
-		(void)class_info_tuple;
-		TODO();
-	} else if (auto *class_info_type = as<PyType>(classinfo)) {
-		if (object->type() == class_info_type) {
-			return Ok(py_true());
-		} else {
-			auto mro_ = object->type()->mro();
-			if (mro_.is_err()) { return Err(mro_.unwrap_err()); }
-			auto *mro = mro_.unwrap();
-			for (const auto &m : mro->elements()) {
-				if (std::get<PyObject *>(m) == class_info_type) { return Ok(py_true()); }
+		types.reserve(class_info_tuple->elements().size());
+		for (const auto &el : class_info_tuple->elements()) {
+			auto el_obj = PyObject::from(el);
+			if (el_obj.is_err()) return el_obj;
+			if (!as<PyType>(el_obj.unwrap())) {
+				return Err(type_error("isinstance() arg 2 must be a type or tuple of types"));
 			}
-			return Ok(py_false());
+			types.push_back(as<PyType>(el_obj.unwrap()));
 		}
+	} else if (auto *class_info_type = as<PyType>(classinfo)) {
+		types.push_back(class_info_type);
 	} else {
-		TODO();
+		return Err(type_error("isinstance() arg 2 must be a type or tuple of types"));
 	}
+
+	const auto result = std::any_of(types.begin(), types.end(), [object](PyType *const &t) {
+		return object->type()->issubclass(t);
+	});
+
+	return Ok(result ? py_true() : py_false());
 }
 
 PyResult<PyObject *> issubclass(const PyTuple *args, const PyDict *kwargs, Interpreter &)
@@ -560,15 +697,196 @@ PyResult<PyObject *> issubclass(const PyTuple *args, const PyDict *kwargs, Inter
 	}
 }
 
+PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+{
+	if (args->size() != 1) {
+		return Err(type_error("all expected 1 arguments, got {}", args->size()));
+	}
+
+	if (kwargs && !kwargs->map().empty()) {
+		return Err(type_error("all() takes no keyword arguments"));
+	}
+	auto iterable_ = PyObject::from(args->elements()[0]);
+	if (iterable_.is_err()) return iterable_;
+	auto *iterable = iterable_.unwrap();
+#
+	const auto &iterator = iterable->iter();
+	if (iterator.is_err()) return iterator;
+	auto next_value = iterator.unwrap()->next();
+	while (!next_value.is_err()) {
+		const auto is_truthy = next_value.unwrap()->bool_();
+		if (is_truthy.is_err()) return Err(is_truthy.unwrap_err());
+		if (!is_truthy.unwrap()) { return Ok(py_false()); }
+		next_value = iterator.unwrap()->next();
+	}
+
+	// FIXME: store StopIteration type somewhere so we don't have to instantiate a StopIteration
+	//        exception object just to get its type
+	if (next_value.unwrap_err()->type() == stop_iteration("")->type()) {
+		return Ok(py_true());
+	} else {
+		return next_value;
+	}
+}
+
+PyResult<PyObject *> exec(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+{
+	ASSERT(args)
+	if (args->size() < 1) {
+		return Err(type_error("exec expected at least 1 argument, got {}", args->size()));
+	}
+	if (args->size() > 3) {
+		return Err(type_error("exec expected at most 3 arguments, got {}", args->size()));
+	}
+
+	auto source_ = PyObject::from(args->elements()[0]);
+	auto globals_ = args->size() >= 2 ? PyObject::from(args->elements()[1]) : Ok(py_none());
+	auto locals_ = args->size() == 3 ? PyObject::from(args->elements()[2]) : Ok(py_none());
+
+	if (source_.is_err()) return source_;
+	if (globals_.is_err()) return globals_;
+	if (locals_.is_err()) return locals_;
+
+	auto *source = source_.unwrap();
+	auto *globals = globals_.unwrap();
+	auto *locals = locals_.unwrap();
+
+	ASSERT(source);
+	ASSERT(globals);
+	ASSERT(locals);
+
+	if (globals == py_none()) {
+		globals = interpreter.execution_frame()->globals();
+		if (locals == py_none()) { locals = interpreter.execution_frame()->locals(); }
+		if (!globals || !locals) { TODO(); }
+	} else if (locals == py_none()) {
+		locals = globals;
+	}
+
+	if (!as<PyDict>(globals)) {
+		return Err(type_error("exec() globals must be a dict, not {}", globals->type()->name()));
+	}
+
+	if (locals->as_mapping().is_err() && locals != py_none()) {
+		return Err(type_error("locals must be a mapping or None, not {}", locals->type()->name()));
+	}
+
+	if (!as<PyDict>(globals)->map().contains(String{ "__builtin__" })) {
+		as<PyDict>(globals)->insert(
+			String{ "__builtin__" }, interpreter.execution_frame()->builtins());
+	}
+
+	if (auto *code = as<PyCode>(source)) {
+		if (!as<PyDict>(locals)) { TODO(); }
+		return code->eval(as<PyDict>(globals),
+			as<PyDict>(locals),
+			PyTuple::create().unwrap(),
+			PyDict::create().unwrap(),
+			{},
+			{},
+			{},
+			PyString::create("").unwrap());
+	} else {
+		TODO();
+	}
+}
+
+PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
+{
+	ASSERT(args)
+	if (args->size() < 1) {
+		return Err(type_error("compile() missing required argument 'source' (pos 0)"));
+	}
+	auto arg0_ = PyObject::from(args->elements()[0]);
+	if (arg0_.is_err()) return arg0_;
+	auto *source = arg0_.unwrap();
+
+	if (args->size() < 2) {
+		return Err(type_error("compile() missing required argument 'filename' (pos 0)"));
+	}
+	auto arg1_ = PyObject::from(args->elements()[1]);
+	if (arg1_.is_err()) return arg1_;
+	auto *filename = arg1_.unwrap();
+
+	if (args->size() < 3) {
+		return Err(type_error("compile() missing required argument 'mode' (pos 0)"));
+	}
+	auto arg2_ = PyObject::from(args->elements()[2]);
+	if (arg2_.is_err()) return arg2_;
+	auto *mode = arg2_.unwrap();
+
+	auto args3_ = [args]() -> PyResult<PyObject *> {
+		if (args->size() < 4) return PyInteger::create(0);
+		return PyObject::from(args->elements()[3]);
+	}();
+	if (args3_.is_err()) return args3_;
+	auto *flags = args3_.unwrap();
+
+	auto args4_ = [args]() -> PyResult<PyObject *> {
+		if (args->size() < 5) return Ok(py_false());
+		return PyObject::from(args->elements()[4]);
+	}();
+	if (args4_.is_err()) return args4_;
+	auto *dont_inherit = args4_.unwrap();
+
+	auto args5_ = [args]() -> PyResult<PyObject *> {
+		if (args->size() < 6) return PyInteger::create(-1);
+		return PyObject::from(args->elements()[5]);
+	}();
+	if (args5_.is_err()) return args5_;
+	auto *optimize = args5_.unwrap();
+
+	ASSERT(as<PyString>(source) || as<PyBytes>(source));
+	ASSERT(as<PyString>(filename));
+	ASSERT(as<PyString>(mode));
+	ASSERT(as<PyInteger>(flags));
+	ASSERT(as<PyBool>(dont_inherit));
+	ASSERT(as<PyInteger>(optimize));
+
+	auto source_str = [source]() {
+		if (as<PyString>(source)) { return as<PyString>(source)->value(); }
+		const auto &bytes = as<PyBytes>(source)->value().b;
+		std::string source_str;
+		source_str.reserve(bytes.size());
+		std::transform(bytes.begin(),
+			bytes.end(),
+			std::back_inserter(source_str),
+			[](const std::byte b) -> char { return static_cast<char>(b); });
+		return source_str;
+	}();
+	const auto filename_str = as<PyString>(filename)->value();
+	const auto mode_str = as<PyString>(mode)->value();
+	if (mode_str == "exec") {
+		if (source_str.back() != '\n') { source_str.append("\n"); }
+
+		auto lexer = Lexer::create(source_str, filename_str);
+		parser::Parser p{ lexer };
+		p.parse();
+
+		std::shared_ptr<Program> bytecode = codegen::BytecodeGenerator::compile(
+			p.module(), { filename_str }, compiler::OptimizationLevel::None);
+		if (!bytecode) { TODO(); }
+
+		return Ok(bytecode->main_function());
+	} else if (mode_str == "eval") {
+		TODO();
+	} else if (mode_str == "single") {
+		TODO();
+	} else {
+		return Err(value_error("compile() mode must be 'exec', 'eval' or 'single'"));
+	}
+}
+
+
 auto initialize_types()
 {
 	type();
+	integer();
 	bool_();
 	bytes();
 	ellipsis();
 	str();
 	float_();
-	integer();
 	none();
 	module();
 	object();
@@ -581,6 +899,8 @@ auto initialize_types()
 	tuple_iterator();
 	range();
 	range_iterator();
+	set();
+	set_iterator();
 	function();
 	native_function();
 	code();
@@ -606,8 +926,10 @@ auto initialize_types()
 		list(),
 		tuple(),
 		range(),
+		set(),
 		property(),
-		classmethod() };
+		classmethod(),
+		slice() };
 }
 
 auto initialize_exceptions(PyModule *blt)
@@ -621,6 +943,11 @@ auto initialize_exceptions(PyModule *blt)
 	ValueError::register_type(blt);
 	NameError::register_type(blt);
 	RuntimeError::register_type(blt);
+	ImportError::register_type(blt);
+	KeyError::register_type(blt);
+	NotImplementedError::register_type(blt);
+	ModuleNotFoundError::register_type(blt);
+	OSError::register_type(blt);
 }
 
 }// namespace
@@ -642,112 +969,141 @@ PyModule *builtins_module(Interpreter &interpreter)
 
 	auto types = initialize_types();
 
-	s_builtin_module = heap.allocate<PyModule>(PyString::create("__builtins__").unwrap());
+	s_builtin_module = PyModule::create(PyDict::create().unwrap(),
+		PyString::create("__builtins__").unwrap(),
+		PyString::create("").unwrap())
+						   .unwrap();
 
 	for (auto *type : types) {
-		s_builtin_module->insert(PyString::create(type->name()).unwrap(), type);
+		s_builtin_module->add_symbol(PyString::create(type->name()).unwrap(), type);
 	}
 
 	initialize_exceptions(s_builtin_module);
 
-	s_builtin_module->insert(PyString::create("__build_class__").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("__build_class__").unwrap(),
 		heap.allocate<PyNativeFunction>(
 			"__build_class__", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return build_class(args, kwargs, interpreter);
 			}));
 
-	s_builtin_module->insert(PyString::create("abs").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("__import__").unwrap(),
+		heap.allocate<PyNativeFunction>(
+			"__import__", [&interpreter](PyTuple *args, PyDict *kwargs) {
+				return import(args, kwargs, interpreter);
+			}));
+
+	s_builtin_module->add_symbol(PyString::create("abs").unwrap(),
 		heap.allocate<PyNativeFunction>("abs", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return abs(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("dir").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("all").unwrap(),
+		heap.allocate<PyNativeFunction>("all", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return all(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("dir").unwrap(),
 		heap.allocate<PyNativeFunction>("dir", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return dir(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("getattr").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("getattr").unwrap(),
 		heap.allocate<PyNativeFunction>("getattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return getattr(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("globals").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("globals").unwrap(),
 		heap.allocate<PyNativeFunction>("globals", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return globals(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("hasattr").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("hasattr").unwrap(),
 		heap.allocate<PyNativeFunction>("hasattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return hasattr(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("hex").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("hex").unwrap(),
 		heap.allocate<PyNativeFunction>("hex", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return hex(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("id").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("id").unwrap(),
 		heap.allocate<PyNativeFunction>("id", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return id(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("iter").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("iter").unwrap(),
 		heap.allocate<PyNativeFunction>("iter", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return iter(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("isinstance").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("isinstance").unwrap(),
 		heap.allocate<PyNativeFunction>(
 			"isinstance", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return isinstance(args, kwargs, interpreter);
 			}));
 
-	s_builtin_module->insert(PyString::create("issubclass").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("issubclass").unwrap(),
 		heap.allocate<PyNativeFunction>(
 			"issubclass", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return issubclass(args, kwargs, interpreter);
 			}));
 
-	s_builtin_module->insert(PyString::create("locals").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("locals").unwrap(),
 		heap.allocate<PyNativeFunction>("locals", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return locals(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("len").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("len").unwrap(),
 		heap.allocate<PyNativeFunction>("len", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return len(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("next").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("next").unwrap(),
 		heap.allocate<PyNativeFunction>("next", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return next(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("ord").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("ord").unwrap(),
 		heap.allocate<PyNativeFunction>("ord", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return ord(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("print").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("print").unwrap(),
 		heap.allocate<PyNativeFunction>("print", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return print(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("repr").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("repr").unwrap(),
 		heap.allocate<PyNativeFunction>("repr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return repr(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("setattr").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("setattr").unwrap(),
 		heap.allocate<PyNativeFunction>("setattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return setattr(args, kwargs, interpreter);
 		}));
 
-	s_builtin_module->insert(PyString::create("staticmethod").unwrap(),
+	s_builtin_module->add_symbol(PyString::create("staticmethod").unwrap(),
 		heap.allocate<PyNativeFunction>(
 			"staticmethod", [&interpreter](PyTuple *args, PyDict *kwargs) {
 				return staticmethod(args, kwargs, interpreter);
 			}));
+
+	s_builtin_module->add_symbol(PyString::create("exec").unwrap(),
+		heap.allocate<PyNativeFunction>("exec", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return exec(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("compile").unwrap(),
+		heap.allocate<PyNativeFunction>("compile", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return compile(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("max").unwrap(),
+		heap.allocate<PyNativeFunction>("max", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return max(args, kwargs, interpreter);
+		}));
 
 	return s_builtin_module;
 }

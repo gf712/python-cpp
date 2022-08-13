@@ -50,7 +50,7 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 				std::get<int64_t>(stop->value().value),
 				std::get<int64_t>(step->value().value));
 		}
-		ASSERT_NOT_REACHED()
+		ASSERT_NOT_REACHED();
 	}();
 
 	if (std::holds_alternative<PyResult<PyRange *>>(obj)) return std::get<PyResult<PyRange *>>(obj);
@@ -95,11 +95,13 @@ std::once_flag range_flag;
 std::unique_ptr<TypePrototype> register_range() { return std::move(klass<PyRange>("range").type); }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyRange::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyRange::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(range_flag, []() { type = ::register_range(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(range_flag, []() { type = ::register_range(); });
+		return std::move(type);
+	};
 }
 
 
@@ -143,9 +145,11 @@ std::unique_ptr<TypePrototype> register_range_iterator()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyRangeIterator::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyRangeIterator::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(range_iterator_flag, []() { type = ::register_range_iterator(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(range_iterator_flag, []() { type = ::register_range_iterator(); });
+		return std::move(type);
+	};
 }

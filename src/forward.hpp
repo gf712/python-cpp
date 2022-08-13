@@ -9,6 +9,7 @@ class Module;
 }// namespace ast
 
 class Bytecode;
+class BytecodeProgram;
 namespace codegen {
 class BytecodeGenerator;
 }
@@ -17,6 +18,8 @@ class Interpreter;
 class InterpreterSession;
 class Instruction;
 class Program;
+class VirtualMachine;
+class Label;
 
 namespace parser {
 class Parser;

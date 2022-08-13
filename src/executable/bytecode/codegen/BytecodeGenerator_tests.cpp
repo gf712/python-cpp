@@ -16,9 +16,8 @@ std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	return std::unique_ptr<BytecodeProgram>(static_cast<BytecodeProgram *>(
-		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None)
-			.release()));
+	return std::static_pointer_cast<BytecodeProgram>(
+		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None));
 }
 }// namespace
 

@@ -14,8 +14,13 @@ using Registers = std::vector<py::Value>;
 
 struct State
 {
-	std::optional<size_t> jump_block_count;
-	bool catch_exception{ false };
+	enum class CleanupLogic {
+		CATCH_EXCEPTION,
+		WITH_EXIT,
+	};
+	std::stack<std::optional<std::pair<CleanupLogic, InstructionVector::const_iterator>>> cleanup{
+		{ std::nullopt }
+	};
 };
 
 struct StackFrame : NonCopyable
@@ -44,13 +49,13 @@ class VirtualMachine
 
 	InstructionBlock::const_iterator m_instruction_pointer;
 	Heap &m_heap;
-	std::unique_ptr<InterpreterSession> m_interpreter_session;
+	std::unique_ptr<Interpreter> m_interpreter;
 	State *m_state{ nullptr };
 
 	friend StackFrame;
 
   public:
-	int execute(std::unique_ptr<Program>& program);
+	int execute(std::shared_ptr<Program> program);
 
 	static VirtualMachine &the()
 	{
@@ -119,6 +124,7 @@ class VirtualMachine
 
 	Heap &heap() { return m_heap; }
 
+	Interpreter &initialize_interpreter(std::shared_ptr<Program> &&);
 	Interpreter &interpreter();
 	const Interpreter &interpreter() const;
 
@@ -146,15 +152,9 @@ class VirtualMachine
 	void setup_call_stack(size_t register_count, size_t stack_size);
 	int call(const std::unique_ptr<Function> &);
 	void ret();
-	void jump_blocks(size_t block_count);
-	void set_exception_handling();
-
-	void shutdown_interpreter(Interpreter &);
-
-	const std::unique_ptr<InterpreterSession> &interpreter_session() const
-	{
-		return m_interpreter_session;
-	}
+	void set_cleanup(State::CleanupLogic cleanup_type,
+		InstructionVector::const_iterator exit_instruction);
+	void leave_cleanup_handling();
 
 	void push_frame(size_t register_count, size_t stack_size);
 

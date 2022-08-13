@@ -2,6 +2,7 @@
 
 #include "AttributeError.hpp"
 #include "CustomPyObject.hpp"
+#include "NotImplementedError.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"
 #include "PyBuiltInMethod.hpp"
@@ -32,7 +33,8 @@ using namespace py;
 namespace {
 bool is_method_descriptor(PyType *obj_type)
 {
-	return obj_type == method_wrapper() || obj_type == function();
+	return obj_type == method_wrapper() || obj_type == function()
+		   || obj_type == classmethod_descriptor();
 }
 
 bool descriptor_is_data(const PyObject *obj)
@@ -46,11 +48,14 @@ bool descriptor_is_data(const PyObject *obj)
 
 size_t ValueHash::operator()(const Value &value) const
 {
+	// TODO: put these hash functions somewhere global so they can be reused by the respective
+	//       PyObject classes
 	const auto result =
 		std::visit(overloaded{ [](const Number &number) -> size_t {
 								  if (std::holds_alternative<double>(number.value)) {
 									  return std::hash<double>{}(std::get<double>(number.value));
 								  } else {
+									  if (std::get<int64_t>(number.value) == -1) return -2;
 									  return std::hash<int64_t>{}(std::get<int64_t>(number.value));
 								  }
 							  },
@@ -91,6 +96,170 @@ bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) cons
 }
 
 
+namespace {
+
+template<typename SlotFunctionType,
+	typename ResultType = typename SlotFunctionType::result_type,
+	typename... Args>
+ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+	Args &&...args_) requires std::is_same_v<typename ResultType::OkType, PyObject *>
+{
+	if (std::holds_alternative<SlotFunctionType>(slot)) {
+		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
+	} else if (std::holds_alternative<PyObject *>(slot)) {
+		// FIXME: this const_cast is needed since in Python land there is no concept of
+		//		  PyObject constness (right?). But for the internal calls handled above
+		//		  which are resolved in the C++ runtime, we want to enforce constness
+		//		  so we end up with the awkward line below. But how could we do better?
+		auto args = PyTuple::create(
+			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
+		if (args.is_err()) { return Err(args.unwrap_err()); }
+		PyDict *kwargs = nullptr;
+		return std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+	} else {
+		TODO();
+	}
+}
+
+template<typename SlotFunctionType,
+	typename ResultType = typename SlotFunctionType::result_type,
+	typename... Args>
+ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+	std::string_view conversion_error_message,
+	Args &&...args_) requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
+{
+	if (std::holds_alternative<SlotFunctionType>(slot)) {
+		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
+	} else if (std::holds_alternative<PyObject *>(slot)) {
+		// FIXME: this const_cast is needed since in Python land there is no concept of
+		//		  PyObject constness (right?). But for the internal calls handled above
+		//		  which are resolved in the C++ runtime, we want to enforce constness
+		//		  so we end up with the awkward line below. But how could we do better?
+		auto args = PyTuple::create(
+			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
+		if (args.is_err()) { return Err(args.unwrap_err()); }
+		PyDict *kwargs = nullptr;
+		if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
+			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			if (result.is_err()) return Err(result.unwrap_err());
+			if (!as<PyBool>(result.unwrap())) {
+				return Err(type_error(std::string(conversion_error_message)));
+			}
+			return Ok(as<PyBool>(result.unwrap())->value());
+		} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
+			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			if (result.is_err()) return Err(result.unwrap_err());
+			if (!as<PyInteger>(result.unwrap())) {
+				return Err(type_error(std::string(conversion_error_message)));
+			}
+			return Ok(as<PyInteger>(result.unwrap())->as_i64());
+		} else if constexpr (std::is_same_v<typename ResultType::OkType, std::monostate>) {
+			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			if (result.is_err()) {
+				return Err(result.unwrap_err());
+			} else {
+				return Ok(std::monostate{});
+			}
+		} else {
+			[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
+			();
+		}
+	} else {
+		TODO();
+	}
+}
+
+}// namespace
+
+
+PyResult<size_t> PyMappingWrapper::len()
+{
+	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().mapping_type_protocol->__len__.has_value()) {
+		return call_slot(*m_object->type_prototype().mapping_type_protocol->__len__,
+			"object cannot be interpreted as an integer",
+			m_object);
+	}
+
+	return Err(type_error("object of type '{}' has no len()", m_object->type()->name()));
+}
+
+PyResult<PyObject *> PyMappingWrapper::getitem(PyObject *name)
+{
+	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().mapping_type_protocol->__getitem__.has_value()) {
+		return call_slot(
+			*m_object->type_prototype().mapping_type_protocol->__getitem__, m_object, name);
+	}
+
+	return Err(type_error("object of type '{}' is not subscriptable", m_object->type()->name()));
+}
+
+PyResult<std::monostate> PyMappingWrapper::setitem(PyObject *name, PyObject *value)
+{
+	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().mapping_type_protocol->__setitem__.has_value()) {
+		return call_slot(*m_object->type_prototype().mapping_type_protocol->__setitem__,
+			"",
+			m_object,
+			name,
+			value);
+	}
+
+	return Err(type_error(
+		"object of type '{}' does not support item assignment", m_object->type()->name()));
+}
+
+PyResult<std::monostate> PyMappingWrapper::delitem(PyObject *name)
+{
+	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().mapping_type_protocol->__delitem__.has_value()) {
+		return call_slot(
+			*m_object->type_prototype().mapping_type_protocol->__delitem__, "", m_object, name);
+	}
+
+	return Err(
+		type_error("object of type '{}' does not support item deletion", m_object->type()->name()));
+}
+
+PyResult<size_t> PySequenceWrapper::len()
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__len__.has_value()) {
+		return call_slot(*m_object->type_prototype().sequence_type_protocol->__len__,
+			"object cannot be interpreted as an integer",
+			m_object);
+	}
+
+	return Err(type_error("object of type '{}' has no len()", m_object->type()->name()));
+}
+
+PyResult<bool> PySequenceWrapper::contains(PyObject *value)
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__contains__.has_value()) {
+		return call_slot(*m_object->type_prototype().sequence_type_protocol->__contains__,
+			"object cannot be interpreted as a bool",
+			m_object,
+			value);
+	}
+
+	return Err(type_error("object of type '{}' has no contains()", m_object->type()->name()));
+}
+
+PyResult<PyObject *> PySequenceWrapper::concat(PyObject *value)
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__concat__.has_value()) {
+		return call_slot(
+			*m_object->type_prototype().sequence_type_protocol->__concat__, m_object, value);
+	}
+
+	return Err(type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
+		m_object->type()->name(),
+		value->type()->name()));
+}
+
 template<> PyResult<PyObject *> PyObject::from(PyObject *const &value)
 {
 	ASSERT(value)
@@ -129,7 +298,20 @@ template<> PyResult<PyObject *> PyObject::from(const Value &value)
 	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
 }
 
-PyObject::PyObject(const TypePrototype &type) : Cell(), m_type_prototype(type) {}
+PyObject::PyObject(const TypePrototype &type) : Cell(), m_type(type) {}
+
+PyObject::PyObject(PyType *type) : Cell(), m_type(type) {}
+
+const TypePrototype &PyObject::type_prototype() const
+{
+	if (std::holds_alternative<std::reference_wrapper<const TypePrototype>>(m_type)) {
+		return std::get<std::reference_wrapper<const TypePrototype>>(m_type).get();
+	} else {
+		auto *type = std::get<PyType *>(m_type);
+		ASSERT(type);
+		return type->underlying_type();
+	}
+}
 
 void PyObject::visit_graph(Visitor &visitor)
 {
@@ -137,9 +319,51 @@ void PyObject::visit_graph(Visitor &visitor)
 	if (m_attributes) { visitor.visit(*m_attributes); }
 }
 
+PyResult<PyMappingWrapper> PyObject::as_mapping()
+{
+	if (type_prototype().mapping_type_protocol.has_value()) {
+		return Ok(PyMappingWrapper(this));
+	} else {
+		return Err(type_error("object of type {} is not mappable", type_prototype().__name__));
+	}
+}
+
+PyResult<PySequenceWrapper> PyObject::as_sequence()
+{
+	if (type_prototype().sequence_type_protocol.has_value()) {
+		return Ok(PySequenceWrapper(this));
+	} else {
+		return Err(type_error("object of type {} is not a sequence", type_prototype().__name__));
+	}
+}
+
+PyResult<PyBufferProcs> PyObject::as_buffer()
+{
+	if (type_prototype().as_buffer.has_value()) {
+		return Ok(*type_prototype().as_buffer);
+	} else {
+		return Err(
+			type_error("a bytes-like object is required, not '{}'", type_prototype().__name__));
+	}
+}
+
+PyResult<std::monostate> PyObject::get_buffer(PyBuffer &buffer, int flags)
+{
+	return as_buffer().and_then(
+		[&buffer, flags, this](const PyBufferProcs &bc) -> PyResult<std::monostate> {
+			(void)buffer;
+			(void)flags;
+			(void)this;
+			(void)bc;
+			return Err(not_implemented_error("get_buffer not implemented!"));
+			// return bc.getbuffer(this, buffer, flags);
+		});
+}
+
 PyResult<PyObject *> PyObject::__repr__() const
 {
-	return PyString::create(fmt::format("<object at {}>", static_cast<const void *>(this)));
+	return PyString::create(fmt::format(
+		"<{} object at {}>", type_prototype().__name__, static_cast<const void *>(this)));
 }
 
 PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op) const
@@ -208,138 +432,64 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		// op not supported
 		return Err(type_error("'{}' not supported between instances of '{}' and '{}'",
 			opstr[static_cast<size_t>(op)],
-			m_type_prototype.__name__,
-			other->m_type_prototype.__name__));
+			type_prototype().__name__,
+			other->type_prototype().__name__));
 	}
 	}
 }
-
-namespace {
-template<typename SlotFunctionType,
-	typename ResultType = typename SlotFunctionType::result_type,
-	typename... Args>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-	Args &&... args_) requires std::is_same_v<typename ResultType::OkType, PyObject *>
-{
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
-	} else if (std::holds_alternative<PyObject *>(slot)) {
-		// FIXME: this const_cast is needed since in Python land there is no concept of
-		//		  PyObject constness (right?). But for the internal calls handled above
-		//		  which are resolved in the C++ runtime, we want to enforce constness
-		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(
-			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
-		if (args.is_err()) { return Err(args.unwrap_err()); }
-		PyDict *kwargs = nullptr;
-		return std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
-	} else {
-		TODO();
-	}
-}
-
-template<typename SlotFunctionType,
-	typename ResultType = typename SlotFunctionType::result_type,
-	typename... Args>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-	std::string_view conversion_error_message,
-	Args &&... args_) requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
-{
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
-	} else if (std::holds_alternative<PyObject *>(slot)) {
-		// FIXME: this const_cast is needed since in Python land there is no concept of
-		//		  PyObject constness (right?). But for the internal calls handled above
-		//		  which are resolved in the C++ runtime, we want to enforce constness
-		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(
-			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
-		if (args.is_err()) { return Err(args.unwrap_err()); }
-		PyDict *kwargs = nullptr;
-		if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
-			if (result.is_err()) return Err(result.unwrap_err());
-			if (!as<PyBool>(result.unwrap())) {
-				return Err(type_error(std::string(conversion_error_message)));
-			}
-			return Ok(as<PyBool>(result.unwrap())->value());
-		} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
-			if (result.is_err()) return Err(result.unwrap_err());
-			if (!as<PyInteger>(result.unwrap())) {
-				return Err(type_error(std::string(conversion_error_message)));
-			}
-			return Ok(as<PyInteger>(result.unwrap())->as_i64());
-		} else if constexpr (std::is_same_v<typename ResultType::OkType, std::monostate>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
-			if (result.is_err()) {
-				return Err(result.unwrap_err());
-			} else {
-				return Ok(std::monostate{});
-			}
-		} else {
-			[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
-			();
-		}
-	} else {
-		TODO();
-	}
-}
-
-}// namespace
 
 PyResult<PyObject *> PyObject::eq(const PyObject *other) const
 {
-	if (m_type_prototype.__eq__.has_value()) {
-		return call_slot(*m_type_prototype.__eq__, this, other);
+	if (type_prototype().__eq__.has_value()) {
+		return call_slot(*type_prototype().__eq__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::ge(const PyObject *other) const
 {
-	if (m_type_prototype.__eq__.has_value()) {
-		return call_slot(*m_type_prototype.__ge__, this, other);
+	if (type_prototype().__eq__.has_value()) {
+		return call_slot(*type_prototype().__ge__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::gt(const PyObject *other) const
 {
-	if (m_type_prototype.__gt__.has_value()) {
-		return call_slot(*m_type_prototype.__gt__, this, other);
+	if (type_prototype().__gt__.has_value()) {
+		return call_slot(*type_prototype().__gt__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::le(const PyObject *other) const
 {
-	if (m_type_prototype.__le__.has_value()) {
-		return call_slot(*m_type_prototype.__le__, this, other);
+	if (type_prototype().__le__.has_value()) {
+		return call_slot(*type_prototype().__le__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::lt(const PyObject *other) const
 {
-	if (m_type_prototype.__lt__.has_value()) {
-		return call_slot(*m_type_prototype.__lt__, this, other);
+	if (type_prototype().__lt__.has_value()) {
+		return call_slot(*type_prototype().__lt__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::ne(const PyObject *other) const
 {
-	if (m_type_prototype.__ne__.has_value()) {
-		return call_slot(*m_type_prototype.__ne__, this, other);
+	if (type_prototype().__ne__.has_value()) {
+		return call_slot(*type_prototype().__ne__, this, other);
 	}
 	return Ok(not_implemented());
 }
 
 PyResult<PyObject *> PyObject::getattribute(PyObject *attribute) const
 {
-	if (m_type_prototype.__getattribute__.has_value()) {
-		return call_slot(*m_type_prototype.__getattribute__, this, attribute);
+	if (type_prototype().__getattribute__.has_value()) {
+		return call_slot(*type_prototype().__getattribute__, this, attribute);
 	}
 	TODO();
 }
@@ -351,41 +501,29 @@ PyResult<std::monostate> PyObject::setattribute(PyObject *attribute, PyObject *v
 			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
 	}
 
-	if (auto descriptor_ = type()->lookup(attribute); descriptor_.is_ok()) {
-		auto *descriptor = descriptor_.unwrap();
-		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
-		if (descriptor_set.has_value()) {
-			TODO();
-			return call_slot(*descriptor_set, "", this, attribute, value);
-		}
+	if (auto setattr_method = type()->underlying_type().__setattribute__;
+		setattr_method.has_value()) {
+		return call_slot(*setattr_method, "", this, attribute, value);
+	} else {
+		return Err(type_error("'{}' object has no attributes (assign to {})",
+			type()->underlying_type().__name__,
+			attribute->to_string()));
 	}
-
-	if (!m_attributes) {
-		if (auto dict = PyDict::create(); dict.is_ok()) {
-			m_attributes = dict.unwrap();
-		} else {
-			return Err(dict.unwrap_err());
-		}
-	}
-
-	m_attributes->insert(attribute, value);
-
-	return Ok(std::monostate{});
 }
 
 PyResult<PyObject *> PyObject::repr() const
 {
-	if (m_type_prototype.__repr__.has_value()) {
-		return call_slot(*m_type_prototype.__repr__, this);
+	if (type_prototype().__repr__.has_value()) {
+		return call_slot(*type_prototype().__repr__, this);
 	}
 	TODO();
 }
 
-PyResult<size_t> PyObject::hash() const
+PyResult<int64_t> PyObject::hash() const
 {
-	if (m_type_prototype.__hash__.has_value()) {
+	if (type_prototype().__hash__.has_value()) {
 		return call_slot(
-			*m_type_prototype.__hash__, "__hash__ method should return an integer", this);
+			*type_prototype().__hash__, "__hash__ method should return an integer", this);
 	} else {
 		return __hash__();
 	}
@@ -393,125 +531,176 @@ PyResult<size_t> PyObject::hash() const
 
 PyResult<PyObject *> PyObject::call(PyTuple *args, PyDict *kwargs)
 {
-	if (m_type_prototype.__call__.has_value()) {
-		return call_slot(*m_type_prototype.__call__, this, args, kwargs);
+	if (type_prototype().__call__.has_value()) {
+		return call_slot(*type_prototype().__call__, this, args, kwargs);
 	}
-	return Err(type_error("'{}' object is not callable", m_type_prototype.__name__));
+	return Err(type_error("'{}' object is not callable", type_prototype().__name__));
 }
 
 
 PyResult<PyObject *> PyObject::add(const PyObject *other) const
 {
-	if (m_type_prototype.__add__.has_value()) {
-		return call_slot(*m_type_prototype.__add__, this, other);
-	} else if (other->m_type_prototype.__add__.has_value()) {
-		return call_slot(*other->m_type_prototype.__add__, other, this);
+	if (type_prototype().__add__.has_value()) {
+		return call_slot(*type_prototype().__add__, this, other);
+	} else if (other->type_prototype().__add__.has_value()) {
+		return call_slot(*other->type_prototype().__add__, other, this);
+	} else if (auto seq = const_cast<PyObject *>(this)->as_sequence(); seq.is_ok()) {
+		return seq.unwrap().concat(const_cast<PyObject *>(other));
 	}
 	return Err(type_error("unsupported operand type(s) for +: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::subtract(const PyObject *other) const
 {
-	if (m_type_prototype.__sub__.has_value()) {
-		return call_slot(*m_type_prototype.__sub__, this, other);
+	if (type_prototype().__sub__.has_value()) {
+		return call_slot(*type_prototype().__sub__, this, other);
 	}
 	return Err(type_error("unsupported operand type(s) for -: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::multiply(const PyObject *other) const
 {
-	if (m_type_prototype.__mul__.has_value()) {
-		return call_slot(*m_type_prototype.__mul__, this, other);
-	} else if (other->m_type_prototype.__mul__.has_value()) {
-		return call_slot(*other->m_type_prototype.__mul__, other, this);
+	if (type_prototype().__mul__.has_value()) {
+		return call_slot(*type_prototype().__mul__, this, other);
+	} else if (other->type_prototype().__mul__.has_value()) {
+		return call_slot(*other->type_prototype().__mul__, other, this);
 	}
 	return Err(type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::exp(const PyObject *other) const
 {
-	if (m_type_prototype.__exp__.has_value()) {
-		return call_slot(*m_type_prototype.__exp__, this, other);
+	if (type_prototype().__exp__.has_value()) {
+		return call_slot(*type_prototype().__exp__, this, other);
 	}
 	return Err(type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::lshift(const PyObject *other) const
 {
-	if (m_type_prototype.__lshift__.has_value()) {
-		return call_slot(*m_type_prototype.__lshift__, this, other);
+	if (type_prototype().__lshift__.has_value()) {
+		return call_slot(*type_prototype().__lshift__, this, other);
 	}
 	return Err(type_error("unsupported operand type(s) for <<: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::modulo(const PyObject *other) const
 {
-	if (m_type_prototype.__mod__.has_value()) {
-		return call_slot(*m_type_prototype.__mod__, this, other);
+	if (type_prototype().__mod__.has_value()) {
+		return call_slot(*type_prototype().__mod__, this, other);
 	}
 	return Err(type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
-		m_type_prototype.__name__,
-		other->m_type_prototype.__name__));
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<PyObject *> PyObject::and_(PyObject *other)
+{
+	if (type_prototype().__and__.has_value()) {
+		return call_slot(*type_prototype().__and__, this, other);
+	} else if (other->type_prototype().__and__.has_value()) {
+		return call_slot(*other->type_prototype().__and__, other, this);
+	} else if (auto seq = as_sequence(); seq.is_ok()) {
+		return seq.unwrap().concat(other);
+	}
+	return Err(type_error("unsupported operand type(s) for &: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<bool> PyObject::contains(PyObject *value)
+{
+	if (auto seq = as_sequence(); seq.is_ok()) {
+		if (type_prototype().sequence_type_protocol->__contains__.has_value()) {
+			return seq.unwrap().contains(value);
+		}
+	}
+	auto it = iter();
+	if (it.is_err()) { return Err(it.unwrap_err()); }
+
+	auto n = it.unwrap()->next();
+
+	while (n.is_ok()) {
+		if (auto r = n.unwrap()->eq(value); r.is_ok()) {
+			if (auto c = truthy(r.unwrap(), VirtualMachine::the().interpreter());
+				c.is_ok() && c.unwrap()) {
+				return Ok(true);
+			} else if (c.is_err()) {
+				return c;
+			}
+		} else if (r.is_err()) {
+			return Err(r.unwrap_err());
+		}
+		n = it.unwrap()->next();
+	}
+
+	if (n.is_err() && (n.unwrap_err()->type() != stop_iteration("")->type())) {
+		return Err(n.unwrap_err());
+	}
+	return Ok(false);
+}
+
+PyResult<std::monostate> PyObject::delete_item(PyObject *key)
+{
+	if (auto mapping = as_mapping(); mapping.is_ok()) {
+		if (type_prototype().mapping_type_protocol->__delitem__.has_value()) {
+			return mapping.unwrap().delitem(key);
+		}
+	}
+
+	// TODO: support sequence deletion
+
+	return Err(type_error("'{}' object does not support item deletion", type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::abs() const
 {
-	if (m_type_prototype.__abs__.has_value()) { return call_slot(*m_type_prototype.__abs__, this); }
-	return Err(type_error("bad operand type for abs(): '{}'", m_type_prototype.__name__));
+	if (type_prototype().__abs__.has_value()) { return call_slot(*type_prototype().__abs__, this); }
+	return Err(type_error("bad operand type for abs(): '{}'", type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::neg() const
 {
-	if (m_type_prototype.__neg__.has_value()) { return call_slot(*m_type_prototype.__neg__, this); }
-	return Err(type_error("bad operand type for unary -: '{}'", m_type_prototype.__name__));
+	if (type_prototype().__neg__.has_value()) { return call_slot(*type_prototype().__neg__, this); }
+	return Err(type_error("bad operand type for unary -: '{}'", type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::pos() const
 {
-	if (m_type_prototype.__pos__.has_value()) { return call_slot(*m_type_prototype.__pos__, this); }
-	return Err(type_error("bad operand type for unary +: '{}'", m_type_prototype.__name__));
+	if (type_prototype().__pos__.has_value()) { return call_slot(*type_prototype().__pos__, this); }
+	return Err(type_error("bad operand type for unary +: '{}'", type_prototype().__name__));
 }
 
 PyResult<PyObject *> PyObject::invert() const
 {
-	if (m_type_prototype.__invert__.has_value()) {
-		return call_slot(*m_type_prototype.__invert__, this);
+	if (type_prototype().__invert__.has_value()) {
+		return call_slot(*type_prototype().__invert__, this);
 	}
-	return Err(type_error("bad operand type for unary ~: '{}'", m_type_prototype.__name__));
+	return Err(type_error("bad operand type for unary ~: '{}'", type_prototype().__name__));
 }
 
 
 PyResult<bool> PyObject::bool_() const
 {
-	ASSERT(m_type_prototype.__bool__.has_value())
-	return call_slot(*m_type_prototype.__bool__, "__bool__ should return bool", this);
+	ASSERT(type_prototype().__bool__.has_value())
+	return call_slot(*type_prototype().__bool__, "__bool__ should return bool", this);
 }
 
-
-PyResult<size_t> PyObject::len() const
-{
-	if (m_type_prototype.__len__.has_value()) {
-		return call_slot(
-			*m_type_prototype.__len__, "object cannot be interpreted as an integer", this);
-	}
-
-	return Err(type_error("object of type '{}' has no len()", type()->name()));
-}
 
 PyResult<PyObject *> PyObject::iter() const
 {
-	if (m_type_prototype.__iter__.has_value()) {
-		return call_slot(*m_type_prototype.__iter__, this);
+	if (type_prototype().__iter__.has_value()) {
+		return call_slot(*type_prototype().__iter__, this);
 	}
 
 	return Err(type_error("'{}' object is not iterable", type()->name()));
@@ -519,8 +708,8 @@ PyResult<PyObject *> PyObject::iter() const
 
 PyResult<PyObject *> PyObject::next()
 {
-	if (m_type_prototype.__next__.has_value()) {
-		return call_slot(*m_type_prototype.__next__, this);
+	if (type_prototype().__next__.has_value()) {
+		return call_slot(*type_prototype().__next__, this);
 	}
 
 	return Err(type_error("'{}' object is not an iterator", type()->name()));
@@ -528,8 +717,8 @@ PyResult<PyObject *> PyObject::next()
 
 PyResult<PyObject *> PyObject::get(PyObject *instance, PyObject *owner) const
 {
-	if (m_type_prototype.__get__.has_value()) {
-		return call_slot(*m_type_prototype.__get__, this, instance, owner);
+	if (type_prototype().__get__.has_value()) {
+		return call_slot(*type_prototype().__get__, this, instance, owner);
 	}
 	TODO();
 }
@@ -562,17 +751,17 @@ PyResult<PyObject *> PyObject::new_(PyTuple *args, PyDict *kwargs) const
 	if (args_.is_err()) return args_;
 	args = args_.unwrap();
 
-	if (m_type_prototype.__new__.has_value()) {
-		return call_slot(*m_type_prototype.__new__, type, args, kwargs);
+	if (type_prototype().__new__.has_value()) {
+		return call_slot(*type_prototype().__new__, type, args, kwargs);
 	}
 	TODO();
 }
 
 PyResult<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 {
-	if (m_type_prototype.__init__.has_value()) {
-		if (std::holds_alternative<InitSlotFunctionType>(*m_type_prototype.__init__)) {
-			return std::get<InitSlotFunctionType>(*m_type_prototype.__init__)(this, args, kwargs);
+	if (type_prototype().__init__.has_value()) {
+		if (std::holds_alternative<InitSlotFunctionType>(*type_prototype().__init__)) {
+			return std::get<InitSlotFunctionType>(*type_prototype().__init__)(this, args, kwargs);
 		} else {
 			std::vector<Value> new_args;
 			new_args.reserve(args->size() + 1);
@@ -581,7 +770,7 @@ PyResult<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 			auto args_ = PyTuple::create(new_args);
 			if (args_.is_err()) return Err(args_.unwrap_err());
 			auto result =
-				std::get<PyObject *>(*m_type_prototype.__init__)->call(args_.unwrap(), kwargs);
+				std::get<PyObject *>(*type_prototype().__init__)->call(args_.unwrap(), kwargs);
 			if (result.is_err()) return Err(result.unwrap_err());
 			if (auto *obj = result.unwrap(); obj != py_none()) {
 				return Err(type_error(
@@ -608,11 +797,14 @@ PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
 	auto *name = as<PyString>(attribute);
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err()) return descriptor_;
-	auto *descriptor = descriptor_.unwrap();
+	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::static_type()) {
+		return descriptor_;
+	}
 
 	bool descriptor_has_get = false;
-	if (descriptor) {
+
+	if (descriptor_.is_ok()) {
+		auto *descriptor = descriptor_.unwrap();
 		const auto &descriptor_get = descriptor->type()->underlying_type().__get__;
 		if (descriptor_get.has_value()) { descriptor_has_get = true; }
 		if (descriptor_get.has_value() && descriptor_is_data(descriptor->type())) {
@@ -627,13 +819,14 @@ PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
 		// AttributeError
 	}
 
-	if (descriptor_has_get) { return descriptor->get(const_cast<PyObject *>(this), type()); }
+	if (descriptor_has_get) {
+		return descriptor_.unwrap()->get(const_cast<PyObject *>(this), type());
+	}
 
-	// PyType::lookup returns py_none if it doesn't find name in the objects in the MRO chain
-	if (descriptor != py_none()) { return descriptor_; }
+	if (descriptor_.is_ok()) { return descriptor_; }
 
 	return Err(attribute_error(
-		"'{}' object has no attribute '{}'", m_type_prototype.__name__, name->to_string()));
+		"'{}' object has no attribute '{}'", type_prototype().__name__, name->to_string()));
 }
 
 PyResult<PyObject *> PyObject::get_attribute(PyObject *name) const
@@ -676,6 +869,8 @@ std::tuple<PyResult<PyObject *>, LookupAttrResult> PyObject::lookup_attribute(Py
 	if (std::get<0>(result).is_err()
 		&& (std::get<0>(result).unwrap_err()->type() == AttributeError::static_type())) {
 		return { Ok(py_none()), LookupAttrResult::NOT_FOUND };
+	} else if (std::get<0>(result).is_err()) {
+		return { std::get<0>(result), LookupAttrResult::NOT_FOUND };
 	} else {
 		return result;
 	}
@@ -684,8 +879,6 @@ std::tuple<PyResult<PyObject *>, LookupAttrResult> PyObject::lookup_attribute(Py
 
 PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 {
-	bool method_found = false;
-
 	{
 		// check if the derived object uses the default __getattribute__
 		const auto &getattribute_ = type()->underlying_type().__getattribute__;
@@ -697,10 +890,14 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 	}
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err()) return descriptor_;
-	auto *descriptor = descriptor_.unwrap();
+	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::static_type()) {
+		return descriptor_;
+	}
 
-	if (descriptor) {
+	bool method_found = false;
+
+	if (descriptor_.is_ok()) {
+		auto *descriptor = descriptor_.unwrap();
 		if (is_method_descriptor(descriptor->type())) {
 			method_found = true;
 		} else {
@@ -716,36 +913,50 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 	}
 
 	if (method_found) {
-		auto result = descriptor->get(const_cast<PyObject *>(this), type());
+		auto result = descriptor_.unwrap()->get(const_cast<PyObject *>(this), type());
 		ASSERT(result.is_ok())
 		return result;
 	}
 
 	return Err(attribute_error(
-		"'{}' object has no attribute '{}'", m_type_prototype.__name__, name->to_string()));
+		"'{}' object has no attribute '{}'", type_prototype().__name__, name->to_string()));
 }
 
 PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObject *value)
 {
-	if (as<PyString>(attribute)) {
-		if (!m_attributes) {
-			auto d = PyDict::create();
-			if (d.is_err()) return Err(d.unwrap_err());
-			m_attributes = d.unwrap();
-		}
-		m_attributes->insert(attribute, value);
-		return Ok(std::monostate{});
+	if (!as<PyString>(attribute)) {
+		return Err(
+			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
 	}
-	TODO();
+
+	if (auto descriptor_ = type()->lookup(attribute); descriptor_.is_ok()) {
+		auto *descriptor = descriptor_.unwrap();
+		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
+		if (descriptor_set.has_value()) {
+			return call_slot(*descriptor_set, "", descriptor, this, value);
+		}
+	}
+
+	if (!m_attributes) {
+		if (auto dict = PyDict::create(); dict.is_ok()) {
+			m_attributes = dict.unwrap();
+		} else {
+			return Err(dict.unwrap_err());
+		}
+	}
+
+	m_attributes->insert(attribute, value);
+
+	return Ok(std::monostate{});
 }
 
 PyResult<bool> PyObject::__bool__() const { return Ok(true); }
 
-PyResult<size_t> PyObject::__hash__() const { return Ok(bit_cast<size_t>(this) >> 4); }
+PyResult<int64_t> PyObject::__hash__() const { return Ok(bit_cast<size_t>(this) >> 4); }
 
-bool PyObject::is_callable() const { return m_type_prototype.__call__.has_value(); }
+bool PyObject::is_callable() const { return type_prototype().__call__.has_value(); }
 
-const std::string &PyObject::name() const { return m_type_prototype.__name__; }
+const std::string &PyObject::name() const { return type_prototype().__name__; }
 
 PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
@@ -825,18 +1036,36 @@ std::string PyObject::to_string() const
 	return fmt::format("PyObject at {}", static_cast<const void *>(this));
 }
 
-PyType *PyObject::type() const { return object(); }
+PyType *PyObject::type() const
+{
+	if (std::holds_alternative<PyType *>(m_type)) { return std::get<PyType *>(m_type); }
+	ASSERT(false && "Static types should overload PyObject::type!");
+}
 
 namespace {
 
 std::once_flag object_type_flag;
 
-std::unique_ptr<TypePrototype> register_type() { return std::move(klass<PyObject>("object").type); }
+std::unique_ptr<TypePrototype> register_type()
+{
+	return std::move(klass<PyObject>("object")
+						 .property(
+							 "__class__",
+							 [](PyObject *self) { return self->type(); },
+							 [](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
+								 (void)self;
+								 (void)value;
+								 TODO();
+							 })
+						 .type);
+}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyObject::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyObject::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(object_type_flag, []() { type = ::register_type(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(object_type_flag, []() { type = ::register_type(); });
+		return std::move(type);
+	};
 }

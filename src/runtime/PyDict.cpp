@@ -1,4 +1,5 @@
 #include "PyDict.hpp"
+#include "KeyError.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyNone.hpp"
@@ -6,6 +7,7 @@
 #include "PyTuple.hpp"
 #include "RuntimeError.hpp"
 #include "StopIteration.hpp"
+#include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -109,6 +111,29 @@ std::string PyDict::to_string() const
 
 PyResult<PyObject *> PyDict::__repr__() const { return PyString::create(to_string()); }
 
+PyResult<PyObject *> PyDict::__iter__() const { return PyDictKeyIterator::create(*this); }
+
+PyResult<PyObject *> PyDict::__getitem__(PyObject *key)
+{
+	if (auto it = m_map.find(key); it != m_map.end()) { return PyObject::from(it->second); }
+	return Err(key_error("{}", key->to_string()));
+}
+
+PyResult<std::monostate> PyDict::__setitem__(PyObject *key, PyObject *value)
+{
+	m_map.insert_or_assign(key, value);
+	return Ok(std::monostate{});
+}
+
+PyResult<std::monostate> PyDict::__delitem__(PyObject *key)
+{
+	if (auto it = m_map.find(key); it != m_map.end()) {
+		m_map.erase(it);
+		return Ok(std::monostate{});
+	}
+	return Err(key_error("{}", key->to_string()));
+}
+
 PyResult<PyObject *> PyDict::__eq__(const PyObject *other) const
 {
 	if (!as<PyDict>(other)) { return Ok(py_false()); }
@@ -131,6 +156,8 @@ Value PyDict::operator[](Value key) const
 }
 
 void PyDict::insert(const Value &key, const Value &value) { m_map.insert_or_assign(key, value); }
+
+void PyDict::remove(const Value &key) { m_map.erase(key); }
 
 PyResult<PyObject *> PyDict::merge(PyTuple *args, PyDict *kwargs)
 {
@@ -179,6 +206,18 @@ PyResult<PyObject *> PyDict::get(PyObject *key, PyObject *default_value) const
 	return Ok(py_none());
 }
 
+PyResult<PyObject *> PyDict::pop(PyObject *key, PyObject *default_value)
+{
+	if (auto it = m_map.find(key); it != m_map.end()) {
+		auto result = it->second;
+		m_map.erase(it);
+		return PyObject::from(result);
+	} else if (default_value) {
+		return Ok(default_value);
+	}
+	return Err(key_error("{}", key->repr().unwrap()->to_string()));
+}
+
 PyResult<PyObject *> PyDict::update(PyDict *other)
 {
 	for (const auto &[key, value] : other->map()) {
@@ -217,6 +256,22 @@ std::unique_ptr<TypePrototype> register_dict()
 					return self->get(key, default_value);
 				})
 			.def(
+				"pop",
+				+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
+					ASSERT(args)
+					ASSERT(!kwargs || kwargs->size() == 0)
+					auto key_ = PyObject::from(args->elements()[0]);
+					if (key_.is_err()) return key_;
+					PyObject *key = key_.unwrap();
+					PyObject *default_value = nullptr;
+					if (args->elements().size() == 2) {
+						auto default_value_ = PyObject::from(args->elements()[1]);
+						if (default_value_.is_err()) return default_value_;
+						default_value = default_value_.unwrap();
+					}
+					return self->pop(key, default_value);
+				})
+			.def(
 				"update",
 				+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 					ASSERT(args)
@@ -227,20 +282,45 @@ std::unique_ptr<TypePrototype> register_dict()
 					if (other->type() != dict()) { return Err(runtime_error("TODO")); }
 					return self->update(as<PyDict>(other));
 				})
+			.def(
+				"items",
+				+[](PyDict *self, PyTuple *, PyDict *) -> PyResult<PyObject *> {
+					return PyDictItems::create(*self);
+				})
 			.type);
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyDict::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyDict::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(dict_flag, []() { type = ::register_dict(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_flag, []() { type = ::register_dict(); });
+		return std::move(type);
+	};
+}
+
+PyResult<PyDictItems *> PyDictItems::create(const PyDict &pydict)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictItems>(pydict);
+	if (!result) { return Err(memory_error(sizeof(PyDictItems))); }
+	return Ok(result);
 }
 
 PyDictItems::PyDictItems(const PyDict &pydict)
 	: PyBaseObject(BuiltinTypes::the().dict_items()), m_pydict(pydict)
 {}
+
+PyResult<PyObject *> PyDictItems::__iter__() const { return PyDictItemsIterator::create(*this); }
+
+
+PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
+
+PyDictItemsIterator PyDictItems::end() const
+{
+	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	return PyDictItemsIterator(*this, end_position);
+}
 
 std::string PyDictItems::to_string() const
 {
@@ -277,30 +357,176 @@ std::unique_ptr<TypePrototype> register_dict_items()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyDictItems::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyDictItems::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(dict_items_flag, []() { type = ::register_dict_items(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_items_flag, []() { type = ::register_dict_items(); });
+		return std::move(type);
+	};
 }
 
-PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict)
-	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()), m_pydictitems(pydict),
+// ---
+
+PyResult<PyDictKeys *> PyDictKeys::create(const PyDict &pydict)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictKeys>(pydict);
+	if (!result) { return Err(memory_error(sizeof(PyDictKeys))); }
+	return Ok(result);
+}
+
+PyDictKeys::PyDictKeys(const PyDict &pydict)
+	: PyBaseObject(BuiltinTypes::the().dict_keys()), m_pydict(pydict)
+{}
+
+PyResult<PyObject *> PyDictKeys::__iter__() const { return PyDictKeyIterator::create(*this); }
+
+PyDictKeyIterator PyDictKeys::begin() const { return PyDictKeyIterator(*this); }
+
+PyDictKeyIterator PyDictKeys::end() const
+{
+	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	return PyDictKeyIterator(*this, end_position);
+}
+
+std::string PyDictKeys::to_string() const
+{
+	std::ostringstream os;
+	os << "dict_keys([";
+	auto it = begin();
+	auto end_it = end();
+
+	while (it != end_it) {
+		os << (*it)->to_string();
+		std::advance(it, 1);
+		if (it != end_it) { os << ","; }
+	}
+
+	os << "])";
+	return os.str();
+}
+
+void PyDictKeys::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+}
+
+PyType *PyDictKeys::type() const { return dict_keys(); }
+
+namespace {
+
+std::once_flag dict_keys_flag;
+
+std::unique_ptr<TypePrototype> register_dict_keys()
+{
+	return std::move(klass<PyDictKeys>("dict_keys").type);
+}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyDictKeys::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_keys_flag, []() { type = ::register_dict_keys(); });
+		return std::move(type);
+	};
+}
+
+PyResult<PyDictValues *> PyDictValues::create(const PyDict &pydict)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictValues>(pydict);
+	if (!result) { return Err(memory_error(sizeof(PyDictKeys))); }
+	return Ok(result);
+}
+
+PyDictValues::PyDictValues(const PyDict &pydict)
+	: PyBaseObject(BuiltinTypes::the().dict_values()), m_pydict(pydict)
+{}
+
+PyResult<PyObject *> PyDictValues::__iter__() const { return PyDictValueIterator::create(*this); }
+
+PyDictValueIterator PyDictValues::begin() const { return PyDictValueIterator(*this); }
+
+PyDictValueIterator PyDictValues::end() const
+{
+	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	return PyDictValueIterator(*this, end_position);
+}
+
+std::string PyDictValues::to_string() const
+{
+	std::ostringstream os;
+	os << "dict_values([";
+	auto it = begin();
+	auto end_it = end();
+
+	while (it != end_it) {
+		os << (*it)->to_string();
+		std::advance(it, 1);
+		if (it != end_it) { os << ","; }
+	}
+
+	os << "])";
+	return os.str();
+}
+
+void PyDictValues::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+}
+
+PyType *PyDictValues::type() const { return dict_values(); }
+
+namespace {
+
+std::once_flag dict_values_flag;
+
+std::unique_ptr<TypePrototype> register_dict_values()
+{
+	return std::move(klass<PyDictKeys>("dict_values").type);
+}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyDictValues::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_values_flag, []() { type = ::register_dict_values(); });
+		return std::move(type);
+	};
+}
+
+
+// iterators
+
+PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items)
+	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()), m_pydictitems(pydict_items),
 	  m_current_iterator(m_pydictitems.m_pydict.map().begin())
 {}
 
-PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict, size_t position)
-	: PyDictItemsIterator(pydict)
+PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items, size_t position)
+	: PyDictItemsIterator(pydict_items)
 {
 	std::advance(m_current_iterator, position);
 }
 
-PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*this); }
 
-PyDictItemsIterator PyDictItems::end() const
+PyResult<PyDictItemsIterator *> PyDictItemsIterator::create(const PyDictItems &pydict_items)
 {
-	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
-	return PyDictItemsIterator(*this, end_position);
+	auto *result = VirtualMachine::the().heap().allocate<PyDictItemsIterator>(pydict_items);
+	if (!result) { return Err(memory_error(sizeof(PyDictItemsIterator))); }
+	return Ok(result);
+}
+
+PyResult<PyDictItemsIterator *> PyDictItemsIterator::create(const PyDictItems &pydict_items,
+	size_t position)
+{
+	auto *result =
+		VirtualMachine::the().heap().allocate<PyDictItemsIterator>(pydict_items, position);
+	if (!result) { return Err(memory_error(sizeof(PyDictItemsIterator))); }
+	return Ok(result);
 }
 
 void PyDictItemsIterator::visit_graph(Visitor &visitor)
@@ -361,9 +587,196 @@ std::unique_ptr<TypePrototype> register_dict_items_iterator()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyDictItemsIterator::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyDictItemsIterator::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(dict_items_iterator_flag, []() { type = ::register_dict_items_iterator(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_items_iterator_flag, []() { type = ::register_dict_items_iterator(); });
+		return std::move(type);
+	};
+}
+
+
+PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys)
+	: PyBaseObject(BuiltinTypes::the().dict_key_iterator()), m_pydictkeys(pydict_keys),
+	  m_current_iterator(m_pydictkeys.m_pydict.map().begin())
+{}
+
+PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position)
+	: PyDictKeyIterator(pydict_keys)
+{
+	std::advance(m_current_iterator, position);
+}
+
+
+PyResult<PyDictKeyIterator *> PyDictKeyIterator::create(const PyDictKeys &pydict_keys)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictKeyIterator>(pydict_keys);
+	if (!result) { return Err(memory_error(sizeof(PyDictKeyIterator))); }
+	return Ok(result);
+}
+
+PyResult<PyDictKeyIterator *> PyDictKeyIterator::create(const PyDictKeys &pydict_keys,
+	size_t position)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictKeyIterator>(pydict_keys, position);
+	if (!result) { return Err(memory_error(sizeof(PyDictKeyIterator))); }
+	return Ok(result);
+}
+
+void PyDictKeyIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (std::holds_alternative<PyObject *>(m_current_iterator->first)) {
+		visitor.visit(*std::get<PyObject *>(m_current_iterator->first));
+	}
+	visitor.visit(*const_cast<PyDictKeys *>(&m_pydictkeys));
+}
+
+std::string PyDictKeyIterator::to_string() const
+{
+	return fmt::format("<dict_keyiterator at {}>", static_cast<const void *>(this));
+}
+
+PyResult<PyObject *> PyDictKeyIterator::__repr__() const { return PyString::create(to_string()); }
+
+PyResult<PyObject *> PyDictKeyIterator::__next__()
+{
+	if (m_current_iterator != m_pydictkeys.m_pydict.map().end()) {
+		auto [key, _] = *m_current_iterator;
+		m_current_iterator++;
+		return PyObject::from(key);
+	}
+	return Err(stop_iteration(""));
+}
+
+bool PyDictKeyIterator::operator==(const PyDictKeyIterator &other) const
+{
+	return &m_pydictkeys == &other.m_pydictkeys && m_current_iterator == other.m_current_iterator;
+}
+
+PyDictKeyIterator &PyDictKeyIterator::operator++()
+{
+	m_current_iterator++;
+	return *this;
+}
+
+PyObject *PyDictKeyIterator::operator*() const
+{
+	auto [key, _] = *m_current_iterator;
+	return PyObject::from(key).unwrap();
+}
+
+PyType *PyDictKeyIterator::type() const { return dict_key_iterator(); }
+
+namespace {
+
+std::once_flag dict_key_iterator_flag;
+
+std::unique_ptr<TypePrototype> register_dict_key_iterator()
+{
+	return std::move(klass<PyDictKeyIterator>("dict_keyiterator").type);
+}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyDictKeyIterator::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_key_iterator_flag, []() { type = ::register_dict_key_iterator(); });
+		return std::move(type);
+	};
+}
+
+PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values)
+	: PyBaseObject(BuiltinTypes::the().dict_value_iterator()), m_pydictvalues(pydict_values),
+	  m_current_iterator(m_pydictvalues.m_pydict.map().begin())
+{}
+
+PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values, size_t position)
+	: PyDictValueIterator(pydict_values)
+{
+	std::advance(m_current_iterator, position);
+}
+
+PyResult<PyDictValueIterator *> PyDictValueIterator::create(const PyDictValues &pydict_values)
+{
+	auto *result = VirtualMachine::the().heap().allocate<PyDictValueIterator>(pydict_values);
+	if (!result) { return Err(memory_error(sizeof(PyDictValueIterator))); }
+	return Ok(result);
+}
+
+PyResult<PyDictValueIterator *> PyDictValueIterator::create(const PyDictValues &pydict_values,
+	size_t position)
+{
+	auto *result =
+		VirtualMachine::the().heap().allocate<PyDictValueIterator>(pydict_values, position);
+	if (!result) { return Err(memory_error(sizeof(PyDictValueIterator))); }
+	return Ok(result);
+}
+
+void PyDictValueIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (std::holds_alternative<PyObject *>(m_current_iterator->second)) {
+		visitor.visit(*std::get<PyObject *>(m_current_iterator->second));
+	}
+
+	visitor.visit(*const_cast<PyDictValues *>(&m_pydictvalues));
+}
+
+std::string PyDictValueIterator::to_string() const
+{
+	return fmt::format("<dict_valueiterator at {}>", static_cast<const void *>(this));
+}
+
+PyResult<PyObject *> PyDictValueIterator::__repr__() const { return PyString::create(to_string()); }
+
+PyResult<PyObject *> PyDictValueIterator::__next__()
+{
+	if (m_current_iterator != m_pydictvalues.m_pydict.map().end()) {
+		auto [_, value] = *m_current_iterator;
+		m_current_iterator++;
+		return PyObject::from(value);
+	}
+	return Err(stop_iteration(""));
+}
+
+bool PyDictValueIterator::operator==(const PyDictValueIterator &other) const
+{
+	return &m_pydictvalues == &other.m_pydictvalues
+		   && m_current_iterator == other.m_current_iterator;
+}
+
+PyDictValueIterator &PyDictValueIterator::operator++()
+{
+	m_current_iterator++;
+	return *this;
+}
+
+PyObject *PyDictValueIterator::operator*() const
+{
+	auto [_, value] = *m_current_iterator;
+	return PyObject::from(value).unwrap();
+}
+
+PyType *PyDictValueIterator::type() const { return dict_value_iterator(); }
+
+namespace {
+
+std::once_flag dict_value_iterator_flag;
+
+std::unique_ptr<TypePrototype> register_dict_value_iterator()
+{
+	return std::move(klass<PyDictValueIterator>("dict_valueiterator").type);
+}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyDictValueIterator::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(dict_value_iterator_flag, []() { type = ::register_dict_value_iterator(); });
+		return std::move(type);
+	};
 }

@@ -17,41 +17,49 @@ class PyFrame : public PyBaseObject
 
 	struct ExceptionStackItem
 	{
-		py::BaseException *exception{ nullptr };
-		py::PyType *exception_type{ nullptr };
-		py::PyTraceback *traceback{ nullptr };
+		BaseException *exception{ nullptr };
+		PyType *exception_type{ nullptr };
+		PyTraceback *traceback{ nullptr };
 	};
+
+	PyFrame(const std::vector<std::string> &);
 
   protected:
 	// next outer frame object (this frame’s caller)
 	PyFrame *m_f_back{ nullptr };
 	// builtins namespace seen by this frame
-	py::PyModule *m_builtins;
+	PyModule *m_builtins{ nullptr };
 	// global namespace seen by this frame
-	py::PyDict *m_globals;
+	PyDict *m_globals{ nullptr };
 	// local namespace seen by this frame
-	py::PyDict *m_locals;
+	PyDict *m_locals{ nullptr };
+	// code segment
+	PyCode *m_f_code{ nullptr };
+
 	size_t m_register_count;
-	const py::PyTuple *m_consts;
-	std::vector<py::PyCell *> m_freevars;
-	py::BaseException *m_exception_to_catch{ nullptr };
+	const std::vector<std::string> &m_names;
+	const PyTuple *m_consts;
+	std::vector<PyCell *> m_freevars;
+	BaseException *m_exception_to_catch{ nullptr };
 	std::shared_ptr<std::vector<ExceptionStackItem>> m_exception_stack;
 
   public:
 	static PyFrame *create(PyFrame *parent,
 		size_t register_count,
 		size_t freevar_count,
-		py::PyDict *globals,
-		py::PyDict *locals,
-		const py::PyTuple *consts);
+		PyCode *code,
+		PyDict *globals,
+		PyDict *locals,
+		const PyTuple *consts,
+		const std::vector<std::string> &names);
 
-	void put_local(const std::string &name, const py::Value &);
-	void put_global(const std::string &name, const py::Value &);
+	void put_local(const std::string &name, const Value &);
+	void put_global(const std::string &name, const Value &);
 
 	PyFrame *parent() const { return m_f_back; }
 
-	void push_exception(py::BaseException *exception);
-	py::BaseException *pop_exception();
+	void push_exception(BaseException *exception);
+	BaseException *pop_exception();
 
 	std::optional<ExceptionStackItem> exception_info() const
 	{
@@ -59,23 +67,28 @@ class PyFrame : public PyBaseObject
 		return m_exception_stack->back();
 	}
 
-	bool catch_exception(py::PyObject *) const;
+	bool catch_exception(PyObject *) const;
 
-	void set_exception_to_catch(py::BaseException *exception);
+	void set_exception_to_catch(BaseException *exception);
 
 	PyFrame *exit();
 
-	py::PyDict *globals() const;
-	py::PyDict *locals() const;
-	py::PyModule *builtins() const;
-	const std::vector<py::PyCell *> &freevars() const;
-	std::vector<py::PyCell *> &freevars();
-	py::Value consts(size_t index) const;
+	PyDict *globals() const;
+	PyDict *locals() const;
+	PyModule *builtins() const;
+	PyCode *code() const { return m_f_code; }
+
+	const std::vector<PyCell *> &freevars() const;
+	std::vector<PyCell *> &freevars();
+	Value consts(size_t index) const;
+	const std::string &names(size_t index) const;
 
 	std::string to_string() const override;
 	void visit_graph(Visitor &) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
+
+	PyType *type() const override;
 
   private:
 	PyFrame();

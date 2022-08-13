@@ -23,6 +23,9 @@ class StopIteration : public Exception
 	}
 
   public:
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;

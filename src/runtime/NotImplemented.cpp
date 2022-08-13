@@ -16,11 +16,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> NotImplemented::register_type()
+std::function<std::unique_ptr<TypePrototype>()> NotImplemented::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(not_implemented_flag, []() { type = register_not_implemented(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(not_implemented_flag, []() { type = register_not_implemented(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

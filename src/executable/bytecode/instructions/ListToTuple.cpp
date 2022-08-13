@@ -1,6 +1,7 @@
 #include "ListToTuple.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

@@ -1,6 +1,8 @@
 #include "LoadName.hpp"
 #include "executable/bytecode/serialization/serialize.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/NameError.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

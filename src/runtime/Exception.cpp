@@ -22,6 +22,8 @@ PyType *Exception::register_type(PyModule *module)
 	if (!s_exception_type) {
 		s_exception_type =
 			klass<Exception>(module, "Exception", BaseException::s_base_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("Exception").unwrap(), s_exception_type);
 	}
 	return s_exception_type;
 }

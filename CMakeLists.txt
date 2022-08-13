@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 include(FetchContent)
+include(ExternalProject)
 
 project(python++)
 
@@ -28,6 +29,29 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
 	GIT_TAG v3.0.0)
 FetchContent_MakeAvailable(cxxopts)
+
+FetchContent_Declare(
+	cpython
+	GIT_REPOSITORY https://github.com/python/cpython.git
+	GIT_TAG v3.9.13)
+FetchContent_MakeAvailable(cpython)
+
+find_package(ICU REQUIRED COMPONENTS uc)
+# if (NOT ${ICU_FOUND})
+# 	ExternalProject_Add(icu
+# 		GIT_REPOSITORY    https://github.com/unicode-org/icu.git
+# 		GIT_TAG           release-71-1
+# 		INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/external
+# 		CONFIGURE_COMMAND "./configure"
+# 		BUILD_COMMAND ${CMAKE_COMMAND} -E env
+# 			CC=${CMAKE_C_COMPILER}
+# 			CXX=${CMAKE_CXX_COMPILER}
+# 			make
+# 		BUILD_IN_SOURCE TRUE
+# 		INSTALL_COMMAND make DESTDIR=${CMAKE_CURRENT_BINARY_DIR}/external install
+# 	)
+# 	add_library(icu::)
+# endif()
 
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::GMock ALIAS gmock)

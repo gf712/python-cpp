@@ -46,11 +46,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyFloat::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyFloat::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(float_flag, []() { type = register_float(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(float_flag, []() { type = register_float(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

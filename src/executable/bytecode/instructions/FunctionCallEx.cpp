@@ -2,6 +2,7 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyTuple.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -34,6 +35,8 @@ PyResult<Value> FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 		}
 	}();
 	if (kwargs.is_err()) { return Err(args.unwrap_err()); }
+
+	spdlog::debug("calling function with argument expansion: \'{}\'", callable_object->to_string());
 
 	auto result = callable_object->call(args.unwrap(), kwargs.unwrap());
 	if (result.is_ok()) {

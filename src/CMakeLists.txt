@@ -14,17 +14,22 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/BuildDict.cpp
     executable/bytecode/instructions/BuildList.cpp
     executable/bytecode/instructions/BuildTuple.cpp
+    executable/bytecode/instructions/BuildSet.cpp
+    executable/bytecode/instructions/BuildSlice.cpp
     executable/bytecode/instructions/CompareOperation.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
+    executable/bytecode/instructions/ClearTopCleanup.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/DeleteName.cpp
+    executable/bytecode/instructions/DeleteSubscript.cpp
     executable/bytecode/instructions/ForIter.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/GetIter.cpp
-    executable/bytecode/instructions/InplaceSub.cpp
+    executable/bytecode/instructions/InplaceOp.cpp
     executable/bytecode/instructions/Instructions.cpp
+    executable/bytecode/instructions/ImportFrom.cpp
     executable/bytecode/instructions/ImportName.cpp
     executable/bytecode/instructions/Jump.cpp
     executable/bytecode/instructions/JumpForward.cpp
@@ -33,13 +38,17 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/JumpIfNotExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
     executable/bytecode/instructions/JumpIfTrueOrPop.cpp
+    executable/bytecode/instructions/LeaveExceptionHandling.cpp
+    executable/bytecode/instructions/ListAppend.cpp
     executable/bytecode/instructions/ListExtend.cpp
     executable/bytecode/instructions/ListToTuple.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
     executable/bytecode/instructions/LoadClosure.cpp
+    executable/bytecode/instructions/LoadConst.cpp
     executable/bytecode/instructions/LoadDeref.cpp
+    executable/bytecode/instructions/LoadFast.cpp
     executable/bytecode/instructions/LoadGlobal.cpp
     executable/bytecode/instructions/LoadMethod.cpp
     executable/bytecode/instructions/LoadName.cpp
@@ -49,9 +58,12 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReRaise.cpp
     executable/bytecode/instructions/ReturnValue.cpp
+    executable/bytecode/instructions/SetAdd.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
+    executable/bytecode/instructions/SetupWith.cpp
     executable/bytecode/instructions/StoreAttr.cpp
     executable/bytecode/instructions/StoreDeref.cpp
+    executable/bytecode/instructions/StoreFast.cpp
     executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/StoreSubscript.cpp
@@ -83,27 +95,42 @@ set(RUNTIME_SOURCE_FILES
     # cmake-format: sortable
     runtime/CustomPyObject.cpp
     runtime/modules/BuiltinsModule.cpp
+    runtime/modules/ImpModule.cpp
+    runtime/modules/IOModule.cpp
+    runtime/modules/MarshalModule.cpp
+    runtime/modules/PosixModule.cpp
     runtime/modules/SysModule.cpp
+    runtime/modules/ThreadModule.cpp
+    runtime/modules/WarningsModule.cpp
+    runtime/modules/WeakRefModule.cpp
     runtime/types/builtin.cpp
     runtime/AssertionError.cpp
     runtime/AttributeError.cpp
     runtime/BaseException.cpp
     runtime/Exception.cpp
+    runtime/Import.cpp
+    runtime/ImportError.cpp
+    runtime/KeyError.cpp
     runtime/MemoryError.cpp
+    runtime/ModuleNotFoundError.cpp
     runtime/NameError.cpp
     runtime/NotImplemented.cpp
+    runtime/NotImplementedError.cpp
+    runtime/OSError.cpp
     runtime/PyBoundMethod.cpp
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
     runtime/PyBytes.cpp
     runtime/PyCell.cpp
     runtime/PyClassMethod.cpp
+    runtime/PyClassMethodDescriptor.cpp
     runtime/PyCode.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp
     runtime/PyFrame.cpp
     runtime/PyFunction.cpp
+    runtime/PyGetSetDescriptor.cpp
     runtime/PyInteger.cpp
     runtime/PyList.cpp
     runtime/PyLLVMFunction.cpp
@@ -111,17 +138,21 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyMethodDescriptor.cpp
     runtime/PyMemberDescriptor.cpp
     runtime/PyModule.cpp
+    runtime/PyNamespace.cpp
     runtime/PyNone.cpp
     runtime/PyNumber.cpp
     runtime/PyObject.cpp
     runtime/PyRange.cpp
     runtime/PyProperty.cpp
+    runtime/PySet.cpp
+    runtime/PySlice.cpp
     runtime/PySlotWrapper.cpp
     runtime/PyString.cpp
     runtime/PyStaticMethod.cpp
     runtime/PyTraceback.cpp
     runtime/PyTuple.cpp
     runtime/PyType.cpp
+    runtime/PyWeakRef.cpp
     runtime/RuntimeError.cpp
     runtime/StopIteration.cpp
     runtime/TypeError.cpp
@@ -158,7 +189,7 @@ add_library(
 
 add_executable(unittests ${UNITTEST_SOURCES})
 
-target_link_libraries(python-cpp PUBLIC spdlog_header_only)
+target_link_libraries(python-cpp PUBLIC spdlog_header_only ICU::uc)
 
 target_include_directories(python-cpp PUBLIC .)
 
@@ -211,7 +242,7 @@ if(LLVM_FOUND)
   target_link_libraries(python-cpp-llvm-glue PRIVATE llvm-interface)
   target_link_libraries(python-cpp-llvm PUBLIC llvm-interface)
   target_sources(python-cpp-llvm PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-glue>)
-  target_link_libraries(python-cpp-llvm-tests PRIVATE python-cpp-llvm)
+  target_link_libraries(python-cpp-llvm-tests PRIVATE python-cpp-llvm gtest)
   target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
   target_compile_definitions(python-cpp PUBLIC USE_LLVM)
 
@@ -223,3 +254,6 @@ target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main cxxopts)
 
 add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp)
+
+add_executable(freeze utilities/freeze.cpp)
+target_link_libraries(freeze PRIVATE python-cpp cxxopts)

@@ -17,5 +17,7 @@ class ReturnValue final : public Instruction
 
 	std::vector<uint8_t> serialize() const final;
 
+	Register source() const { return m_source; }
+
 	uint8_t id() const final { return RETURN_VALUE; }
 };

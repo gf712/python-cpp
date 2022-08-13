@@ -20,6 +20,8 @@ PyType *TypeError::register_type(PyModule *module)
 	if (!s_type_error) {
 		s_type_error =
 			klass<TypeError>(module, "TypeError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("TypeError").unwrap(), s_type_error);
 	}
 	return s_type_error;
 }

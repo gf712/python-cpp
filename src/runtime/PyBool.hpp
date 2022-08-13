@@ -1,29 +1,27 @@
 #pragma once
 
-#include "PyObject.hpp"
+#include "PyInteger.hpp"
 
 namespace py {
 
-class PyBool : public PyBaseObject
+class PyBool : public PyInteger
 {
 	friend class ::Heap;
 	friend PyObject *py_true();
 	friend PyObject *py_false();
 
-	bool m_value;
-
   public:
 	std::string to_string() const override;
 
-	bool value() const { return m_value; }
+	bool value() const;
 
 	void visit_graph(Visitor &) override {}
 
-	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
 	PyResult<bool> __bool__() const;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:

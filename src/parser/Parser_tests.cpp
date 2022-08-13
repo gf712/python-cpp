@@ -46,6 +46,7 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 					TODO();
 				}
 			},
+			[&](const Bytes &bytes) { ASSERT_EQ(bytes.b, std::get<Bytes>(*expected_value).b); },
 			[&](const auto &val) {
 				(void)val;
 				TODO();
@@ -407,7 +408,6 @@ void compare_augmented_assign(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-
 void compare_import(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -418,16 +418,28 @@ void compare_import(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_names.size(), expected_names.size());
 
 	for (size_t i = 0; i < result_names.size(); ++i) {
-		ASSERT_EQ(result_names[i], expected_names[i]);
+		ASSERT_EQ(result_names[i].name, expected_names[i].name);
+		ASSERT_EQ(result_names[i].asname, expected_names[i].asname);
 	}
-
-	const auto result_asname = as<Import>(result)->asname();
-	const auto expected_asname = as<Import>(expected)->asname();
-	ASSERT_EQ(result_asname.has_value(), expected_asname.has_value());
-
-	if (expected_asname.has_value()) { ASSERT_EQ(*result_asname, *expected_asname); }
 }
 
+void compare_import_from(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::ImportFrom);
+
+	const auto result_names = as<ImportFrom>(result)->names();
+	const auto expected_names = as<ImportFrom>(expected)->names();
+	ASSERT_EQ(result_names.size(), expected_names.size());
+
+	for (size_t i = 0; i < result_names.size(); ++i) {
+		ASSERT_EQ(result_names[i].name, expected_names[i].name);
+		ASSERT_EQ(result_names[i].asname, expected_names[i].asname);
+	}
+
+	ASSERT_EQ(as<ImportFrom>(result)->level(), as<ImportFrom>(expected)->level());
+	ASSERT_EQ(as<ImportFrom>(result)->module(), as<ImportFrom>(expected)->module());
+}
 
 void compare_slices(const Subscript::SliceType &result, const Subscript::SliceType &expected)
 {
@@ -763,6 +775,78 @@ void compare_with_item(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_optional_vars, expected_optional_vars);
 }
 
+void compare_list_comprehension(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::ListComp);
+
+	const auto result_elt = as<ListComp>(result)->elt();
+	const auto expected_elt = as<ListComp>(expected)->elt();
+	dispatch(result_elt, expected_elt);
+
+	const auto result_generators = as<ListComp>(result)->generators();
+	const auto expected_generators = as<ListComp>(expected)->generators();
+	ASSERT_EQ(result_generators.size(), expected_generators.size());
+	for (size_t i = 0; i < result_generators.size(); ++i) {
+		dispatch(result_generators[i], expected_generators[i]);
+	}
+}
+
+void compare_set_comprehension(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::SetComp);
+
+	const auto result_elt = as<SetComp>(result)->elt();
+	const auto expected_elt = as<SetComp>(expected)->elt();
+	dispatch(result_elt, expected_elt);
+
+	const auto result_generators = as<SetComp>(result)->generators();
+	const auto expected_generators = as<SetComp>(expected)->generators();
+	ASSERT_EQ(result_generators.size(), expected_generators.size());
+	for (size_t i = 0; i < result_generators.size(); ++i) {
+		dispatch(result_generators[i], expected_generators[i]);
+	}
+}
+
+void compare_comprehension(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Comprehension);
+
+	const auto result_target = as<Comprehension>(result)->target();
+	const auto expected_target = as<Comprehension>(expected)->target();
+	dispatch(result_target, expected_target);
+
+	const auto result_iter = as<Comprehension>(result)->iter();
+	const auto expected_iter = as<Comprehension>(expected)->iter();
+	dispatch(result_iter, expected_iter);
+
+	const auto result_ifs = as<Comprehension>(result)->ifs();
+	const auto expected_ifs = as<Comprehension>(expected)->ifs();
+	ASSERT_EQ(result_ifs.size(), expected_ifs.size());
+	for (size_t i = 0; i < result_ifs.size(); ++i) { dispatch(result_ifs[i], expected_ifs[i]); }
+
+	ASSERT_EQ(as<Comprehension>(result)->is_async(), as<Comprehension>(expected)->is_async());
+}
+
+void compare_generator_expression(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::GeneratorExp);
+
+	const auto result_elt = as<GeneratorExp>(result)->elt();
+	const auto expected_elt = as<GeneratorExp>(expected)->elt();
+	dispatch(result_elt, expected_elt);
+
+	const auto result_generators = as<GeneratorExp>(result)->generators();
+	const auto expected_generators = as<GeneratorExp>(expected)->generators();
+	ASSERT_EQ(result_generators.size(), expected_generators.size());
+	for (size_t i = 0; i < result_generators.size(); ++i) {
+		dispatch(result_generators[i], expected_generators[i]);
+	}
+}
+
 void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	if (!expected) {
@@ -850,6 +934,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_import(result, expected);
 		break;
 	}
+	case ASTNodeType::ImportFrom: {
+		compare_import_from(result, expected);
+		break;
+	}
 	case ASTNodeType::Subscript: {
 		compare_subscript(result, expected);
 		break;
@@ -910,6 +998,22 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_with_item(result, expected);
 		break;
 	}
+	case ASTNodeType::ListComp: {
+		compare_list_comprehension(result, expected);
+		break;
+	}
+	case ASTNodeType::SetComp: {
+		compare_set_comprehension(result, expected);
+		break;
+	}
+	case ASTNodeType::Comprehension: {
+		compare_comprehension(result, expected);
+		break;
+	}
+	case ASTNodeType::GeneratorExp: {
+		compare_generator_expression(result, expected);
+		break;
+	}
 	default: {
 		spdlog::error("Unhandled AST node type {}", node_type_to_string(expected->node_type()));
 		TODO();
@@ -959,21 +1063,22 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 	assert_generates_ast(program, expected_ast);
 }
 
-// TEST(Parser, MultipleAssignments)
-// {
-// 	constexpr std::string_view program = "a = b = 1\n";
+TEST(Parser, MultipleAssignments)
+{
+	constexpr std::string_view program = "a = b = 1\n";
 
-// 	auto expected_ast = create_test_module();
-// 	expected_ast->emplace(std::make_shared<Assign>(
-// 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
-// 			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>("a", ContextType::STORE),
-// 				std::make_shared<Name>("b", ContextType::STORE) },
-// 			ContextType::STORE) },
-// 		std::make_shared<Constant>(int64_t{ 0 }),
-// 		""));
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+			std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+		},
+		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		"",
+		SourceLocation{}));
 
-// 	assert_generates_ast(program, expected_ast);
-// }
+	assert_generates_ast(program, expected_ast);
+}
 
 TEST(Parser, MultipleAssignmentsWithStructuredBinding)
 {
@@ -999,6 +1104,25 @@ TEST(Parser, MultipleAssignmentsWithStructuredBinding)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, SingleValueAssignmentTuple)
+{
+	constexpr std::string_view program = "_CASE_INSENSITIVE_PLATFORMS_STR_KEY = 'win',\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+			"_CASE_INSENSITIVE_PLATFORMS_STR_KEY", ContextType::STORE, SourceLocation{}) },
+		std::make_shared<Tuple>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Constant>(String{ "win" }, SourceLocation{}),
+			},
+			ContextType::LOAD,
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
 
 TEST(Parser, BlankLine)
 {
@@ -1086,7 +1210,56 @@ TEST(Parser, BinaryOperationModulo)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, BinaryOperationAnd)
+{
+	constexpr std::string_view program = "a = 0 & 1\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+									 "a", ContextType::STORE, SourceLocation{}) },
+			std::make_shared<BinaryExpr>(BinaryOpType::AND,
+				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
+			"",
+			SourceLocation{}));
 
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, BinaryOperationOr)
+{
+	constexpr std::string_view program = "a = 0 | 1\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+									 "a", ContextType::STORE, SourceLocation{}) },
+			std::make_shared<BinaryExpr>(BinaryOpType::OR,
+				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
+			"",
+			SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, BinaryOperationXor)
+{
+	constexpr std::string_view program = "a = 0 ^ 1\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+									 "a", ContextType::STORE, SourceLocation{}) },
+			std::make_shared<BinaryExpr>(BinaryOpType::XOR,
+				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
+			"",
+			SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
 TEST(Parser, FunctionDefinition)
 {
 	constexpr std::string_view program =
@@ -1330,6 +1503,29 @@ TEST(Parser, LiteralDict)
 					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
 				},
+				SourceLocation{}),
+			"",
+			SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LiteralSet)
+{
+	constexpr std::string_view program = "a = {1, 2, 3, 5}\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+									 "a", ContextType::STORE, SourceLocation{}) },
+			std::make_shared<Set>(
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
+					std::make_shared<Constant>(int64_t{ 3 }, SourceLocation{}),
+					std::make_shared<Constant>(int64_t{ 5 }, SourceLocation{}),
+				},
+				ContextType::LOAD,
 				SourceLocation{}),
 			"",
 			SourceLocation{}));
@@ -1594,6 +1790,20 @@ TEST(Parser, AugmentedAssign)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, AugmentedAssignOr)
+{
+	constexpr std::string_view program = "a |= b\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<AugAssign>(
+		std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+		BinaryOpType::OR,
+		std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 
 TEST(Parser, WhileLoop)
 {
@@ -1631,8 +1841,11 @@ TEST(Parser, Import)
 	constexpr std::string_view program = "import fibo\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Import>(std::vector<std::string>{ "fibo" }, SourceLocation{}));
+	auto import = std::make_shared<Import>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo",
+	});
+	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1642,8 +1855,12 @@ TEST(Parser, ImportAs)
 	constexpr std::string_view program = "import fibo as f\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Import>(std::vector<std::string>{ "fibo" }, "f", SourceLocation{}));
+	auto import = std::make_shared<Import>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo",
+		.asname = "f",
+	});
+	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1653,8 +1870,87 @@ TEST(Parser, ImportDottedAs)
 	constexpr std::string_view program = "import fibo.nac.ci as f\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Import>(
-		std::vector<std::string>{ "fibo", "nac", "ci" }, "f", SourceLocation{}));
+	auto import = std::make_shared<Import>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo.nac.ci",
+		.asname = "f",
+	});
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportMultiple)
+{
+	constexpr std::string_view program = "import fibo.nac.ci as f, bar as b, foo\n";
+
+	auto expected_ast = create_test_module();
+	auto import = std::make_shared<Import>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo.nac.ci",
+		.asname = "f",
+	});
+	import->add_alias(alias{
+		.name = "bar",
+		.asname = "b",
+	});
+	import->add_alias(alias{
+		.name = "foo",
+	});
+
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFrom)
+{
+	constexpr std::string_view program = "from sequence import fibo\n";
+
+	auto expected_ast = create_test_module();
+	auto import = std::make_shared<ImportFrom>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo",
+	});
+	import->set_module("sequence");
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFromDotted)
+{
+	constexpr std::string_view program = "from internal.math.sequence import fibo\n";
+
+	auto expected_ast = create_test_module();
+	auto import = std::make_shared<ImportFrom>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibo",
+	});
+	import->set_module("internal.math.sequence");
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFromDottedMutiple)
+{
+	constexpr std::string_view program =
+		"from internal.math.sequence import fibonacci as fib, factorial\n";
+
+	auto expected_ast = create_test_module();
+	auto import = std::make_shared<ImportFrom>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibonacci",
+		.asname = "fib",
+	});
+
+	import->add_alias(alias{
+		.name = "factorial",
+	});
+
+	import->set_module("internal.math.sequence");
+	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1736,6 +2032,45 @@ TEST(Parser, SubscriptSliceExpression)
 		ContextType::LOAD,
 		SourceLocation{}));
 
+
+	assert_generates_ast(program, expected_ast);
+}
+
+
+TEST(Parser, SubscriptSliceExpressionNoStart)
+{
+	constexpr std::string_view program = "a[:2:1]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Subscript>(
+		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+		Subscript::Slice{
+			.lower = nullptr,
+			.upper = std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
+			.step = std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		},
+		ContextType::LOAD,
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SubscriptSliceExpressionNoStartOrEnd)
+{
+	constexpr std::string_view program = "a[::-1]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Subscript>(
+		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+		Subscript::Slice{
+			.lower = nullptr,
+			.upper = nullptr,
+			.step = std::make_shared<UnaryExpr>(UnaryOpType::SUB,
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
+		},
+		ContextType::LOAD,
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -2639,6 +2974,127 @@ TEST(Parser, WithItemVar)
 			SourceLocation{}) },
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>(SourceLocation{}) },
 		"",
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ListComprehension)
+{
+	constexpr std::string_view program = "[len(sep) == 1 for sep in path_separators]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<ListComp>(
+		std::make_shared<Compare>(
+			std::make_shared<Call>(
+				std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
+				std::vector<std::shared_ptr<ast::ASTNode>>{
+					std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
+				std::vector<std::shared_ptr<ast::Keyword>>{},
+				SourceLocation{}),
+			Compare::OpType::Eq,
+			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		std::vector<std::shared_ptr<Comprehension>>{
+			std::make_shared<Comprehension>(
+				std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
+				std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
+				std::vector<std::shared_ptr<ASTNode>>{},
+				false,
+				SourceLocation{}),
+		},
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ListComprehensionIf)
+{
+	constexpr std::string_view program = "[sep for sep in path_separators if len(sep) == 1]\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<ListComp>(
+		std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}),
+		std::vector<std::shared_ptr<Comprehension>>{
+			std::make_shared<Comprehension>(
+				std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
+				std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
+				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Compare>(
+					std::make_shared<Call>(
+						std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
+						std::vector<std::shared_ptr<ast::ASTNode>>{
+							std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
+						std::vector<std::shared_ptr<ast::Keyword>>{},
+						SourceLocation{}),
+					Compare::OpType::Eq,
+					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+					SourceLocation{}) },
+				false,
+				SourceLocation{}),
+		},
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, GeneratorExpr)
+{
+	constexpr std::string_view program = "all(len(sep) == 1 for sep in path_separators)\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Call>(
+		std::make_shared<Name>("all", ContextType::LOAD, SourceLocation{}),
+		std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<GeneratorExp>(
+			std::make_shared<Compare>(
+				std::make_shared<Call>(
+					std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
+					std::vector<std::shared_ptr<ast::ASTNode>>{
+						std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
+					std::vector<std::shared_ptr<ast::Keyword>>{},
+					SourceLocation{}),
+				Compare::OpType::Eq,
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
+			std::vector<std::shared_ptr<Comprehension>>{
+				std::make_shared<Comprehension>(
+					std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
+					std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
+					std::vector<std::shared_ptr<ASTNode>>{},
+					false,
+					SourceLocation{}),
+			},
+			SourceLocation{}) },
+		std::vector<std::shared_ptr<ast::Keyword>>{},
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, SetComp)
+{
+	constexpr std::string_view program = "{s for s in path_separators}\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<SetComp>(std::make_shared<Name>("s", ContextType::LOAD, SourceLocation{}),
+			std::vector<std::shared_ptr<Comprehension>>{
+				std::make_shared<Comprehension>(
+					std::make_shared<Name>("s", ContextType::STORE, SourceLocation{}),
+					std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
+					std::vector<std::shared_ptr<ASTNode>>{},
+					false,
+					SourceLocation{}),
+			},
+			SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, Bytes)
+{
+	constexpr std::string_view program = "b\"hello\"\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Constant>(Bytes{ { std::byte{ 'h' },
+														 std::byte{ 'e' },
+														 std::byte{ 'l' },
+														 std::byte{ 'l' },
+														 std::byte{ 'o' } } },
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }

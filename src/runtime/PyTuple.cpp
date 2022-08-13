@@ -2,8 +2,11 @@
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyInteger.hpp"
+#include "PySlice.hpp"
 #include "PyString.hpp"
 #include "StopIteration.hpp"
+#include "TypeError.hpp"
+#include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -113,6 +116,19 @@ PyResult<PyObject *> PyTuple::__iter__() const
 
 PyResult<size_t> PyTuple::__len__() const { return Ok(m_elements.size()); }
 
+PyResult<PyObject *> PyTuple::__add__(const PyObject *other) const
+{
+	auto *b = as<PyTuple>(other);
+	if (!b) {
+		return Err(
+			type_error("can only concatenate tuple (not \"{}\") to tuple", other->type()->name()));
+	}
+	if (m_elements.empty()) return Ok(const_cast<PyObject *>(other));
+	std::vector<Value> elements = m_elements;
+	elements.insert(elements.end(), b->elements().begin(), b->elements().end());
+	return PyTuple::create(elements);
+}
+
 PyResult<PyObject *> PyTuple::__eq__(const PyObject *other) const
 {
 	if (!as<PyTuple>(other)) { return Ok(py_false()); }
@@ -134,6 +150,44 @@ PyResult<PyObject *> PyTuple::__eq__(const PyObject *other) const
 			return is_true.unwrap();
 		});
 	return Ok(result ? py_true() : py_false());
+}
+
+PyResult<PyObject *> PyTuple::__getitem__(PyObject *index)
+{
+	if (auto index_int = as<PyInteger>(index)) {
+		const auto i = index_int->as_i64();
+		if (i >= 0) {
+			if (static_cast<size_t>(i) >= m_elements.size()) {
+				// FIXME: should be IndexError
+				return Err(value_error("list index out of range"));
+			}
+			return PyObject::from(m_elements[i]);
+		} else {
+			TODO();
+		}
+	} else if (auto slice = as<PySlice>(index)) {
+		auto indices_ = slice->unpack();
+		if (indices_.is_err()) return Err(indices_.unwrap_err());
+		const auto [start_, end_, step] = indices_.unwrap();
+
+		const auto [start, end, slice_length] =
+			PySlice::adjust_indices(start_, end_, step, m_elements.size());
+
+		if (slice_length == 0) { return PyTuple::create(); }
+		if (start == 0 && end == static_cast<int64_t>(m_elements.size()) && step == 1) {
+			return Ok(this);
+		}
+
+		std::vector<Value> new_tuple_values;
+		new_tuple_values.reserve(slice_length);
+		for (int64_t idx = start, i = 0; i < slice_length; idx += step, ++i) {
+			new_tuple_values.push_back(m_elements[idx]);
+		}
+		return PyTuple::create(new_tuple_values);
+	} else {
+		return Err(
+			type_error("tuple indices must be integers or slices, not {}", index->type()->name()));
+	}
 }
 
 PyTupleIterator PyTuple::begin() const { return PyTupleIterator(*this); }
@@ -167,11 +221,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyTuple::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyTuple::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(tuple_flag, []() { type = register_tuple(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(tuple_flag, []() { type = register_tuple(); });
+		return std::move(type);
+	};
 }
 
 
@@ -240,11 +296,13 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyTupleIterator::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyTupleIterator::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(tuple_iterator_flag, []() { type = register_tuple_iterator(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(tuple_iterator_flag, []() { type = register_tuple_iterator(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

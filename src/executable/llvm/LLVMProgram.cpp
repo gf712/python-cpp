@@ -132,21 +132,32 @@ struct LLVMProgram::InternalConfig
 	}
 };
 
-LLVMProgram::LLVMProgram(std::unique_ptr<llvm::Module> &&module,
+LLVMProgram::LLVMProgram(std::string filename, std::vector<std::string> argv)
+	: Program(std::move(filename), std::move(argv))
+{}
+
+std::shared_ptr<Program> LLVMProgram::create(std::unique_ptr<llvm::Module> &&module,
 	std::unique_ptr<llvm::LLVMContext> &&ctx,
 	std::string filename,
 	std::vector<std::string> argv)
-	: Program(std::move(filename), std::move(argv))
 {
+	auto program = std::shared_ptr<LLVMProgram>(new LLVMProgram{ filename, argv });
 	for (const auto &f : module->functions()) {
-		m_functions.push_back(std::make_shared<codegen::LLVMFunction>(f));
+		program->m_functions.push_back(std::make_shared<codegen::LLVMFunction>(f, program));
 	}
+
 	auto *m = module.get();
 	auto *ctx_ptr = ctx.get();
 
-	m_config = LLVMProgram::InternalConfig::create(std::move(module), std::move(ctx)).release();
-	m_interop_functions = LLVMProgram::InteropFunctions::create(
-		m, *ctx_ptr, m_config->main_jitlib, *m_config->execution_session, *m_config->data_layout);
+	program->m_config =
+		LLVMProgram::InternalConfig::create(std::move(module), std::move(ctx)).release();
+	program->m_interop_functions = LLVMProgram::InteropFunctions::create(m,
+		*ctx_ptr,
+		program->m_config->main_jitlib,
+		*program->m_config->execution_session,
+		*program->m_config->data_layout);
+
+	return program;
 }
 
 LLVMProgram::~LLVMProgram() { delete m_config; }
@@ -260,3 +271,5 @@ py::PyObject *LLVMProgram::as_pyfunction(const std::string &function_name,
 
 	return create_llvm_function(demangled_name, std::move(llvm_func));
 }
+
+py::PyObject *LLVMProgram::main_function() { return as_pyfunction("main", {}, {}, {}); }

@@ -31,7 +31,7 @@ class PyTraceback : public PyBaseObject
 
 	void visit_graph(Visitor &visitor) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

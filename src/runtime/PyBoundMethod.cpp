@@ -32,7 +32,7 @@ std::string PyBoundMethod::to_string() const
 	auto self_qualname = m_self->getattribute(qualname_str.unwrap());
 	if (self_qualname.is_err()) { TODO(); }
 	return fmt::format(
-		"<bound method '{}' of '{}'>", m_method->name(), self_qualname.unwrap()->to_string());
+		"<bound method '{}' of '{}'>", m_method->to_string(), self_qualname.unwrap()->to_string());
 }
 
 PyResult<PyObject *> PyBoundMethod::__repr__() const { return PyString::create(to_string()); }
@@ -61,11 +61,13 @@ std::unique_ptr<TypePrototype> register_bound_method()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyBoundMethod::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyBoundMethod::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(bound_method_flag, []() { type = ::register_bound_method(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(bound_method_flag, []() { type = ::register_bound_method(); });
+		return std::move(type);
+	};
 }
 
 template<> PyBoundMethod *py::as(PyObject *node)

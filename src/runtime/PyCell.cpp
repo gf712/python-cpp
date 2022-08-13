@@ -75,11 +75,13 @@ namespace {
 	std::unique_ptr<TypePrototype> register_cell() { return std::move(klass<PyCell>("cell").type); }
 }// namespace
 
-std::unique_ptr<TypePrototype> PyCell::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyCell::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(cell_flag, []() { type = register_cell(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(cell_flag, []() { type = register_cell(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

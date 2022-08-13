@@ -6,21 +6,15 @@ namespace py {
 
 class PyBuiltInMethod : public PyBaseObject
 {
-	using FunctionType = std::function<PyResult<PyObject *>(PyTuple *, PyDict *)>;
-	const std::string m_name;
-	FunctionType m_builtin_method;
+	MethodDefinition &m_ml;
 	PyObject *m_self;
 
 	friend class ::Heap;
 
-	PyBuiltInMethod(std::string name, FunctionType &&builtin_method, PyObject *self);
+	PyBuiltInMethod(MethodDefinition &method_definition, PyObject *self);
 
   public:
-	static PyResult<PyBuiltInMethod *>
-		create(std::string name, FunctionType &&builtin_method, PyObject *self);
-
-	const std::string &name() { return m_name; }
-	const FunctionType &builtin_method() { return m_builtin_method; }
+	static PyResult<PyBuiltInMethod *> create(MethodDefinition &method_definition, PyObject *self);
 
 	std::string to_string() const override;
 
@@ -29,7 +23,7 @@ class PyBuiltInMethod : public PyBaseObject
 
 	void visit_graph(Visitor &visitor) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

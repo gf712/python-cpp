@@ -7,10 +7,10 @@ class LoadMethod final : public Instruction
 {
 	Register m_destination;
 	Register m_value_source;
-	const std::string m_method_name;
+	Register m_method_name;
 
   public:
-	LoadMethod(Register destination, Register value_source, std::string method_name)
+	LoadMethod(Register destination, Register value_source, Register method_name)
 		: m_destination(destination), m_value_source(value_source), m_method_name(std::move(method_name))
 	{}
 

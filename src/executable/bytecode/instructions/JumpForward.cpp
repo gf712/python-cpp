@@ -1,20 +1,35 @@
 #include "JumpForward.hpp"
+#include "executable/Label.hpp"
 #include "runtime/PyNone.hpp"
+#include "vm/VM.hpp"
+
+#include "../serialization/serialize.hpp"
 
 using namespace py;
 
 PyResult<Value> JumpForward::execute(VirtualMachine &vm, Interpreter &) const
 {
-	vm.jump_blocks(m_block_count);
+	ASSERT(m_offset.has_value())
+	const auto ip = vm.instruction_pointer() + *m_offset;
+	vm.set_instruction_pointer(ip);
 	return Ok(Value{ py_none() });
+};
+
+
+void JumpForward::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+{
+	m_offset = m_label->position() - instruction_idx - 1;
 }
 
 std::vector<uint8_t> JumpForward::serialize() const
 {
-	ASSERT(m_block_count < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_offset.has_value())
 
-	return {
+	std::vector<uint8_t> result{
 		JUMP_FORWARD,
-		static_cast<uint8_t>(m_block_count),
 	};
+
+	::serialize(*m_offset, result);
+
+	return result;
 }

@@ -100,11 +100,13 @@ std::unique_ptr<TypePrototype> register_slot_wrapper()
 }
 }// namespace
 
-std::unique_ptr<TypePrototype> PySlotWrapper::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PySlotWrapper::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(slot_wrapper_flag, []() { type = ::register_slot_wrapper(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(slot_wrapper_flag, []() { type = ::register_slot_wrapper(); });
+		return std::move(type);
+	};
 }
 
 template<> PySlotWrapper *py::as(PyObject *obj)

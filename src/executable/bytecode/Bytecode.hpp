@@ -22,7 +22,8 @@ class Bytecode : public Function
 		size_t stack_size,
 		std::string function_name,
 		InstructionVector &&instructions,
-		std::vector<View> block_views);
+		std::vector<View> block_views,
+		std::shared_ptr<Program> program);
 
 	auto begin() const { return m_block_views.begin(); }
 	auto end() const { return m_block_views.end(); }
@@ -31,7 +32,9 @@ class Bytecode : public Function
 
 	std::vector<uint8_t> serialize() const override;
 
-	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer);
+	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer, std::shared_ptr<Program> program);
 
 	py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const override;
+
+	py::PyResult<py::Value> eval_loop(VirtualMachine &, Interpreter &) const;
 };

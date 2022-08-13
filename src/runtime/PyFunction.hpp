@@ -9,7 +9,7 @@
 namespace py {
 class PyFunction : public PyBaseObject
 {
-	friend std::unique_ptr<TypePrototype> register_type();
+	// friend std::unique_ptr<TypePrototype> register_type();
 
 	PyString *m_name = nullptr;
 	PyCode *m_code = nullptr;
@@ -18,7 +18,7 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> m_defaults;
 	const std::vector<Value> m_kwonly_defaults;
 	std::vector<PyCell *> m_closure;
-	PyModule *m_module = nullptr;
+	PyString *m_module = nullptr;
 
   public:
 	PyFunction(std::string,
@@ -29,8 +29,9 @@ class PyFunction : public PyBaseObject
 		PyDict *globals);
 
 	const PyCode *code() const { return m_code; }
+	PyCode *code() { return m_code; }
 
-	std::string to_string() const override { return fmt::format("PyFunction"); }
+	std::string to_string() const override;
 	const std::vector<Value> &defaults() const { return m_defaults; }
 	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
@@ -46,7 +47,7 @@ class PyFunction : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 
@@ -64,7 +65,7 @@ class PyNativeFunction : public PyBaseObject
 
 	// TODO: fix tracking of lambda captures
 	template<typename... Args>
-	PyNativeFunction(std::string &&name, FunctionType &&function, Args &&... args)
+	PyNativeFunction(std::string &&name, FunctionType &&function, Args &&...args)
 		: PyNativeFunction(std::move(name), std::move(function))
 	{
 		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
@@ -74,7 +75,7 @@ class PyNativeFunction : public PyBaseObject
 	template<typename... Args>
 	static PyResult<PyNativeFunction *> create(std::string name,
 		std::function<PyResult<PyObject *>(PyTuple *, PyDict *)> function,
-		Args &&... args)
+		Args &&...args)
 	{
 		auto *result = VirtualMachine::the().heap().allocate<PyNativeFunction>(
 			std::move(name), std::move(function), std::forward<Args>(args)...);
@@ -95,7 +96,7 @@ class PyNativeFunction : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	static std::unique_ptr<TypePrototype> register_type();
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 };
 

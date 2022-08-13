@@ -122,7 +122,11 @@ int run_and_execute_script(int argc,
 	if (print_tokens) {
 		auto l = Lexer::create(std::filesystem::absolute(filename));
 		std::cout << "Generated tokens: \n";
-		while (auto token = l.next_token()) { std::cout << *token << '\n'; }
+		size_t idx = 0;
+		while (auto token = l.peek_token(idx)) {
+			std::cout << *token << '\n';
+			idx++;
+		}
 		std::cout << std::endl;
 	}
 	parser::Parser p{ lexer };
@@ -134,7 +138,7 @@ int run_and_execute_script(int argc,
 		spdlog::set_level(lvl);
 	}
 	initialize_types();
-	auto bytecode = codegen::BytecodeGenerator::compile(
+	std::shared_ptr<Program> bytecode = codegen::BytecodeGenerator::compile(
 		p.module(), argv_vector, compiler::OptimizationLevel::None);
 
 	if (print_bytecode) {

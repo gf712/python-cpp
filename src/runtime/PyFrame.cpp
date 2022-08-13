@@ -1,32 +1,51 @@
 #include "PyFrame.hpp"
 #include "BaseException.hpp"
 #include "PyCell.hpp"
+#include "PyCode.hpp"
 #include "PyDict.hpp"
 #include "PyModule.hpp"
 #include "PyNone.hpp"
 #include "PyObject.hpp"
 #include "PyTraceback.hpp"
 #include "PyType.hpp"
+#include "executable/Function.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
 namespace py {
 
-PyFrame::PyFrame() : PyBaseObject(BuiltinTypes::the().frame()) {}
+template<> PyFrame *as(PyObject *obj)
+{
+	if (obj->type() == frame()) { return static_cast<PyFrame *>(obj); }
+	return nullptr;
+}
+
+template<> const PyFrame *as(const PyObject *obj)
+{
+	if (obj->type() == frame()) { return static_cast<const PyFrame *>(obj); }
+	return nullptr;
+}
+
+PyFrame::PyFrame(const std::vector<std::string> &names)
+	: PyBaseObject(BuiltinTypes::the().frame()), m_names(names)
+{}
 
 PyFrame *PyFrame::create(PyFrame *parent,
 	size_t register_count,
 	size_t free_vars_count,
+	PyCode *code,
 	PyDict *globals,
 	PyDict *locals,
-	const PyTuple *consts)
+	const PyTuple *consts,
+	const std::vector<std::string> &names)
 {
-	auto *new_frame = Heap::the().allocate<PyFrame>();
+	auto *new_frame = Heap::the().allocate<PyFrame>(names);
 	new_frame->m_f_back = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
 	new_frame->m_locals = locals;
 	new_frame->m_consts = consts;
+	new_frame->m_f_code = code;
 	// if (parent) {
 	// 	new_frame->m_freevars = parent->m_freevars;
 	// 	new_frame->m_freevars.resize(parent->m_freevars.size() + free_vars_count, nullptr);
@@ -41,7 +60,7 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	} else {
 		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
 		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
-			   == module())
+			   == py::module())
 		// TODO: could this just return the builtin singleton?
 		new_frame->m_builtins =
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
@@ -55,16 +74,25 @@ void PyFrame::set_exception_to_catch(BaseException *exception) { m_exception_to_
 void PyFrame::push_exception(BaseException *exception)
 {
 	ASSERT(exception)
+	spdlog::debug("PyFrame::push_exception: current exception count {}", m_exception_stack->size());
 	m_exception_stack->push_back(ExceptionStackItem{ .exception = exception,
 		.exception_type = exception->type(),
 		.traceback = exception->traceback() });
+	spdlog::debug("PyFrame::push_exception: pushed exception {}",
+		m_exception_stack->back().exception->to_string());
+	spdlog::debug("PyFrame::push_exception: added exception, stack has now {} exceptions",
+		m_exception_stack->size());
 }
 
 BaseException *PyFrame::pop_exception()
 {
 	ASSERT(!m_exception_stack->empty())
-	auto exception = m_exception_stack->back().exception;
+	auto *exception = m_exception_stack->back().exception;
+	spdlog::debug("PyFrame::pop_exception: current exception count {}", m_exception_stack->size());
+	spdlog::debug("PyFrame::pop_exception: Popped exception {}", exception->to_string());
 	m_exception_stack->pop_back();
+	spdlog::debug(
+		"PyFrame::pop_exception: cleared exception, {} exceptions left", m_exception_stack->size());
 	return exception;
 }
 
@@ -93,7 +121,14 @@ PyModule *PyFrame::builtins() const { return m_builtins; }
 const std::vector<py::PyCell *> &PyFrame::freevars() const { return m_freevars; }
 std::vector<py::PyCell *> &PyFrame::freevars() { return m_freevars; }
 
-PyFrame *PyFrame::exit() { return m_f_back; }
+PyFrame *PyFrame::exit()
+{
+	spdlog::debug("Leaving PyFrame '{}' and entering PyFrame '{}'",
+		m_f_code->function()->function_name(),
+		m_f_back->m_f_code->function()->function_name());
+
+	return m_f_back;
+}
 
 std::string PyFrame::to_string() const
 {
@@ -111,10 +146,11 @@ std::string PyFrame::to_string() const
 
 void PyFrame::visit_graph(Visitor &visitor)
 {
-	visitor.visit(*this);
+	PyObject::visit_graph(visitor);
 	if (m_locals) visitor.visit(*m_locals);
 	if (m_globals) visitor.visit(*m_globals);
 	if (m_builtins) visitor.visit(*m_builtins);
+	if (m_f_code) visitor.visit(*m_f_code);
 	if (m_exception_to_catch) visitor.visit(*m_exception_to_catch);
 	for (const auto &exception_stack_item : *m_exception_stack) {
 		if (exception_stack_item.exception) { visitor.visit(*exception_stack_item.exception); }
@@ -137,6 +173,12 @@ Value PyFrame::consts(size_t index) const
 	return m_consts->elements()[index];
 }
 
+const std::string &PyFrame::names(size_t index) const
+{
+	ASSERT(index < m_names.size())
+	return m_names[index];
+}
+
 namespace {
 
 	std::once_flag frame_flag;
@@ -147,12 +189,15 @@ namespace {
 	}
 }// namespace
 
-std::unique_ptr<TypePrototype> PyFrame::register_type()
+std::function<std::unique_ptr<TypePrototype>()> PyFrame::type_factory()
 {
-	static std::unique_ptr<TypePrototype> type = nullptr;
-	std::call_once(frame_flag, []() { type = register_frame(); });
-	return std::move(type);
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(frame_flag, []() { type = register_frame(); });
+		return std::move(type);
+	};
 }
 
+PyType *PyFrame::type() const { return frame(); }
 
 }// namespace py

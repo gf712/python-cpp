@@ -36,7 +36,7 @@ class LLVMGenerator : public ast::CodeGenerator
 
 	llvm::Type *arg_type(const std::shared_ptr<ast::ASTNode> &type_annotation);
 
-	template<typename... Args> void set_error_state(std::string_view msg, Args &&... args);
+	template<typename... Args> void set_error_state(std::string_view msg, Args &&...args);
 };
 
 class LLVMFunction : public ::Function
@@ -44,7 +44,7 @@ class LLVMFunction : public ::Function
 	const llvm::Function &m_function;
 
   public:
-	LLVMFunction(const llvm::Function &f);
+	LLVMFunction(const llvm::Function &f, std::shared_ptr<Program>);
 
 	std::string to_string() const override;
 

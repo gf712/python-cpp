@@ -1,5 +1,6 @@
 #include "BuildList.hpp"
 #include "runtime/PyList.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

@@ -120,6 +120,106 @@ bool Bytes::operator==(const PyObject *other) const
 	}
 }
 
+Bytes Bytes::from_unescaped_string(const std::string &str)
+{
+	std::vector<std::byte> bytes;
+	for (size_t i = 0; i < str.size(); ++i) {
+		auto c = str[i];
+		if (c != '\\') {
+			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
+			continue;
+		}
+
+		c = str[++i];
+		switch (c) {
+		case '\n':
+			break;
+		case '\\': {
+			bytes.emplace_back(std::byte{ '\\' });
+		} break;
+		case '\'': {
+			bytes.emplace_back(std::byte{ '\'' });
+		} break;
+		case '\"': {
+			bytes.emplace_back(std::byte{ '\"' });
+		} break;
+		case 'b': {
+			bytes.emplace_back(std::byte{ '\b' });
+		} break;
+		case 'f': {
+			bytes.emplace_back(std::byte{ '\014' });
+		} break;
+		case 't': {
+			bytes.emplace_back(std::byte{ '\t' });
+		} break;
+		case 'n': {
+			bytes.emplace_back(std::byte{ '\n' });
+		} break;
+		case 'r': {
+			bytes.emplace_back(std::byte{ '\r' });
+		} break;
+		case 'v': {
+			bytes.emplace_back(std::byte{ '\013' });
+		} break;
+		case 'a': {
+			bytes.emplace_back(std::byte{ '\007' });
+		} break;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7': {
+			if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
+				c = (c << 3) + str[i + 1] - '0';
+				i++;
+				if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
+					c = (c << 3) + str[i + 1] - '0';
+					i++;
+				}
+			}
+			ASSERT(static_cast<int>(c) < static_cast<int>(std::numeric_limits<std::byte>::max()));
+			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
+		} break;
+		case 'x': {
+		} break;
+		default: {
+			TODO();
+		} break;
+		}
+	}
+
+	return Bytes{ bytes };
+}
+
+
+std::string Bytes::to_string() const
+{
+	static constexpr std::string_view hex_digits = "0123456789abcdef";
+	std::ostringstream os;
+	os << "b'";
+	for (const auto &byte : b) {
+		const auto byte_ = std::to_integer<unsigned char>(byte);
+		if (byte_ == '\\') {
+			os << "\\";
+		} else if (byte_ == '\t') {
+			os << "\\t";
+		} else if (byte_ == '\n') {
+			os << "\\n";
+		} else if (byte_ == '\r') {
+			os << "\\r";
+		} else if (byte_ < ' ' || byte_ >= 0x7f) {
+			os << "\\x" << hex_digits[(byte_ & 0xf0) >> 4] << hex_digits[byte_ & 0xf];
+		} else {
+			os << byte_;
+		}
+	}
+	os << "'";
+	return os.str();
+}
+
 bool Ellipsis::operator==(const PyObject *other) const { return other == py_ellipsis(); }
 
 
@@ -417,6 +517,36 @@ PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpre
 		rhs);
 }
 
+PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{ [](const NoneType &, const auto &) -> PyResult<Value> {
+					   return Ok(NameConstant{ NoneType{} });
+				   },
+			[](const auto &, const NoneType &) -> PyResult<Value> {
+				return Ok(NameConstant{ NoneType{} });
+			},
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				if (std::holds_alternative<int64_t>(lhs_value.value) && std::holds_alternative<int64_t>(rhs_value.value)) {
+					return Ok(Number{ std::get<int64_t>(lhs_value.value) & std::get<int64_t>(rhs_value.value) });
+				} else {
+					const std::string lhs_type = std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
+					const std::string rhs_type = std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
+					return Err(type_error(
+						"unsupported operand type(s) for &: '{}' and '{}'", lhs_type, rhs_type));
+				}
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->and_(py_rhs.unwrap());
+			} },
+		lhs,
+		rhs);
+}
+
 PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	// TODO: Could probably be more efficient, but at least guarantees that Python singletons
@@ -431,10 +561,13 @@ PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &)
 
 PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	TODO();
-	(void)lhs;
-	(void)rhs;
-	return Ok(false);
+	if (!std::holds_alternative<PyObject *>(rhs)) {
+		return Err(type_error("argument of type '{}' is not iterable",
+			PyObject::from(rhs).unwrap()->type()->to_string()));
+	}
+	auto value = PyObject::from(lhs);
+	if (value.is_err()) { return Err(value.unwrap_err()); }
+	return std::get<PyObject *>(rhs)->contains(value.unwrap());
 }
 
 PyResult<bool> truthy(const Value &value, Interpreter &)

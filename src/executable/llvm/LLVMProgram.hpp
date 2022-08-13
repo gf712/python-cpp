@@ -18,11 +18,14 @@ class LLVMProgram : public Program
 	InternalConfig *m_config;
 	std::unique_ptr<InteropFunctions> m_interop_functions;
 
+	LLVMProgram(std::string filename, std::vector<std::string> argv);
+
   public:
-	LLVMProgram(std::unique_ptr<llvm::Module> &&module,
+	static std::shared_ptr<Program> create(std::unique_ptr<llvm::Module> &&module,
 		std::unique_ptr<llvm::LLVMContext> &&ctx,
 		std::string filename,
 		std::vector<std::string> argv);
+
 
 	~LLVMProgram();
 
@@ -34,6 +37,8 @@ class LLVMProgram : public Program
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
 		const std::vector<py::PyCell *> &closure) const override;
+
+	py::PyObject *main_function() override;
 
 	void visit_functions(Cell::Visitor &) const final {}
 

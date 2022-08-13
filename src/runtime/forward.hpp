@@ -16,6 +16,7 @@ class PyNumber;
 class PyMethodDescriptor;
 class PyModule;
 class PyObject;
+class PySlice;
 class PyString;
 class PyTraceback;
 class PyTuple;

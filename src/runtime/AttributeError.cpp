@@ -22,6 +22,8 @@ PyType *AttributeError::register_type(PyModule *module)
 	if (!s_attribute_error) {
 		s_attribute_error =
 			klass<AttributeError>(module, "AttributeError", Exception::s_exception_type).finalize();
+	} else {
+		module->add_symbol(PyString::create("AttributeError").unwrap(), s_attribute_error);
 	}
 	return s_attribute_error;
 }

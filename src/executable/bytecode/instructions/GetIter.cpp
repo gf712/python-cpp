@@ -1,4 +1,5 @@
 #include "GetIter.hpp"
+#include "vm/VM.hpp"
 
 using namespace py;
 

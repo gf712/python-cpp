@@ -29,12 +29,14 @@ namespace ast {
 	__AST_NODE_TYPE(Assign)             \
 	__AST_NODE_TYPE(Assert)             \
 	__AST_NODE_TYPE(AugAssign)          \
+	__AST_NODE_TYPE(Break)              \
 	__AST_NODE_TYPE(BinaryExpr)         \
 	__AST_NODE_TYPE(BoolOp)             \
 	__AST_NODE_TYPE(Call)               \
 	__AST_NODE_TYPE(ClassDefinition)    \
 	__AST_NODE_TYPE(Continue)           \
 	__AST_NODE_TYPE(Compare)            \
+	__AST_NODE_TYPE(Comprehension)      \
 	__AST_NODE_TYPE(Constant)           \
 	__AST_NODE_TYPE(Delete)             \
 	__AST_NODE_TYPE(Dict)               \
@@ -43,19 +45,24 @@ namespace ast {
 	__AST_NODE_TYPE(For)                \
 	__AST_NODE_TYPE(FormattedValue)     \
 	__AST_NODE_TYPE(FunctionDefinition) \
+	__AST_NODE_TYPE(GeneratorExp)       \
 	__AST_NODE_TYPE(Global)             \
 	__AST_NODE_TYPE(If)                 \
 	__AST_NODE_TYPE(IfExpr)             \
 	__AST_NODE_TYPE(Import)             \
+	__AST_NODE_TYPE(ImportFrom)         \
 	__AST_NODE_TYPE(JoinedStr)          \
 	__AST_NODE_TYPE(Keyword)            \
 	__AST_NODE_TYPE(List)               \
+	__AST_NODE_TYPE(ListComp)           \
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(NamedExpr)          \
 	__AST_NODE_TYPE(Name)               \
 	__AST_NODE_TYPE(Pass)               \
 	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
+	__AST_NODE_TYPE(Set)                \
+	__AST_NODE_TYPE(SetComp)            \
 	__AST_NODE_TYPE(Starred)            \
 	__AST_NODE_TYPE(Subscript)          \
 	__AST_NODE_TYPE(Try)                \
@@ -90,7 +97,7 @@ inline std::string_view node_type_to_string(ASTNodeType node_type)
 		AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 	}
-	ASSERT_NOT_REACHED()
+	ASSERT_NOT_REACHED();
 }
 
 #define __AST_NODE_TYPE(x) class x;
@@ -174,7 +181,7 @@ class Constant : public ASTNode
 
 	const py::Value *value() const { return m_value.get(); }
 
-	virtual Value *codegen(CodeGenerator *) const override;
+	Value *codegen(CodeGenerator *) const override;
 };
 
 
@@ -259,6 +266,29 @@ class Dict : public ASTNode
 
 	const std::vector<std::shared_ptr<ASTNode>> &keys() const { return m_keys; }
 	const std::vector<std::shared_ptr<ASTNode>> &values() const { return m_values; }
+
+	Value *codegen(CodeGenerator *) const override;
+};
+
+
+class Set : public ASTNode
+{
+  private:
+	std::vector<std::shared_ptr<ASTNode>> m_elements;
+	ContextType m_ctx;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+
+  public:
+	Set(std::vector<std::shared_ptr<ASTNode>> elements,
+		ContextType ctx,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::List, source_location), m_elements(std::move(elements)), m_ctx(ctx)
+	{}
+
+	ContextType context() const { return m_ctx; }
+	const std::vector<std::shared_ptr<ASTNode>> &elements() const { return m_elements; }
 
 	Value *codegen(CodeGenerator *) const override;
 };
@@ -354,7 +384,7 @@ inline std::string_view stringify_unary_op(UnaryOpType op)
 		UNARY_OPERATIONS
 #undef __UNARY_OP
 	}
-	ASSERT_NOT_REACHED()
+	ASSERT_NOT_REACHED();
 }
 
 class UnaryExpr : public ASTNode
@@ -381,16 +411,19 @@ class UnaryExpr : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 };
 
-#define BINARY_OPERATIONS  \
-	__BINARY_OP(PLUS)      \
-	__BINARY_OP(MINUS)     \
-	__BINARY_OP(MODULO)    \
-	__BINARY_OP(MULTIPLY)  \
-	__BINARY_OP(EXP)       \
-	__BINARY_OP(SLASH)     \
-	__BINARY_OP(FLOORDIV)  \
-	__BINARY_OP(LEFTSHIFT) \
-	__BINARY_OP(RIGHTSHIFT)
+#define BINARY_OPERATIONS   \
+	__BINARY_OP(PLUS)       \
+	__BINARY_OP(MINUS)      \
+	__BINARY_OP(MODULO)     \
+	__BINARY_OP(MULTIPLY)   \
+	__BINARY_OP(EXP)        \
+	__BINARY_OP(SLASH)      \
+	__BINARY_OP(FLOORDIV)   \
+	__BINARY_OP(LEFTSHIFT)  \
+	__BINARY_OP(RIGHTSHIFT) \
+	__BINARY_OP(AND)        \
+	__BINARY_OP(OR)         \
+	__BINARY_OP(XOR)
 
 enum class BinaryOpType {
 #define __BINARY_OP(x) x,
@@ -407,7 +440,7 @@ inline std::string_view stringify_binary_op(BinaryOpType op)
 		BINARY_OPERATIONS
 #undef __BINARY_OP
 	}
-	ASSERT_NOT_REACHED()
+	ASSERT_NOT_REACHED();
 }
 
 class BinaryExpr : public ASTNode
@@ -587,7 +620,7 @@ class FunctionDefinition final : public ASTNode
 {
 	const std::string m_function_name;
 	const std::shared_ptr<Arguments> m_args;
-	const std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 	const std::shared_ptr<ASTNode> m_returns;
 	std::string m_type_comment;
@@ -611,6 +644,7 @@ class FunctionDefinition final : public ASTNode
 	const std::string &name() const { return m_function_name; }
 	const std::shared_ptr<Arguments> &args() const { return m_args; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
 	const std::string &type_comment() const { return m_type_comment; }
@@ -653,7 +687,7 @@ class ClassDefinition final : public ASTNode
 	const std::string m_class_name;
 	const std::vector<std::shared_ptr<ASTNode>> m_bases;
 	const std::vector<std::shared_ptr<Keyword>> m_keywords;
-	const std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
 	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
 
 	void print_this_node(const std::string &indent) const final;
@@ -674,6 +708,7 @@ class ClassDefinition final : public ASTNode
 	const std::vector<std::shared_ptr<ASTNode>> &bases() const { return m_bases; }
 	const std::vector<std::shared_ptr<Keyword>> &keywords() const { return m_keywords; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
 
 	void add_decorator(std::shared_ptr<ASTNode> decorator)
@@ -755,6 +790,8 @@ class If : public ASTNode
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &orelse() { return m_orelse; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -786,6 +823,8 @@ class For : public ASTNode
 	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &orelse() { return m_orelse; }
 	const std::string &type_comment() const { return m_type_comment; }
 
 	Value *codegen(CodeGenerator *) const override;
@@ -813,6 +852,8 @@ class While : public ASTNode
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &orelse() { return m_orelse; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -872,7 +913,7 @@ class Compare : public ASTNode
 			COMPARE_OPERATIONS
 #undef __COMPARE_OP
 		}
-		ASSERT_NOT_REACHED()
+		ASSERT_NOT_REACHED();
 	}
 
 	void print_this_node(const std::string &indent) const override;
@@ -904,38 +945,57 @@ class Attribute : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 };
 
-
-class Import : public ASTNode
+struct alias
 {
-	std::vector<std::string> m_names;
-	std::optional<std::string> m_asname;
+	std::string name;
+	std::string asname;
+};
+
+class ImportBase : public ASTNode
+{
+  protected:
+	std::vector<alias> m_names;
 
   public:
-	Import(SourceLocation source_location) : ASTNode(ASTNodeType::Import, source_location) {}
-
-	Import(std::vector<std::string> names, SourceLocation source_location)
-		: ASTNode(ASTNodeType::Import, source_location), m_names(std::move(names))
+	ImportBase(ASTNodeType node_type, SourceLocation source_location)
+		: ASTNode(node_type, source_location)
 	{}
 
-	Import(std::vector<std::string> names,
-		std::optional<std::string> asname,
-		SourceLocation source_location)
-		: ASTNode(ASTNodeType::Import, source_location), m_names(std::move(names)),
-		  m_asname(std::move(asname))
+	ImportBase(ASTNodeType node_type, SourceLocation source_location, std::vector<alias> &&names)
+		: ASTNode(node_type, source_location), m_names(std::move(names))
 	{}
 
-	const std::optional<std::string> &asname() const { return m_asname; }
-	const std::vector<std::string> &names() const { return m_names; }
-	std::string dotted_name() const
-	{
-		return std::accumulate(
-			std::next(m_names.begin()), m_names.end(), *m_names.begin(), [](auto rhs, auto lhs) {
-				return std::move(rhs) + "." + lhs;
-			});
-	}
-	void set_asname(std::string name) { m_asname = std::move(name); }
+	void add_alias(alias alias_) { m_names.push_back(std::move(alias_)); }
 
-	void add_dotted_name(std::string name) { m_names.push_back(std::move(name)); }
+	const std::vector<alias> &names() const { return m_names; }
+};
+
+class Import : public ImportBase
+{
+  public:
+	Import(SourceLocation source_location) : ImportBase(ASTNodeType::Import, source_location) {}
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class ImportFrom : public ImportBase
+{
+	std::string m_module;
+	size_t m_level{ 0 };
+
+  public:
+	ImportFrom(SourceLocation source_location)
+		: ImportBase(ASTNodeType::ImportFrom, source_location)
+	{}
+
+	const std::string &module() const { return m_module; }
+	size_t level() const { return m_level; }
+
+	void set_module(std::string module) { m_module = std::move(module); }
+	void increment_level() { m_level++; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1050,6 +1110,7 @@ class ExceptHandler : public ASTNode
 	const std::shared_ptr<ASTNode> &type() const { return m_type; }
 	const std::string &name() const { return m_name; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1078,9 +1139,12 @@ class Try : public ASTNode
 	{}
 
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 	const std::vector<std::shared_ptr<ExceptHandler>> &handlers() const { return m_handlers; }
 	const std::vector<std::shared_ptr<ASTNode>> &orelse() const { return m_orelse; }
 	const std::vector<std::shared_ptr<ASTNode>> &finalbody() const { return m_finalbody; }
+	std::vector<std::shared_ptr<ASTNode>> &orelse() { return m_orelse; }
+	std::vector<std::shared_ptr<ASTNode>> &finalbody() { return m_finalbody; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1154,7 +1218,7 @@ class BoolOp : public ASTNode
 			BOOL_OPERATIONS
 #undef __COMPARE_OP
 		}
-		ASSERT_NOT_REACHED()
+		ASSERT_NOT_REACHED();
 	}
 
 	void print_this_node(const std::string &indent) const override;
@@ -1175,6 +1239,17 @@ class Continue : public ASTNode
 {
   public:
 	Continue(SourceLocation source_location) : ASTNode(ASTNodeType::Continue, source_location) {}
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class Break : public ASTNode
+{
+  public:
+	Break(SourceLocation source_location) : ASTNode(ASTNodeType::Break, source_location) {}
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1255,6 +1330,7 @@ class With : public ASTNode
 
 	const std::vector<std::shared_ptr<WithItem>> &items() const { return m_items; }
 	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
 	const std::string &type_comment() const { return m_type_comment; }
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1325,6 +1401,105 @@ class NamedExpr : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 };
 
+class Comprehension : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_target;
+	std::shared_ptr<ASTNode> m_iter;
+	std::vector<std::shared_ptr<ASTNode>> m_ifs;
+	const bool m_is_async;
+
+  public:
+	Comprehension(std::shared_ptr<ASTNode> target,
+		std::shared_ptr<ASTNode> iter,
+		std::vector<std::shared_ptr<ASTNode>> ifs,
+		bool is_async,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::Comprehension, source_location), m_target(target), m_iter(iter),
+		  m_ifs(ifs), m_is_async(is_async)
+	{}
+
+	const std::shared_ptr<ASTNode> &target() const { return m_target; }
+	const std::shared_ptr<ASTNode> &iter() const { return m_iter; }
+	const std::vector<std::shared_ptr<ASTNode>> &ifs() const { return m_ifs; }
+	std::vector<std::shared_ptr<ASTNode>> &ifs() { return m_ifs; }
+
+	bool is_async() const { return m_is_async; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class ListComp : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_elt;
+	std::vector<std::shared_ptr<Comprehension>> m_generators;
+
+  public:
+	ListComp(std::shared_ptr<ASTNode> elt,
+		std::vector<std::shared_ptr<Comprehension>> &&generators,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::ListComp, source_location), m_elt(std::move(elt)),
+		  m_generators(std::move(generators))
+	{}
+
+	const std::shared_ptr<ASTNode> elt() const { return m_elt; }
+	const std::vector<std::shared_ptr<Comprehension>> &generators() const { return m_generators; }
+	std::vector<std::shared_ptr<Comprehension>> &generators() { return m_generators; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class GeneratorExp : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_elt;
+	std::vector<std::shared_ptr<Comprehension>> m_generators;
+
+  public:
+	GeneratorExp(std::shared_ptr<ASTNode> elt,
+		std::vector<std::shared_ptr<Comprehension>> &&generators,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::GeneratorExp, source_location), m_elt(std::move(elt)),
+		  m_generators(std::move(generators))
+	{}
+
+	const std::shared_ptr<ASTNode> elt() const { return m_elt; }
+	const std::vector<std::shared_ptr<Comprehension>> &generators() const { return m_generators; }
+	std::vector<std::shared_ptr<Comprehension>> &generators() { return m_generators; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class SetComp : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_elt;
+	std::vector<std::shared_ptr<Comprehension>> m_generators;
+
+  public:
+	SetComp(std::shared_ptr<ASTNode> elt,
+		std::vector<std::shared_ptr<Comprehension>> &&generators,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::SetComp, source_location), m_elt(std::move(elt)),
+		  m_generators(std::move(generators))
+	{}
+
+	const std::shared_ptr<ASTNode> elt() const { return m_elt; }
+	const std::vector<std::shared_ptr<Comprehension>> &generators() const { return m_generators; }
+	std::vector<std::shared_ptr<Comprehension>> &generators() { return m_generators; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
 class JoinedStr : public ASTNode
 {
 	std::vector<std::shared_ptr<ASTNode>> m_values;
@@ -1384,5 +1559,33 @@ struct CodeGenerator
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 };
+
+struct NodeVisitor
+{
+#define __AST_NODE_TYPE(NodeType) virtual void visit(NodeType *node);
+	AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+
+  protected:
+	void dispatch(ASTNode *node);
+#define __AST_NODE_TYPE(NodeType) void dispatch(NodeType *node);
+	AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+};
+
+struct NodeTransformVisitor
+{
+	bool m_can_return_multiple_nodes{ false };
+#define __AST_NODE_TYPE(NodeType) \
+	virtual std::vector<std::shared_ptr<ASTNode>> visit(std::shared_ptr<NodeType> node);
+	AST_NODE_TYPES
+#undef __AST_NODE_TYPE
+
+  protected:
+	void transform_single_node(std::shared_ptr<ASTNode> node);
+
+	void transform_multiple_nodes(std::vector<std::shared_ptr<ASTNode>> &nodes);
+};
+
 
 }// namespace ast

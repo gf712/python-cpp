@@ -8,6 +8,9 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
+#include "vm/VM.hpp"
+
+#include "../serialization/serialize.hpp"
 
 using namespace py;
 
@@ -46,7 +49,9 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 					return Ok(Value{ py_none() });
 				}
 			} else {
-				const auto source_size = (*obj)->len();
+				const auto mapping = (*obj)->as_mapping();
+				if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
+				const auto source_size = mapping.unwrap().len();
 				if (source_size.is_err()) { return Err(source_size.unwrap_err()); }
 				auto len = source_size.unwrap();
 				if (len != m_destination.size()) {
@@ -104,9 +109,11 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 
 std::vector<uint8_t> UnpackSequence::serialize() const
 {
-	TODO();
-	return {
+	std::vector<uint8_t> bytes{
 		UNPACK_SEQUENCE,
-		m_source,
 	};
+	::serialize(m_destination, bytes);
+	::serialize(m_source, bytes);
+
+	return bytes;
 }
