@@ -30,43 +30,41 @@ using namespace parser;
 
 static int hits = 0;
 
-template<typename TuplePattern, size_t idx>
-constexpr void push_id(std::array<void *, 10> &result) requires(
-	idx < std::tuple_size<TuplePattern>{})
+template<typename T, typename... Ts> auto head(std::tuple<T, Ts...> t) { return std::get<0>(t); }
+
+template<std::size_t... Ns, typename... Ts>
+auto tail_impl(std::index_sequence<Ns...>, std::tuple<Ts...> t)
 {
-	result[idx] = (void *)&std::tuple_element<idx, TuplePattern>::type::matches_impl;
-	if constexpr (idx == std::tuple_size<TuplePattern>{} - 1) {
-		return;
+	return std::make_tuple(std::get<Ns + 1u>(t)...);
+}
+
+template<typename... Ts> auto tail(std::tuple<Ts...> t)
+{
+	return tail_impl(std::make_index_sequence<sizeof...(Ts) - 1u>(), t);
+}
+
+template<typename T, size_t Index, size_t CurrentIndex> constexpr auto get_tuple_from_helper()
+{
+	if constexpr (Index == CurrentIndex) {
+		return T{};
 	} else {
-		push_id<TuplePattern, idx + 1>(result);
+		return get_tuple_from_helper<decltype(tail(T{})), Index, CurrentIndex + 1>();
 	}
 }
 
-size_t hash(std::array<void *, 10> &&arr)
+template<typename T, size_t Index> constexpr auto get_tuple_from()
 {
-	size_t hash_value = bit_cast<size_t>(arr[0]) + 0x9e3779b9 + (bit_cast<size_t>(arr[0]) << 6)
-						+ (bit_cast<size_t>(arr[0]) >> 2);
-	for (size_t idx = 1; idx < arr.size(); ++idx) {
-		if (arr[idx] == nullptr) { break; }
-		hash_value ^= bit_cast<size_t>(arr[idx]) + 0x9e3779b9 + (bit_cast<size_t>(arr[idx]) << 6)
-					  + (bit_cast<size_t>(arr[idx]) >> 2);
+	static_assert(Index < std::tuple_size_v<T>);
+	if constexpr (Index == 0) {
+		return T{};
+	} else {
+		return get_tuple_from_helper<decltype(tail(T{})), Index, 1>();
 	}
-	return hash_value;
-}
-
-template<typename TuplePattern, size_t idx> std::array<void *, 10> consteval ids()
-{
-	constexpr size_t n_elements = std::tuple_size<TuplePattern>{} - idx;
-	static_assert(n_elements < 10);
-	std::array<void *, 10> result{};
-	result[0] = (void *)&std::tuple_element<idx, TuplePattern>::type::matches_impl;
-	if constexpr (std::tuple_size<TuplePattern>{} > 1) { push_id<TuplePattern, idx>(result); }
-	return result;
 }
 
 size_t Parser::CacheHash::operator()(const Parser::CacheLine &cache) const
 {
-	size_t seed = std::get<1>(cache.type_matcher_ids);
+	size_t seed = cache.type_info->hash_code();
 	seed ^= bit_cast<size_t>(cache.token.start().pointer_to_program) + 0x9e3779b9 + (seed << 6)
 			+ (seed >> 2);
 	seed ^= static_cast<size_t>(cache.token.token_type()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -76,22 +74,10 @@ size_t Parser::CacheHash::operator()(const Parser::CacheLine &cache) const
 bool Parser::CacheEqual::operator()(const Parser::CacheLine &lhs,
 	const Parser::CacheLine &rhs) const
 {
+	if (lhs.type_info != rhs.type_info) { return false; }
 	if ((lhs.token.start().pointer_to_program != rhs.token.start().pointer_to_program)
 		|| (lhs.token.token_type() != rhs.token.token_type())) {
 		return false;
-	}
-	for (size_t idx = 0; idx < std::get<0>(lhs.type_matcher_ids).size(); ++idx) {
-		if (std::get<0>(lhs.type_matcher_ids)[idx] != std::get<0>(rhs.type_matcher_ids)[idx]) {
-			return false;
-		}
-		if ((std::get<0>(lhs.type_matcher_ids)[idx] == nullptr)
-			^ (std::get<0>(rhs.type_matcher_ids)[idx] == nullptr)) {
-			return false;
-		}
-		if ((std::get<0>(lhs.type_matcher_ids)[idx] == nullptr)
-			&& (std::get<0>(rhs.type_matcher_ids)[idx] == nullptr)) {
-			break;
-		}
 	}
 	return true;
 }
@@ -113,7 +99,7 @@ template<typename Derived> struct Pattern
 	}
 };
 
-template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
+template<size_t TypeIdx, size_t StartIdx, typename PatternTuple> class PatternMatch_
 {
 	template<typename T, typename = void> struct has_advance_by : std::false_type
 	{
@@ -124,59 +110,79 @@ template<size_t TypeIdx, typename PatternTuple> class PatternMatch_
 	{
 	};
 
+	static bool skip_by_result(Parser &p, size_t token_position, size_t rule_index)
+	{
+		const auto original_position = p.token_position();
+		p.token_position() = token_position;
+		switch (rule_index) {
+#define SKIP_BY_RESULT(OFFSET)                                                                \
+	case OFFSET: {                                                                            \
+		if constexpr ((StartIdx + OFFSET) < std::tuple_size_v<PatternTuple>) {                \
+			auto result = PatternMatch_<StartIdx + OFFSET, StartIdx, PatternTuple>::match(p); \
+			if (!result) { p.token_position() = original_position; }                          \
+			return result;                                                                    \
+		} else if constexpr ((StartIdx + OFFSET) == std::tuple_size_v<PatternTuple>) {        \
+			return true;                                                                      \
+		} else {                                                                              \
+			ASSERT(false && "internal parser error")                                          \
+		}                                                                                     \
+	} break;
+			SKIP_BY_RESULT(1);
+			SKIP_BY_RESULT(2);
+			SKIP_BY_RESULT(3);
+			SKIP_BY_RESULT(4);
+			SKIP_BY_RESULT(5);
+			SKIP_BY_RESULT(6);
+			SKIP_BY_RESULT(7);
+			SKIP_BY_RESULT(8);
+			SKIP_BY_RESULT(9);
+			SKIP_BY_RESULT(10);
+			SKIP_BY_RESULT(11);
+			SKIP_BY_RESULT(12);
+			SKIP_BY_RESULT(13);
+#undef SKIP_BY_RESULT
+		}
+		ASSERT(false && "internal parser error");
+	}
+
   public:
 	PatternMatch_() {}
 	static bool match(Parser &p)
 	{
 		using CurrentType = typename std::tuple_element<TypeIdx, PatternTuple>::type;
 		const size_t original_token_position = p.token_position();
-		// const auto t = p.lexer().peek_token(original_token_position);
+		const auto t = p.lexer().peek_token(original_token_position);
 		hits++;
-		// std::optional<Parser::CacheLine> line;
-		// if (t.has_value()) {
-		// 	line = Parser::CacheLine{
-		// 		{ ids<PatternTuple, TypeIdx>(), hash(ids<PatternTuple, TypeIdx>()) }, *t
-		// 	};
-		// 	if (p.m_cache.contains(*line)) {
-		// 		// hits++;
-		// 		// std::cout << "cache hit " << t->to_string() << " :: " <<
-		// 		// typeid(CurrentType).name()
-		// 		// 		  << "\n";
-		// 		return false;
-		// 	}
-		// }
+		std::optional<Parser::CacheLine> line;
+		if (t.has_value()) {
+			const auto &type_info = typeid(get_tuple_from<PatternTuple, TypeIdx>());
+			line = Parser::CacheLine{ &type_info, *t };
+			const auto it = p.m_cache.find(*line);
+			if (it != p.m_cache.end()) {
+				const auto [token_position, rule_index] = it->second;
+				if (token_position == 0) return false;
+				ASSERT(token_position > 0 && rule_index > 0)
+				return skip_by_result(p, token_position, rule_index);
+			}
+		}
 		if (CurrentType::matches(p)) {
-			// std::string str;
-			// for (size_t i = original_token_position; i < p.token_position(); ++i) {
-			// 	str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
-			// 		p.lexer().peek_token(i)->end().pointer_to_program);
-			// 	str += ' ';
-			// }
-			// DEBUG_LOG("match: " + str + '\n');
 			if constexpr (has_advance_by<CurrentType>::value) {
 				p.token_position() += CurrentType::advance_by;
 			}
+			const size_t rule_index = TypeIdx - StartIdx + 1;
+			const size_t token_position = p.token_position();
+			p.m_cache[*line] = { token_position, rule_index };
 			if constexpr (TypeIdx + 1 == std::tuple_size_v<PatternTuple>) {
 				return true;
 			} else {
-				return PatternMatch_<TypeIdx + 1, PatternTuple>::match(p);
+				return PatternMatch_<TypeIdx + 1, StartIdx, PatternTuple>::match(p);
 			}
 		} else {
-			// std::string str;
-			// for (size_t i = original_token_position; i < p.token_position(); ++i) {
-			// 	str += std::string(p.lexer().peek_token(i)->start().pointer_to_program,
-			// 		p.lexer().peek_token(i)->end().pointer_to_program);
-			// 	str += ' ';
-			// }
-			// DEBUG_LOG("no match: " + str + '\n');
 			p.token_position() = original_token_position;
-			// if (t.has_value()) {
-			// 	ASSERT(line.has_value())
-			// 	p.m_cache.insert(*line);
-			// 	// std::cout << "adding cache " << t->to_string()
-			// 	// 		  << " :: " << typeid(CurrentType).name() << "\n";
-			// }
-			// hits++;
+			if (t.has_value()) {
+				ASSERT(line.has_value())
+				p.m_cache[*line] = { 0, 0 };
+			}
 			return false;
 		}
 	}
@@ -190,7 +196,7 @@ template<typename... PatternType> class PatternMatch
 	{
 		const auto start_token_position = p.token_position();
 		const auto start_stack_size = p.stack().size();
-		const bool is_match = PatternMatch_<0, std::tuple<PatternType...>>::match(p);
+		const bool is_match = PatternMatch_<0, 0, std::tuple<PatternType...>>::match(p);
 		if (!is_match) {
 			while (p.stack().size() > start_stack_size) { p.pop_back(); }
 			p.token_position() = start_token_position;
@@ -5434,7 +5440,7 @@ struct StatementsPattern : Pattern<StatementsPattern>
 		using pattern1 = PatternMatch<StatementPattern>;
 		while (pattern1::match(p)) {
 			p.commit();
-			p.m_cache.clear();
+			// p.m_cache.clear();
 		}
 		return true;
 	}
@@ -5474,9 +5480,11 @@ void Parser::parse()
 	const auto result = FilePattern::matches(*this);
 	(void)result;
 	DEBUG_LOG("Parser return code: {}", result);
-	std::cout << m_cache.load_factor() << '\n';
+	// std::cout << m_cache.load_factor() << '\n';
 	std::cout << "hits " << hits << '\n';
-	// for (const auto &c : m_cache) { std::cout << std::get<1>(c.type_matcher_ids) << '\n'; }
+	std::cout << "cache size " << m_cache.size() << '\n';
+	// for (const auto &c : m_cache) { std::cout << std::get<1>(c.type_matcher_ids) << '\n';
+	// }
 	m_module->print_node("");
 }
 }// namespace parser

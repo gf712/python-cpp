@@ -24,7 +24,7 @@ class Parser
   public:
 	struct CacheLine
 	{
-		std::tuple<std::array<void *, 10>, size_t> type_matcher_ids;
+		const std::type_info *type_info;
 		Token token;
 	};
 
@@ -38,7 +38,7 @@ class Parser
 		bool operator()(const CacheLine &lhs, const CacheLine &rhs) const;
 	};
 
-	std::unordered_set<CacheLine, CacheHash, CacheEqual> m_cache;
+	std::unordered_map<CacheLine, std::tuple<size_t, size_t>, CacheHash, CacheEqual> m_cache;
 
   public:
 	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>(l.filename())), m_lexer(l)
