@@ -320,6 +320,12 @@ class Heap
 
 	void collect_garbage();
 
+	GarbageCollector &garbage_collector()
+	{
+		ASSERT(m_gc);
+		return *m_gc;
+	}
+
 	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
