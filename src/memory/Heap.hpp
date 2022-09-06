@@ -36,15 +36,16 @@ class Block
 
 			std::optional<size_t> mark_next_free_chunk()
 			{
-				// spdlog::debug(
-				// 	"mark_next_free_chunk() -> chunk bit mask: {}", m_occupied_chunks.to_string());
+				spdlog::trace(
+					"mark_next_free_chunk -> chunk bit mask: {}", m_occupied_chunks.to_string());
 				if (auto chunk_idx = next_free_chunk()) {
 					ASSERT(!m_occupied_chunks[*chunk_idx])
-					// spdlog::debug("marking next free chunk -> old chunk bit mask: {}",
-					// 	m_occupied_chunks.to_string());
+					spdlog::trace("marking next free chunk -> old chunk bit mask: {}",
+						m_occupied_chunks.to_string());
 					m_occupied_chunks.flip(*chunk_idx);
-					// spdlog::debug("marking next free chunk -> new chunk bit mask: {}",
-					// 	m_occupied_chunks.to_string());
+					spdlog::trace("marking next free chunk -> new chunk bit mask: {} (index: {})",
+						m_occupied_chunks.to_string(),
+						*chunk_idx);
 					return *chunk_idx;
 				} else {
 					return {};
@@ -303,7 +304,7 @@ class Heap
 
 	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
-	template<typename T, typename... Args> T *allocate(Args &&... args)
+	template<typename T, typename... Args> T *allocate(Args &&...args)
 	{
 		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...).get(); }
 		collect_garbage();
@@ -319,7 +320,7 @@ class Heap
 
 	void collect_garbage();
 
-	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&... args)
+	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
 		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);

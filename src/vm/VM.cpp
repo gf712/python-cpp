@@ -86,13 +86,13 @@ Interpreter &VirtualMachine::initialize_interpreter(std::shared_ptr<Program> &&p
 
 Interpreter &VirtualMachine::interpreter()
 {
-	ASSERT(m_interpreter)
+	ASSERT(has_interpreter());
 	return *m_interpreter;
 }
 
 const Interpreter &VirtualMachine::interpreter() const
 {
-	ASSERT(m_interpreter)
+	ASSERT(has_interpreter());
 	return *m_interpreter;
 }
 

@@ -127,6 +127,7 @@ class VirtualMachine
 	Interpreter &initialize_interpreter(std::shared_ptr<Program> &&);
 	Interpreter &interpreter();
 	const Interpreter &interpreter() const;
+	bool has_interpreter() const { return m_interpreter.operator bool(); }
 
 	void set_instruction_pointer(InstructionBlock::const_iterator pos)
 	{

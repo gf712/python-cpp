@@ -108,6 +108,7 @@ bool Slab::has_address(uint8_t *address) const
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
 	std::array blocks = {
+		block16.get(),
 		block32.get(),
 		block64.get(),
 		block128.get(),

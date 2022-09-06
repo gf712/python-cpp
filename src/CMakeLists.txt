@@ -170,6 +170,7 @@ set(UNITTEST_SOURCES
     executable/bytecode/codegen/BytecodeGenerator_tests.cpp
     executable/bytecode/codegen/VariablesResolver_tests.cpp
     lexer/Lexer_tests.cpp
+    memory/Heap_tests.cpp
     parser/Parser_tests.cpp
     runtime/PyNumber_tests.cpp
     runtime/PyType_tests.cpp

@@ -67,6 +67,11 @@ class GarbageCollector
 	virtual void run(Heap &) const = 0;
 	virtual void resume() = 0;
 	virtual void pause() = 0;
+
+	void set_frequency(size_t new_frequency) { m_frequency = new_frequency; }
+
+  protected:
+	size_t m_frequency;
 };
 
 class MarkSweepGC : public GarbageCollector
@@ -84,7 +89,6 @@ class MarkSweepGC : public GarbageCollector
 
   private:
 	mutable uint8_t *m_stack_bottom{ nullptr };
-	size_t m_frequency;
 	mutable size_t m_iterations_since_last_sweep{ 0 };
 	bool m_pause{ false };
 };

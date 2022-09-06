@@ -14,7 +14,7 @@
 
 using namespace py;
 
-MarkSweepGC::MarkSweepGC() : m_frequency(10000) {}
+MarkSweepGC::MarkSweepGC() : GarbageCollector() { set_frequency(10000); }
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {
@@ -61,22 +61,26 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 		}
 	}
 
-	const auto &interpreter = VirtualMachine::the().interpreter();
-	auto *execution_frame = interpreter.execution_frame();
-	if (execution_frame) { roots.insert(execution_frame); }
-	ASSERT(interpreter.modules())
-	roots.insert(interpreter.modules());
-	struct AddRoot : Cell::Visitor
-	{
-		std::unordered_set<Cell *> &roots_;
-		AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
-		void visit(Cell &cell)
+	if (VirtualMachine::the().has_interpreter()) {
+		const auto &interpreter = VirtualMachine::the().interpreter();
+		auto *execution_frame = interpreter.execution_frame();
+		if (execution_frame) { roots.insert(execution_frame); }
+		ASSERT(interpreter.modules())
+		roots.insert(interpreter.modules());
+		struct AddRoot : Cell::Visitor
 		{
-			spdlog::debug("Adding root {}", (void *)&cell);
-			roots_.insert(&cell);
+			std::unordered_set<Cell *> &roots_;
+			AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
+			void visit(Cell &cell)
+			{
+				spdlog::debug("Adding root {}", (void *)&cell);
+				roots_.insert(&cell);
+			}
+		} visitor{ roots };
+		if (interpreter.execution_frame()) {
+			interpreter.execution_frame()->code()->program()->visit_functions(visitor);
 		}
-	} visitor{ roots };
-	interpreter.execution_frame()->code()->program()->visit_functions(visitor);
+	}
 	return roots;
 }
 
@@ -126,6 +130,7 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
 	std::array blocks = {
+		std::reference_wrapper{ heap.slab().block_16() },
 		std::reference_wrapper{ heap.slab().block_32() },
 		std::reference_wrapper{ heap.slab().block_64() },
 		std::reference_wrapper{ heap.slab().block_128() },
@@ -159,9 +164,12 @@ void MarkSweepGC::mark_all_live_objects(const std::unordered_set<Cell *> &roots)
 
 void MarkSweepGC::sweep(Heap &heap) const
 {
+	spdlog::trace("MarkSweepGC::sweep start");
+
 	// TODO: once the ideal block sizes are fixed there should be an iterator
 	//       returning a list of all blocks
 	std::array blocks = {
+		std::reference_wrapper{ heap.slab().block_16() },
 		std::reference_wrapper{ heap.slab().block_32() },
 		std::reference_wrapper{ heap.slab().block_64() },
 		std::reference_wrapper{ heap.slab().block_128() },
@@ -174,7 +182,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
 			chunk.for_each_cell_alive([&chunk](uint8_t *memory) {
-				auto *header = static_cast<GarbageCollected *>(static_cast<void *>(memory));
+				auto *header = bit_cast<GarbageCollected *>(memory);
 				if (header->white()) {
 					auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
 					if (cell->is_pyobject()) {
@@ -188,13 +196,14 @@ void MarkSweepGC::sweep(Heap &heap) const
 			});
 		}
 	}
+	spdlog::trace("MarkSweepGC::sweep done");
 }
 
 
 void MarkSweepGC::run(Heap &heap) const
 {
 	if (m_pause) { return; }
-	if (m_iterations_since_last_sweep++ < m_frequency) { return; }
+	if (++m_iterations_since_last_sweep < m_frequency) { return; }
 
 	mark_all_cell_unreachable(heap);
 
