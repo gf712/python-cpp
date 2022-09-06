@@ -3749,7 +3749,7 @@ struct ImportFromTargetsPattern : Pattern<ImportFromTargetsPattern>
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
 			ImportFromAsNamesPattern,
 			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>,
-			NegativeLookAhead<SingleTokenPattern<Token::TokenType::RPAREN>>>;
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'(' import_from_as_names [','] ')'");
 			return true;

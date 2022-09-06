@@ -1955,6 +1955,28 @@ TEST(Parser, ImportFromDottedMutiple)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, ImportFromDottedMutipleInParen)
+{
+	constexpr std::string_view program =
+		"from internal.math.sequence import (fibonacci as fib, factorial)\n";
+
+	auto expected_ast = create_test_module();
+	auto import = std::make_shared<ImportFrom>(SourceLocation{});
+	import->add_alias(alias{
+		.name = "fibonacci",
+		.asname = "fib",
+	});
+
+	import->add_alias(alias{
+		.name = "factorial",
+	});
+
+	import->set_module("internal.math.sequence");
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, SubscriptIndexExpression)
 {
 	constexpr std::string_view program = "a[0]\n";
