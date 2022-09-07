@@ -1124,6 +1124,46 @@ TEST(Parser, SingleValueAssignmentTuple)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, AssignToTuple)
+{
+	constexpr std::string_view program = "(a, b) = foo\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+			},
+			ContextType::STORE,
+			SourceLocation{}) },
+		std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		"",
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, AssignToList)
+{
+	constexpr std::string_view program = "[a, b] = foo\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<List>(
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+			},
+			ContextType::STORE,
+			SourceLocation{}) },
+		std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		"",
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, BlankLine)
 {
 	constexpr std::string_view program =

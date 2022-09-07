@@ -665,6 +665,40 @@ struct NAMEPattern : Pattern<NAMEPattern>
 	}
 };
 
+struct StarTargetsTupleSeq : Pattern<StarTargetsTupleSeq>
+{
+	// star_targets_tuple_seq:
+	//     | star_target (',' star_target )+ [',']
+	//     | star_target ','
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<
+			ApplyInBetweenPattern<StarTargetPattern, SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("star_target (',' star_target )+ [',']");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct StarTargetsListSeq : Pattern<StarTargetsListSeq>
+{
+	// star_targets_list_seq: ','.star_target+ [',']
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<
+			ApplyInBetweenPattern<StarTargetPattern, SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("','.star_target+ [',']");
+			return true;
+		}
+		return false;
+	}
+};
+
 struct StarAtomPattern : Pattern<StarAtomPattern>
 {
 	// star_atom:
@@ -674,15 +708,47 @@ struct StarAtomPattern : Pattern<StarAtomPattern>
 	// | '[' [star_targets_list_seq] ']'
 	static bool matches_impl(Parser &p)
 	{
+		BlockScope scope{ p };
 		// NAME
+		const auto start = p.lexer().peek_token(p.token_position());
+
 		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
 		if (pattern1::match(p)) {
 			DEBUG_LOG("'(' target_with_star_atom ')'");
+			std::string id{ p.lexer().get(start->start(), start->end()) };
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
+			scope.parent().push_back(std::make_shared<Name>(
+				id, ContextType::STORE, SourceLocation{ start->start(), end->end() }));
+			return true;
+		}
 
-			const auto token = p.lexer().peek_token(p.token_position() - 1);
-			std::string id{ p.lexer().get(token->start(), token->end()) };
-			p.push_to_stack(std::make_shared<Name>(
-				id, ContextType::STORE, SourceLocation{ token->start(), token->end() }));
+		// '(' [star_targets_tuple_seq] ')'
+		using pattern3 = PatternMatch<SingleTokenPattern<Token::TokenType::LPAREN>,
+			ZeroOrOnePattern<StarTargetsTupleSeq>,
+			SingleTokenPattern<Token::TokenType::RPAREN>>;
+		if (pattern3::match(p)) {
+			DEBUG_LOG("'(' [star_targets_tuple_seq] ')'");
+			std::vector<std::shared_ptr<ASTNode>> els;
+			els.reserve(p.stack().size());
+			while (!p.stack().empty()) { els.push_back(p.pop_front()); }
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
+			scope.parent().push_back(std::make_shared<Tuple>(
+				els, ContextType::STORE, SourceLocation{ start->start(), end->end() }));
+			return true;
+		}
+
+		// '[' [star_targets_list_seq] ']'
+		using pattern4 = PatternMatch<SingleTokenPattern<Token::TokenType::LSQB>,
+			ZeroOrOnePattern<StarTargetsListSeq>,
+			SingleTokenPattern<Token::TokenType::RSQB>>;
+		if (pattern4::match(p)) {
+			DEBUG_LOG("'(' [star_targets_list_seq] ')'");
+			std::vector<std::shared_ptr<ASTNode>> els;
+			els.reserve(p.stack().size());
+			while (!p.stack().empty()) { els.push_back(p.pop_front()); }
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
+			scope.parent().push_back(std::make_shared<List>(
+				els, ContextType::STORE, SourceLocation{ start->start(), end->end() }));
 			return true;
 		}
 		return false;
