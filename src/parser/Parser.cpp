@@ -653,6 +653,8 @@ using ReservedKeywords = std::tuple<AndKeywordPattern,
 	WhileKeywordPattern,
 	WithKeywordPattern>;
 
+struct StarTargetPattern;
+
 struct NAMEPattern : Pattern<NAMEPattern>
 {
 	static bool matches_impl(Parser &p)
@@ -4510,6 +4512,36 @@ struct StarEtcPattern : Pattern<StarEtcPattern>
 	}
 };
 
+struct SlashNoDefaultPattern : Pattern<SlashNoDefaultPattern>
+{
+	// slash_no_default:
+	//     | param_no_default+ '/' ','
+	//     | param_no_default+ '/' &')'
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>,
+			SingleTokenPattern<Token::TokenType::SLASH>,
+			SingleTokenPattern<Token::TokenType::COMMA>>;
+		// param_no_default+ '/' ','
+		if (pattern1::match(p)) {
+			DEBUG_LOG("param_no_default+ '/' ','");
+			return true;
+		}
+
+		using pattern2 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>,
+			SingleTokenPattern<Token::TokenType::SLASH>,
+			LookAhead<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		// param_no_default+ '/' &')'
+		if (pattern2::match(p)) {
+			DEBUG_LOG("param_no_default+ '/' &')'");
+			return true;
+		}
+
+		return false;
+	}
+};
+
+
 struct ParametersPattern : Pattern<ParametersPattern>
 {
 	// parameters:
@@ -4525,6 +4557,46 @@ struct ParametersPattern : Pattern<ParametersPattern>
 			SourceLocation{ start_token->start(), start_token->end() }));
 		size_t stack_size = p.stack().size();
 		auto &args = p.stack().back();
+
+		// slash_no_default param_no_default* param_with_default* [star_etc]
+		using pattern1 = PatternMatch<SlashNoDefaultPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("slash_no_default param_no_default* param_with_default* [star_etc]");
+			std::deque<std::shared_ptr<ASTNode>> positional_args;
+			while (p.stack().size() > stack_size) { positional_args.push_front(p.pop_back()); }
+			while (!positional_args.empty()) {
+				auto positional_arg = positional_args.front();
+				positional_args.pop_front();
+				ASSERT(as<Argument>(positional_arg));
+				as<Arguments>(args)->push_positional_arg(as<Argument>(positional_arg));
+			}
+
+			using pattern1a = PatternMatch<ZeroOrMorePattern<ParamNoDefaultPattern>,
+				ZeroOrMorePattern<ParamWithDefaultPattern>>;
+			if (pattern1a::match(p)) {
+				for (size_t idx = stack_size; idx < p.stack().size(); ++idx) {
+					auto node = p.stack()[idx];
+					if (as<Argument>(node)) {
+						as<Arguments>(args)->push_arg(as<Argument>(node));
+					} else if (as<Keyword>(node)) {
+						auto arg = std::make_shared<Argument>(
+							*as<Keyword>(node)->arg(), nullptr, "", node->source_location());
+						as<Arguments>(args)->push_arg(arg);
+						as<Arguments>(args)->push_default(as<Keyword>(node)->value());
+					} else {
+						PARSER_ERROR();
+					}
+				}
+				while (p.stack().size() > stack_size) { p.pop_back(); }
+			} else {
+				return false;
+			}
+			using pattern1b = PatternMatch<StarEtcPattern>;
+			if (pattern1b::match(p)) {
+				DEBUG_LOG("slash_no_default param_no_default* param_with_default* [star_etc]");
+			}
+			return true;
+		}
 
 		// param_no_default+ param_with_default* [star_etc]
 		using pattern3 = PatternMatch<OneOrMorePattern<ParamNoDefaultPattern>,

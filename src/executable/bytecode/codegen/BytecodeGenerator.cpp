@@ -712,7 +712,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	m_stack.pop();
 	exit_function(f->function_info().function_id);
 
-	size_t arg_count = node->args()->args().size();
+	size_t arg_count = node->args()->args().size() + node->args()->posonlyargs().size();
 	size_t kwonly_arg_count = node->args()->kwonlyargs().size();
 
 	std::vector<Register> defaults;
@@ -800,8 +800,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 
 Value *BytecodeGenerator::visit(const Arguments *node)
 {
-	// if (!node->kw_defaults().empty()) { TODO(); }
-
+	for (const auto &arg : node->posonlyargs()) { generate(arg.get(), m_function_id); }
 	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
 	for (const auto &arg : node->kwonlyargs()) { generate(arg.get(), m_function_id); }
 	if (node->vararg()) { generate(node->vararg().get(), m_function_id); }

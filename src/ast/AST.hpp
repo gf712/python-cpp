@@ -581,7 +581,13 @@ class Arguments : public ASTNode
 
 	void print_this_node(const std::string &indent) const final;
 
+	void push_positional_arg(std::shared_ptr<Argument> arg)
+	{
+		m_posonlyargs.push_back(std::move(arg));
+	}
+
 	void push_arg(std::shared_ptr<Argument> arg) { m_args.push_back(std::move(arg)); }
+
 	std::vector<std::string> argument_names() const;
 
 	std::vector<std::string> kw_only_argument_names() const;

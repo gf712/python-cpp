@@ -904,6 +904,7 @@ void Argument::print_this_node(const std::string &indent) const
 std::vector<std::string> Arguments::argument_names() const
 {
 	std::vector<std::string> arg_names;
+	for (const auto &arg : m_posonlyargs) { arg_names.push_back(arg->name()); }
 	for (const auto &arg : m_args) { arg_names.push_back(arg->name()); }
 	return arg_names;
 }

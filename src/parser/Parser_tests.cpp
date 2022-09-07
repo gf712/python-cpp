@@ -2905,6 +2905,38 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, FunctionDefinitionWithPositionalArgsWithoutDefault)
+{
+	constexpr std::string_view program =
+		"def f(a, /, b, **kwargs):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+			},
+			std::vector{
+				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+			},
+			nullptr,
+			std::vector<std::shared_ptr<Argument>>{},
+			std::vector<std::shared_ptr<ASTNode>>{  },
+			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<std::shared_ptr<ASTNode>>{},
+			SourceLocation{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(SourceLocation{}),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		"",// type_comment
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+
 TEST(Parser, AssignToAttributeSubscript)
 {
 	constexpr std::string_view program = "sys.modules.foo[spec.name.bar] = my.module\n";

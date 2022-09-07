@@ -140,6 +140,7 @@ Value *VariablesResolver::visit(const Argument *node)
 
 Value *VariablesResolver::visit(const Arguments *node)
 {
+	for (const auto &arg : node->posonlyargs()) { arg->codegen(this); }
 	for (const auto &arg : node->args()) { arg->codegen(this); }
 	for (const auto &arg : node->kwonlyargs()) { arg->codegen(this); }
 
