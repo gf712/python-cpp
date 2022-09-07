@@ -877,42 +877,8 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
-
-auto initialize_types()
+auto builtin_types()
 {
-	type();
-	integer();
-	bool_();
-	bytes();
-	ellipsis();
-	str();
-	float_();
-	none();
-	module();
-	object();
-	dict();
-	dict_items();
-	dict_items_iterator();
-	list();
-	list_iterator();
-	tuple();
-	tuple_iterator();
-	range();
-	range_iterator();
-	set();
-	set_iterator();
-	function();
-	native_function();
-	code();
-	cell();
-	builtin_method();
-	slot_wrapper();
-	bound_method();
-	method_wrapper();
-	static_method();
-	property();
-	classmethod();
-
 	return std::array{ type(),
 		bool_(),
 		bytes(),
@@ -967,7 +933,7 @@ PyModule *builtins_module(Interpreter &interpreter)
 
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
-	auto types = initialize_types();
+	auto types = builtin_types();
 
 	s_builtin_module = PyModule::create(PyDict::create().unwrap(),
 		PyString::create("__builtins__").unwrap(),

@@ -11,7 +11,7 @@ using namespace py;
 TEST(PyType, ObjectClassParent)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	auto *bases = object()->underlying_type().__bases__;
+	auto *bases = object()->__bases__;
 	EXPECT_TRUE(bases->elements().empty());
 
 	auto mro_ = object()->mro();
@@ -25,16 +25,21 @@ TEST(PyType, ObjectClassParent)
 	EXPECT_EQ(mro_0, object());
 }
 
+TypePrototype *new_type(const std::string &name, std::vector<PyObject *> bases)
+{
+	auto *new_type = new TypePrototype{};
+	new_type->__name__ = name;
+	new_type->__bases__ = bases;
+	return new_type;
+}
+
 TEST(PyType, InheritanceTriangle)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(object()).unwrap() }));
-	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "B2", .__bases__ = PyTuple::create(object()).unwrap() }));
+	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B1", { object() })));
+	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B2", { object() })));
 
-	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap() }));
+	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("C", { B1, B2 })));
 
 	auto C_mro_ = C->mro();
 	ASSERT_TRUE(C_mro_.is_ok());
@@ -50,14 +55,10 @@ TEST(PyType, InheritanceTriangle)
 TEST(PyType, InheritanceDiamond)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *A = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "A", .__bases__ = PyTuple::create(object()).unwrap() }));
-	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "B1", .__bases__ = PyTuple::create(A).unwrap() }));
-	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "B2", .__bases__ = PyTuple::create(A).unwrap() }));
-	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(
-		new TypePrototype{ .__name__ = "C", .__bases__ = PyTuple::create(B1, B2).unwrap() }));
+	PyType *A = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("A", { object() })));
+	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B1", { A })));
+	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B2", { A })));
+	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("C", { B1, B2 })));
 
 	auto C_mro_ = C->mro();
 	ASSERT_TRUE(C_mro_.is_ok());

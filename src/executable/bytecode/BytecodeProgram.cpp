@@ -198,8 +198,10 @@ PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 	}
 	if (auto it = std::find_if(m_functions.begin(),
 			m_functions.end(),
-			[&function_name](
-				const auto &f) { return f->function()->function_name() == function_name; });
+			[&function_name](const auto &f) {
+				ASSERT(f->function());
+				return f->function()->function_name() == function_name;
+			});
 		it != m_functions.end()) {
 		auto *code = *it;
 		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);

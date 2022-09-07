@@ -46,6 +46,13 @@ bool descriptor_is_data(const PyObject *obj)
 }
 }// namespace
 
+void TypePrototype::visit_graph(::Cell::Visitor &visitor)
+{
+	if (__class__) { visitor.visit(*__class__); }
+	if (__dict__) { visitor.visit(*__dict__); }
+	if (__mro__) { visitor.visit(*__mro__); }
+}
+
 size_t ValueHash::operator()(const Value &value) const
 {
 	// TODO: put these hash functions somewhere global so they can be reused by the respective
@@ -317,6 +324,13 @@ void PyObject::visit_graph(Visitor &visitor)
 {
 	visitor.visit(*this);
 	if (m_attributes) { visitor.visit(*m_attributes); }
+	if (std::holds_alternative<PyType *>(m_type)) {
+		if (auto *t = std::get<PyType *>(m_type)) { visitor.visit(*t); }
+	} else {
+		const_cast<TypePrototype &>(
+			std::get<std::reference_wrapper<const TypePrototype>>(m_type).get())
+			.visit_graph(visitor);
+	}
 }
 
 PyResult<PyMappingWrapper> PyObject::as_mapping()

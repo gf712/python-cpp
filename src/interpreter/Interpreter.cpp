@@ -242,3 +242,21 @@ PyResult<Value> Interpreter::get_object(const std::string &name)
 		return Ok(Value{ py_none() });
 	}();
 }
+
+void Interpreter::visit_graph(::Cell::Visitor &visitor)
+{
+	if (m_current_frame) {
+		visitor.visit(*m_current_frame);
+		auto *frame = m_current_frame;
+		while (frame) {
+			frame->code()->program()->visit_functions(visitor);
+			frame = frame->parent();
+		}
+	}
+	if (m_global_frame) visitor.visit(*m_global_frame);
+	if (m_modules) visitor.visit(*m_modules);
+	if (m_module) visitor.visit(*m_module);
+	if (m_builtins) visitor.visit(*m_builtins);
+	if (m_importlib) visitor.visit(*m_importlib);
+	if (m_import_func) visitor.visit(*m_import_func);
+}

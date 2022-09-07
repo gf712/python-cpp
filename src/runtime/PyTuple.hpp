@@ -6,7 +6,9 @@ namespace py {
 
 class PyTupleIterator;
 
-class PyTuple : public PyBaseObject, PySequence
+class PyTuple
+	: public PyBaseObject
+	, PySequence
 {
 	friend class ::Heap;
 	friend class PyTupleIterator;
@@ -23,6 +25,7 @@ class PyTuple : public PyBaseObject, PySequence
   public:
 	static PyResult<PyTuple *> create();
 	static PyResult<PyTuple *> create(std::vector<Value> &&elements);
+	static PyResult<PyTuple *> create(std::vector<PyObject *> &&elements);
 	static PyResult<PyTuple *> create(const std::vector<PyObject *> &elements);
 	template<typename... Args> static PyResult<PyTuple *> create(Args &&...args)
 	{

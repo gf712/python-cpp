@@ -49,8 +49,12 @@ void Block::reset()
 
 uint8_t *Block::allocate()
 {
-	for (auto &chunk : m_chunks) {
-		if (auto *ptr = chunk.allocate()) { return ptr; }
+	for (size_t idx = 0; auto &chunk : m_chunks) {
+		if (auto *ptr = chunk.allocate()) {
+			spdlog::trace("Allocated pointer in chunk {} (block size={})", idx, object_size());
+			return ptr;
+		}
+		++idx;
 	}
 
 	spdlog::debug("Need to allocate more chunks");

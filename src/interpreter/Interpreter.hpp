@@ -89,6 +89,8 @@ class Interpreter
 	py::PyResult<py::PyObject *>
 		call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
 
+	void visit_graph(::Cell::Visitor &);
+
   private:
 	void internal_setup(const std::string &name,
 		std::string entry_script,

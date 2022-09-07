@@ -16,6 +16,7 @@ class PyType : public PyBaseObject
 
   public:
 	PyTuple *__mro__{ nullptr };
+	PyTuple *__bases__{ nullptr };
 
   private:
 	PyType(TypePrototype &type_prototype);

@@ -92,17 +92,17 @@ namespace {
 			return Err(import_error("attempted relative import with no known parent package"));
 		}
 
+		const auto &package_str = as<PyString>(package)->value();
+
 		for (size_t level_up = 1; level_up < level; level_up++) {
-			const auto &package_str = as<PyString>(package)->value();
-			auto pos = package_str.find_last_of('.', last_dot);
+			const auto pos = package_str.find_last_of('.', last_dot);
 			if (pos == std::string::npos) {
 				return Err(import_error("attempted relative import beyond top-level package"));
 			}
 			last_dot = pos;
 		}
 
-		const auto &package_str = as<PyString>(package)->value();
-		auto base_ = PyString::create(package_str.substr(last_dot));
+		auto base_ = PyString::create(package_str.substr(0, last_dot));
 		if (base_.is_err()) return base_;
 		auto *base = base_.unwrap();
 		if (base->size() == 0) { return Ok(base); }
@@ -236,7 +236,7 @@ PyResult<PyObject *> import_module_level_object(PyString *name,
 	}();
 
 	if (module.is_err()) {
-		spdlog::error("{}", module.unwrap_err()->to_string());
+		spdlog::error("{}", module.unwrap_err()->format_traceback());
 		TODO();
 	}
 
@@ -251,6 +251,8 @@ PyResult<PyModule *> import_frozen_module(PyString *name)
 
 	const auto &serialised_code = frozen_module->get().code;
 	std::shared_ptr<Program> program = BytecodeProgram::deserialize(serialised_code);
+
+	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
 	if (!program) { return Err(import_error("TODO")); }
 
@@ -283,6 +285,7 @@ PyResult<PyModule *> import_frozen_module(PyString *name)
 
 	if (result.is_err()) {
 		remove_module(name);
+		spdlog::error("{}", result.unwrap_err()->to_string());
 		TODO();
 		return Err(import_error("TODO"));
 	}

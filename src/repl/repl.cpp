@@ -69,13 +69,14 @@ namespace {
 
 void initialize_types()
 {
-	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-
+	[[maybe_unused]] auto scope_static_alloc =
+		VirtualMachine::the().heap().scoped_static_allocation();
 	type();
 	bool_();
 	bytes();
 	ellipsis();
 	str();
+	str_iterator();
 	float_();
 	integer();
 	none();
@@ -84,23 +85,38 @@ void initialize_types()
 	dict();
 	dict_items();
 	dict_items_iterator();
+	dict_keys();
+	dict_key_iterator();
+	dict_values();
+	dict_value_iterator();
 	list();
 	list_iterator();
 	tuple();
 	tuple_iterator();
+	set();
+	set_iterator();
 	range();
 	range_iterator();
+	slice();
 	function();
 	native_function();
+	llvm_function();
 	code();
 	cell();
 	builtin_method();
 	slot_wrapper();
 	bound_method();
 	method_wrapper();
+	classmethod_descriptor();
+	getset_descriptor();
 	static_method();
 	property();
 	classmethod();
+	member_descriptor();
+	traceback();
+	not_implemented();
+	frame();
+	namespace_();
 }
 
 
@@ -109,7 +125,8 @@ int run_and_execute_script(int argc,
 	bool print_bytecode,
 	bool print_tokens,
 	bool use_llvm,
-	bool print_ast)
+	bool print_ast,
+	uint64_t gc_frequency)
 {
 	size_t arg_idx{ 1 };
 	const char *filename = argv[arg_idx];
@@ -118,6 +135,7 @@ int run_and_execute_script(int argc,
 	while (arg_idx < argc) { argv_vector.emplace_back(argv[arg_idx++]); }
 
 	auto &vm = VirtualMachine::the();
+	vm.heap().garbage_collector().set_frequency(gc_frequency);
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
 	if (print_tokens) {
 		auto l = Lexer::create(std::filesystem::absolute(filename));
@@ -197,6 +215,9 @@ int main(int argc, char **argv)
 		("d,debug", "Enable debug logging", cxxopts::value<bool>()->default_value("false"))
 		("trace", "Enable trace logging", cxxopts::value<bool>()->default_value("false"))
 		("use-llvm", "Enable trace logging", cxxopts::value<bool>()->default_value("false"))
+		("gc-frequency",
+		 "Frequency at which the garbage collector is run. Unit is number of allocations",
+		 cxxopts::value<uint64_t>()->default_value("10000"))
 		("h,help", "Print usage");
 	options
 		.positional_help("[optional args]")
@@ -224,7 +245,8 @@ int main(int argc, char **argv)
 			result["bytecode"].as<bool>(),
 			result["tokenize"].as<bool>(),
 			result["use-llvm"].as<bool>(),
-			result["ast"].as<bool>());
+			result["ast"].as<bool>(),
+			result["gc-frequency"].as<uint64_t>());
 	}
 
 	if (result.count("m")) {

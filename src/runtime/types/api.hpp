@@ -26,9 +26,7 @@ template<typename T> struct klass
 		klass(PyModule *module, std::string_view name, BaseType &&...bases)
 		: type(TypePrototype::create<T>(name)), m_module(module)
 	{
-		auto bases_ = PyTuple::create(bases...);
-		if (bases_.is_err()) { TODO(); }
-		type->__bases__ = bases_.unwrap();
+		type->__bases__ = std::vector<PyObject *>{ bases... };
 	}
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
@@ -38,9 +36,7 @@ template<typename T> struct klass
 		klass(std::string_view name, BaseType &&...bases)
 		: type(TypePrototype::create<T>(name))
 	{
-		auto bases_ = PyTuple::create(bases...);
-		if (bases_.is_err()) { TODO(); }
-		type->__bases__ = bases_.unwrap();
+		type->__bases__ = std::vector<PyObject *>{ bases... };
 	}
 
 	using AttributeGetterType = std::function<PyObject *(T *)>;
@@ -277,6 +273,7 @@ template<typename T> struct klass
 	PyType *finalize()
 	{
 		auto *type_ = PyType::initialize(std::move(type));
+		spdlog::trace("Added type@{} with name {}", (void *)type_, type_->name());
 		auto name = PyString::create(type_->name());
 		if (name.is_err()) { TODO(); }
 		m_module->add_symbol(name.unwrap(), type_);

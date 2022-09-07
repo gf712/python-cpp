@@ -253,7 +253,7 @@ struct TypePrototype
 	PyDict *__dict__{ nullptr };
 
 	PyTuple *__mro__{ nullptr };
-	PyTuple *__bases__{ nullptr };
+	std::vector<PyObject *> __bases__;
 	std::optional<TraverseFunctionType> traverse;
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
@@ -261,6 +261,8 @@ struct TypePrototype
 	void add_member(MemberDefinition &&member) { __members__.push_back(std::move(member)); }
 	void add_property(PropertyDefinition &&property) { __getset__.push_back(std::move(property)); }
 	void add_method(MethodDefinition &&method) { __methods__.push_back(std::move(method)); }
+
+	void visit_graph(::Cell::Visitor &visitor);
 };
 
 namespace {

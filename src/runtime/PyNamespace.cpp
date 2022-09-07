@@ -82,6 +82,7 @@ PyResult<PyObject *> PyNamespace::__lt__(const PyObject *obj) const
 
 void PyNamespace::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	if (m_dict) visitor.visit(*m_dict);
 }
 

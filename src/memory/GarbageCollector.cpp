@@ -14,7 +14,7 @@
 
 using namespace py;
 
-MarkSweepGC::MarkSweepGC() : GarbageCollector() { set_frequency(10000); }
+MarkSweepGC::MarkSweepGC() : GarbageCollector() { set_frequency(10'000); }
 
 std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 {
@@ -62,11 +62,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	}
 
 	if (VirtualMachine::the().has_interpreter()) {
-		const auto &interpreter = VirtualMachine::the().interpreter();
-		auto *execution_frame = interpreter.execution_frame();
-		if (execution_frame) { roots.insert(execution_frame); }
-		ASSERT(interpreter.modules())
-		roots.insert(interpreter.modules());
+		auto &interpreter = VirtualMachine::the().interpreter();
 		struct AddRoot : Cell::Visitor
 		{
 			std::unordered_set<Cell *> &roots_;
@@ -77,9 +73,7 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 				roots_.insert(&cell);
 			}
 		} visitor{ roots };
-		if (interpreter.execution_frame()) {
-			interpreter.execution_frame()->code()->program()->visit_functions(visitor);
-		}
+		interpreter.visit_graph(visitor);
 	}
 	return roots;
 }
@@ -89,8 +83,6 @@ struct MarkGCVisitor : Cell::Visitor
 	std::unordered_set<Cell *> m_visited;
 	void visit(Cell &cell)
 	{
-		// FIXME: due to the current awkward situation with static memory
-		// 		  it can happen that
 		if (m_visited.contains(&cell)) return;
 		m_visited.insert(&cell);
 

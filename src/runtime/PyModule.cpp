@@ -19,9 +19,12 @@
 using namespace py;
 
 PyModule::PyModule(PyDict *symbol_table, PyString *module_name, PyObject *doc)
-	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(module_name), m_doc(doc),
-	  m_package(PyString::create("").unwrap()), m_loader(py_none()), m_spec(py_none())
+	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(module_name), m_doc(doc)
 {
+	m_package = PyString::create("").unwrap();
+	m_loader = py_none();
+	m_spec = py_none();
+
 	m_attributes = symbol_table;
 	m_dict = m_attributes;
 	m_attributes->insert(String{ "__name__" }, m_module_name);
@@ -33,11 +36,15 @@ PyModule::PyModule(PyDict *symbol_table, PyString *module_name, PyObject *doc)
 
 PyResult<PyObject *> PyModule::__repr__() const
 {
-	auto module_repr = VirtualMachine::the().interpreter().importlib()->get_method(
-		PyString::create("_module_repr").unwrap());
-	return module_repr.and_then([this](PyObject *obj) {
-		return obj->call(PyTuple::create(const_cast<PyModule *>(this)).unwrap(), nullptr);
-	});
+	if (VirtualMachine::the().interpreter().importlib()) {
+		auto module_repr = VirtualMachine::the().interpreter().importlib()->get_method(
+			PyString::create("_module_repr").unwrap());
+		return module_repr.and_then([this](PyObject *obj) {
+			return obj->call(PyTuple::create(const_cast<PyModule *>(this)).unwrap(), nullptr);
+		});
+	} else {
+		return PyString::create(fmt::format("<module {}>", m_module_name->value()));
+	}
 }
 
 PyResult<PyObject *> PyModule::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -144,6 +151,7 @@ void PyModule::visit_graph(Visitor &visitor)
 	if (m_package) visitor.visit(*m_package);
 	if (m_loader) visitor.visit(*m_loader);
 	if (m_spec) visitor.visit(*m_spec);
+	if (m_program) { m_program->visit_functions(visitor); }
 }
 
 std::string PyModule::to_string() const

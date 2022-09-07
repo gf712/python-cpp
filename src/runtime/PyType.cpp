@@ -159,7 +159,8 @@ std::vector<PyObject *> mro_(PyType *type)
 
 	std::vector<std::vector<PyObject *>> bases_mro;
 
-	for (const auto &base : type->underlying_type().__bases__->elements()) {
+	ASSERT(type->__bases__)
+	for (const auto &base : type->__bases__->elements()) {
 		if (auto *precomputed_mro =
 				static_cast<PyType *>(std::get<PyObject *>(base))->underlying_type().__mro__) {
 			std::vector<PyObject *> base_mro;
@@ -202,15 +203,14 @@ PyType *PyType::type() const
 
 PyType *PyType::initialize(TypePrototype &type_prototype)
 {
-	auto *type = VirtualMachine::the().heap().allocate_static<PyType>(type_prototype).get();
+	auto *type = VirtualMachine::the().heap().allocate<PyType>(type_prototype);
 	type->initialize(nullptr);
 	return type;
 }
 
 PyType *PyType::initialize(std::unique_ptr<TypePrototype> &&type_prototype)
 {
-	auto *type =
-		VirtualMachine::the().heap().allocate_static<PyType>(std::move(type_prototype)).get();
+	auto *type = VirtualMachine::the().heap().allocate<PyType>(std::move(type_prototype));
 	type->initialize(nullptr);
 	return type;
 }
@@ -233,8 +233,7 @@ namespace {
 						TODO();
 					})
 				.property_readonly("__dict__", [](PyType *self) { return self->dict(); })
-				.property_readonly(
-					"__bases__", [](PyType *self) { return self->underlying_type().__bases__; })
+				.property_readonly("__bases__", [](PyType *self) { return self->__bases__; })
 				.type);
 	}
 }// namespace
@@ -403,10 +402,6 @@ namespace {
 
 void PyType::initialize(PyDict *ns)
 {
-	// FIXME: this a hack to extend the lifetime of all objects owned by types, which *can* be
-	// static (i.e. builtin types) and not visited by the garbage collector
-	[[maybe_unused]] auto scope_static_alloc =
-		VirtualMachine::the().heap().scoped_static_allocation();
 	underlying_type().__class__ = this;
 	auto dict = PyDict::create();
 	if (dict.is_err()) { TODO(); }
@@ -414,27 +409,36 @@ void PyType::initialize(PyDict *ns)
 	// m_attributes should be a "mappingproxy" object, not dict for PyType
 	m_attributes = underlying_type().__dict__;
 
-	if (!underlying_type().__bases__) {
-		// not ideal, but avoids recursively calling object()
-		if (underlying_type().__name__ == "object") {
-			auto bases = PyTuple::create();
-			if (bases.is_err()) { TODO(); }
-			underlying_type().__bases__ = static_cast<PyTuple *>(bases.unwrap());
+	if (!__bases__) {
+		if (underlying_type().__bases__.empty()) {
+			// not ideal, but avoids recursively calling object()
+			if (underlying_type().__name__ == "object") {
+				auto bases = PyTuple::create();
+				if (bases.is_err()) { TODO(); }
+				__bases__ = bases.unwrap();
+			} else {
+				auto bases = PyTuple::create(object());
+				if (bases.is_err()) { TODO(); }
+				__bases__ = bases.unwrap();
+			}
 		} else {
-			auto bases = PyTuple::create(object());
+			auto b = underlying_type().__bases__;
+			b.push_back(object());
+			auto bases = PyTuple::create(std::move(b));
 			if (bases.is_err()) { TODO(); }
-			underlying_type().__bases__ = static_cast<PyTuple *>(bases.unwrap());
+			__bases__ = bases.unwrap();
 		}
 	}
+
 	// not ideal, but avoids recursively calling object()
 	if (underlying_type().__name__ == "object") {
 		auto mro = PyTuple::create(this);
 		if (mro.is_err()) { TODO(); }
-		underlying_type().__mro__ = static_cast<PyTuple *>(mro.unwrap());
+		underlying_type().__mro__ = mro.unwrap();
 	} else {
 		auto mro = mro_internal();
 		if (mro.is_err()) { TODO(); }
-		underlying_type().__mro__ = static_cast<PyTuple *>(mro.unwrap());
+		underlying_type().__mro__ = mro.unwrap();
 	}
 
 	__mro__ = underlying_type().__mro__;
@@ -567,8 +571,8 @@ void PyType::initialize(PyDict *ns)
 				},
 				this);
 			if (fn.is_err()) { TODO(); }
-			auto new_fn = PyStaticMethod::create(static_cast<PyString *>(name.unwrap()),
-				static_cast<PyNativeFunction *>(fn.unwrap()));
+			auto new_fn =
+				PyStaticMethod::create(name.unwrap(), static_cast<PyNativeFunction *>(fn.unwrap()));
 			ASSERT(new_fn.is_ok())
 			underlying_type().__dict__->insert(String{ "__new__" }, new_fn.unwrap());
 		} else {
@@ -579,17 +583,15 @@ void PyType::initialize(PyDict *ns)
 	for (auto member : underlying_type().__members__) {
 		auto name = PyString::create(member.name);
 		if (name.is_err()) { TODO(); }
-		auto m = PyMemberDescriptor::create(static_cast<PyString *>(name.unwrap()),
-			this,
-			member.member_accessor,
-			member.member_setter);
+		auto m = PyMemberDescriptor::create(
+			name.unwrap(), this, member.member_accessor, member.member_setter);
 		ASSERT(m.is_ok())
 		underlying_type().__dict__->insert(String{ member.name }, m.unwrap());
 	}
 	for (auto &property : underlying_type().__getset__) {
 		auto name = PyString::create(property.name);
 		if (name.is_err()) { TODO(); }
-		auto m = PyGetSetDescriptor::create(static_cast<PyString *>(name.unwrap()), this, property);
+		auto m = PyGetSetDescriptor::create(name.unwrap(), this, property);
 		ASSERT(m.is_ok())
 		underlying_type().__dict__->insert(String{ property.name }, m.unwrap());
 	}
@@ -694,9 +696,11 @@ PyResult<PyType *> PyType::build_type(PyString *type_name, PyTuple *bases, PyDic
 	auto *type = VirtualMachine::the().heap().allocate<PyType>(std::move(new_type_prototype));
 	if (!type) { return Err(memory_error(sizeof(PyType))); }
 	type->underlying_type().__name__ = type_name->value();
-	type->underlying_type().__bases__ = bases;
+	type->__bases__ = bases;
 	type->underlying_type().__mro__ = nullptr;
 	type->initialize(ns);
+
+	spdlog::trace("Created type@{} #{}", (void *)type, type->name());
 
 	return Ok(type);
 }
@@ -843,10 +847,10 @@ void PyType::visit_graph(Visitor &visitor)
 
 	if (underlying_type().__dict__) { visitor.visit(*underlying_type().__dict__); }
 
-	if (underlying_type().__mro__) { visitor.visit(*underlying_type().__mro__); }
-
-	if (underlying_type().__bases__) { visitor.visit(*underlying_type().__bases__); }
-
 	if (underlying_type().__class__) { visitor.visit(*underlying_type().__class__); }
+
+	if (__bases__) { visitor.visit(*__bases__); }
+
+	if (__mro__) { visitor.visit(*__mro__); }
 }
 }// namespace py

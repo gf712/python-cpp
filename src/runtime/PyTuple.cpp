@@ -36,6 +36,16 @@ namespace {
 		result.insert(result.end(), elements.begin(), elements.end());
 		return result;
 	}
+
+	std::vector<Value> make_value_vector(std::vector<PyObject *> &&elements)
+	{
+		ASSERT(std::all_of(
+			elements.begin(), elements.end(), [](const auto &el) { return el != nullptr; }));
+		std::vector<Value> result;
+		result.reserve(elements.size());
+		result.insert(result.end(), elements.begin(), elements.end());
+		return result;
+	}
 }// namespace
 
 PyTuple::PyTuple(std::vector<Value> &&elements)
@@ -69,6 +79,15 @@ PyResult<PyTuple *> PyTuple::create(const std::vector<PyObject *> &elements)
 {
 	auto &heap = VirtualMachine::the().heap();
 	if (auto *obj = heap.allocate<PyTuple>(elements)) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
+}
+
+PyResult<PyTuple *> PyTuple::create(std::vector<PyObject *> &&elements)
+{
+	auto &heap = VirtualMachine::the().heap();
+	if (auto *obj = heap.allocate<PyTuple>(make_value_vector(std::move(elements)))) {
+		return Ok(obj);
+	}
 	return Err(memory_error(sizeof(PyTuple)));
 }
 
@@ -280,6 +299,7 @@ PyResult<PyObject *> PyTupleIterator::operator*() const
 
 void PyTupleIterator::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	const_cast<PyTuple &>(m_pytuple).visit_graph(visitor);
 }
 

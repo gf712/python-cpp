@@ -138,6 +138,8 @@ void PyCode::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	if (m_consts) { visitor.visit(*const_cast<PyTuple *>(m_consts)); }
+	if (m_lnotab) { visitor.visit(*m_lnotab); }
+	m_program->visit_functions(visitor);
 }
 
 PyObject *PyCode::make_function(const std::string &function_name,

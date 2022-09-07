@@ -330,8 +330,8 @@ PyModule *sys_module(Interpreter &interpreter)
 	implementation->insert(String{ "hexversion" }, Number{ 0x03090000 });
 	implementation->insert(String{ "_multiarch" }, String{ "x86_64-linux-gnu" });
 
-	s_sys_module->add_symbol(
-		PyString::create("implementation").unwrap(), PyNamespace::create(implementation).unwrap());
+	auto *implementation_ns = PyNamespace::create(implementation).unwrap();
+	s_sys_module->add_symbol(PyString::create("implementation").unwrap(), implementation_ns);
 
 	s_sys_module->add_symbol(PyString::create("version_info").unwrap(), version);
 

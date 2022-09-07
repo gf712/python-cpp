@@ -98,10 +98,10 @@ class PyDictKeys : public PyBaseObject
 
 	const PyDict &m_pydict;
 
+	PyDictKeys(const PyDict &pydict);
+
   public:
 	static PyResult<PyDictKeys *> create(const PyDict &pydict);
-
-	PyDictKeys(const PyDict &pydict);
 
 	PyDictKeyIterator begin() const;
 	PyDictKeyIterator end() const;
@@ -124,10 +124,10 @@ class PyDictValues : public PyBaseObject
 
 	const PyDict &m_pydict;
 
+	PyDictValues(const PyDict &pydict);
+
   public:
 	static PyResult<PyDictValues *> create(const PyDict &pydict);
-
-	PyDictValues(const PyDict &pydict);
 
 	PyDictValueIterator begin() const;
 	PyDictValueIterator end() const;
@@ -149,16 +149,15 @@ class PyDictItemsIterator : public PyBaseObject
 	const PyDictItems &m_pydictitems;
 	PyDict::MapType::const_iterator m_current_iterator;
 
+	PyDictItemsIterator(const PyDictItems &pydict_items);
+	PyDictItemsIterator(const PyDictItems &pydict_items, size_t position);
+
   public:
 	using difference_type = PyDict::MapType::difference_type;
 	using value_type = PyTuple *;
 	using pointer = value_type *;
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
-
-	PyDictItemsIterator(const PyDictItems &pydict_items);
-
-	PyDictItemsIterator(const PyDictItems &pydict_items, size_t position);
 
 	static PyResult<PyDictItemsIterator *> create(const PyDictItems &pydict_items);
 	static PyResult<PyDictItemsIterator *> create(const PyDictItems &pydict_items, size_t position);
@@ -183,9 +182,13 @@ class PyDictKeyIterator : public PyBaseObject
 {
 	friend class ::Heap;
 	friend PyDictItems;
+	friend PyDictKeys;
 
 	const PyDictKeys &m_pydictkeys;
 	PyDict::MapType::const_iterator m_current_iterator;
+
+	PyDictKeyIterator(const PyDictKeys &pydict_keys);
+	PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position);
 
   public:
 	using difference_type = PyDict::MapType::difference_type;
@@ -193,10 +196,6 @@ class PyDictKeyIterator : public PyBaseObject
 	using pointer = value_type *;
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
-
-	PyDictKeyIterator(const PyDictKeys &pydict_keys);
-
-	PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position);
 
 	static PyResult<PyDictKeyIterator *> create(const PyDictKeys &pydict_keys);
 	static PyResult<PyDictKeyIterator *> create(const PyDictKeys &pydict_keys, size_t position);
@@ -220,9 +219,13 @@ class PyDictValueIterator : public PyBaseObject
 {
 	friend class ::Heap;
 	friend PyDictItems;
+	friend PyDictValues;
 
 	const PyDictValues &m_pydictvalues;
 	PyDict::MapType::const_iterator m_current_iterator;
+
+	PyDictValueIterator(const PyDictValues &pydict_values);
+	PyDictValueIterator(const PyDictValues &pydict_values, size_t position);
 
   public:
 	using difference_type = PyDict::MapType::difference_type;
@@ -230,10 +233,6 @@ class PyDictValueIterator : public PyBaseObject
 	using pointer = value_type *;
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
-
-	PyDictValueIterator(const PyDictValues &pydict_values);
-
-	PyDictValueIterator(const PyDictValues &pydict_values, size_t position);
 
 	static PyResult<PyDictValueIterator *> create(const PyDictValues &pydict_values);
 	static PyResult<PyDictValueIterator *> create(const PyDictValues &pydict_values,

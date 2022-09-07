@@ -48,6 +48,7 @@ PyType *RuntimeError::register_type(PyModule *module)
 	} else {
 		module->add_symbol(PyString::create("RuntimeError").unwrap(), s_runtime_error);
 	}
+	spdlog::trace("RuntimeError type @{}", (void *)s_runtime_error);
 	return s_runtime_error;
 }
 
