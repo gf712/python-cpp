@@ -587,6 +587,14 @@ Value *VariablesResolver::visit(const Comprehension *node)
 		auto name = std::static_pointer_cast<Name>(node->target());
 		ASSERT(name->ids().size() == 1)
 		m_current_scope->get().visibility[name->ids()[0]] = Visibility::LOCAL;
+	} else if (auto target = as<Tuple>(node->target())) {
+		for (const auto &el : target->elements()) {
+			ASSERT(el->node_type() == ASTNodeType::Name);
+			ASSERT(as<Name>(el)->ids().size() == 1);
+			m_current_scope->get().visibility[as<Name>(el)->ids()[0]] = Visibility::LOCAL;
+		}
+	} else {
+		TODO();
 	}
 
 	for (auto &if_ : node->ifs()) { if_->codegen(this); }

@@ -2084,9 +2084,32 @@ std::tuple<std::shared_ptr<Label>, std::shared_ptr<Label>, BytecodeValue *>
 		const auto name = std::static_pointer_cast<Name>(node->target());
 		ASSERT(name->ids().size() == 1)
 		store_name(name->ids()[0], dst);
+	} else if (auto target = as<Tuple>(node->target())) {
+		std::vector<Register> unpack_dst;
+		std::vector<BytecodeValue *> values;
+		std::vector<std::string> names;
+		unpack_dst.reserve(target->elements().size());
+		values.reserve(target->elements().size());
+		names.reserve(target->elements().size());
+
+		for (const auto &el : target->elements()) {
+			ASSERT(el->node_type() == ASTNodeType::Name);
+			ASSERT(as<Name>(el)->ids().size() == 1);
+
+			names.push_back(as<Name>(el)->ids()[0]);
+			values.push_back(create_value(names.back()));
+			unpack_dst.push_back(values.back()->get_register());
+		}
+		emit<UnpackSequence>(unpack_dst, dst->get_register());
+
+		for (auto name_it = names.begin(); const auto &v : values) {
+			store_name(*name_it, v);
+			++name_it;
+		}
 	} else {
 		TODO();
 	}
+
 	for (const auto &if_ : node->ifs()) {
 		auto *result = generate(if_.get(), m_function_id);
 		ASSERT(result);
