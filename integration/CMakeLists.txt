@@ -12,8 +12,8 @@ add_custom_target(
           && echo "Running python scripts:"
           && echo "------------------------"
           && echo ""
-          && $<TARGET_FILE:python> ${PROJECT_SOURCE_DIR}/integration/fibonacci/main.py
-          && $<TARGET_FILE:python> ${PROJECT_SOURCE_DIR}/integration/mandelbrot/mandelbrot.py
+          && $<TARGET_FILE:python> ${PROJECT_SOURCE_DIR}/integration/fibonacci/main.py --gc-frequency 1
+          && $<TARGET_FILE:python> ${PROJECT_SOURCE_DIR}/integration/mandelbrot/mandelbrot.py  --gc-frequency 1
           && ${PROJECT_SOURCE_DIR}/integration/run_python_tests.sh $<TARGET_FILE:python>
           && echo ""
           && echo "------------------------"
