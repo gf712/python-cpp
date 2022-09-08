@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Exception.hpp"
+#include "ImportError.hpp"
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
@@ -8,7 +9,7 @@
 
 namespace py {
 
-class ModuleNotFoundError : public Exception
+class ModuleNotFoundError : public ImportError
 {
 	friend class ::Heap;
 	template<typename... Args>

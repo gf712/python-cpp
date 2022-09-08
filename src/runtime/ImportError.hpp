@@ -11,7 +11,10 @@ class ImportError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *import_error(const std::string &message, Args &&... args);
+	friend BaseException *import_error(const std::string &message, Args &&...args);
+
+  protected:
+	ImportError(PyType *, PyTuple *args);
 
   private:
 	ImportError(PyTuple *args);
@@ -27,12 +30,14 @@ class ImportError : public Exception
 
 	static PyType *register_type(PyModule *);
 
+	static PyType* static_type();
+
 	PyType *type() const override;
 };
 
 
 template<typename... Args>
-inline BaseException *import_error(const std::string &message, Args &&... args)
+inline BaseException *import_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())
