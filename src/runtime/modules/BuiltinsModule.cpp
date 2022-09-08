@@ -605,30 +605,6 @@ PyResult<PyObject *> max(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	}
 }
 
-PyResult<PyObject *> staticmethod(const PyTuple *args, const PyDict *kwargs, Interpreter &)
-{
-	if (args->size() != 1) {
-		return Err(
-			type_error("staticmethod() takes exactly one argument ({} given)", args->size()));
-	}
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("staticmethod() takes no keyword arguments"));
-	}
-
-	auto object_ = PyObject::from(args->elements()[0]);
-	if (object_.is_err()) return object_;
-	auto *function = object_.unwrap();
-
-	ASSERT(as<PyFunction>(function))
-
-	if (auto result = PyStaticMethod::create(as<PyFunction>(function)->function_name(), function);
-		result.is_ok()) {
-		return Ok(static_cast<PyObject *>(result.unwrap()));
-	} else {
-		return Err(result.unwrap_err());
-	}
-}
-
 PyResult<PyObject *> isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
 	if (args->size() != 2) {
@@ -894,6 +870,7 @@ auto builtin_types()
 		range(),
 		set(),
 		property(),
+		static_method(),
 		classmethod(),
 		slice() };
 }
@@ -1049,12 +1026,6 @@ PyModule *builtins_module(Interpreter &interpreter)
 		heap.allocate<PyNativeFunction>("setattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return setattr(args, kwargs, interpreter);
 		}));
-
-	s_builtin_module->add_symbol(PyString::create("staticmethod").unwrap(),
-		heap.allocate<PyNativeFunction>(
-			"staticmethod", [&interpreter](PyTuple *args, PyDict *kwargs) {
-				return staticmethod(args, kwargs, interpreter);
-			}));
 
 	s_builtin_module->add_symbol(PyString::create("exec").unwrap(),
 		heap.allocate<PyNativeFunction>("exec", [&interpreter](PyTuple *args, PyDict *kwargs) {

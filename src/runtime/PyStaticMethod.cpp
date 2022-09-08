@@ -10,25 +10,22 @@
 
 using namespace py;
 
-std::string PyStaticMethod::to_string() const
+PyResult<PyObject *> PyStaticMethod::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
-	if (m_underlying_type) {
-		return fmt::format(
-			"<staticmethod '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
-	} else {
-		return fmt::format("<staticmethod at {}>", static_cast<const void *>(this));
-	}
+	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(args && args->elements().size() == 1);
+
+	return PyObject::from(args->elements()[0]).and_then([](PyObject *function) {
+		return PyStaticMethod::create(function);
+	});
 }
 
 void PyStaticMethod::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*m_name);
 	if (m_underlying_type) { visitor.visit(*m_underlying_type); }
 	if (m_static_method) { visitor.visit(*m_static_method); }
 }
-
-PyResult<PyObject *> PyStaticMethod::__repr__() const { return PyString::create(to_string()); }
 
 PyResult<PyObject *> PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
 {
@@ -36,15 +33,14 @@ PyResult<PyObject *> PyStaticMethod::call_static_method(PyTuple *args, PyDict *k
 	return m_static_method->call(args, kwargs);
 }
 
-PyStaticMethod::PyStaticMethod(PyString *name, PyType *underlying_type, PyObject *function)
-	: PyBaseObject(BuiltinTypes::the().static_method()), m_name(std::move(name)),
-	  m_underlying_type(underlying_type), m_static_method(function)
+PyStaticMethod::PyStaticMethod(PyType *underlying_type, PyObject *function)
+	: PyBaseObject(BuiltinTypes::the().static_method()), m_underlying_type(underlying_type),
+	  m_static_method(function)
 {}
 
-
-PyResult<PyStaticMethod *> PyStaticMethod::create(PyString *name, PyObject *function)
+PyResult<PyStaticMethod *> PyStaticMethod::create(PyObject *function)
 {
-	auto result = VirtualMachine::the().heap().allocate<PyStaticMethod>(name, nullptr, function);
+	auto result = VirtualMachine::the().heap().allocate<PyStaticMethod>(nullptr, function);
 	if (!result) { return Err(memory_error(sizeof(PyStaticMethod))); }
 	return Ok(result);
 }
@@ -64,7 +60,7 @@ std::once_flag static_method_flag;
 
 std::unique_ptr<TypePrototype> register_static_method()
 {
-	return std::move(klass<PyStaticMethod>("static_method").type);
+	return std::move(klass<PyStaticMethod>("staticmethod").type);
 }
 }// namespace
 

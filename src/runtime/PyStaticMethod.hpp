@@ -6,23 +6,20 @@ namespace py {
 
 class PyStaticMethod : public PyBaseObject
 {
-	PyString *m_name;
 	PyType *m_underlying_type{ nullptr };
-	PyObject *m_static_method;
+	PyObject *m_static_method{ nullptr };
 
 	friend class ::Heap;
 
-	PyStaticMethod(PyString *name, PyType *underlying_type, PyObject *function);
+	PyStaticMethod(PyType *underlying_type, PyObject *function);
 
   public:
-	static PyResult<PyStaticMethod *> create(PyString *name, PyObject *function);
+	static PyResult<PyStaticMethod *> create(PyObject *function);
 
-	PyString *static_method_name() { return m_name; }
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	PyObject *static_method() { return m_static_method; }
 
-	std::string to_string() const override;
-
-	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __get__(PyObject *instance, PyObject *owner) const;
 	PyResult<PyObject *> call_static_method(PyTuple *args, PyDict *kwargs);
 

@@ -549,8 +549,6 @@ void PyType::initialize(PyDict *ns)
 		underlying_type().__dict__->insert(name, init_func);
 	}
 	if (underlying_type().__new__.has_value()) {
-		auto name = PyString::create("__new__");
-		if (name.is_err()) { TODO(); }
 		if (std::holds_alternative<NewSlotFunctionType>(*underlying_type().__new__)) {
 			auto fn = PyNativeFunction::create(
 				"__new__",
@@ -571,8 +569,7 @@ void PyType::initialize(PyDict *ns)
 				},
 				this);
 			if (fn.is_err()) { TODO(); }
-			auto new_fn =
-				PyStaticMethod::create(name.unwrap(), static_cast<PyNativeFunction *>(fn.unwrap()));
+			auto new_fn = PyStaticMethod::create(static_cast<PyNativeFunction *>(fn.unwrap()));
 			ASSERT(new_fn.is_ok())
 			underlying_type().__dict__->insert(String{ "__new__" }, new_fn.unwrap());
 		} else {
