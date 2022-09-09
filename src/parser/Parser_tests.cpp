@@ -201,6 +201,15 @@ void compare_return(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
+void compare_yield(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Yield);
+
+	const auto result_value = as<Yield>(result)->value();
+	const auto expected_value = as<Yield>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
 void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::If);
@@ -895,6 +904,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 		compare_return(result, expected);
 		break;
 	}
+	case ASTNodeType::Yield: {
+		compare_yield(result, expected);
+		break;
+	}
 	case ASTNodeType::If: {
 		compare_if(result, expected);
 		break;
@@ -1316,6 +1329,7 @@ TEST(Parser, BinaryOperationXor)
 
 	assert_generates_ast(program, expected_ast);
 }
+
 TEST(Parser, FunctionDefinition)
 {
 	constexpr std::string_view program =
@@ -3219,9 +3233,8 @@ TEST(Parser, LambdaWithNoArgs)
 		},
 		std::make_shared<Lambda>(
 			std::make_shared<Arguments>(
-				std::vector<std::shared_ptr<Argument>>{},
-				SourceLocation{}),// args
-			std::make_shared<Constant>(int64_t{1}, SourceLocation{}),
+				std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
+			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 			SourceLocation{}),
 		"",
 		SourceLocation{}));
@@ -3246,6 +3259,53 @@ TEST(Parser, LambdaWithNoDefaultArg)
 			std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}),
 			SourceLocation{}),
 		"",
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, Yield)
+{
+	constexpr std::string_view program =
+		"def gen():\n"
+		"   yield 1\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("gen",// function_name
+		std::make_shared<Arguments>(
+			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Yield>(
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}), SourceLocation{}),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		"",// type_comment
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, YieldMutipleValues)
+{
+	constexpr std::string_view program =
+		"def gen():\n"
+		"   yield 1, 2\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("gen",// function_name
+		std::make_shared<Arguments>(
+			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Yield>(
+				std::make_shared<Tuple>(
+					std::vector<std::shared_ptr<ASTNode>>{
+						std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+						std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
+					},
+					ContextType::LOAD, SourceLocation{}), SourceLocation{}),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		"",// type_comment
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);

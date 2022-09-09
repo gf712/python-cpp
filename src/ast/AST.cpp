@@ -83,6 +83,8 @@ void NodeVisitor::visit(AugAssign *node)
 
 void NodeVisitor::visit(Return *node) { dispatch(node->value().get()); }
 
+void NodeVisitor::visit(Yield *node) { dispatch(node->value().get()); }
+
 void NodeVisitor::visit(Argument *node)
 {
 	if (node->annotation()) dispatch(node->annotation().get());
@@ -411,6 +413,13 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_pt
 }
 
 std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Return> node)
+{
+	transform_single_node(node->value());
+
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Yield> node)
 {
 	transform_single_node(node->value());
 
@@ -892,6 +901,19 @@ void AugAssign::print_this_node(const std::string &indent) const
 void Return::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}Return [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	spdlog::debug("{}  - value:", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	m_value->print_node(new_indent);
+}
+
+void Yield::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Yield [{}:{}-{}:{}]",
 		indent,
 		source_location().start.row + 1,
 		source_location().start.column + 1,

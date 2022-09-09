@@ -474,6 +474,13 @@ ast::Value *LLVMGenerator::visit(const ast::Return *node)
 	return return_value;
 }
 
+ast::Value *LLVMGenerator::visit(const ast::Yield *node)
+{
+	(void)node;
+	TODO();
+	return nullptr;
+}
+
 ast::Value *LLVMGenerator::visit(const ast::Subscript *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Try *node) { TODO(); }

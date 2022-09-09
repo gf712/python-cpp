@@ -558,6 +558,15 @@ Value *VariablesResolver::visit(const Return *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const Yield *node)
+{
+	ASSERT(m_current_scope->get().type == Scope::Type::FUNCTION
+		   || m_current_scope->get().type == Scope::Type::CLOSURE)
+	m_current_scope->get().is_generator = true;
+	node->value()->codegen(this);
+	return nullptr;
+}
+
 Value *VariablesResolver::visit(const Starred *node)
 {
 	node->value()->codegen(this);

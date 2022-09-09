@@ -637,6 +637,11 @@ struct WithKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "with"; }
 };
 
+struct YieldKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "yield"; }
+};
+
 using ReservedKeywords = std::tuple<AndKeywordPattern,
 	AsKeywordPattern,
 	AssertKeywordPattern,
@@ -663,7 +668,8 @@ using ReservedKeywords = std::tuple<AndKeywordPattern,
 	ReturnPattern,
 	TryKeywordPattern,
 	WhileKeywordPattern,
-	WithKeywordPattern>;
+	WithKeywordPattern,
+	YieldKeywordPattern>;
 
 struct StarTargetPattern;
 
@@ -3735,7 +3741,38 @@ struct AugAssignPattern : Pattern<AugAssignPattern>
 
 struct YieldExpressionPattern : Pattern<YieldExpressionPattern>
 {
-	static bool matches_impl(Parser &) { return false; }
+	// yield_expr:
+	// 		| 'yield' 'from' expression
+	// 		| 'yield' [star_expressions]
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		const auto start = p.lexer().peek_token(p.token_position());
+
+		// 'yield' 'from' expression
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, YieldKeywordPattern>,
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			TODO();
+			return true;
+		}
+
+		// 'yield' [star_expressions]
+		using pattern2 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, YieldKeywordPattern>,
+			ZeroOrOnePattern<StarExpressionsPattern>>;
+		if (pattern2::match(p)) {
+			ASSERT(p.stack().size() == 1)
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
+			scope.parent().push_back(std::make_shared<Yield>(
+				p.pop_back(), SourceLocation{ start->start(), end->end() }));
+			return true;
+		}
+
+		return false;
+	}
 };
 
 
@@ -4281,6 +4318,22 @@ struct DeleteStatementPattern : Pattern<DeleteStatementPattern>
 	}
 };
 
+struct YieldStatementPattern : Pattern<YieldStatementPattern>
+{
+	// yield_stmt: yield_expr
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("yield_stmt");
+
+		using pattern1 = PatternMatch<YieldExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("yield_expr");
+			return true;
+		}
+		return false;
+	}
+};
+
 struct AssertStatementPattern : Pattern<AssertStatementPattern>
 {
 	// assert_stmt: 'assert' expression [',' expression ]
@@ -4457,6 +4510,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern7 = PatternMatch<DeleteStatementPattern>;
 		if (pattern7::match(p)) {
 			DEBUG_LOG("del_stmt");
+			return true;
+		}
+		using pattern8 = PatternMatch<YieldStatementPattern>;
+		if (pattern8::match(p)) {
+			DEBUG_LOG("yield_stmt");
 			return true;
 		}
 		using pattern9 = PatternMatch<AssertStatementPattern>;

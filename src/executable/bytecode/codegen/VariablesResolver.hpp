@@ -20,6 +20,9 @@ class VariablesResolver : public ast::CodeGenerator
 		std::vector<std::reference_wrapper<Scope>> children;
 		std::set<std::string> captures;
 		std::unordered_map<std::string, Visibility> visibility;
+		// this is beyond the scope of this class, but it is simple and cheap to check if a function
+		// is a generator at this stage
+		bool is_generator{ false };
 	};
 
 	using VisibilityMap = std::unordered_map<std::string, std::unique_ptr<Scope>>;
