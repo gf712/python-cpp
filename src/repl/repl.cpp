@@ -67,59 +67,6 @@ std::optional<std::string> getline(const std::string &prompt)
 
 namespace {
 
-void initialize_types()
-{
-	[[maybe_unused]] auto scope_static_alloc =
-		VirtualMachine::the().heap().scoped_static_allocation();
-	type();
-	bool_();
-	bytes();
-	ellipsis();
-	str();
-	str_iterator();
-	float_();
-	integer();
-	none();
-	module();
-	object();
-	dict();
-	dict_items();
-	dict_items_iterator();
-	dict_keys();
-	dict_key_iterator();
-	dict_values();
-	dict_value_iterator();
-	list();
-	list_iterator();
-	tuple();
-	tuple_iterator();
-	set();
-	set_iterator();
-	range();
-	range_iterator();
-	slice();
-	function();
-	native_function();
-	llvm_function();
-	code();
-	cell();
-	builtin_method();
-	slot_wrapper();
-	bound_method();
-	method_wrapper();
-	classmethod_descriptor();
-	getset_descriptor();
-	static_method();
-	property();
-	classmethod();
-	member_descriptor();
-	traceback();
-	not_implemented();
-	frame();
-	namespace_();
-}
-
-
 int run_and_execute_script(int argc,
 	char **argv,
 	bool print_bytecode,
@@ -136,6 +83,7 @@ int run_and_execute_script(int argc,
 
 	auto &vm = VirtualMachine::the();
 	vm.heap().garbage_collector().set_frequency(gc_frequency);
+	initialize_types();
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
 	if (print_tokens) {
 		auto l = Lexer::create(std::filesystem::absolute(filename));
@@ -155,7 +103,6 @@ int run_and_execute_script(int argc,
 		p.module()->print_node("");
 		spdlog::set_level(lvl);
 	}
-	initialize_types();
 	std::shared_ptr<Program> bytecode = codegen::BytecodeGenerator::compile(
 		p.module(), argv_vector, compiler::OptimizationLevel::None);
 

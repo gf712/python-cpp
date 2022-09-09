@@ -14,6 +14,7 @@
 #include "runtime/Value.hpp"
 #include "runtime/modules/Modules.hpp"
 #include "runtime/modules/config.hpp"
+#include "runtime/types/builtin.hpp"
 
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -24,6 +25,58 @@
 
 namespace fs = std::filesystem;
 using namespace py;
+
+void initialize_types()
+{
+	[[maybe_unused]] auto scope_static_alloc =
+		VirtualMachine::the().heap().scoped_static_allocation();
+	type();
+	bool_();
+	bytes();
+	ellipsis();
+	str();
+	str_iterator();
+	float_();
+	integer();
+	none();
+	module();
+	object();
+	dict();
+	dict_items();
+	dict_items_iterator();
+	dict_keys();
+	dict_key_iterator();
+	dict_values();
+	dict_value_iterator();
+	list();
+	list_iterator();
+	tuple();
+	tuple_iterator();
+	set();
+	set_iterator();
+	range();
+	range_iterator();
+	slice();
+	function();
+	native_function();
+	llvm_function();
+	code();
+	cell();
+	builtin_method();
+	slot_wrapper();
+	bound_method();
+	method_wrapper();
+	classmethod_descriptor();
+	getset_descriptor();
+	static_method();
+	property();
+	classmethod();
+	member_descriptor();
+	traceback();
+	not_implemented();
+	frame();
+	namespace_();
+}
 
 Interpreter::Interpreter() {}
 
@@ -36,6 +89,7 @@ void Interpreter::internal_setup(const std::string &name,
 	Config &&config,
 	std::shared_ptr<Program> &&program)
 {
+	initialize_types();
 	m_modules = PyDict::create().unwrap();
 	m_entry_script = std::move(entry_script);
 	m_argv = std::move(argv);

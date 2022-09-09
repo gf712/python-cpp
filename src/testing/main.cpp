@@ -1,4 +1,5 @@
 #include "vm/VM.hpp"
+#include "interpreter/Interpreter.hpp"
 
 #include "gtest/gtest.h"
 
@@ -16,6 +17,7 @@ class PythonVMEnvironment : public ::testing::Environment
 	{
 		auto &vm = VirtualMachine::the();
 		vm.heap().set_start_stack_pointer(bit_cast<uintptr_t *>(m_argv));
+		initialize_types();
 	}
 
 	void TearDown() override {}

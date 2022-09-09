@@ -68,15 +68,16 @@ BuiltinTypes::BuiltinTypes()
 	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory())
 {}
 
-#define INITIALIZE_TYPE(TYPENAME)                             \
-	PyType *TYPENAME()                                        \
-	{                                                         \
-		static PyType *type = nullptr;                        \
-		if (!type) {                                          \
-			auto &prototype = BuiltinTypes::the().TYPENAME(); \
-			type = PyType::initialize(prototype);             \
-		}                                                     \
-		return type;                                          \
+#define INITIALIZE_TYPE(TYPENAME)                                                         \
+	PyType *TYPENAME()                                                                    \
+	{                                                                                     \
+		static PyType *type = nullptr;                                                    \
+		if (!type) {                                                                      \
+			auto &prototype = BuiltinTypes::the().TYPENAME();                             \
+			type = PyType::initialize(prototype);                                         \
+			spdlog::trace("Initialized builtin type {} @{}", type->name(), (void *)type); \
+		}                                                                                 \
+		return type;                                                                      \
 	}
 
 namespace py {

@@ -101,3 +101,5 @@ class Interpreter
 		Config &&,
 		std::shared_ptr<Program> &&);
 };
+
+void initialize_types();
