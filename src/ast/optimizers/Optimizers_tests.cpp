@@ -459,9 +459,10 @@ void assert_generates_ast(std::string_view program,
 {
 	auto lexer = Lexer::create(std::string(program), "_optimizers_dummy_.py");
 	parser::Parser p{ lexer };
+	const auto spdlog_level = spdlog::get_level();
 	spdlog::set_level(spdlog::level::debug);
 	p.parse();
-	// spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog_level);
 
 	if (lvl > compiler::OptimizationLevel::None) {
 		auto module = p.module();
@@ -477,7 +478,7 @@ void assert_generates_ast(std::string_view program,
 	spdlog::set_level(spdlog::level::debug);
 	p.module()->print_node("");
 	expected_module->print_node("");
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog_level);
 }
 
 std::shared_ptr<Module> create_test_module()

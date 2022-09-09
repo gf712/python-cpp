@@ -9,14 +9,12 @@
 namespace {
 std::shared_ptr<Program> generate_llvm_module(std::string_view program)
 {
-	spdlog::set_level(spdlog::level::info);
 	auto lexer = Lexer::create(std::string(program), "_llvm_backend_tests_.py");
 	parser::Parser p{ lexer };
 	p.parse();
 
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
-	spdlog::set_level(spdlog::level::debug);
 	return codegen::LLVMGenerator::compile(module, {}, compiler::OptimizationLevel::None);
 }
 }// namespace

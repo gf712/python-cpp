@@ -1042,14 +1042,13 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 {
 	auto lexer = Lexer::create(std::string(program), "_parser_test_.py");
 	parser::Parser p{ lexer };
-	// spdlog::set_level(spdlog::level::debug);
 	p.parse();
-	// spdlog::set_level(spdlog::level::info);
 
+	const auto lvl = spdlog::get_level();
 	spdlog::set_level(spdlog::level::debug);
 	p.module()->print_node("");
 	expected_module->print_node("");
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(lvl);
 
 	ASSERT_EQ(p.module()->body().size(), expected_module->body().size());
 
