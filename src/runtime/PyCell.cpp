@@ -69,6 +69,8 @@ const Value &PyCell::content() const { return m_content; }
 
 PyResult<PyObject *> PyCell::__repr__() const { return PyString::create(to_string()); }
 
+void PyCell::set_cell(const Value &new_value) { m_content = new_value; }
+
 namespace {
 	std::once_flag cell_flag;
 

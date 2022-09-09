@@ -23,6 +23,8 @@ class PyCell : public PyBaseObject
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
+	void set_cell(const Value&);
+
 	const Value &content() const;
 
 	PyResult<PyObject *> __repr__() const;
