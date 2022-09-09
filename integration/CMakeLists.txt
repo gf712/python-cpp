@@ -2,7 +2,7 @@ include(GoogleTest)
 
 add_executable(integration-tests_ program.cpp ../src/testing/main.cpp)
 target_link_libraries(integration-tests_ PRIVATE python-cpp gtest gtest_main cxxopts)
-gtest_add_tests(TARGET integration-tests_)
+# gtest_add_tests(TARGET integration-tests_)
 
 # cmake-format: off
 add_custom_target(

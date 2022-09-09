@@ -189,7 +189,7 @@ add_library(
   ${RUNTIME_SOURCE_FILES}
   ${VM_SOURCE_FILES})
 
-add_executable(unittests ${UNITTEST_SOURCES})
+add_executable(unittests_ ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp PUBLIC spdlog_header_only ICU::uc)
 
@@ -248,11 +248,13 @@ if(LLVM_FOUND)
   target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
   target_compile_definitions(python-cpp PUBLIC USE_LLVM)
 
-  target_sources(unittests PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-tests>)
-  target_link_libraries(unittests PRIVATE python-cpp-llvm)
+  target_sources(unittests_ PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-tests>)
+  target_link_libraries(unittests_ PRIVATE python-cpp-llvm)
 endif()
 
-target_link_libraries(unittests PRIVATE python-cpp gtest gtest_main cxxopts)
+target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts)
+set_target_properties(unittests_ PROPERTIES OUTPUT_NAME "unittests")
+add_custom_target(run-unittests COMMAND $<TARGET_FILE:unittests_> DEPENDS unittests_)
 
 add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp)

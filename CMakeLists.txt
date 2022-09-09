@@ -68,3 +68,6 @@ check_cxx_source_compiles(
 
 add_subdirectory(src)
 add_subdirectory(integration)
+
+add_custom_target(test)
+add_dependencies(test run-unittests integration-tests)
