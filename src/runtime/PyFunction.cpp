@@ -56,7 +56,8 @@ PyType *PyFunction::type() const { return function(); }
 
 PyResult<PyObject *> PyFunction::__repr__() const
 {
-	return PyString::create(fmt::format("<function {}>", m_name->value()));
+	return PyString::create(
+		fmt::format("<function {} at {}>", m_name->value(), static_cast<const void *>(this)));
 }
 
 PyResult<PyObject *> PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const

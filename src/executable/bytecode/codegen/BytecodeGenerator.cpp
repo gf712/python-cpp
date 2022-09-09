@@ -800,9 +800,195 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 
 Value *BytecodeGenerator::visit(const Lambda *node)
 {
-	(void)node;
-	TODO();
-	return nullptr;
+	// TODO: abstract away logic from here and FunctionDefinition* to avoid repetition
+	std::vector<std::string> varnames;
+	std::vector<size_t> cell2arg;
+
+	m_ctx.push_local_args(node->args());
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		mangle_namespace(m_stack), "<lambda>", node->source_location());
+	auto *f = create_function(function_name);
+
+	create_nested_scope("<lambda>", function_name);
+	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
+
+	const auto &name_visibility_it = m_variable_visibility.find(function_name);
+	ASSERT(name_visibility_it != m_variable_visibility.end())
+	const auto &name_visibility = name_visibility_it->second->visibility;
+
+	for (const auto &arg_name : node->args()->argument_names()) {
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			auto *value = create_free_value(arg_name);
+			m_stack.top().locals.emplace(arg_name, value);
+		}
+	}
+	for (const auto &arg_name : node->args()->kw_only_argument_names()) {
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			auto *value = create_free_value(arg_name);
+			m_stack.top().locals.emplace(arg_name, value);
+		}
+	}
+	if (node->args()->vararg()) {
+		const auto &arg_name = node->args()->vararg()->name();
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			auto *value = create_free_value(arg_name);
+			m_stack.top().locals.emplace(arg_name, value);
+		}
+	}
+	if (node->args()->kwarg()) {
+		const auto &arg_name = node->args()->kwarg()->name();
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			auto *value = create_free_value(arg_name);
+			m_stack.top().locals.emplace(arg_name, value);
+		}
+	}
+	for (const auto &capture : m_variable_visibility.at(function_name)->captures) {
+		auto *value = create_free_value(capture);
+		captures.emplace_back(capture, value);
+		m_stack.top().locals.emplace(capture, value);
+	}
+
+	auto *block = allocate_block(f->function_info().function_id);
+	auto *old_block = m_current_block;
+	set_insert_point(block);
+
+	generate(node->args().get(), f->function_info().function_id);
+
+	auto *lambda_return_value = generate(node->body().get(), f->function_info().function_id);
+	ASSERT(lambda_return_value);
+	emit<ReturnValue>(lambda_return_value->get_register());
+
+	// always return None
+	// this can be optimised away later on
+	auto none_value_register = allocate_register();
+	auto *value = load_const(py::NameConstant{ py::NoneType{} }, f->function_info().function_id);
+	emit<LoadConst>(none_value_register, value->get_index());
+	emit<ReturnValue>(none_value_register);
+
+	for (size_t idx = 0; const auto &arg_name : node->args()->argument_names()) {
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+		idx++;
+	}
+	for (size_t idx = node->args()->argument_names().size();
+		 const auto &arg_name : node->args()->kw_only_argument_names()) {
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+		idx++;
+	}
+
+	if (node->args()->vararg() != nullptr) {
+		const size_t idx =
+			node->args()->argument_names().size() + node->args()->kw_only_argument_names().size();
+		const auto &arg_name = node->args()->vararg()->name();
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+	}
+
+	if (node->args()->kwarg() != nullptr) {
+		size_t idx =
+			node->args()->argument_names().size() + node->args()->kw_only_argument_names().size();
+		if (node->args()->vararg()) { idx++; }
+		const auto &arg_name = node->args()->kwarg()->name();
+		varnames.push_back(arg_name);
+		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
+		if (auto it = name_visibility.find(arg_name);
+			it->second == VariablesResolver::Visibility::CELL) {
+			cell2arg.push_back(idx);
+		}
+	}
+
+	set_insert_point(old_block);
+	m_ctx.pop_local_args();
+	m_stack.pop();
+	exit_function(f->function_info().function_id);
+
+	size_t arg_count = node->args()->args().size() + node->args()->posonlyargs().size();
+	size_t kwonly_arg_count = node->args()->kwonlyargs().size();
+
+	std::vector<Register> defaults;
+	defaults.reserve(node->args()->defaults().size());
+	for (const auto &default_node : node->args()->defaults()) {
+		defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+	}
+
+	std::vector<Register> kw_defaults;
+	kw_defaults.reserve(node->args()->kw_defaults().size());
+	for (const auto &default_node : node->args()->kw_defaults()) {
+		if (default_node) {
+			kw_defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+		}
+	}
+
+	auto captures_tuple = [&]() -> std::optional<Register> {
+		if (!captures.empty()) {
+			std::vector<Register> capture_regs;
+			capture_regs.reserve(captures.size());
+			for (const auto &[name, el] : captures) {
+				ASSERT(m_stack.top().locals.contains(name));
+				const auto &value = m_stack.top().locals.at(name);
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				emit<LoadClosure>(el->get_free_var_index(),
+					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
+				capture_regs.push_back(el->get_free_var_index());
+			}
+			auto *tuple_value = build_tuple(capture_regs);
+			return tuple_value->get_register();
+		} else {
+			return {};
+		}
+	}();
+
+	auto flags = CodeFlags::create();
+	if (node->args()->vararg() != nullptr) { flags.set(CodeFlags::Flag::VARARGS); }
+	if (node->args()->kwarg() != nullptr) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
+
+	f->function_info().function.metadata.varnames = varnames;
+
+	for (const auto &[varname, v] : name_visibility) {
+		if (v == VariablesResolver::Visibility::FREE) {
+			f->function_info().function.metadata.freevars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::CELL) {
+			f->function_info().function.metadata.cellvars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::LOCAL) {
+			f->function_info().function.metadata.varnames.push_back(varname);
+		} else {
+			// TODO: add to co_names
+			// A tuple containing names used by the bytecode:
+			//  * global variables,
+			//  * functions
+			//  * classes
+			//	* attributes loaded from objects
+		}
+	}
+
+	// TODO
+	// f->function_info().function.metadata.filename = ;
+	f->function_info().function.metadata.arg_count = arg_count;
+	f->function_info().function.metadata.kwonly_arg_count = kwonly_arg_count;
+	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
+	f->function_info().function.metadata.nlocals = varnames.size();
+	f->function_info().function.metadata.flags = flags;
+
+	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
+
+	return f;
 }
 
 Value *BytecodeGenerator::visit(const Arguments *node)
