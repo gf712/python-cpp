@@ -188,7 +188,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 	const std::vector<Value> &default_values,
 	const std::vector<Value> &kw_default_values,
-	const std::vector<PyCell *> &closure) const
+	PyTuple *closure) const
 {
 	for (const auto &backend : m_backends) {
 		if (auto *f =

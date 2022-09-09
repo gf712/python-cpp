@@ -29,22 +29,14 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 		}
 	}
 
-	auto closure = [&]() -> PyResult<std::vector<PyCell *>> {
+	auto closure = [&]() -> PyResult<PyTuple *> {
 		if (m_captures_tuple) {
-			auto value_ = PyObject::from(vm.reg(*m_captures_tuple));
-			if (value_.is_err()) { return Err(value_.unwrap_err()); }
-			auto *value = value_.unwrap();
-			ASSERT(as<PyTuple>(value))
-			std::vector<PyCell *> cells;
-			cells.reserve(as<PyTuple>(value)->size());
-			for (const auto &el : as<PyTuple>(value)->elements()) {
-				ASSERT(std::holds_alternative<PyObject *>(el))
-				ASSERT(as<PyCell>(std::get<PyObject *>(el)))
-				cells.push_back(as<PyCell>(std::get<PyObject *>(el)));
-			}
-			return Ok(cells);
+			auto cells = PyObject::from(vm.reg(*m_captures_tuple));
+			if (cells.is_err()) return Err(cells.unwrap_err());
+			ASSERT(as<PyTuple>(cells.unwrap()));
+			return Ok(as<PyTuple>(cells.unwrap()));
 		} else {
-			return Ok(std::vector<PyCell *>{});
+			return Ok(nullptr);
 		}
 	}();
 

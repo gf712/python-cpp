@@ -36,7 +36,7 @@ class LLVMProgram : public Program
 	py::PyObject *as_pyfunction(const std::string &function_name,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		const std::vector<py::PyCell *> &closure) const override;
+		py::PyTuple *closure) const override;
 
 	py::PyObject *main_function() override;
 

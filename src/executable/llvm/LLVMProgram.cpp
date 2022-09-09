@@ -238,7 +238,7 @@ void LLVMProgram::create_interop_function(const std::shared_ptr<::Function> &fun
 py::PyObject *LLVMProgram::as_pyfunction(const std::string &function_name,
 	const std::vector<py::Value> &default_values,
 	const std::vector<py::Value> &kw_default_values,
-	const std::vector<py::PyCell *> &closure) const
+	PyTuple *closure) const
 {
 	if (!default_values.empty()) { TODO(); }
 	if (!kw_default_values.empty()) { TODO(); }

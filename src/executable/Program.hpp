@@ -76,7 +76,7 @@ class Program
 	virtual py::PyObject *as_pyfunction(const std::string &function_name,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		const std::vector<py::PyCell *> &closure) const = 0;
+		py::PyTuple *closure) const = 0;
 
 	virtual py::PyObject *main_function() = 0;
 

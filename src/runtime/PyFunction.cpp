@@ -23,7 +23,7 @@ PyFunction::PyFunction(std::string name,
 	std::vector<Value> defaults,
 	std::vector<Value> kwonly_defaults,
 	PyCode *code,
-	std::vector<PyCell *> closure,
+	PyTuple *closure,
 	PyDict *globals)
 	: PyBaseObject(BuiltinTypes::the().function()), m_code(code), m_globals(globals),
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
@@ -46,10 +46,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_module) visitor.visit(*m_module);
 	if (m_dict) visitor.visit(*m_dict);
 	if (m_name) visitor.visit(*m_name);
-	for (const auto &c : m_closure) {
-		ASSERT(c);
-		visitor.visit(*c);
-	}
+	if (m_closure) visitor.visit(*m_closure);
 }
 
 PyType *PyFunction::type() const { return function(); }
@@ -69,8 +66,14 @@ PyResult<PyObject *> PyFunction::__get__(PyObject *instance, PyObject * /*owner*
 PyResult<PyObject *>
 	PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const
 {
-	return m_code->eval(
-		m_globals, locals, args, kwargs, m_defaults, m_kwonly_defaults, m_closure, m_name);
+	return m_code->eval(m_globals,
+		locals,
+		args,
+		kwargs,
+		m_defaults,
+		m_kwonly_defaults,
+		m_closure ? m_closure->elements() : std::vector<Value>{},
+		m_name);
 }
 
 PyResult<PyObject *> PyFunction::__call__(PyTuple *args, PyDict *kwargs)
@@ -99,6 +102,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 								 .attr("__globals__", &PyFunction::m_globals)
 								 .attr("__dict__", &PyFunction::m_dict)
 								 .attr("__name__", &PyFunction::m_name)
+								 .attribute_readonly("__closure__", &PyFunction::m_closure)
 								 .type);
 		});
 		return std::move(type);

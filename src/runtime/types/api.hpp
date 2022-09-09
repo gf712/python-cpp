@@ -91,8 +91,9 @@ template<typename T> struct klass
 					typename std::remove_cvref_t<typename member_pointer<ClassMemberType>::type>;
 
 				if constexpr (std::is_convertible_v<MemberType, PyObject *>) {
-					if (!member) { return py_none(); }
-					return static_cast<T *>(self)->*member;
+					PyObject *obj = static_cast<T *>(self)->*member;
+					if (!obj) { return py_none(); }
+					return obj;
 				} else if constexpr (std::numeric_limits<MemberType>::is_integer) {
 					if constexpr (std::numeric_limits<MemberType>::is_signed) {
 						return PyInteger::create(
@@ -145,8 +146,9 @@ template<typename T> struct klass
 					typename std::remove_cvref_t<typename member_pointer<ClassMemberType>::type>;
 
 				if constexpr (std::is_convertible_v<MemberType, PyObject *>) {
-					if (!member) { return py_none(); }
-					return static_cast<T *>(self)->*member;
+					PyObject *obj = static_cast<T *>(self)->*member;
+					if (!obj) { return py_none(); }
+					return obj;
 				} else if constexpr (std::numeric_limits<MemberType>::is_integer) {
 					if constexpr (std::numeric_limits<MemberType>::is_signed) {
 						return PyInteger::create(

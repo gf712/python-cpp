@@ -123,13 +123,13 @@ class PyCode : public PyBaseObject
 		PyDict *kwargs,
 		const std::vector<Value> &defaults,
 		const std::vector<Value> &kw_defaults,
-		const std::vector<PyCell *> &closure,
+		const std::vector<Value> &closure,
 		PyString *name) const;
 
 	PyObject *make_function(const std::string &function_name,
 		const std::vector<py::Value> &default_values,
 		const std::vector<py::Value> &kw_default_values,
-		const std::vector<py::PyCell *> &closure) const;
+		PyTuple *closure) const;
 
 	static std::pair<PyResult<PyCode *>, size_t> deserialize(std::span<const uint8_t> &,
 		std::shared_ptr<Program>);

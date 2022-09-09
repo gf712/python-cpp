@@ -17,7 +17,7 @@ class PyFunction : public PyBaseObject
 	PyDict *m_dict = nullptr;
 	const std::vector<Value> m_defaults;
 	const std::vector<Value> m_kwonly_defaults;
-	std::vector<PyCell *> m_closure;
+	PyTuple *m_closure{ nullptr };
 	PyString *m_module = nullptr;
 
   public:
@@ -25,7 +25,7 @@ class PyFunction : public PyBaseObject
 		std::vector<Value> defaults,
 		std::vector<Value> kwonly_defaults,
 		PyCode *code,
-		std::vector<PyCell *> closure,
+		PyTuple *closure,
 		PyDict *globals);
 
 	const PyCode *code() const { return m_code; }

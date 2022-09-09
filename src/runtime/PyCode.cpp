@@ -145,7 +145,7 @@ void PyCode::visit_graph(Visitor &visitor)
 PyObject *PyCode::make_function(const std::string &function_name,
 	const std::vector<py::Value> &default_values,
 	const std::vector<py::Value> &kw_default_values,
-	const std::vector<py::PyCell *> &closure) const
+	PyTuple *closure) const
 {
 	auto *f = m_program->as_pyfunction(function_name, default_values, kw_default_values, closure);
 	ASSERT(f)
@@ -158,7 +158,7 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 	PyDict *kwargs,
 	const std::vector<Value> &defaults,
 	const std::vector<Value> &kw_defaults,
-	const std::vector<PyCell *> &closure,
+	const std::vector<Value> &closure,
 	PyString *name) const
 {
 	auto *function_frame = PyFrame::create(VirtualMachine::the().interpreter().execution_frame(),
