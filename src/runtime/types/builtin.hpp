@@ -70,6 +70,8 @@ class BuiltinTypes
 
 	mutable Type m_namespace;
 
+	mutable Type m_generator;
+
 	BuiltinTypes();
 
 	TypePrototype &get_type(Type &t) const
@@ -147,6 +149,8 @@ class BuiltinTypes
 	TypePrototype &not_implemented() const { return get_type(m_not_implemented); }
 
 	TypePrototype &namespace_() const { return get_type(m_namespace); }
+
+	TypePrototype &generator() const { return get_type(m_generator); }
 };
 
 PyType *type();
@@ -195,5 +199,6 @@ PyType *traceback();
 PyType *not_implemented();
 PyType *frame();
 PyType *namespace_();
+PyType *generator();
 
 }// namespace py

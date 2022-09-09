@@ -14,6 +14,7 @@
 #include "runtime/PyFloat.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyGenerator.hpp"
 #include "runtime/PyGetSetDescriptor.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyLLVMFunction.hpp"
@@ -65,7 +66,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_classmethod(PyClassMethod::type_factory()),
 	  m_member_descriptor(PyMemberDescriptor::type_factory()),
 	  m_traceback(PyTraceback::type_factory()), m_frame(PyFrame::type_factory()),
-	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory())
+	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory()),
+	  m_generator(PyGenerator::type_factory())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                                                         \
@@ -138,4 +140,6 @@ INITIALIZE_TYPE(not_implemented)
 INITIALIZE_TYPE(frame)
 
 INITIALIZE_TYPE(namespace_)
+
+INITIALIZE_TYPE(generator)
 }// namespace py

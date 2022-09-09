@@ -8,6 +8,7 @@ class PyDict;
 class PyFloat;
 class PyFunction;
 class PyFrame;
+class PyGenerator;
 class PyInteger;
 class PyList;
 class PyNativeFunction;

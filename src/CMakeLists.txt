@@ -130,6 +130,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyFloat.cpp
     runtime/PyFrame.cpp
     runtime/PyFunction.cpp
+    runtime/PyGenerator.cpp
     runtime/PyGetSetDescriptor.cpp
     runtime/PyInteger.cpp
     runtime/PyList.cpp

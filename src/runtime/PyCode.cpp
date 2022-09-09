@@ -3,6 +3,7 @@
 #include "PyCell.hpp"
 #include "PyFrame.hpp"
 #include "PyFunction.hpp"
+#include "PyGenerator.hpp"
 #include "PyTuple.hpp"
 #include "executable/Function.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -341,14 +342,21 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 	spdlog::debug("Requesting stack frame with {} virtual registers", m_register_count);
 
 	for (size_t idx = m_cellvars.size(); const auto &el : closure) {
-		function_frame->freevars()[idx++] = el;
+		ASSERT(std::holds_alternative<PyObject *>(el));
+		ASSERT(as<PyCell>(std::get<PyObject *>(el)));
+		function_frame->freevars()[idx++] = as<PyCell>(std::get<PyObject *>(el));
 	}
 
-	// spdlog::debug("Frame: {}", (void *)execution_frame);
-	// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
-	// spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
-	// if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
-	return VirtualMachine::the().interpreter().call(m_function, function_frame);
+	if (m_flags.is_set(CodeFlags::Flag::GENERATOR)) {
+		// FIXME: pass the qualname
+		return PyGenerator::create(function_frame, name, PyString::create("").unwrap());
+	} else {
+		// spdlog::debug("Frame: {}", (void *)execution_frame);
+		// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
+		// spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
+		// if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
+		return VirtualMachine::the().interpreter().call(m_function, function_frame);
+	}
 }
 
 std::vector<uint8_t> PyCode::serialize() const
