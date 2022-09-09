@@ -372,6 +372,13 @@ ast::Value *LLVMGenerator::visit(const ast::FunctionDefinition *node)
 	return create_value(F);
 }
 
+ast::Value *LLVMGenerator::visit(const ast::Lambda *node)
+{
+	(void)node;
+	TODO();
+	return nullptr;
+}
+
 ast::Value *LLVMGenerator::visit(const ast::If *node)
 {
 	auto *condition = generate(node->test().get());

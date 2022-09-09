@@ -140,6 +140,19 @@ void compare_function_definition(const std::shared_ptr<ASTNode> &result,
 	EXPECT_EQ(result_type_comment, expected_type_comment);
 }
 
+void compare_lambda(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::Lambda);
+
+	const auto result_args = as<Lambda>(result)->args();
+	const auto expected_args = as<Lambda>(expected)->args();
+	dispatch(result_args, expected_args);
+
+	const auto result_body = as<Lambda>(result)->body();
+	const auto expected_body = as<Lambda>(expected)->body();
+	dispatch(result_body, expected_body);
+}
 
 void compare_class_definition(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
@@ -1012,6 +1025,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::GeneratorExp: {
 		compare_generator_expression(result, expected);
+		break;
+	}
+	case ASTNodeType::Lambda: {
+		compare_lambda(result, expected);
 		break;
 	}
 	default: {
@@ -2962,7 +2979,7 @@ TEST(Parser, FunctionDefinitionWithPositionalArgsWithoutDefault)
 			},
 			nullptr,
 			std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<ASTNode>>{  },
+			std::vector<std::shared_ptr<ASTNode>>{},
 			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
 			std::vector<std::shared_ptr<ASTNode>>{},
 			SourceLocation{}),// args
@@ -3190,6 +3207,48 @@ TEST(Parser, Bytes)
 														 std::byte{ 'l' },
 														 std::byte{ 'o' } } },
 		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LambdaWithNoArgs)
+{
+	constexpr std::string_view program = "a = lambda: 1\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+		},
+		std::make_shared<Lambda>(
+			std::make_shared<Arguments>(
+				std::vector<std::shared_ptr<Argument>>{},
+				SourceLocation{}),// args
+			std::make_shared<Constant>(int64_t{1}, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, LambdaWithNoDefaultArg)
+{
+	constexpr std::string_view program = "a = lambda x: x\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<Assign>(
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+		},
+		std::make_shared<Lambda>(
+			std::make_shared<Arguments>(
+				std::vector<std::shared_ptr<Argument>>{
+					std::make_shared<Argument>("x", nullptr, "", SourceLocation{}),
+				},
+				SourceLocation{}),// args
+			std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
+
 	assert_generates_ast(program, expected_ast);
 }
 

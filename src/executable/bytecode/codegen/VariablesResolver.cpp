@@ -326,6 +326,52 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const Lambda *node)
+{
+	auto caller = m_current_scope;
+
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		m_current_scope->get().namespace_, "<lambda>", node->source_location());
+
+	auto ns = m_current_scope->get().namespace_ + ".<lambda>";
+
+	for (const auto &default_ : node->args()->defaults()) {
+		// load default values using the outer scope
+		default_->codegen(this);
+	}
+
+	for (const auto &default_ : node->args()->kw_defaults()) {
+		// load default values using the outer scope
+		if (default_) { default_->codegen(this); }
+	}
+
+	ASSERT(!m_visibility.contains(function_name))
+
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::CLOSURE,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+	} else {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::FUNCTION,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+	}
+
+	caller->get().children.push_back(*m_current_scope);
+
+	m_to_visit.emplace_back(*m_current_scope, node->args());
+
+	m_to_visit.emplace_back(*m_current_scope, node->body());
+
+	m_current_scope = caller;
+
+	return nullptr;
+}
+
 Value *VariablesResolver::visit(const Global *node)
 {
 	auto &visibility = m_current_scope->get().visibility;

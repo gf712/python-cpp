@@ -798,6 +798,13 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	return f;
 }
 
+Value *BytecodeGenerator::visit(const Lambda *node)
+{
+	(void)node;
+	TODO();
+	return nullptr;
+}
+
 Value *BytecodeGenerator::visit(const Arguments *node)
 {
 	for (const auto &arg : node->posonlyargs()) { generate(arg.get(), m_function_id); }

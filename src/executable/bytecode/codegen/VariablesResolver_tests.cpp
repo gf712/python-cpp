@@ -136,3 +136,27 @@ TEST(VariablesResolver, ClassDefinition)
 	auto visibility = generate_resolver(program);
 	(void)visibility;
 }
+
+TEST(VariablesResolver, LambdaDefinition)
+{
+	static constexpr std::string_view program = "a = lambda c: a + b + c\n";
+
+	auto visibility = generate_resolver(program);
+	ASSERT_EQ(visibility.size(), 2);
+
+	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
+	auto &main = visibility.at("_bytecode_generator_tests_");
+	ASSERT_EQ(main->visibility.size(), 1);
+	ASSERT_TRUE(main->visibility.contains("a"));
+	ASSERT_EQ(main->visibility.at("a"), VariablesResolver::Visibility::NAME);
+
+	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.<lambda>.0:4"));
+	auto &lambda_ = visibility.at("_bytecode_generator_tests_.<lambda>.0:4");
+	ASSERT_EQ(lambda_->visibility.size(), 3);
+	ASSERT_TRUE(lambda_->visibility.contains("a"));
+	ASSERT_EQ(lambda_->visibility.at("a"), VariablesResolver::Visibility::GLOBAL);
+	ASSERT_TRUE(lambda_->visibility.contains("b"));
+	ASSERT_EQ(lambda_->visibility.at("b"), VariablesResolver::Visibility::GLOBAL);
+	ASSERT_TRUE(lambda_->visibility.contains("c"));
+	ASSERT_EQ(lambda_->visibility.at("c"), VariablesResolver::Visibility::LOCAL);
+}

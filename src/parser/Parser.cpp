@@ -587,6 +587,11 @@ struct InKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "in"; }
 };
 
+struct LambdaKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "lambda"; }
+};
+
 struct NotKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "not"; }
@@ -644,6 +649,7 @@ using ReservedKeywords = std::tuple<AndKeywordPattern,
 	IsKeywordPattern,
 	ImportKeywordPattern,
 	InKeywordPattern,
+	LambdaKeywordPattern,
 	NotKeywordPattern,
 	OrKeywordPattern,
 	PassKeywordPattern,
@@ -3260,6 +3266,196 @@ struct DisjunctionPattern : Pattern<DisjunctionPattern>
 	}
 };
 
+struct DefaultPattern;
+
+struct LambdaParamPattern : Pattern<LambdaParamPattern>
+{
+	// lambda_param: NAME
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("lambda_param");
+		using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("NAME");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct LambdaParamNoDefaultPattern : Pattern<LambdaParamNoDefaultPattern>
+{
+	// lambda_param_no_default:
+	//     | lambda_param ','
+	//     | lambda_param &':'
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("lambda_param_no_default");
+		const auto start = p.lexer().peek_token(p.token_position());
+		auto args = as<Arguments>(p.stack().back());
+		ASSERT(args);
+
+		// lambda_param ','
+		using pattern1 =
+			PatternMatch<LambdaParamPattern, SingleTokenPattern<Token::TokenType::COMMA>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("lambda_param ','");
+			std::string parameter_name{
+				start->start().pointer_to_program,
+				start->end().pointer_to_program,
+			};
+			args->push_arg(std::make_shared<Argument>(
+				parameter_name, nullptr, "", SourceLocation{ start->start(), start->end() }));
+			return true;
+		}
+
+		// lambda_param &':'
+		using pattern2 = PatternMatch<LambdaParamPattern,
+			LookAhead<SingleTokenPattern<Token::TokenType::COLON>>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("lambda_param &':'");
+			std::string parameter_name{
+				start->start().pointer_to_program,
+				start->end().pointer_to_program,
+			};
+			args->push_arg(std::make_shared<Argument>(
+				parameter_name, nullptr, "", SourceLocation{ start->start(), start->end() }));
+			return true;
+		}
+
+		return false;
+	}
+};
+
+struct LambdaParamWithDefaultPattern : Pattern<LambdaParamWithDefaultPattern>
+{
+	// lambda_param_with_default:
+	//     | lambda_param default ','
+	//     | lambda_param default &':'
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("lambda_param_with_default");
+		const auto start = p.lexer().peek_token(p.token_position());
+		auto args = as<Arguments>(p.stack().back());
+		ASSERT(args);
+
+		// lambda_param default ','
+		using pattern1 = PatternMatch<LambdaParamPattern,
+			DefaultPattern,
+			SingleTokenPattern<Token::TokenType::COMMA>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("lambda_param default ','");
+			const auto &default_ = p.pop_back();
+			std::string parameter_name{
+				start->start().pointer_to_program,
+				start->end().pointer_to_program,
+			};
+			args->push_arg(std::make_shared<Argument>(
+				parameter_name, nullptr, "", SourceLocation{ start->start(), start->end() }));
+			args->push_default(default_);
+			return true;
+		}
+
+		// lambda_param default &':'
+		using pattern2 = PatternMatch<LambdaParamPattern,
+			DefaultPattern,
+			LookAhead<SingleTokenPattern<Token::TokenType::COLON>>>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("lambda_param default &':'");
+			const auto &default_ = p.pop_back();
+			std::string parameter_name{
+				start->start().pointer_to_program,
+				start->end().pointer_to_program,
+			};
+			args->push_arg(std::make_shared<Argument>(
+				parameter_name, nullptr, "", SourceLocation{ start->start(), start->end() }));
+			args->push_default(default_);
+			return true;
+		}
+
+		return false;
+	}
+};
+
+struct LambdaStarEtcPattern : Pattern<LambdaStarEtcPattern>
+{
+	// lambda_star_etc:
+	//     | '*' lambda_param_no_default lambda_param_maybe_default* [lambda_kwds]
+	//     | '*' ',' lambda_param_maybe_default+ [lambda_kwds]
+	//     | lambda_kwds
+	static bool matches_impl(Parser &) { return false; }
+};
+
+struct LambdaParametersPattern : Pattern<LambdaParametersPattern>
+{
+	// lambda_parameters:
+	//     | lambda_slash_no_default lambda_param_no_default* lambda_param_with_default*
+	//     	 [lambda_star_etc]
+	//     | lambda_slash_with_default lambda_param_with_default*
+	//       [lambda_star_etc]
+	//     | lambda_param_no_default+ lambda_param_with_default* [lambda_star_etc]
+	//     | lambda_param_with_default+ [lambda_star_etc]
+	//     | lambda_star_etc
+	static bool matches_impl(Parser &p)
+	{
+		using pattern3 = PatternMatch<OneOrMorePattern<LambdaParamNoDefaultPattern>,
+			ZeroOrMorePattern<LambdaParamWithDefaultPattern>,
+			ZeroOrOnePattern<LambdaStarEtcPattern>>;
+		if (pattern3::match(p)) {
+			DEBUG_LOG("lambda_param_no_default+ lambda_param_with_default* [lambda_star_etc]");
+			return true;
+		}
+		return false;
+	}
+};
+
+struct LambdaParamsPattern : Pattern<LambdaParamsPattern>
+{
+	// lambda_params: lambda_parameters
+	static bool matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatch<LambdaParametersPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("lambda_parameters");
+			ASSERT(p.stack().size() == 1);
+			p.push_to_stack(p.pop_back());
+			return true;
+		}
+		return false;
+	}
+};
+
+struct LambDefPattern : Pattern<LambDefPattern>
+{
+	// lambdef: 'lambda' [lambda_params] ':' expression
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		const auto start = p.lexer().peek_token(p.token_position());
+		p.push_to_stack(
+			std::make_shared<Arguments>(SourceLocation{ start->start(), start->end() }));
+
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, LambdaKeywordPattern>,
+			ZeroOrOnePattern<LambdaParamsPattern>,
+			SingleTokenPattern<Token::TokenType::COLON>,
+			ExpressionPattern>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("'lambda' [lambda_params] ':' expression");
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
+			ASSERT(p.stack().size() == 2);
+			const auto &body = p.pop_back();
+			const auto &args = p.pop_back();
+			ASSERT(as<Arguments>(args));
+			scope.parent().push_back(std::make_shared<Lambda>(
+				as<Arguments>(args), body, SourceLocation{ start->start(), end->end() }));
+			return true;
+		}
+
+		return false;
+	}
+};
+
 struct ExpressionPattern : Pattern<ExpressionPattern>
 {
 	// expression:
@@ -3291,6 +3487,13 @@ struct ExpressionPattern : Pattern<ExpressionPattern>
 		using pattern2 = PatternMatch<DisjunctionPattern>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("disjunction")
+			return true;
+		}
+
+		// lambdef
+		using pattern3 = PatternMatch<LambDefPattern>;
+		if (pattern3::match(p)) {
+			DEBUG_LOG("lambdef")
 			return true;
 		}
 

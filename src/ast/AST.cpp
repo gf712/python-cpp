@@ -107,6 +107,12 @@ void NodeVisitor::visit(FunctionDefinition *node)
 	dispatch(node->returns().get());
 }
 
+void NodeVisitor::visit(Lambda *node)
+{
+	dispatch(node->args().get());
+	dispatch(node->body().get());
+}
+
 void NodeVisitor::visit(Keyword *node) { dispatch(node->value().get()); }
 
 void NodeVisitor::visit(ClassDefinition *node)
@@ -434,6 +440,13 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
 	transform_multiple_nodes(node->body());
 	for (auto &el : node->decorator_list()) { transform_single_node(el); }
 	transform_single_node(node->returns());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Lambda> node)
+{
+	transform_single_node(node->args());
+	transform_single_node(node->body());
 	return { node };
 }
 
@@ -972,6 +985,21 @@ void FunctionDefinition::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - returns:", indent);
 	if (m_returns) m_returns->print_node(new_indent);
 	spdlog::debug("{}  - type_comment:{}", indent, m_type_comment);
+}
+
+void Lambda::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Lambda [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - args:", indent);
+	m_args->print_node(new_indent);
+	spdlog::debug("{}  - body:", indent);
+	m_body->print_node(new_indent);
 }
 
 void Keyword::print_this_node(const std::string &indent) const

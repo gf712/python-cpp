@@ -53,6 +53,7 @@ namespace ast {
 	__AST_NODE_TYPE(ImportFrom)         \
 	__AST_NODE_TYPE(JoinedStr)          \
 	__AST_NODE_TYPE(Keyword)            \
+	__AST_NODE_TYPE(Lambda)             \
 	__AST_NODE_TYPE(List)               \
 	__AST_NODE_TYPE(ListComp)           \
 	__AST_NODE_TYPE(Module)             \
@@ -659,6 +660,25 @@ class FunctionDefinition final : public ASTNode
 	{
 		m_decorator_list.push_back(std::move(decorator));
 	}
+
+	Value *codegen(CodeGenerator *) const override;
+};
+
+class Lambda final : public ASTNode
+{
+	const std::shared_ptr<Arguments> m_args;
+	std::shared_ptr<ASTNode> m_body;
+
+	void print_this_node(const std::string &indent) const final;
+
+  public:
+	Lambda(std::shared_ptr<Arguments> args, std::shared_ptr<ASTNode> body, SourceLocation location)
+		: ASTNode(ASTNodeType::Lambda, location), m_args(std::move(args)), m_body(std::move(body))
+	{}
+
+	const std::shared_ptr<Arguments> &args() const { return m_args; }
+	const std::shared_ptr<ASTNode> &body() const { return m_body; }
+	std::shared_ptr<ASTNode> &body() { return m_body; }
 
 	Value *codegen(CodeGenerator *) const override;
 };
