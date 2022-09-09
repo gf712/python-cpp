@@ -592,6 +592,11 @@ struct LambdaKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "lambda"; }
 };
 
+struct NonLocalKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "nonlocal"; }
+};
+
 struct NotKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "not"; }
@@ -650,6 +655,7 @@ using ReservedKeywords = std::tuple<AndKeywordPattern,
 	ImportKeywordPattern,
 	InKeywordPattern,
 	LambdaKeywordPattern,
+	NonLocalKeywordPattern,
 	NotKeywordPattern,
 	OrKeywordPattern,
 	PassKeywordPattern,
@@ -4353,6 +4359,49 @@ struct GlobalStatementPattern : Pattern<GlobalStatementPattern>
 	}
 };
 
+struct NonLocalStatementPattern : Pattern<NonLocalStatementPattern>
+{
+	// nonlocal_stmt: 'nonlocal' ','.NAME+
+	struct NonLocalName : Pattern<NonLocalName>
+	{
+		static bool matches_impl(Parser &p)
+		{
+			auto token = p.lexer().peek_token(p.token_position());
+			std::string_view maybe_name{ token->start().pointer_to_program,
+				token->end().pointer_to_program };
+			// nonlocal_name: NAME
+			using pattern1 = PatternMatch<SingleTokenPattern<Token::TokenType::NAME>>;
+
+			if (pattern1::match(p)) {
+				ASSERT(as<NonLocal>(p.stack().back()))
+				as<NonLocal>(p.stack().back())->add_name(std::string(maybe_name));
+				return true;
+			}
+			return false;
+		}
+	};
+
+	static bool matches_impl(Parser &p)
+	{
+		BlockScope scope{ p };
+		const auto start_token = p.lexer().peek_token(p.token_position());
+		p.push_to_stack(std::make_shared<NonLocal>(std::vector<std::string>{},
+			SourceLocation{ start_token->start(), start_token->end() }));
+
+		DEBUG_LOG("NonLocalStatementPattern");
+		using pattern1 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, NonLocalKeywordPattern>,
+			OneOrMorePattern<
+				ApplyInBetweenPattern<NonLocalName, SingleTokenPattern<Token::TokenType::COMMA>>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("nonlocal_stmt: 'nonlocal' ','.NAME+");
+			scope.parent().push_back(p.pop_back());
+			return true;
+		}
+		return false;
+	}
+};
+
 struct SmallStatementPattern : Pattern<SmallStatementPattern>
 {
 	// small_stmt:
@@ -4436,6 +4485,11 @@ struct SmallStatementPattern : Pattern<SmallStatementPattern>
 		using pattern12 = PatternMatch<GlobalStatementPattern>;
 		if (pattern12::match(p)) {
 			DEBUG_LOG("global_stmt");
+			return true;
+		}
+		using pattern13 = PatternMatch<NonLocalStatementPattern>;
+		if (pattern13::match(p)) {
+			DEBUG_LOG("nonlocal_stmt");
 			return true;
 		}
 		return false;

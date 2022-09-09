@@ -237,6 +237,8 @@ void NodeVisitor::visit(Break *) {}
 
 void NodeVisitor::visit(Global *) {}
 
+void NodeVisitor::visit(NonLocal *) {}
+
 void NodeVisitor::visit(Delete *node)
 {
 	for (auto &el : node->targets()) { dispatch(el.get()); }
@@ -616,6 +618,11 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_pt
 }
 
 std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Global> node)
+{
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<NonLocal> node)
 {
 	return { node };
 }
@@ -1362,7 +1369,19 @@ void Break::print_this_node(const std::string &indent) const { spdlog::debug("{}
 
 void Global::print_this_node(const std::string &indent) const
 {
-	spdlog::debug("{}Globals [{}:{}-{}:{}]",
+	spdlog::debug("{}Global [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	std::string new_indent = indent + std::string(6, ' ');
+	for (const auto &name : m_names) { spdlog::debug("{} {}", new_indent, name); }
+}
+
+void NonLocal::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}NonLocal [{}:{}-{}:{}]",
 		indent,
 		source_location().start.row + 1,
 		source_location().start.column + 1,

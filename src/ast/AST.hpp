@@ -59,6 +59,7 @@ namespace ast {
 	__AST_NODE_TYPE(Module)             \
 	__AST_NODE_TYPE(NamedExpr)          \
 	__AST_NODE_TYPE(Name)               \
+	__AST_NODE_TYPE(NonLocal)           \
 	__AST_NODE_TYPE(Pass)               \
 	__AST_NODE_TYPE(Raise)              \
 	__AST_NODE_TYPE(Return)             \
@@ -1300,6 +1301,25 @@ class Global : public ASTNode
   private:
 	void print_this_node(const std::string &indent) const override;
 };
+
+class NonLocal : public ASTNode
+{
+	std::vector<std::string> m_names;
+
+  public:
+	NonLocal(std::vector<std::string> names, SourceLocation source_location)
+		: ASTNode(ASTNodeType::NonLocal, source_location), m_names(std::move(names))
+	{}
+
+	const std::vector<std::string> &names() const { return m_names; }
+	void add_name(const std::string &name) { m_names.push_back(name); }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
 
 class Delete : public ASTNode
 {

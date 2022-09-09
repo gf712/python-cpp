@@ -1961,6 +1961,8 @@ Value *BytecodeGenerator::visit(const Expression *node)
 
 Value *BytecodeGenerator::visit(const Global *) { return nullptr; }
 
+Value *BytecodeGenerator::visit(const NonLocal *) { return nullptr; }
+
 Value *BytecodeGenerator::visit(const Delete *node)
 {
 	for (const auto &target : node->targets()) { generate(target.get(), m_function_id); }

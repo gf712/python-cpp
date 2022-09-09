@@ -137,6 +137,49 @@ TEST(VariablesResolver, ClassDefinition)
 	(void)visibility;
 }
 
+TEST(VariablesResolver, NonLocal)
+{
+	static constexpr std::string_view program =
+		"a = 1\n"
+		"b = 1\n"
+		"def outer():\n"
+		"   a = 1\n"
+		"   b = 1\n"
+		"   def inner():\n"
+		"      nonlocal b\n"
+		"      a = 2\n"
+		"      b = 2\n";
+
+	auto visibility = generate_resolver(program);
+	ASSERT_EQ(visibility.size(), 3);
+
+	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
+	auto &main = visibility.at("_bytecode_generator_tests_");
+	ASSERT_EQ(main->visibility.size(), 3);
+	ASSERT_TRUE(main->visibility.contains("a"));
+	ASSERT_TRUE(main->visibility.contains("b"));
+	ASSERT_EQ(main->visibility.at("a"), VariablesResolver::Visibility::NAME);
+	ASSERT_EQ(main->visibility.at("b"), VariablesResolver::Visibility::NAME);
+
+	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.outer.2:0"));
+	auto &outer = visibility.at("_bytecode_generator_tests_.outer.2:0");
+	ASSERT_EQ(outer->visibility.size(), 3);
+	ASSERT_TRUE(outer->visibility.contains("inner"));
+	ASSERT_EQ(outer->visibility.at("inner"), VariablesResolver::Visibility::LOCAL);
+	ASSERT_TRUE(outer->visibility.contains("a"));
+	ASSERT_EQ(outer->visibility.at("a"), VariablesResolver::Visibility::LOCAL);
+	ASSERT_TRUE(outer->visibility.contains("b"));
+	ASSERT_EQ(outer->visibility.at("b"), VariablesResolver::Visibility::CELL);
+
+	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.outer.inner.5:3"));
+	auto &inner = visibility.at("_bytecode_generator_tests_.outer.inner.5:3");
+	ASSERT_EQ(inner->visibility.size(), 2);
+	ASSERT_TRUE(inner->visibility.contains("a"));
+	ASSERT_EQ(inner->visibility.at("a"), VariablesResolver::Visibility::LOCAL);
+	ASSERT_TRUE(inner->visibility.contains("b"));
+	ASSERT_EQ(inner->visibility.at("b"), VariablesResolver::Visibility::FREE);
+}
+
 TEST(VariablesResolver, LambdaDefinition)
 {
 	static constexpr std::string_view program = "a = lambda c: a + b + c\n";

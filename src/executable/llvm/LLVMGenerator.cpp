@@ -261,6 +261,8 @@ ast::Value *LLVMGenerator::visit(const ast::Delete *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Global *node) { TODO(); }
 
+ast::Value *LLVMGenerator::visit(const ast::NonLocal *node) { TODO(); }
+
 ast::Value *LLVMGenerator::visit(const ast::IfExpr *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::NamedExpr *node) { TODO(); }

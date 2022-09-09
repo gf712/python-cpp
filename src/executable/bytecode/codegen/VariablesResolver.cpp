@@ -394,6 +394,28 @@ Value *VariablesResolver::visit(const Global *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const NonLocal *node)
+{
+	auto &visibility = m_current_scope->get().visibility;
+
+	for (const auto &name : node->names()) {
+		if (auto it = visibility.find(name); it != visibility.end()) {
+			if (it->second == Visibility::NAME || it->second == Visibility::LOCAL) {
+				// TODO: raise SyntaxError
+				spdlog::error(
+					"SyntaxError: name '{}' is assigned to before nonlocal declaration", name);
+				std::abort();
+			} else if (captured_by_closure(it->second)) {
+				// TODO: raise SyntaxError
+				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+				std::abort();
+			}
+		}
+		annotate_free_and_cell_variables(name);
+	}
+	return nullptr;
+}
+
 Value *VariablesResolver::visit(const If *node)
 {
 	node->test()->codegen(this);
