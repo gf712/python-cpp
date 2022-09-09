@@ -56,3 +56,13 @@ def captures_kwargs():
     assert result[3] == {"d": 4}
 
 captures_kwargs()
+
+x = 0
+def nonlocal_func():
+    x = 1
+    def inner():
+        nonlocal x
+        x = 2
+        assert x == 2
+    assert x == 1
+assert x == 0

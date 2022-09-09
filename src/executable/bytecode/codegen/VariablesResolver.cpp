@@ -76,11 +76,12 @@ void VariablesResolver::store(const std::string &name, SourceLocation source_loc
 			} else {
 				auto &visibility = parent->visibility;
 				if (auto it = visibility.find(name); it != visibility.end()) {
-					if (it->second == Visibility::GLOBAL) {
-					} else {
+					if (it->second == Visibility::CELL) {
 						annotate_free_and_cell_variables(name);
+						found = true;
+					} else if (it->second == Visibility::GLOBAL || it->second == Visibility::FREE) {
+						found = true;
 					}
-					found = true;
 					break;
 				}
 				parent = parent->parent;
@@ -115,10 +116,11 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 			if (auto it = visibility.find(name); it != visibility.end()) {
 				if (it->second == Visibility::GLOBAL) {
 					current_scope_vars[name] = Visibility::GLOBAL;
-				} else {
+					found = true;
+				} else if (it->second == Visibility::CELL || it->second == Visibility::LOCAL) {
 					annotate_free_and_cell_variables(name);
+					found = true;
 				}
-				found = true;
 				break;
 			}
 			parent = parent->parent;
