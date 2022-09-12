@@ -328,6 +328,13 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const AsyncFunctionDefinition *node)
+{
+	(void)node;
+	TODO();
+	return nullptr;
+}
+
 Value *VariablesResolver::visit(const Lambda *node)
 {
 	auto caller = m_current_scope;

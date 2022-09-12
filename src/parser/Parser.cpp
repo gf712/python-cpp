@@ -516,6 +516,11 @@ struct AssertKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "assert"; }
 };
 
+struct AsyncKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "async"; }
+};
+
 struct BreakKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "break"; }
@@ -526,11 +531,15 @@ struct ContinueKeywordPattern
 	static bool matches(std::string_view token_value) { return token_value == "continue"; }
 };
 
+struct DefKeywordPattern
+{
+	static bool matches(std::string_view token_value) { return token_value == "def"; }
+};
+
 struct DeleteKeywordPattern
 {
 	static bool matches(std::string_view token_value) { return token_value == "del"; }
 };
-
 
 struct ElifKeywordPattern
 {
@@ -645,8 +654,10 @@ struct YieldKeywordPattern
 using ReservedKeywords = std::tuple<AndKeywordPattern,
 	AsKeywordPattern,
 	AssertKeywordPattern,
+	AsyncKeywordPattern,
 	BreakKeywordPattern,
 	ContinueKeywordPattern,
+	DefKeywordPattern,
 	DeleteKeywordPattern,
 	ElifKeywordPattern,
 	ElseKeywordPattern,
@@ -4572,11 +4583,6 @@ struct SimpleStatementPattern : Pattern<SimpleStatementPattern>
 	}
 };
 
-struct DefPattern
-{
-	static bool matches(std::string_view token_value) { return token_value == "def"; }
-};
-
 struct AnnotationPattern : Pattern<AnnotationPattern>
 {
 	// annotation: ':' expression
@@ -5090,7 +5096,7 @@ struct FunctionDefinitionPattern : Pattern<FunctionDefinitionPattern>
 	static bool matches_impl(Parser &p)
 	{
 		using pattern1 =
-			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, DefPattern>,
+			PatternMatch<AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, DefKeywordPattern>,
 				FunctionNamePattern,
 				SingleTokenPattern<Token::TokenType::LPAREN>,
 				ZeroOrOnePattern<ParamsPattern>,
@@ -5112,14 +5118,14 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 {
 	// function_def_raw:
 	//     | function_def block
-	//     | ASYNC 'def' function_name '(' [params] ')' ['->' expression ] ':'
-	//     [func_type_comment] block
+	//     | 'ASYNC' function_def block
 	static bool matches_impl(Parser &p)
 	{
 		BlockScope scope{ p };
+		const auto &start = p.lexer().peek_token(p.token_position())->start();
+
 		// function_def block
 		using pattern1 = PatternMatch<FunctionDefinitionPattern>;
-		const auto &start = p.lexer().peek_token(p.token_position())->start();
 		if (pattern1::match(p)) {
 			DEBUG_LOG("function_def_raw: function_def");
 			auto name = p.pop_front();
@@ -5153,6 +5159,52 @@ struct FunctionDefinitionRawStatement : Pattern<FunctionDefinitionRawStatement>
 			ASSERT(as<Constant>(name));
 			ASSERT(as<Arguments>(args));
 			auto function = std::make_shared<FunctionDefinition>(
+				std::get<String>(*as<Constant>(name)->value()).s,
+				as<Arguments>(args),
+				body,
+				std::vector<std::shared_ptr<ASTNode>>{},
+				returns,
+				"",
+				SourceLocation{ start, end });
+			scope.parent().push_back(function);
+			function->print_node("");
+			return true;
+		}
+
+		using pattern2 = PatternMatch<
+			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AsyncKeywordPattern>,
+			FunctionDefinitionPattern>;
+		if (pattern2::match(p)) {
+			DEBUG_LOG("function_def_raw: 'ASYNC' function_def");
+			auto name = p.pop_front();
+			auto args = [&]() -> std::shared_ptr<ast::ASTNode> {
+				if (!p.stack().empty()) {
+					return p.pop_front();
+				} else {
+					return std::make_shared<Arguments>(SourceLocation{ name->source_location() });
+				}
+			}();
+			auto returns = [&]() -> std::shared_ptr<ast::ASTNode> {
+				if (!p.stack().empty()) {
+					return p.pop_front();
+				} else {
+					return nullptr;
+				}
+			}();
+
+			std::vector<std::shared_ptr<ASTNode>> body;
+			{
+				BlockScope inner_scope{ p };
+				using pattern1a = PatternMatch<ZeroOrOnePattern<BlockPattern>>;
+				if (pattern1a::match(p)) { DEBUG_LOG("block"); }
+				for (auto &&node : p.stack()) { body.push_back(std::move(node)); }
+			}
+
+			ASSERT(!body.empty())
+			const auto &end = body.back()->source_location().end;
+			ASSERT(as<Constant>(name));
+			ASSERT(as<Arguments>(args));
+			auto function = std::make_shared<AsyncFunctionDefinition>(
 				std::get<String>(*as<Constant>(name)->value()).s,
 				as<Arguments>(args),
 				body,

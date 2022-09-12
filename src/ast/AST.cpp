@@ -109,6 +109,14 @@ void NodeVisitor::visit(FunctionDefinition *node)
 	dispatch(node->returns().get());
 }
 
+void NodeVisitor::visit(AsyncFunctionDefinition *node)
+{
+	dispatch(node->args().get());
+	for (auto &el : node->body()) { dispatch(el.get()); }
+	for (auto &el : node->decorator_list()) { dispatch(el.get()); }
+	dispatch(node->returns().get());
+}
+
 void NodeVisitor::visit(Lambda *node)
 {
 	dispatch(node->args().get());
@@ -446,6 +454,16 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_pt
 
 std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
 	std::shared_ptr<FunctionDefinition> node)
+{
+	transform_single_node(node->args());
+	transform_multiple_nodes(node->body());
+	for (auto &el : node->decorator_list()) { transform_single_node(el); }
+	transform_single_node(node->returns());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
+	std::shared_ptr<AsyncFunctionDefinition> node)
 {
 	transform_single_node(node->args());
 	transform_multiple_nodes(node->body());
@@ -998,6 +1016,27 @@ void Arguments::print_this_node(const std::string &indent) const
 void FunctionDefinition::print_this_node(const std::string &indent) const
 {
 	spdlog::debug("{}FunctionDefinition [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	spdlog::debug("{}  - function_name: {}", indent, m_function_name);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - args:", indent);
+	m_args->print_node(new_indent);
+	spdlog::debug("{}  - body:", indent);
+	for (const auto &statement : m_body) { statement->print_node(new_indent); }
+	spdlog::debug("{}  - decorator_list:", indent);
+	for (const auto &decorator : m_decorator_list) { decorator->print_node(new_indent); }
+	spdlog::debug("{}  - returns:", indent);
+	if (m_returns) m_returns->print_node(new_indent);
+	spdlog::debug("{}  - type_comment:{}", indent, m_type_comment);
+}
+
+void AsyncFunctionDefinition::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}AsyncFunctionDefinition [{}:{}-{}:{}]",
 		indent,
 		source_location().start.row + 1,
 		source_location().start.column + 1,

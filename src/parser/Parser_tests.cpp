@@ -140,6 +140,40 @@ void compare_function_definition(const std::shared_ptr<ASTNode> &result,
 	EXPECT_EQ(result_type_comment, expected_type_comment);
 }
 
+void compare_async_function_definition(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::AsyncFunctionDefinition);
+
+	const auto result_name = as<AsyncFunctionDefinition>(result)->name();
+	const auto expected_name = as<AsyncFunctionDefinition>(expected)->name();
+	EXPECT_EQ(result_name, expected_name);
+
+	const auto result_args = as<AsyncFunctionDefinition>(result)->args();
+	const auto expected_args = as<AsyncFunctionDefinition>(expected)->args();
+	dispatch(result_args, expected_args);
+
+	const auto result_body = as<AsyncFunctionDefinition>(result)->body();
+	const auto expected_body = as<AsyncFunctionDefinition>(expected)->body();
+	ASSERT_EQ(result_body.size(), expected_body.size());
+	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
+
+	const auto result_decorator_list = as<AsyncFunctionDefinition>(result)->decorator_list();
+	const auto expected_decorator_list = as<AsyncFunctionDefinition>(expected)->decorator_list();
+	ASSERT_EQ(result_decorator_list.size(), expected_decorator_list.size());
+	for (size_t i = 0; i < result_decorator_list.size(); ++i) {
+		dispatch(result_decorator_list[i], expected_decorator_list[i]);
+	}
+
+	const auto result_returns = as<AsyncFunctionDefinition>(result)->returns();
+	const auto expected_returns = as<AsyncFunctionDefinition>(expected)->returns();
+	dispatch(result_returns, expected_returns);
+
+	const auto result_type_comment = as<AsyncFunctionDefinition>(result)->type_comment();
+	const auto expected_type_comment = as<AsyncFunctionDefinition>(expected)->type_comment();
+	EXPECT_EQ(result_type_comment, expected_type_comment);
+}
+
 void compare_lambda(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -898,6 +932,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::FunctionDefinition: {
 		compare_function_definition(result, expected);
+		break;
+	}
+	case ASTNodeType::AsyncFunctionDefinition: {
+		compare_async_function_definition(result, expected);
 		break;
 	}
 	case ASTNodeType::Return: {
@@ -3301,13 +3339,33 @@ TEST(Parser, YieldMutipleValues)
 						std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 						std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
 					},
-					ContextType::LOAD, SourceLocation{}), SourceLocation{}),
+					ContextType::LOAD,
+					SourceLocation{}),
+				SourceLocation{}),
 		},// body
 		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
 
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, Coroutine)
+{
+	constexpr std::string_view program =
+		"async def foo():\n"
+		"  return 1\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<AsyncFunctionDefinition>("foo",
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),
+		std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Return>(
+			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}), SourceLocation{}) },
+		std::vector<std::shared_ptr<ast::ASTNode>>{},
+		nullptr,
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 

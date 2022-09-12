@@ -22,57 +22,58 @@ struct SourceLocation
 
 namespace ast {
 
-#define AST_NODE_TYPES                  \
-	__AST_NODE_TYPE(Argument)           \
-	__AST_NODE_TYPE(Arguments)          \
-	__AST_NODE_TYPE(Attribute)          \
-	__AST_NODE_TYPE(Assign)             \
-	__AST_NODE_TYPE(Assert)             \
-	__AST_NODE_TYPE(AugAssign)          \
-	__AST_NODE_TYPE(Break)              \
-	__AST_NODE_TYPE(BinaryExpr)         \
-	__AST_NODE_TYPE(BoolOp)             \
-	__AST_NODE_TYPE(Call)               \
-	__AST_NODE_TYPE(ClassDefinition)    \
-	__AST_NODE_TYPE(Continue)           \
-	__AST_NODE_TYPE(Compare)            \
-	__AST_NODE_TYPE(Comprehension)      \
-	__AST_NODE_TYPE(Constant)           \
-	__AST_NODE_TYPE(Delete)             \
-	__AST_NODE_TYPE(Dict)               \
-	__AST_NODE_TYPE(ExceptHandler)      \
-	__AST_NODE_TYPE(Expression)         \
-	__AST_NODE_TYPE(For)                \
-	__AST_NODE_TYPE(FormattedValue)     \
-	__AST_NODE_TYPE(FunctionDefinition) \
-	__AST_NODE_TYPE(GeneratorExp)       \
-	__AST_NODE_TYPE(Global)             \
-	__AST_NODE_TYPE(If)                 \
-	__AST_NODE_TYPE(IfExpr)             \
-	__AST_NODE_TYPE(Import)             \
-	__AST_NODE_TYPE(ImportFrom)         \
-	__AST_NODE_TYPE(JoinedStr)          \
-	__AST_NODE_TYPE(Keyword)            \
-	__AST_NODE_TYPE(Lambda)             \
-	__AST_NODE_TYPE(List)               \
-	__AST_NODE_TYPE(ListComp)           \
-	__AST_NODE_TYPE(Module)             \
-	__AST_NODE_TYPE(NamedExpr)          \
-	__AST_NODE_TYPE(Name)               \
-	__AST_NODE_TYPE(NonLocal)           \
-	__AST_NODE_TYPE(Pass)               \
-	__AST_NODE_TYPE(Raise)              \
-	__AST_NODE_TYPE(Return)             \
-	__AST_NODE_TYPE(Set)                \
-	__AST_NODE_TYPE(SetComp)            \
-	__AST_NODE_TYPE(Starred)            \
-	__AST_NODE_TYPE(Subscript)          \
-	__AST_NODE_TYPE(Try)                \
-	__AST_NODE_TYPE(Tuple)              \
-	__AST_NODE_TYPE(UnaryExpr)          \
-	__AST_NODE_TYPE(While)              \
-	__AST_NODE_TYPE(With)               \
-	__AST_NODE_TYPE(WithItem)           \
+#define AST_NODE_TYPES                       \
+	__AST_NODE_TYPE(Argument)                \
+	__AST_NODE_TYPE(Arguments)               \
+	__AST_NODE_TYPE(Attribute)               \
+	__AST_NODE_TYPE(Assign)                  \
+	__AST_NODE_TYPE(Assert)                  \
+	__AST_NODE_TYPE(AsyncFunctionDefinition) \
+	__AST_NODE_TYPE(AugAssign)               \
+	__AST_NODE_TYPE(Break)                   \
+	__AST_NODE_TYPE(BinaryExpr)              \
+	__AST_NODE_TYPE(BoolOp)                  \
+	__AST_NODE_TYPE(Call)                    \
+	__AST_NODE_TYPE(ClassDefinition)         \
+	__AST_NODE_TYPE(Continue)                \
+	__AST_NODE_TYPE(Compare)                 \
+	__AST_NODE_TYPE(Comprehension)           \
+	__AST_NODE_TYPE(Constant)                \
+	__AST_NODE_TYPE(Delete)                  \
+	__AST_NODE_TYPE(Dict)                    \
+	__AST_NODE_TYPE(ExceptHandler)           \
+	__AST_NODE_TYPE(Expression)              \
+	__AST_NODE_TYPE(For)                     \
+	__AST_NODE_TYPE(FormattedValue)          \
+	__AST_NODE_TYPE(FunctionDefinition)      \
+	__AST_NODE_TYPE(GeneratorExp)            \
+	__AST_NODE_TYPE(Global)                  \
+	__AST_NODE_TYPE(If)                      \
+	__AST_NODE_TYPE(IfExpr)                  \
+	__AST_NODE_TYPE(Import)                  \
+	__AST_NODE_TYPE(ImportFrom)              \
+	__AST_NODE_TYPE(JoinedStr)               \
+	__AST_NODE_TYPE(Keyword)                 \
+	__AST_NODE_TYPE(Lambda)                  \
+	__AST_NODE_TYPE(List)                    \
+	__AST_NODE_TYPE(ListComp)                \
+	__AST_NODE_TYPE(Module)                  \
+	__AST_NODE_TYPE(NamedExpr)               \
+	__AST_NODE_TYPE(Name)                    \
+	__AST_NODE_TYPE(NonLocal)                \
+	__AST_NODE_TYPE(Pass)                    \
+	__AST_NODE_TYPE(Raise)                   \
+	__AST_NODE_TYPE(Return)                  \
+	__AST_NODE_TYPE(Set)                     \
+	__AST_NODE_TYPE(SetComp)                 \
+	__AST_NODE_TYPE(Starred)                 \
+	__AST_NODE_TYPE(Subscript)               \
+	__AST_NODE_TYPE(Try)                     \
+	__AST_NODE_TYPE(Tuple)                   \
+	__AST_NODE_TYPE(UnaryExpr)               \
+	__AST_NODE_TYPE(While)                   \
+	__AST_NODE_TYPE(With)                    \
+	__AST_NODE_TYPE(WithItem)                \
 	__AST_NODE_TYPE(Yield)
 
 class Value
@@ -660,6 +661,47 @@ class FunctionDefinition final : public ASTNode
 		std::string type_comment,
 		SourceLocation location)
 		: ASTNode(ASTNodeType::FunctionDefinition, location),
+		  m_function_name(std::move(function_name)), m_args(std::move(args)),
+		  m_body(std::move(body)), m_decorator_list(std::move(decorator_list)),
+		  m_returns(std::move(returns)), m_type_comment(std::move(type_comment))
+	{}
+
+	const std::string &name() const { return m_function_name; }
+	const std::shared_ptr<Arguments> &args() const { return m_args; }
+	const std::vector<std::shared_ptr<ASTNode>> &body() const { return m_body; }
+	std::vector<std::shared_ptr<ASTNode>> &body() { return m_body; }
+	const std::vector<std::shared_ptr<ASTNode>> &decorator_list() const { return m_decorator_list; }
+	const std::shared_ptr<ASTNode> &returns() const { return m_returns; }
+	const std::string &type_comment() const { return m_type_comment; }
+
+	void add_decorator(std::shared_ptr<ASTNode> decorator)
+	{
+		m_decorator_list.push_back(std::move(decorator));
+	}
+
+	Value *codegen(CodeGenerator *) const override;
+};
+
+class AsyncFunctionDefinition final : public ASTNode
+{
+	const std::string m_function_name;
+	const std::shared_ptr<Arguments> m_args;
+	std::vector<std::shared_ptr<ASTNode>> m_body;
+	std::vector<std::shared_ptr<ASTNode>> m_decorator_list;
+	const std::shared_ptr<ASTNode> m_returns;
+	std::string m_type_comment;
+
+	void print_this_node(const std::string &indent) const final;
+
+  public:
+	AsyncFunctionDefinition(std::string function_name,
+		std::shared_ptr<Arguments> args,
+		std::vector<std::shared_ptr<ASTNode>> body,
+		std::vector<std::shared_ptr<ASTNode>> decorator_list,
+		std::shared_ptr<ASTNode> returns,
+		std::string type_comment,
+		SourceLocation location)
+		: ASTNode(ASTNodeType::AsyncFunctionDefinition, location),
 		  m_function_name(std::move(function_name)), m_args(std::move(args)),
 		  m_body(std::move(body)), m_decorator_list(std::move(decorator_list)),
 		  m_returns(std::move(returns)), m_type_comment(std::move(type_comment))

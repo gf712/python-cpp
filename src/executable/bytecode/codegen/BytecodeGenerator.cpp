@@ -801,6 +801,14 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 	return f;
 }
 
+
+Value *BytecodeGenerator::visit(const AsyncFunctionDefinition *node)
+{
+	(void)node;
+	TODO();
+	return nullptr;
+}
+
 Value *BytecodeGenerator::visit(const Lambda *node)
 {
 	// TODO: abstract away logic from here and FunctionDefinition* to avoid repetition
