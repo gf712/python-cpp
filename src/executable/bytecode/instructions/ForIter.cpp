@@ -22,7 +22,7 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &) const
 		if (next_value.is_err()) {
 			auto *last_exception = next_value.unwrap_err();
 
-			if (last_exception->type()->issubclass(stop_iteration("")->type())) {
+			if (last_exception->type()->issubclass(stop_iteration()->type())) {
 				vm.set_instruction_pointer(vm.instruction_pointer() + *m_offset);
 				return Ok(py_none());
 			}

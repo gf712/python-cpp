@@ -644,7 +644,7 @@ PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
 		if (value.is_ok()) { new_string.append(m_value); }
 	};
 
-	if (value.is_err() && value.unwrap_err()->type() != stop_iteration("")->type()) {
+	if (value.is_err() && value.unwrap_err()->type() != stop_iteration()->type()) {
 		return value;
 	}
 	return PyString::create(new_string);
@@ -898,7 +898,7 @@ PyResult<PyObject *> PyStringIterator::__next__()
 		uni_str.toUTF8String(str);
 		return PyString::create(str);
 	}
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 PyType *PyStringIterator::type() const { return list_iterator(); }

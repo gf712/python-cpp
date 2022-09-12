@@ -580,7 +580,7 @@ PyResult<PyObject *> max(const PyTuple *args, const PyDict *kwargs, Interpreter 
 			value = iterator.unwrap()->next();
 		}
 
-		if (value.unwrap_err()->type() != stop_iteration("")->type()) {
+		if (value.unwrap_err()->type() != stop_iteration()->type()) {
 			return Err(value.unwrap_err());
 		}
 
@@ -698,7 +698,7 @@ PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter 
 
 	// FIXME: store StopIteration type somewhere so we don't have to instantiate a StopIteration
 	//        exception object just to get its type
-	if (next_value.unwrap_err()->type() == stop_iteration("")->type()) {
+	if (next_value.unwrap_err()->type() == stop_iteration()->type()) {
 		return Ok(py_true());
 	} else {
 		return next_value;

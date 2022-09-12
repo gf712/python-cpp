@@ -115,7 +115,7 @@ PyResult<int32_t> PySet::__init__(PyTuple *args, PyDict *kwargs)
 		value = iterator.unwrap()->next();
 	}
 
-	if (value.unwrap_err()->type() != stop_iteration("")->type()) {
+	if (value.unwrap_err()->type() != stop_iteration()->type()) {
 		return Err(value.unwrap_err());
 	}
 
@@ -203,7 +203,7 @@ PyResult<PyObject *> PySetIterator::__next__()
 	if (m_current_index < m_pyset.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			*std::next(m_pyset.elements().begin(), m_current_index++));
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 PyType *PySetIterator::type() const { return set_iterator(); }

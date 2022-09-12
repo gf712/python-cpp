@@ -59,6 +59,7 @@
 #include "Unary.hpp"
 #include "UnpackSequence.hpp"
 #include "WithExceptStart.hpp"
+#include "YieldValue.hpp"
 
 #include "../serialization/deserialize.hpp"
 
@@ -425,6 +426,10 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<StoreDeref>(dst, src);
+	}
+	case YIELD_VALUE: {
+		const auto src = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<YieldValue>(src);
 	}
 	}
 	spdlog::error("Missing opcode: {}", instruction_code);

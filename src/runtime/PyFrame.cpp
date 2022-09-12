@@ -37,7 +37,8 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	PyDict *globals,
 	PyDict *locals,
 	const PyTuple *consts,
-	const std::vector<std::string> &names)
+	const std::vector<std::string> &names,
+	PyObject *generator)
 {
 	auto *new_frame = Heap::the().allocate<PyFrame>(names);
 	new_frame->m_f_back = parent;
@@ -46,12 +47,6 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	new_frame->m_locals = locals;
 	new_frame->m_consts = consts;
 	new_frame->m_f_code = code;
-	// if (parent) {
-	// 	new_frame->m_freevars = parent->m_freevars;
-	// 	new_frame->m_freevars.resize(parent->m_freevars.size() + free_vars_count, nullptr);
-	// } else {
-	// 	new_frame->m_freevars = std::vector<PyCell *>(free_vars_count, nullptr);
-	// }
 	new_frame->m_freevars = std::vector<PyCell *>(free_vars_count, nullptr);
 
 	if (new_frame->m_f_back) {
@@ -66,6 +61,8 @@ PyFrame *PyFrame::create(PyFrame *parent,
 			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
 		new_frame->m_exception_stack = std::make_shared<std::vector<ExceptionStackItem>>();
 	}
+
+	new_frame->m_generator = generator;
 	return new_frame;
 }
 
@@ -164,6 +161,7 @@ void PyFrame::visit_graph(Visitor &visitor)
 		if (freevar) { visitor.visit(*freevar); }
 	}
 	if (m_consts) { visitor.visit(*const_cast<PyTuple *>(m_consts)); }
+	if (m_generator) { visitor.visit(*m_generator); }
 }
 
 Value PyFrame::consts(size_t index) const

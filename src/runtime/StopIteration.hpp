@@ -10,19 +10,17 @@ namespace py {
 class StopIteration : public Exception
 {
 	friend class ::Heap;
-	template<typename... Args>
-	friend BaseException *stop_iteration(const std::string &message, Args &&... args);
+	template<typename... Args> friend BaseException *stop_iteration(Args &&...args);
 
   private:
 	StopIteration(PyTuple *args);
 
+  public:
 	static StopIteration *create(PyTuple *args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		return heap.allocate<StopIteration>(args);
 	}
-
-  public:
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
@@ -31,12 +29,9 @@ class StopIteration : public Exception
 	PyType *type() const override;
 };
 
-template<typename... Args>
-inline BaseException *stop_iteration(const std::string &message, Args &&... args)
+template<typename... Args> inline BaseException *stop_iteration(Args &&...args)
 {
-	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
-	ASSERT(msg.is_ok())
-	auto args_tuple = PyTuple::create(msg.unwrap());
+	auto args_tuple = PyTuple::create(std::forward<Args>(args)...);
 	if (args_tuple.is_err()) { TODO(); }
 	return StopIteration::create(args_tuple.unwrap());
 }

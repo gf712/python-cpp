@@ -25,26 +25,42 @@ struct State
 
 struct StackFrame : NonCopyable
 {
-	Registers registers;
-	Registers locals;
-	InstructionBlock::const_iterator return_address;
-	VirtualMachine *vm{ nullptr };
-	std::unique_ptr<State> state;
+  private:
+	StackFrame() = default;
 
-	StackFrame() = delete;
 	StackFrame(size_t register_count,
 		size_t stack_size,
 		InstructionBlock::const_iterator return_address,
 		VirtualMachine *);
+
 	StackFrame(StackFrame &&);
+
+  public:
+	template<typename... Args> static std::unique_ptr<StackFrame> create(Args &&...args)
+	{
+		return std::unique_ptr<StackFrame>(new StackFrame{ std::forward<Args>(args)... });
+	}
+
+	Registers registers;
+	Registers locals;
+	InstructionBlock::const_iterator return_address;
+	InstructionBlock::const_iterator last_instruction_pointer;
+	VirtualMachine *vm{ nullptr };
+	std::unique_ptr<State> state;
+
 	~StackFrame();
+
+	StackFrame clone() const;
+
+	StackFrame &restore();
+	void leave();
 };
 
 class VirtualMachine
 	: NonCopyable
 	, NonMoveable
 {
-	std::stack<StackFrame> m_stack;
+	std::stack<std::reference_wrapper<StackFrame>> m_stack;
 	std::deque<std::vector<const py::Value *>> m_stack_objects;
 
 	InstructionBlock::const_iterator m_instruction_pointer;
@@ -97,28 +113,28 @@ class VirtualMachine
 
 	std::optional<std::reference_wrapper<Registers>> registers()
 	{
-		if (!m_stack.empty()) { return m_stack.top().registers; }
+		if (!m_stack.empty()) { return m_stack.top().get().registers; }
 		return {};
 	}
 	std::optional<std::reference_wrapper<const Registers>> registers() const
 	{
-		if (!m_stack.empty()) { return m_stack.top().registers; }
+		if (!m_stack.empty()) { return m_stack.top().get().registers; }
 		return {};
 	}
 
 	std::optional<std::reference_wrapper<Registers>> stack_locals()
 	{
-		if (!m_stack.empty()) { return m_stack.top().locals; }
+		if (!m_stack.empty()) { return m_stack.top().get().locals; }
 		return {};
 	}
 
 	std::optional<std::reference_wrapper<const Registers>> stack_locals() const
 	{
-		if (!m_stack.empty()) { return m_stack.top().locals; }
+		if (!m_stack.empty()) { return m_stack.top().get().locals; }
 		return {};
 	}
 
-	const std::stack<StackFrame> &stack() const { return m_stack; }
+	const std::stack<std::reference_wrapper<StackFrame>> &stack() const { return m_stack; }
 	const State &state() const { return *m_state; }
 	State &state() { return *m_state; }
 
@@ -132,6 +148,7 @@ class VirtualMachine
 	void set_instruction_pointer(InstructionBlock::const_iterator pos)
 	{
 		m_instruction_pointer = pos;
+		m_stack.top().get().last_instruction_pointer = m_instruction_pointer;
 	}
 
 	const InstructionBlock::const_iterator &instruction_pointer() const
@@ -142,22 +159,24 @@ class VirtualMachine
 	const py::Value *stack_pointer() const
 	{
 		ASSERT(!m_stack.empty())
-		ASSERT(!m_stack.top().registers.empty())
-		return &m_stack.top().registers.front();
+		ASSERT(!m_stack.top().get().registers.empty())
+		return &m_stack.top().get().registers.front();
 	}
 
 	void clear();
 
 	void dump() const;
 
-	void setup_call_stack(size_t register_count, size_t stack_size);
+	[[nodiscard]] std::unique_ptr<StackFrame> setup_call_stack(size_t register_count,
+		size_t stack_size);
 	int call(const std::unique_ptr<Function> &);
 	void ret();
 	void set_cleanup(State::CleanupLogic cleanup_type,
 		InstructionVector::const_iterator exit_instruction);
 	void leave_cleanup_handling();
 
-	void push_frame(size_t register_count, size_t stack_size);
+	std::unique_ptr<StackFrame> push_frame(size_t register_count, size_t stack_size);
+	void push_frame(StackFrame &frame);
 
 	void pop_frame();
 

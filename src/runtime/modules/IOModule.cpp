@@ -95,7 +95,7 @@ class IOBase : public PyBaseObject
 							// since we don't handle the situation where __next__ returns
 							// Ok(nullptr), we make an extra allocation here for StopIteration,
 							// and have the same semantics as cpython
-							return Err(stop_iteration(""));
+							return Err(stop_iteration());
 						} else {
 							return Ok(line);
 						}
@@ -203,7 +203,7 @@ class IOBase : public PyBaseObject
 		while (true) {
 			auto line = it->next();
 			if (line.is_err()) {
-				if (line.unwrap_err()->type() == stop_iteration("")->type()) {
+				if (line.unwrap_err()->type() == stop_iteration()->type()) {
 					break;
 				} else {
 					return line;
@@ -263,7 +263,7 @@ class IOBase : public PyBaseObject
 		while (true) {
 			auto line = iter->next();
 			if (line.is_err()) {
-				if (line.unwrap_err()->type() == stop_iteration("")->type()) {
+				if (line.unwrap_err()->type() == stop_iteration()->type()) {
 					break;
 				} else {
 					return line;

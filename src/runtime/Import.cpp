@@ -277,7 +277,8 @@ PyResult<PyModule *> import_frozen_module(PyString *name)
 				module.unwrap()->symbol_table(),
 				module.unwrap()->symbol_table(),
 				code->consts(),
-				code->names());
+				code->names(),
+				nullptr);
 		[[maybe_unused]] auto scoped_stack =
 			vm.interpreter().setup_call_stack(code->function(), function_frame);
 		return vm.interpreter().call(code->function(), function_frame);

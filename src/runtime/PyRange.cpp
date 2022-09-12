@@ -124,7 +124,7 @@ PyResult<PyObject *> PyRangeIterator::__next__()
 		m_current_index += m_pyrange.step();
 		return result;
 	}
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 PyType *PyRangeIterator::type() const { return range_iterator(); }

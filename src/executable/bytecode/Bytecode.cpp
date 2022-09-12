@@ -103,10 +103,32 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	// create main stack frame
-	if (vm.stack().empty()) { vm.setup_call_stack(m_register_count, m_stack_size); }
+	[[maybe_unused]] auto main_frame = [&vm, this]() -> std::unique_ptr<StackFrame> {
+		if (vm.stack().empty()) { return vm.setup_call_stack(m_register_count, m_stack_size); }
+		return nullptr;
+	}();
 
 	const auto &begin_function_block = begin();
 	vm.set_instruction_pointer(begin_function_block->begin());
+
+	return eval_loop(vm, interpreter);
+}
+
+PyResult<Value> Bytecode::call_without_setup(VirtualMachine &vm, Interpreter &interpreter) const
+{
+	// create main stack frame
+	ASSERT(!vm.stack().empty());
+
+	constexpr auto sentinel = decltype(vm.stack().top().get().last_instruction_pointer)();
+	if (vm.stack().top().get().last_instruction_pointer == sentinel) {
+		// first time calling with the stack frame, so we don't have a last instruction pointer yet
+		const auto &begin_function_block = begin();
+		vm.set_instruction_pointer(begin_function_block->begin());
+	} else {
+		// otherwise resume execution, by starting execution from the instruction after the last run
+		// instruction
+		vm.set_instruction_pointer(vm.stack().top().get().last_instruction_pointer + 1);
+	}
 
 	return eval_loop(vm, interpreter);
 }
@@ -136,7 +158,7 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 	const auto stack_depth = vm.stack().size();
 	const auto initial_ip = vm.instruction_pointer();
 
-	bool requires_block_jump = false;
+	bool requires_block_jump = true;
 
 	for (; block_view != end_function_block;) {
 		const auto begin = block_view->begin();

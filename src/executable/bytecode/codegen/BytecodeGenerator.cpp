@@ -61,6 +61,7 @@
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 #include "executable/bytecode/instructions/WithExceptStart.hpp"
+#include "executable/bytecode/instructions/YieldValue.hpp"
 
 #include "ast/optimizers/ConstantFolding.hpp"
 #include "executable/FunctionBlock.hpp"
@@ -1086,7 +1087,7 @@ Value *BytecodeGenerator::visit(const Yield *node)
 		});
 	}
 	m_return_transform[m_function_id] = std::move(transforms);
-	emit<ReturnValue>(src->get_register());
+	emit<YieldValue>(src->get_register());
 	return src;
 }
 

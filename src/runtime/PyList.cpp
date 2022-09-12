@@ -258,7 +258,7 @@ PyResult<PyObject *> PyListIterator::__next__()
 	if (m_current_index < m_pylist.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pylist.elements()[m_current_index++]);
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 PyType *PyListIterator::type() const { return list_iterator(); }

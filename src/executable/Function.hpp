@@ -52,4 +52,5 @@ class Function : NonCopyable
 	std::shared_ptr<Program> program() const { return m_program; }
 
 	virtual py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const = 0;
+	virtual py::PyResult<py::Value> call_without_setup(VirtualMachine &, Interpreter &) const = 0;
 };

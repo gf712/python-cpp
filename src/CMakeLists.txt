@@ -70,6 +70,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp
     executable/bytecode/instructions/WithExceptStart.cpp
+    executable/bytecode/instructions/YieldValue.cpp
     executable/Mangler.cpp)
 
 set(EXECUTABLE_SOURCE_FILES # cmake-format: sortable

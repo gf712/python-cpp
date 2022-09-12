@@ -14,7 +14,9 @@ class PyFrame : public PyBaseObject
 {
 	friend Heap;
 	friend Interpreter;
+	friend PyGenerator;
 
+  public:
 	struct ExceptionStackItem
 	{
 		BaseException *exception{ nullptr };
@@ -22,6 +24,7 @@ class PyFrame : public PyBaseObject
 		PyTraceback *traceback{ nullptr };
 	};
 
+  private:
 	PyFrame(const std::vector<std::string> &);
 
   protected:
@@ -35,6 +38,8 @@ class PyFrame : public PyBaseObject
 	PyDict *m_locals{ nullptr };
 	// code segment
 	PyCode *m_f_code{ nullptr };
+	// generator object
+	PyObject *m_generator{ nullptr };
 
 	size_t m_register_count;
 	const std::vector<std::string> &m_names;
@@ -51,7 +56,8 @@ class PyFrame : public PyBaseObject
 		PyDict *globals,
 		PyDict *locals,
 		const PyTuple *consts,
-		const std::vector<std::string> &names);
+		const std::vector<std::string> &names,
+		PyObject *generator);
 
 	void put_local(const std::string &name, const Value &);
 	void put_global(const std::string &name, const Value &);
@@ -77,6 +83,8 @@ class PyFrame : public PyBaseObject
 	PyDict *locals() const;
 	PyModule *builtins() const;
 	PyCode *code() const { return m_f_code; }
+	PyObject *generator() const { return m_generator; }
+	void set_generator(PyObject *generator) { m_generator = generator; }
 
 	const std::vector<PyCell *> &freevars() const;
 	std::vector<PyCell *> &freevars();

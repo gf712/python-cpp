@@ -561,7 +561,7 @@ PyResult<PyObject *> PyDictItemsIterator::__next__()
 		m_current_iterator++;
 		return PyTuple::create(key, value);
 	}
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 bool PyDictItemsIterator::operator==(const PyDictItemsIterator &other) const
@@ -655,7 +655,7 @@ PyResult<PyObject *> PyDictKeyIterator::__next__()
 		m_current_iterator++;
 		return PyObject::from(key);
 	}
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 bool PyDictKeyIterator::operator==(const PyDictKeyIterator &other) const
@@ -747,7 +747,7 @@ PyResult<PyObject *> PyDictValueIterator::__next__()
 		m_current_iterator++;
 		return PyObject::from(value);
 	}
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 bool PyDictValueIterator::operator==(const PyDictValueIterator &other) const

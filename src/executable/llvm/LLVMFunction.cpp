@@ -9,3 +9,9 @@ py::PyResult<py::Value> LLVMFunction::call(VirtualMachine &, Interpreter &) cons
 	// invoked outside the VM and/or Interpreter
 	TODO();
 }
+
+py::PyResult<py::Value> LLVMFunction::call_without_setup(VirtualMachine &vm,
+	Interpreter &interpreter) const
+{
+	return call(vm, interpreter);
+}

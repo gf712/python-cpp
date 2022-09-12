@@ -169,7 +169,8 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 		globals,
 		locals,
 		consts(),
-		names());
+		names(),
+		nullptr);
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_function, function_frame);
 
@@ -339,8 +340,6 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 		}
 	}
 
-	spdlog::debug("Requesting stack frame with {} virtual registers", m_register_count);
-
 	for (size_t idx = m_cellvars.size(); const auto &el : closure) {
 		ASSERT(std::holds_alternative<PyObject *>(el));
 		ASSERT(as<PyCell>(std::get<PyObject *>(el)));
@@ -349,7 +348,13 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 
 	if (m_flags.is_set(CodeFlags::Flag::GENERATOR)) {
 		// FIXME: pass the qualname
-		return PyGenerator::create(function_frame, name, PyString::create("").unwrap());
+		auto stack_frame = scoped_stack.release();
+		return PyGenerator::create(
+			function_frame, std::move(stack_frame), name, PyString::create("").unwrap())
+			.and_then([function_frame](PyGenerator *generator) {
+				function_frame->set_generator(generator);
+				return Ok(generator);
+			});
 	} else {
 		// spdlog::debug("Frame: {}", (void *)execution_frame);
 		// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());

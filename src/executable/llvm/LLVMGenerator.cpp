@@ -505,8 +505,7 @@ ast::Value *LLVMGenerator::visit(const ast::GeneratorExp *node) { TODO(); }
 
 ast::Value *LLVMGenerator::visit(const ast::SetComp *node) { TODO(); }
 
-template<typename... Args>
-void LLVMGenerator::set_error_state(std::string_view msg, Args &&... args)
+template<typename... Args> void LLVMGenerator::set_error_state(std::string_view msg, Args &&...args)
 {
 	spdlog::debug(msg, std::forward<Args>(args)...);
 	m_ctx->state.status = Context::State::Status::ERROR;

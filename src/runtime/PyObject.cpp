@@ -658,7 +658,7 @@ PyResult<bool> PyObject::contains(PyObject *value)
 		n = it.unwrap()->next();
 	}
 
-	if (n.is_err() && (n.unwrap_err()->type() != stop_iteration("")->type())) {
+	if (n.is_err() && (n.unwrap_err()->type() != stop_iteration()->type())) {
 		return Err(n.unwrap_err());
 	}
 	return Ok(false);

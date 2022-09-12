@@ -271,7 +271,7 @@ PyResult<PyObject *> PyTupleIterator::__next__()
 	if (m_current_index < m_pytuple.elements().size())
 		return std::visit([](const auto &element) { return PyObject::from(element); },
 			m_pytuple.elements()[m_current_index++]);
-	return Err(stop_iteration(""));
+	return Err(stop_iteration());
 }
 
 bool PyTupleIterator::operator==(const PyTupleIterator &other) const

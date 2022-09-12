@@ -76,6 +76,7 @@ void initialize_types()
 	not_implemented();
 	frame();
 	namespace_();
+	generator();
 }
 
 Interpreter::Interpreter() {}
@@ -120,8 +121,8 @@ void Interpreter::internal_setup(const std::string &name,
 	main_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
 	auto *globals = main_module->symbol_table();
 	auto *locals = globals;
-	m_current_frame =
-		PyFrame::create(nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names);
+	m_current_frame = PyFrame::create(
+		nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names, nullptr);
 	m_global_frame = m_current_frame;
 
 	if (config.requires_importlib) {
@@ -214,16 +215,26 @@ PyModule *Interpreter::get_imported_module(PyString *name) const
 ScopedStack::~ScopedStack()
 {
 	auto &vm = VirtualMachine::the();
-	if (&vm.stack().top() == &top_frame) { vm.pop_frame(); }
+	if (!vm.stack().empty() && top_frame && &vm.stack().top().get() == top_frame.get()) {
+		vm.pop_frame();
+	}
+}
+
+std::unique_ptr<StackFrame> ScopedStack::release()
+{
+	ASSERT(top_frame);
+	auto &vm = VirtualMachine::the();
+	vm.pop_frame();
+	return std::move(top_frame);
 }
 
 ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,
 	PyFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
-	vm.setup_call_stack(
+	auto frame = vm.setup_call_stack(
 		function_frame->m_register_count, func->stack_size() + function_frame->freevars().size());
-	return ScopedStack{ vm.stack().top() };
+	return ScopedStack{ std::move(frame) };
 }
 
 PyResult<PyObject *> Interpreter::call(const std::unique_ptr<Function> &func,
@@ -233,6 +244,24 @@ PyResult<PyObject *> Interpreter::call(const std::unique_ptr<Function> &func,
 	function_frame->m_f_back = m_current_frame;
 	m_current_frame = function_frame;
 	auto result = func->call(vm, *this);
+
+	// cleanup: the current_frame will be garbage collected
+	m_current_frame = m_current_frame->exit();
+
+	return result.and_then([](const auto &value) { return PyObject::from(value); });
+}
+
+PyResult<PyObject *> Interpreter::call(const std::unique_ptr<Function> &func,
+	PyFrame *function_frame,
+	StackFrame &stack_frame)
+{
+	auto &vm = VirtualMachine::the();
+	function_frame->m_f_back = m_current_frame;
+	m_current_frame = function_frame;
+
+	stack_frame.return_address = VirtualMachine::the().instruction_pointer();
+	stack_frame.restore();
+	auto result = func->call_without_setup(vm, *this);
 
 	// cleanup: the current_frame will be garbage collected
 	m_current_frame = m_current_frame->exit();

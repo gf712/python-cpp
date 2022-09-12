@@ -35,6 +35,7 @@ class Bytecode : public Function
 	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer, std::shared_ptr<Program> program);
 
 	py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const override;
+	py::PyResult<py::Value> call_without_setup(VirtualMachine &, Interpreter &) const override;
 
 	py::PyResult<py::Value> eval_loop(VirtualMachine &, Interpreter &) const;
 };

@@ -11,8 +11,10 @@ class BytecodeProgram;
 
 struct ScopedStack
 {
-	const StackFrame &top_frame;
+	std::unique_ptr<StackFrame> top_frame;
 	~ScopedStack();
+
+	std::unique_ptr<StackFrame> release();
 };
 
 class Interpreter
@@ -51,7 +53,7 @@ class Interpreter
 	py::PyResult<py::Value> get_object(const std::string &name);
 
 	template<typename PyObjectType, typename... Args>
-	py::PyObject *allocate_object(const std::string &name, Args &&... args)
+	py::PyObject *allocate_object(const std::string &name, Args &&...args)
 	{
 		auto &heap = VirtualMachine::the().heap();
 		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {
@@ -85,6 +87,9 @@ class Interpreter
 	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
 	py::PyResult<py::PyObject *> call(const std::unique_ptr<Function> &,
 		py::PyFrame *function_frame);
+
+	py::PyResult<py::PyObject *>
+		call(const std::unique_ptr<Function> &, py::PyFrame *function_frame, StackFrame &frame);
 
 	py::PyResult<py::PyObject *>
 		call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);

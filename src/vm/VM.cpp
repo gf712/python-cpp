@@ -42,6 +42,33 @@ StackFrame::~StackFrame()
 	if (vm) { spdlog::debug("Popping frame. New stack size: {}", vm->m_stack.size()); }
 }
 
+StackFrame StackFrame::clone() const
+{
+	StackFrame stack_frame;
+	stack_frame.registers = registers;
+	stack_frame.locals = locals;
+	stack_frame.return_address = return_address;
+	stack_frame.last_instruction_pointer = last_instruction_pointer;
+	stack_frame.vm = vm;
+	stack_frame.state = std::make_unique<State>(*state);
+	return stack_frame;
+}
+
+
+StackFrame &StackFrame::restore()
+{
+	ASSERT(vm);
+	vm->push_frame(*this);
+	return vm->stack().top();
+}
+
+void StackFrame::leave()
+{
+	ASSERT(vm);
+	// ASSERT(vm->m_stack.top() == *this);
+	vm->pop_frame();
+}
+
 VirtualMachine::VirtualMachine() : m_heap(Heap::the())
 {
 	uintptr_t *rbp;
@@ -49,9 +76,10 @@ VirtualMachine::VirtualMachine() : m_heap(Heap::the())
 	m_heap.set_start_stack_pointer(rbp);
 }
 
-void VirtualMachine::setup_call_stack(size_t register_count, size_t stack_size)
+std::unique_ptr<StackFrame> VirtualMachine::setup_call_stack(size_t register_count,
+	size_t stack_size)
 {
-	push_frame(register_count, stack_size);
+	return push_frame(register_count, stack_size);
 }
 
 void VirtualMachine::ret()
@@ -187,22 +215,22 @@ void VirtualMachine::leave_cleanup_handling()
 	m_state->cleanup.pop();
 }
 
-void VirtualMachine::push_frame(size_t register_count, size_t stack_size)
+std::unique_ptr<StackFrame> VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 {
-	if (m_stack.empty()) {
-		// the stack of main doesn't need a return address, since once it is popped
-		// we shut down and there is nothing left to do
-		m_stack.push(
-			StackFrame{ register_count, stack_size, InstructionBlock::const_iterator{}, this });
-	} else {
-		// return address is the instruction after the current instruction
-		const auto return_address = m_instruction_pointer;
-		m_stack.push(StackFrame{ register_count, stack_size, return_address, this });
-	}
-	spdlog::debug("Pushing frame. New stack size: {}", m_stack.size());
+	auto new_frame = m_stack.empty() ? StackFrame::create(
+						 register_count, stack_size, InstructionBlock::const_iterator{}, this)
+									 : StackFrame::create(
+										 register_count, stack_size, m_instruction_pointer, this);
+	push_frame(*new_frame);
 
+	return new_frame;
+}
+
+void VirtualMachine::push_frame(StackFrame &frame)
+{
+	m_stack.push(frame);
 	// set a new state for this stack frame
-	m_state = m_stack.top().state.get();
+	m_state = m_stack.top().get().state.get();
 
 	const auto &r = registers();
 	auto &stack_objects = m_stack_objects.emplace_back();
@@ -214,21 +242,22 @@ void VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 	if (l.has_value()) {
 		for (const auto &v : l->get()) { stack_objects.push_back(&v); }
 	}
+
+	spdlog::debug("Pushing frame. New stack size: {}", m_stack.size());
 }
 
 void VirtualMachine::pop_frame()
 {
 	if (m_stack.size() > 1) {
-		auto return_value = m_stack.top().registers[0];
-		ASSERT((*m_stack.top().return_address).get());
-		m_instruction_pointer = m_stack.top().return_address;
+		auto return_value = m_stack.top().get().registers[0];
+		ASSERT((*m_stack.top().get().return_address).get());
+		m_instruction_pointer = m_stack.top().get().return_address;
 		m_stack.pop();
-		m_stack.top().registers[0] = std::move(return_value);
+		m_stack.top().get().registers[0] = std::move(return_value);
 		// restore stack frame state
-		m_state = m_stack.top().state.get();
+		m_state = m_stack.top().get().state.get();
 		m_stack_objects.pop_back();
 	} else {
-		// FIXME: this is an ugly way to keep the state of the interpreter
 		m_stack.pop();
 		m_stack_objects.pop_back();
 	}
