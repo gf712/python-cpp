@@ -9,6 +9,13 @@ static PyType *s_type_error = nullptr;
 
 TypeError::TypeError(PyTuple *args) : Exception(s_type_error->underlying_type(), args) {}
 
+PyResult<PyObject *> TypeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(type == s_type_error)
+	ASSERT(!kwargs || kwargs->map().empty())
+	return Ok(TypeError::create(args));
+}
+
 PyType *TypeError::type() const
 {
 	ASSERT(s_type_error)

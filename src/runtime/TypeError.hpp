@@ -11,7 +11,7 @@ class TypeError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *type_error(const std::string &message, Args &&... args);
+	friend BaseException *type_error(const std::string &message, Args &&...args);
 
   private:
 	TypeError(PyTuple *args);
@@ -23,13 +23,15 @@ class TypeError : public Exception
 	}
 
   public:
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
 };
 
 template<typename... Args>
-inline BaseException *type_error(const std::string &message, Args &&... args)
+inline BaseException *type_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())
