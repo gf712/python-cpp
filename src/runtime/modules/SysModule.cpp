@@ -1,10 +1,14 @@
+#include "runtime/BaseException.hpp"
 #include "runtime/MemoryError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyFrame.hpp"
+#include "runtime/PyFunction.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNamespace.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTraceback.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/types/api.hpp"
 
@@ -270,6 +274,13 @@ class Version : public PyBaseObject
 	}
 };
 
+PyResult<PyObject *> exc_info(Interpreter &interpreter)
+{
+	auto exc = interpreter.execution_frame()->exception_info();
+	if (!exc.has_value()) { return PyTuple::create(py_none(), py_none(), py_none()); }
+	return PyTuple::create(exc->exception_type, exc->exception, exc->traceback);
+}
+
 }// namespace
 
 namespace py {
@@ -281,7 +292,6 @@ PyModule *sys_module(Interpreter &interpreter)
 	if (s_sys_module && heap.slab().has_address(bit_cast<uint8_t *>(s_sys_module))) {
 		return s_sys_module;
 	}
-
 
 	s_sys_module = PyModule::create(
 		PyDict::create().unwrap(), PyString::create("sys").unwrap(), PyString::create("").unwrap())
@@ -338,6 +348,13 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module->add_symbol(PyString::create("version_info").unwrap(), version);
 
 	s_sys_module->add_symbol(PyString::create("flags").unwrap(), flags);
+
+	s_sys_module->add_symbol(PyString::create("exc_info").unwrap(),
+		PyNativeFunction::create("exc_info", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			ASSERT(!args || args->elements().empty());
+			ASSERT(!kwargs || kwargs->map().empty());
+			return exc_info(interpreter);
+		}).unwrap());
 
 	return s_sys_module;
 }
