@@ -109,6 +109,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/AttributeError.cpp
     runtime/BaseException.cpp
     runtime/Exception.cpp
+    runtime/GeneratorInterface.cpp
     runtime/Import.cpp
     runtime/ImportError.cpp
     runtime/KeyError.cpp

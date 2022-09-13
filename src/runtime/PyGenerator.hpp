@@ -1,21 +1,11 @@
 #pragma once
 
-#include "PyFrame.hpp"
-#include "PyObject.hpp"
+#include "GeneratorInterface.hpp"
 
 namespace py {
-class PyGenerator : public PyBaseObject
+class PyGenerator : public GeneratorInterface<PyGenerator>
 {
 	friend ::Heap;
-
-	PyFrame *m_frame{ nullptr };
-	std::unique_ptr<StackFrame> m_stack_frame;
-	bool m_is_running{ false };
-	PyObject *m_code{ nullptr };
-	PyString *m_name{ nullptr };
-	PyString *m_qualname{ nullptr };
-	std::unique_ptr<std::vector<PyFrame::ExceptionStackItem>> m_exception_stack;
-	bool m_invalid_return{ false };
 
 	PyGenerator(PyFrame *m_frame,
 		std::unique_ptr<StackFrame> &&,
@@ -25,17 +15,11 @@ class PyGenerator : public PyBaseObject
 		PyString *m_qualname);
 
   public:
+	static constexpr std::string_view GeneratorTypeName = "generator";
+
+  public:
 	static PyResult<PyGenerator *>
 		create(PyFrame *frame, std::unique_ptr<StackFrame> &&, PyString *name, PyString *qualname);
-
-	void set_invalid_return(bool invalid_return) { m_invalid_return = invalid_return; }
-
-	std::string to_string() const override;
-
-	PyResult<PyObject *> __repr__() const;
-	PyResult<PyObject *> __iter__() const;
-	PyResult<PyObject *> __next__();
-	PyResult<PyObject *> send();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;

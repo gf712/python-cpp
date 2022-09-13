@@ -14,7 +14,7 @@ class PyFrame : public PyBaseObject
 {
 	friend Heap;
 	friend Interpreter;
-	friend PyGenerator;
+	template<typename T> friend class GeneratorInterface;
 
   public:
 	struct ExceptionStackItem
