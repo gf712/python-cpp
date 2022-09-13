@@ -527,11 +527,15 @@ PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &)
 				return Ok(NameConstant{ NoneType{} });
 			},
 			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
-				if (std::holds_alternative<int64_t>(lhs_value.value) && std::holds_alternative<int64_t>(rhs_value.value)) {
-					return Ok(Number{ std::get<int64_t>(lhs_value.value) & std::get<int64_t>(rhs_value.value) });
+				if (std::holds_alternative<int64_t>(lhs_value.value)
+					&& std::holds_alternative<int64_t>(rhs_value.value)) {
+					return Ok(Number{
+						std::get<int64_t>(lhs_value.value) & std::get<int64_t>(rhs_value.value) });
 				} else {
-					const std::string lhs_type = std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
-					const std::string rhs_type = std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
+					const std::string lhs_type =
+						std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
+					const std::string rhs_type =
+						std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
 					return Err(type_error(
 						"unsupported operand type(s) for &: '{}' and '{}'", lhs_type, rhs_type));
 				}
@@ -588,6 +592,22 @@ PyResult<bool> truthy(const Value &value, Interpreter &)
 						  [](const Ellipsis &) -> PyResult<bool> { return Ok(true); },
 						  [](PyObject *obj) -> PyResult<bool> { return obj->bool_(); } },
 		value);
+}
+
+bool operator==(const Value &lhs_value, const Value &rhs_value)
+{
+	const auto result =
+		std::visit(overloaded{ [](PyObject *const lhs, PyObject *const rhs) {
+								  auto r = lhs->richcompare(rhs, RichCompare::Py_EQ);
+								  ASSERT(r.is_ok())
+								  return r.unwrap() == py_true();
+							  },
+					   [](PyObject *const lhs, const auto &rhs) { return lhs == rhs; },
+					   [](const auto &lhs, PyObject *const rhs) { return lhs == rhs; },
+					   [](const auto &lhs, const auto &rhs) { return lhs == rhs; } },
+			lhs_value,
+			rhs_value);
+	return result;
 }
 
 }// namespace py

@@ -685,9 +685,4 @@ struct ValueHash
 	size_t operator()(const Value &value) const;
 };
 
-struct ValueEqual
-{
-	bool operator()(const Value &lhs, const Value &rhs) const;
-};
-
 }// namespace py

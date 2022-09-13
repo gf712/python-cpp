@@ -16,7 +16,7 @@ class PyDictValueIterator;
 class PyDict : public PyBaseObject
 {
   public:
-	using MapType = std::unordered_map<Value, Value, ValueHash, ValueEqual>;
+	using MapType = std::unordered_map<Value, Value, ValueHash>;
 
   private:
 	friend class ::Heap;

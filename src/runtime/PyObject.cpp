@@ -63,7 +63,7 @@ size_t ValueHash::operator()(const Value &value) const
 									  return std::hash<double>{}(std::get<double>(number.value));
 								  } else {
 									  if (std::get<int64_t>(number.value) == -1) return -2;
-									  return std::hash<int64_t>{}(std::get<int64_t>(number.value));
+									  return std::get<int64_t>(number.value);
 								  }
 							  },
 					   [](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
@@ -73,7 +73,7 @@ size_t ValueHash::operator()(const Value &value) const
 						   if (std::holds_alternative<bool>(c.value)) {
 							   return std::get<bool>(c.value) ? 0 : 1;
 						   } else {
-							   return bit_cast<size_t>(py_none());
+							   return bit_cast<size_t>(py_none()) >> 4;
 						   }
 					   },
 					   [](PyObject *obj) -> size_t {
@@ -84,24 +84,6 @@ size_t ValueHash::operator()(const Value &value) const
 			value);
 	return result;
 }
-
-
-bool ValueEqual::operator()(const Value &lhs_value, const Value &rhs_value) const
-{
-	const auto result =
-		std::visit(overloaded{ [](PyObject *const lhs, PyObject *const rhs) {
-								  auto r = lhs->richcompare(rhs, RichCompare::Py_EQ);
-								  ASSERT(r.is_ok())
-								  return r.unwrap() == py_true();
-							  },
-					   [](PyObject *const lhs, const auto &rhs) { return lhs == rhs; },
-					   [](const auto &lhs, PyObject *const rhs) { return lhs == rhs; },
-					   [](const auto &lhs, const auto &rhs) { return lhs == rhs; } },
-			lhs_value,
-			rhs_value);
-	return result;
-}
-
 
 namespace {
 

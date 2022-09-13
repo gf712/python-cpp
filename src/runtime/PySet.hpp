@@ -9,7 +9,7 @@ class PySet : public PyBaseObject
 	friend class ::Heap;
 
   public:
-	using SetType = std::unordered_set<Value, ValueHash, ValueEqual>;
+	using SetType = std::unordered_set<Value, ValueHash>;
 
   private:
 	SetType m_elements;
