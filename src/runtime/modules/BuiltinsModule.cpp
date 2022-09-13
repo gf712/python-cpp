@@ -126,6 +126,15 @@ PyResult<PyObject *> iter(const PyTuple *args, const PyDict *kwargs, Interpreter
 	return arg.and_then([](auto *obj) { return obj->iter(); });
 }
 
+PyResult<PyObject *> hash(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+{
+	ASSERT(args->size() == 1)
+	const auto &arg = args->operator[](0);
+	if (kwargs) { return Err(type_error("hash() takes no keyword arguments")); }
+	return arg.and_then([](auto *obj) { return obj->hash(); }).and_then([](const size_t h) {
+		return PyInteger::create(h);
+	});
+}
 
 PyResult<PyObject *> next(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
@@ -963,6 +972,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("hasattr").unwrap(),
 		heap.allocate<PyNativeFunction>("hasattr", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return hasattr(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("hash").unwrap(),
+		heap.allocate<PyNativeFunction>("hash", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return hash(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->add_symbol(PyString::create("hex").unwrap(),
