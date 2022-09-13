@@ -3775,10 +3775,14 @@ struct YieldExpressionPattern : Pattern<YieldExpressionPattern>
 			AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, YieldKeywordPattern>,
 			ZeroOrOnePattern<StarExpressionsPattern>>;
 		if (pattern2::match(p)) {
-			ASSERT(p.stack().size() == 1)
+			ASSERT(p.stack().size() <= 1);
 			const auto end = p.lexer().peek_token(p.token_position() - 1);
-			scope.parent().push_back(std::make_shared<Yield>(
-				p.pop_back(), SourceLocation{ start->start(), end->end() }));
+			std::shared_ptr<ASTNode> value =
+				p.stack().empty() ? std::make_shared<Constant>(
+					NameConstant{ NoneType{} }, SourceLocation{ end->start(), end->end() })
+								  : p.pop_back();
+			scope.parent().push_back(
+				std::make_shared<Yield>(value, SourceLocation{ start->start(), end->end() }));
 			return true;
 		}
 
