@@ -1,6 +1,8 @@
 #include "PyCode.hpp"
 #include "MemoryError.hpp"
+#include "PyAsyncGenerator.hpp"
 #include "PyCell.hpp"
+#include "PyCoroutine.hpp"
 #include "PyFrame.hpp"
 #include "PyFunction.hpp"
 #include "PyGenerator.hpp"
@@ -346,12 +348,30 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 		function_frame->freevars()[idx++] = as<PyCell>(std::get<PyObject *>(el));
 	}
 
-	if (m_flags.is_set(CodeFlags::Flag::GENERATOR)) {
+	if (m_flags.is_set(CodeFlags::Flag::GENERATOR) && m_flags.is_set(CodeFlags::Flag::COROUTINE)) {
+		// FIXME: pass the qualname
+		auto stack_frame = scoped_stack.release();
+		return PyAsyncGenerator::create(
+			function_frame, std::move(stack_frame), name, PyString::create("").unwrap())
+			.and_then([function_frame](PyAsyncGenerator *generator) {
+				function_frame->set_generator(generator);
+				return Ok(generator);
+			});
+	} else if (m_flags.is_set(CodeFlags::Flag::GENERATOR)) {
 		// FIXME: pass the qualname
 		auto stack_frame = scoped_stack.release();
 		return PyGenerator::create(
 			function_frame, std::move(stack_frame), name, PyString::create("").unwrap())
 			.and_then([function_frame](PyGenerator *generator) {
+				function_frame->set_generator(generator);
+				return Ok(generator);
+			});
+	} else if (m_flags.is_set(CodeFlags::Flag::COROUTINE)) {
+		// FIXME: pass the qualname
+		auto stack_frame = scoped_stack.release();
+		return PyCoroutine::create(
+			function_frame, std::move(stack_frame), name, PyString::create("").unwrap())
+			.and_then([function_frame](PyCoroutine *generator) {
 				function_frame->set_generator(generator);
 				return Ok(generator);
 			});

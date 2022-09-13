@@ -1,6 +1,7 @@
 #include "builtin.hpp"
 
 #include "runtime/NotImplemented.hpp"
+#include "runtime/PyAsyncGenerator.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
@@ -9,6 +10,7 @@
 #include "runtime/PyClassMethod.hpp"
 #include "runtime/PyClassMethodDescriptor.hpp"
 #include "runtime/PyCode.hpp"
+#include "runtime/PyCoroutine.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
 #include "runtime/PyFloat.hpp"
@@ -67,7 +69,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_member_descriptor(PyMemberDescriptor::type_factory()),
 	  m_traceback(PyTraceback::type_factory()), m_frame(PyFrame::type_factory()),
 	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory()),
-	  m_generator(PyGenerator::type_factory())
+	  m_generator(PyGenerator::type_factory()), m_coroutine(PyCoroutine::type_factory()),
+	  m_async_generator(PyAsyncGenerator::type_factory())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                                                         \
@@ -142,4 +145,6 @@ INITIALIZE_TYPE(frame)
 INITIALIZE_TYPE(namespace_)
 
 INITIALIZE_TYPE(generator)
+INITIALIZE_TYPE(coroutine)
+INITIALIZE_TYPE(async_generator)
 }// namespace py

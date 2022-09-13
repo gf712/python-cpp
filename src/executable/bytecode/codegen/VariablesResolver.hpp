@@ -42,6 +42,9 @@ class VariablesResolver : public ast::CodeGenerator
 	void annotate_free_and_cell_variables(const std::string &name);
 	Scope *top_level_node(const std::string &name) const;
 
+	template <typename FunctionType>
+	void visit_function(FunctionType* function);
+
   public:
 	static VisibilityMap resolve(ast::Module *node)
 	{

@@ -2,8 +2,10 @@
 
 namespace py {
 
+class PyAsyncGenerator;
 class PyCell;
 class PyCode;
+class PyCoroutine;
 class PyDict;
 class PyFloat;
 class PyFunction;

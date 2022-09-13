@@ -20,10 +20,11 @@ class CodeFlags
 		VARKEYWORDS = 3,
 		NESTED = 4,
 		GENERATOR = 5,
+		COROUTINE = 6,
 	};
 
   private:
-	std::bitset<6> m_flags;
+	std::bitset<7> m_flags;
 
 	CodeFlags() = default;
 
@@ -40,14 +41,14 @@ class CodeFlags
 	static CodeFlags from_byte(uint8_t b)
 	{
 		auto f = CodeFlags();
-		f.m_flags = std::bitset<6>(b);
+		f.m_flags = std::bitset<7>(b);
 		return f;
 	}
 
 	void set(Flag f) { m_flags.set(static_cast<uint8_t>(f)); }
 	void reset(Flag f) { m_flags.reset(static_cast<uint8_t>(f)); }
 	bool is_set(Flag f) const { return m_flags[static_cast<uint8_t>(f)]; }
-	std::bitset<6> bits() const { return m_flags; };
+	std::bitset<7> bits() const { return m_flags; };
 };
 
 class Program

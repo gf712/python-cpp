@@ -77,6 +77,8 @@ void initialize_types()
 	frame();
 	namespace_();
 	generator();
+	coroutine();
+	async_generator();
 }
 
 Interpreter::Interpreter() {}

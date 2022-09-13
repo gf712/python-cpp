@@ -71,6 +71,8 @@ class BuiltinTypes
 	mutable Type m_namespace;
 
 	mutable Type m_generator;
+	mutable Type m_coroutine;
+	mutable Type m_async_generator;
 
 	BuiltinTypes();
 
@@ -151,6 +153,8 @@ class BuiltinTypes
 	TypePrototype &namespace_() const { return get_type(m_namespace); }
 
 	TypePrototype &generator() const { return get_type(m_generator); }
+	TypePrototype &coroutine() const { return get_type(m_coroutine); }
+	TypePrototype &async_generator() const { return get_type(m_async_generator); }
 };
 
 PyType *type();
@@ -200,5 +204,7 @@ PyType *not_implemented();
 PyType *frame();
 PyType *namespace_();
 PyType *generator();
+PyType *coroutine();
+PyType *async_generator();
 
 }// namespace py

@@ -276,6 +276,18 @@ Value *VariablesResolver::visit(const For *node)
 
 Value *VariablesResolver::visit(const FunctionDefinition *node)
 {
+	visit_function(node);
+	return nullptr;
+}
+
+Value *VariablesResolver::visit(const AsyncFunctionDefinition *node)
+{
+	visit_function(node);
+	return nullptr;
+}
+
+template<typename FunctionType> void VariablesResolver::visit_function(FunctionType *node)
+{
 	auto caller = m_current_scope;
 
 	for (const auto &decorator : node->decorator_list()) { decorator->codegen(this); }
@@ -324,15 +336,6 @@ Value *VariablesResolver::visit(const FunctionDefinition *node)
 	}
 
 	m_current_scope = caller;
-
-	return nullptr;
-}
-
-Value *VariablesResolver::visit(const AsyncFunctionDefinition *node)
-{
-	(void)node;
-	TODO();
-	return nullptr;
 }
 
 Value *VariablesResolver::visit(const Lambda *node)

@@ -119,6 +119,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/NotImplemented.cpp
     runtime/NotImplementedError.cpp
     runtime/OSError.cpp
+    runtime/PyAsyncGenerator.cpp
     runtime/PyBoundMethod.cpp
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
@@ -127,6 +128,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyClassMethod.cpp
     runtime/PyClassMethodDescriptor.cpp
     runtime/PyCode.cpp
+    runtime/PyCoroutine.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp

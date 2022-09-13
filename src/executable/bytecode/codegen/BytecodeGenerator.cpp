@@ -587,7 +587,7 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 	return dst;
 }
 
-Value *BytecodeGenerator::visit(const FunctionDefinition *node)
+template<typename FunctionType> Value *BytecodeGenerator::generate_function(const FunctionType *node)
 {
 	std::vector<BytecodeValue *> decorator_functions;
 	decorator_functions.reserve(node->decorator_list().size());
@@ -750,10 +750,14 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 		}
 	}();
 
+
 	auto flags = CodeFlags::create();
 	if (node->args()->vararg() != nullptr) { flags.set(CodeFlags::Flag::VARARGS); }
 	if (node->args()->kwarg() != nullptr) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
 	if (is_generator) { flags.set(CodeFlags::Flag::GENERATOR); }
+	if constexpr (std::is_same_v<FunctionType, AsyncFunctionDefinition>) {
+		flags.set(CodeFlags::Flag::COROUTINE);
+	}
 
 	f->function_info().function.metadata.varnames = varnames;
 
@@ -802,11 +806,12 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node)
 }
 
 
+Value *BytecodeGenerator::visit(const FunctionDefinition *node) { return generate_function(node); }
+
+
 Value *BytecodeGenerator::visit(const AsyncFunctionDefinition *node)
 {
-	(void)node;
-	TODO();
-	return nullptr;
+	return generate_function(node);
 }
 
 Value *BytecodeGenerator::visit(const Lambda *node)

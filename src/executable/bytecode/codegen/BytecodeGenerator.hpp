@@ -454,5 +454,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::tuple<std::shared_ptr<Label>, std::shared_ptr<Label>, BytecodeValue *> visit_comprehension(
 		const ast::Comprehension *node,
 		std::function<BytecodeValue *()> container_builder);
+
+	template<typename FunctionType> ast::Value *generate_function(const FunctionType *);
 };
 }// namespace codegen
