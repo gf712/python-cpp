@@ -4262,7 +4262,7 @@ struct DeleteAtomPattern : Pattern<DeleteAtomPattern>
 	}
 };
 
-struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
+struct DeleteTargetPattern : Pattern<DeleteTargetPattern>
 {
 	// del_target:
 	//     | t_primary '.' NAME !t_lookahead
@@ -4270,8 +4270,6 @@ struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
 	//     | del_t_atom
 	static bool matches_impl(Parser &p)
 	{
-		BlockScope scope{ p };
-		const auto start_token = p.lexer().peek_token(p.token_position());
 		using pattern1 = PatternMatch<TPrimaryPattern,
 			SingleTokenPattern<Token::TokenType::DOT>,
 			SingleTokenPattern<Token::TokenType::NAME>,
@@ -4289,24 +4287,42 @@ struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
 		if (pattern2::match(p)) {
 			auto slices = p.pop_back();
 			auto value = p.pop_back();
-			const auto end_token = p.lexer().peek_token(p.token_position());
 			ASSERT(as<Subscript>(slices))
 			as<Subscript>(slices)->set_value(value);
 			as<Subscript>(slices)->set_context(ContextType::DELETE);
-			scope.parent().push_back(
-				std::make_shared<Delete>(std::vector<std::shared_ptr<ASTNode>>{ slices },
-					SourceLocation{ start_token->start(), end_token->end() }));
+			p.push_to_stack(slices);
 			return true;
 		}
 
 		using pattern3 = PatternMatch<DeleteAtomPattern>;
-		if (pattern3::match(p)) {
+		if (pattern3::match(p)) { return true; }
+		return false;
+	}
+};
+
+struct DeleteTargetsPattern : Pattern<DeleteTargetsPattern>
+{
+	// del_targets: ','.del_target+ [',']
+
+	static bool matches_impl(Parser &p)
+	{
+		DEBUG_LOG("del_targets");
+
+		BlockScope scope{ p };
+		const auto start = p.lexer().peek_token(p.token_position());
+
+		using pattern1 = PatternMatch<
+			ApplyInBetweenPattern<DeleteTargetPattern, SingleTokenPattern<Token::TokenType::COMMA>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::COMMA>>>;
+		if (pattern1::match(p)) {
+			DEBUG_LOG("','.del_target+ [',']");
+
+			const auto end = p.lexer().peek_token(p.token_position() - 1);
 			std::vector<std::shared_ptr<ASTNode>> to_delete;
 			to_delete.reserve(p.stack().size());
 			while (!p.stack().empty()) { to_delete.push_back(p.pop_front()); }
-			const auto end_token = p.lexer().peek_token(p.token_position());
-			scope.parent().push_back(std::make_shared<Delete>(
-				to_delete, SourceLocation{ start_token->start(), end_token->end() }));
+			scope.parent().push_back(
+				std::make_shared<Delete>(to_delete, SourceLocation{ start->start(), end->end() }));
 			return true;
 		}
 		return false;
