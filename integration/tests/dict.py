@@ -15,3 +15,12 @@ except KeyError:
     ok = True
 
 assert ok
+
+def dict_from_keys():
+    a = dict.fromkeys([1, 2, 3])
+    assert a == {1: None, 2: None, 3: None}
+
+    a = dict.fromkeys([1, 2, 3], "a")
+    assert a == {1: "a", 2: "a", 3: "a"}
+
+dict_from_keys()

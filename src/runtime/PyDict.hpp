@@ -52,6 +52,7 @@ class PyDict : public PyBaseObject
 	void remove(const Value &key);
 	PyResult<PyObject *> merge(PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> update(PyDict *other);
+	static PyResult<PyObject *> fromkeys(PyObject *iterable, PyObject *value);
 
 	Value operator[](Value key) const;
 

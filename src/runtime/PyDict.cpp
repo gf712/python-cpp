@@ -235,6 +235,28 @@ PyResult<PyObject *> PyDict::update(PyDict *other)
 	return Ok(py_none());
 }
 
+PyResult<PyObject *> PyDict::fromkeys(PyObject *iterable, PyObject *value)
+{
+	auto iterator = iterable->iter();
+	if (iterator.is_err()) return iterator;
+
+	PyDict::MapType map;
+
+	if (!value) { value = py_none(); }
+
+	auto key = iterator.unwrap()->next();
+	while (key.is_ok()) {
+		map.emplace(key.unwrap(), value);
+		key = iterator.unwrap()->next();
+	}
+
+	if (key.unwrap_err() && !key.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
+		return key;
+	}
+
+	return PyDict::create(map);
+}
+
 namespace {
 
 	std::once_flag dict_flag;
@@ -290,6 +312,32 @@ namespace {
 					"items",
 					+[](PyDict *self, PyTuple *, PyDict *) -> PyResult<PyObject *> {
 						return PyDictItems::create(*self);
+					})
+				.classmethod(
+					"fromkeys",
+					+[](PyType *cls, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						ASSERT(cls == dict());
+						ASSERT(args && args->elements().size() > 0);
+						ASSERT(!kwargs || kwargs->map().size());
+
+						auto iterable_ = PyObject::from(args->elements()[0]);
+						if (iterable_.is_err()) return iterable_;
+						auto *iterable = iterable_.unwrap();
+
+						auto value_ = [args]() -> PyResult<PyObject *> {
+							if (args->elements().size() == 2) {
+								return PyObject::from(args->elements()[1]);
+							} else if (args->elements().size() == 3) {
+								TODO();
+							} else {
+								return Ok(nullptr);
+							}
+						}();
+
+						if (value_.is_err()) return value_;
+						auto *value = value_.unwrap();
+
+						return PyDict::fromkeys(iterable, value);
 					})
 				.type);
 	}
