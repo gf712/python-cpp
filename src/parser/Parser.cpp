@@ -2148,7 +2148,8 @@ struct PrimaryPattern_ : Pattern<PrimaryPattern_>
 												 Token::TokenType::RBRACE,
 												 Token::TokenType::AMPER,
 												 Token::TokenType::VBAR,
-												 Token::TokenType::CIRCUMFLEX>,
+												 Token::TokenType::CIRCUMFLEX,
+												 Token::TokenType::SEMI>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, FromKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, ForKeywordPattern>,
 				AndLiteral<SingleTokenPattern<Token::TokenType::NAME>, AndKeywordPattern>,
@@ -2495,7 +2496,8 @@ struct SumPattern_ : Pattern<SumPattern_>
 			Token::TokenType::RBRACE,
 			Token::TokenType::AMPER,
 			Token::TokenType::VBAR,
-			Token::TokenType::CIRCUMFLEX>>>;
+			Token::TokenType::CIRCUMFLEX,
+			Token::TokenType::SEMI>>>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("ϵ");
 			return true;
@@ -2587,7 +2589,8 @@ struct ShiftExprPattern_ : Pattern<ShiftExprPattern_>
 			Token::TokenType::RBRACE,
 			Token::TokenType::AMPER,
 			Token::TokenType::VBAR,
-			Token::TokenType::CIRCUMFLEX>>>;
+			Token::TokenType::CIRCUMFLEX,
+			Token::TokenType::SEMI>>>;
 		if (pattern3::match(p)) {
 			DEBUG_LOG("shift_expr: ϵ");
 			return true;
@@ -2660,7 +2663,8 @@ struct BitwiseAndPattern_ : Pattern<BitwiseAndPattern_>
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE,
 			Token::TokenType::VBAR,
-			Token::TokenType::CIRCUMFLEX>>>;
+			Token::TokenType::CIRCUMFLEX,
+			Token::TokenType::SEMI>>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("bitwise_and': ϵ");
 			return true;
@@ -2730,7 +2734,8 @@ struct BitwiseXorPattern_ : Pattern<BitwiseXorPattern_>
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE,
 			Token::TokenType::VBAR,
-			Token::TokenType::CIRCUMFLEX>>>;
+			Token::TokenType::CIRCUMFLEX,
+			Token::TokenType::SEMI>>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("bitwise_xor': ϵ");
 			return true;
@@ -2803,7 +2808,8 @@ struct BitwiseOrPattern_ : Pattern<BitwiseOrPattern_>
 			Token::TokenType::EQUAL,
 			Token::TokenType::RSQB,
 			Token::TokenType::RBRACE,
-			Token::TokenType::CIRCUMFLEX>>>;
+			Token::TokenType::CIRCUMFLEX,
+			Token::TokenType::SEMI>>>;
 		if (pattern2::match(p)) {
 			DEBUG_LOG("bitwise_and': ϵ");
 			return true;
@@ -4593,11 +4599,17 @@ struct SimpleStatementPattern : Pattern<SimpleStatementPattern>
 	// 	| ';'.small_stmt+ [';'] NEWLINE
 	static bool matches_impl(Parser &p)
 	{
-		using EndPattern = SingleTokenPattern<Token::TokenType::NEWLINE, Token::TokenType::SEMI>;
 
-		using pattern1 = PatternMatch<SmallStatementPattern, EndPattern>;
-
+		using pattern1 = PatternMatch<SmallStatementPattern,
+			NegativeLookAhead<SingleTokenPattern<Token::TokenType::SEMI>>,
+			SingleTokenPattern<Token::TokenType::NEWLINE>>;
 		if (pattern1::match(p)) { return true; }
+
+		using pattern2 = PatternMatch<ApplyInBetweenPattern<SmallStatementPattern,
+										  SingleTokenPattern<Token::TokenType::SEMI>>,
+			ZeroOrOnePattern<SingleTokenPattern<Token::TokenType::SEMI>>,
+			SingleTokenPattern<Token::TokenType::NEWLINE>>;
+		if (pattern2::match(p)) { return true; }
 
 		return false;
 	}
