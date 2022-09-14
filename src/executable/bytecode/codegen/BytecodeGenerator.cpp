@@ -587,7 +587,8 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 	return dst;
 }
 
-template<typename FunctionType> Value *BytecodeGenerator::generate_function(const FunctionType *node)
+template<typename FunctionType>
+Value *BytecodeGenerator::generate_function(const FunctionType *node)
 {
 	std::vector<BytecodeValue *> decorator_functions;
 	decorator_functions.reserve(node->decorator_list().size());
@@ -1132,13 +1133,7 @@ Value *BytecodeGenerator::visit(const Assign *node)
 		} else if (auto ast_subscript = as<Subscript>(target)) {
 			auto *obj = generate(ast_subscript->value().get(), m_function_id);
 			const auto &slice = ast_subscript->slice();
-			auto *index = [&]() -> BytecodeValue * {
-				if (std::holds_alternative<Subscript::Index>(slice)) {
-					return generate(std::get<Subscript::Index>(slice).value.get(), m_function_id);
-				} else {
-					TODO();
-				}
-			}();
+			const auto *index = build_slice(slice);
 			emit<StoreSubscript>(obj->get_register(), index->get_register(), src->get_register());
 		} else {
 			TODO();
@@ -1847,56 +1842,58 @@ Value *BytecodeGenerator::visit(const Module *node)
 	return last;
 }
 
+BytecodeValue *BytecodeGenerator::build_slice(const ast::Subscript::SliceType &sliceNode)
+{
+	if (std::holds_alternative<Subscript::Index>(sliceNode)) {
+		return generate(std::get<Subscript::Index>(sliceNode).value.get(), m_function_id);
+	} else if (std::holds_alternative<Subscript::Slice>(sliceNode)) {
+		const auto &slice = std::get<Subscript::Slice>(sliceNode);
+		auto *index = create_value();
+		auto *lower = slice.lower ? generate(slice.lower.get(), m_function_id) : nullptr;
+		auto *upper = slice.upper ? generate(slice.upper.get(), m_function_id) : nullptr;
+		auto *step = slice.step ? generate(slice.step.get(), m_function_id) : nullptr;
+		if (!upper && !step) {
+			auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+			auto *none_value = create_value();
+			emit<LoadConst>(none_value->get_register(), none->get_index());
+			emit<BuildSlice>(
+				index->get_register(), lower->get_register(), none_value->get_register());
+		} else if (!step) {
+			if (!lower) {
+				auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+				lower = create_value();
+				emit<LoadConst>(lower->get_register(), none->get_index());
+			}
+			emit<BuildSlice>(index->get_register(), lower->get_register(), upper->get_register());
+		} else {
+			if (!lower) {
+				auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+				lower = create_value();
+				emit<LoadConst>(lower->get_register(), none->get_index());
+			}
+			if (!upper) {
+				auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+				upper = create_value();
+				emit<LoadConst>(upper->get_register(), none->get_index());
+			}
+			emit<BuildSlice>(index->get_register(),
+				lower->get_register(),
+				upper->get_register(),
+				step->get_register());
+		}
+		return index;
+	} else if (std::holds_alternative<Subscript::ExtSlice>(sliceNode)) {
+		TODO();
+	}
+	TODO();
+	return nullptr;
+}
+
 Value *BytecodeGenerator::visit(const Subscript *node)
 {
 	auto *result = create_value();
 	const auto *value = generate(node->value().get(), m_function_id);
-	const auto *index = [node, this] {
-		if (std::holds_alternative<Subscript::Index>(node->slice())) {
-			return generate(std::get<Subscript::Index>(node->slice()).value.get(), m_function_id);
-		} else if (std::holds_alternative<Subscript::Slice>(node->slice())) {
-			const auto &slice = std::get<Subscript::Slice>(node->slice());
-			auto *index = create_value();
-			auto *lower = slice.lower ? generate(slice.lower.get(), m_function_id) : nullptr;
-			auto *upper = slice.upper ? generate(slice.upper.get(), m_function_id) : nullptr;
-			auto *step = slice.step ? generate(slice.step.get(), m_function_id) : nullptr;
-			if (!upper && !step) {
-				auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
-				auto *none_value = create_value();
-				emit<LoadConst>(none_value->get_register(), none->get_index());
-				emit<BuildSlice>(
-					index->get_register(), lower->get_register(), none_value->get_register());
-			} else if (!step) {
-				if (!lower) {
-					auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
-					lower = create_value();
-					emit<LoadConst>(lower->get_register(), none->get_index());
-				}
-				emit<BuildSlice>(
-					index->get_register(), lower->get_register(), upper->get_register());
-			} else {
-				if (!lower) {
-					auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
-					lower = create_value();
-					emit<LoadConst>(lower->get_register(), none->get_index());
-				}
-				if (!upper) {
-					auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
-					upper = create_value();
-					emit<LoadConst>(upper->get_register(), none->get_index());
-				}
-				emit<BuildSlice>(index->get_register(),
-					lower->get_register(),
-					upper->get_register(),
-					step->get_register());
-			}
-			return index;
-		} else if (std::holds_alternative<Subscript::ExtSlice>(node->slice())) {
-			TODO();
-		} else {
-			TODO();
-		}
-	}();
+	const auto *index = build_slice(node->slice());
 
 	switch (node->context()) {
 	case ContextType::DELETE: {
