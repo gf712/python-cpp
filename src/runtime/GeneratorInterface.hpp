@@ -34,6 +34,7 @@ template<typename GeneratorType> class GeneratorInterface : public PyBaseObject
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __next__();
 	PyResult<PyObject *> send();
+	PyResult<PyObject *> close();
 
 	void visit_graph(Visitor &visitor) override;
 };

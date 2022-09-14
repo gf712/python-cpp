@@ -83,6 +83,12 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send()
 	return result;
 }
 
+template<typename T> PyResult<PyObject *> GeneratorInterface<T>::close()
+{
+	// TODO: implement generator close logic
+	return Ok(py_none());
+}
+
 template<typename T> void GeneratorInterface<T>::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);

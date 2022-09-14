@@ -52,7 +52,9 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_coroutine()
 	{
-		return std::move(klass<PyCoroutine>(PyCoroutine::GeneratorTypeName).type);
+		return std::move(klass<PyCoroutine>(PyCoroutine::GeneratorTypeName)
+							 .def("close", &PyCoroutine::close)
+							 .type);
 	}
 }// namespace
 

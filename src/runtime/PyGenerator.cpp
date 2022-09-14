@@ -52,7 +52,9 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_generator()
 	{
-		return std::move(klass<PyGenerator>(PyGenerator::GeneratorTypeName).type);
+		return std::move(klass<PyGenerator>(PyGenerator::GeneratorTypeName)
+							 .def("close", &PyGenerator::close)
+							 .type);
 	}
 }// namespace
 

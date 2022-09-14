@@ -52,7 +52,9 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_async_generator()
 	{
-		return std::move(klass<PyAsyncGenerator>(PyAsyncGenerator::GeneratorTypeName).type);
+		return std::move(klass<PyAsyncGenerator>(PyAsyncGenerator::GeneratorTypeName)
+							 .def("close", &PyAsyncGenerator::close)
+							 .type);
 	}
 }// namespace
 
