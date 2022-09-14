@@ -14,10 +14,7 @@ PyResult<Value> BinarySubscript::execute(VirtualMachine &vm, Interpreter &) cons
 	auto subscript = PyObject::from(subscript_value);
 	if (subscript.is_err()) return subscript;
 
-	return object.unwrap()
-		->as_mapping()
-		.and_then(
-			[&subscript](PyMappingWrapper mapping) { return mapping.getitem(subscript.unwrap()); })
+	return object.and_then([&subscript](PyObject *obj) { return obj->getitem(subscript.unwrap()); })
 		.and_then([&vm, this](PyObject *value) {
 			vm.reg(m_dst) = value;
 			return Ok(value);

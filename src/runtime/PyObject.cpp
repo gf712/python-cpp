@@ -10,6 +10,7 @@
 #include "PyDict.hpp"
 #include "PyEllipsis.hpp"
 #include "PyFunction.hpp"
+#include "PyGenericAlias.hpp"
 #include "PyInteger.hpp"
 #include "PyMethodDescriptor.hpp"
 #include "PyNone.hpp"
@@ -364,9 +365,7 @@ PyResult<PyObject *> PyObject::__repr__() const
 
 PyResult<PyObject *> PyObject::__str__()
 {
-	if (!type()->underlying_type().__repr__.has_value()) {
-		return PyObject::__repr__();
-	}
+	if (!type()->underlying_type().__repr__.has_value()) { return PyObject::__repr__(); }
 	return repr();
 }
 
@@ -525,9 +524,7 @@ PyResult<PyObject *> PyObject::repr() const
 
 PyResult<PyObject *> PyObject::str()
 {
-	if (type_prototype().__str__.has_value()) {
-		return call_slot(*type_prototype().__str__, this);
-	}
+	if (type_prototype().__str__.has_value()) { return call_slot(*type_prototype().__str__, this); }
 	return repr();
 }
 
@@ -793,6 +790,25 @@ PyResult<int32_t> PyObject::init(PyTuple *args, PyDict *kwargs)
 	}
 	TODO();
 }
+
+PyResult<PyObject *> PyObject::getitem(PyObject *key)
+{
+	if (as_mapping().is_ok() && type_prototype().mapping_type_protocol->__getitem__.has_value()) {
+		return call_slot(*type_prototype().mapping_type_protocol->__getitem__, this, key);
+	} else if (as_sequence().is_ok()) {
+		// FIXME: add check to see if __getitem__ in sequence protocol is implemented
+	}
+	// TODO: could getitem be virtual and we override the logic below in PyType?
+	if (as<PyType>(this)) {
+		if (this == py::type()) { return PyGenericAlias::create(this, key); }
+		auto method = get_method(PyString::create("__class_getitem__").unwrap());
+		if (method.is_ok()) {
+			return method.unwrap()->call(PyTuple::create(key).unwrap(), PyDict::create().unwrap());
+		}
+	}
+	return Err(type_error("'{}' object is not subscriptable", type()->name()));
+}
+
 
 PyResult<PyObject *> PyObject::__eq__(const PyObject *other) const
 {

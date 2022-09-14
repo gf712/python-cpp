@@ -292,9 +292,9 @@ class PyMappingWrapper
   public:
 	PyMappingWrapper(PyObject *object) : m_object(object) {}
 	PyResult<size_t> len();
-	PyResult<PyObject *> getitem(PyObject *);
-	PyResult<std::monostate> setitem(PyObject *, PyObject *);
-	PyResult<std::monostate> delitem(PyObject *);
+	PyResult<PyObject *> getitem(PyObject *);// mp_subscript
+	PyResult<std::monostate> setitem(PyObject *, PyObject *);// mp_ass_subscript
+	PyResult<std::monostate> delitem(PyObject *);// mp_ass_subscript
 };
 
 struct PySequence
@@ -386,6 +386,8 @@ class PyObject : public Cell
 	PyResult<PyObject *> str();
 	virtual PyResult<PyObject *> new_(PyTuple *args, PyDict *kwargs) const;
 	PyResult<int32_t> init(PyTuple *args, PyDict *kwargs);
+
+	PyResult<PyObject *> getitem(PyObject *);
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
