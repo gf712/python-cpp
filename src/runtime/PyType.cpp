@@ -532,6 +532,20 @@ void PyType::initialize(PyDict *ns)
 			});
 		underlying_type().__dict__->insert(name, call_func);
 	}
+	if (underlying_type().__str__.has_value()) {
+		auto [name, str_func] = wrap_slot(this,
+			"__str__",
+			ns,
+			*underlying_type().__str__,
+			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				if (args && args->size() > 0) {
+					return Err(type_error("expected 0 arguments, got {}", args->size()));
+				}
+				ASSERT(!kwargs || kwargs->map().empty())
+				return std::get<StrSlotFunctionType>(*underlying_type().__str__)(self);
+			});
+		underlying_type().__dict__->insert(name, str_func);
+	}
 	if (underlying_type().__init__.has_value()) {
 		auto [name, init_func] = wrap_slot(this,
 			"__init__",
@@ -809,6 +823,7 @@ void PyType::visit_graph(Visitor &visitor)
 
 	VISIT_SLOT(__repr__)
 	VISIT_SLOT(__call__)
+	VISIT_SLOT(__str__)
 	VISIT_SLOT(__new__)
 	VISIT_SLOT(__init__)
 	VISIT_SLOT(__hash__)

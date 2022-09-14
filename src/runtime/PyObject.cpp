@@ -362,6 +362,14 @@ PyResult<PyObject *> PyObject::__repr__() const
 		"<{} object at {}>", type_prototype().__name__, static_cast<const void *>(this)));
 }
 
+PyResult<PyObject *> PyObject::__str__()
+{
+	if (!type()->underlying_type().__repr__.has_value()) {
+		return PyObject::__repr__();
+	}
+	return repr();
+}
+
 PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op) const
 {
 	constexpr std::array opstr{ "<", "<=", "==", "!=", ">", ">=" };
@@ -513,6 +521,14 @@ PyResult<PyObject *> PyObject::repr() const
 		return call_slot(*type_prototype().__repr__, this);
 	}
 	TODO();
+}
+
+PyResult<PyObject *> PyObject::str()
+{
+	if (type_prototype().__str__.has_value()) {
+		return call_slot(*type_prototype().__str__, this);
+	}
+	return repr();
 }
 
 PyResult<int64_t> PyObject::hash() const

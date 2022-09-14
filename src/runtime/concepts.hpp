@@ -84,7 +84,7 @@ namespace concepts {
 	};
 
 	template<typename T>
-	concept HasStr = requires(const T *obj)
+	concept HasStr = requires(T *obj)
 	{
 		obj->__str__();
 	};

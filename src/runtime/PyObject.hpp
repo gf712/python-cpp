@@ -86,6 +86,7 @@ struct PropertyDefinition
 };
 
 using CallSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyTuple *, PyDict *)>;
+using StrSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *)>;
 using NewSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyType *, PyTuple *, PyDict *)>;
 using InitSlotFunctionType = std::function<PyResult<int32_t>(PyObject *, PyTuple *, PyDict *)>;
@@ -231,6 +232,7 @@ struct TypePrototype
 	std::optional<std::variant<InvertSlotFunctionType, PyObject *>> __invert__;
 
 	std::optional<std::variant<CallSlotFunctionType, PyObject *>> __call__;
+	std::optional<std::variant<StrSlotFunctionType, PyObject *>> __str__;
 	std::optional<std::variant<BoolSlotFunctionType, PyObject *>> __bool__;
 	std::optional<std::variant<ReprSlotFunctionType, PyObject *>> __repr__;
 	std::optional<std::variant<IterSlotFunctionType, PyObject *>> __iter__;
@@ -381,6 +383,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> next();
 
 	PyResult<PyObject *> call(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> str();
 	virtual PyResult<PyObject *> new_(PyTuple *args, PyDict *kwargs) const;
 	PyResult<int32_t> init(PyTuple *args, PyDict *kwargs);
 
@@ -393,6 +396,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> __repr__() const;
 	PyResult<int64_t> __hash__() const;
 	PyResult<bool> __bool__() const;
+	PyResult<PyObject *> __str__();
 
 	bool is_pyobject() const override { return true; }
 	bool is_callable() const;
@@ -663,6 +667,11 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		type_prototype->__set__ =
 			+[](PyObject *self, PyObject *attribute, PyObject *value) -> PyResult<std::monostate> {
 			return static_cast<Type *>(self)->__set__(attribute, value);
+		};
+	}
+	if constexpr (HasStr<Type>) {
+		type_prototype->__str__ = +[](PyObject *self) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__str__();
 		};
 	}
 

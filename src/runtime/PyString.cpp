@@ -101,7 +101,7 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 	// FIXME: handle errors argument
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	ASSERT(args && args->size() == 1)
-	ASSERT(type == str())
+	ASSERT(type == py::str())
 
 	const auto &string = args->elements()[0];
 	if (std::holds_alternative<String>(string)) {
@@ -776,7 +776,7 @@ std::optional<int32_t> PyString::codepoint() const
 	}
 }
 
-PyType *PyString::type() const { return str(); }
+PyType *PyString::type() const { return py::str(); }
 
 PyResult<PyObject *> PyString::__iter__() const
 {
