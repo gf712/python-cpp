@@ -3,6 +3,7 @@
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/BytecodeProgram.hpp"
 #include "executable/bytecode/codegen/BytecodeGenerator.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -14,42 +15,6 @@
 
 using namespace py;
 
-void initialize_types()
-{
-	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-
-	type();
-	bool_();
-	bytes();
-	ellipsis();
-	str();
-	float_();
-	integer();
-	none();
-	module();
-	object();
-	dict();
-	dict_items();
-	dict_items_iterator();
-	list();
-	list_iterator();
-	tuple();
-	tuple_iterator();
-	range();
-	range_iterator();
-	function();
-	native_function();
-	code();
-	cell();
-	builtin_method();
-	slot_wrapper();
-	bound_method();
-	method_wrapper();
-	static_method();
-	property();
-	classmethod();
-}
-
 int freeze(int argc, char **argv, const std::string &output)
 {
 	size_t arg_idx{ 1 };
@@ -59,10 +24,10 @@ int freeze(int argc, char **argv, const std::string &output)
 	while (arg_idx < argc) { argv_vector.emplace_back(argv[arg_idx++]); }
 
 	auto &vm = VirtualMachine::the();
+	initialize_types();
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
 	parser::Parser p{ lexer };
 	p.parse();
-	initialize_types();
 	auto bytecode = codegen::BytecodeGenerator::compile(
 		p.module(), argv_vector, compiler::OptimizationLevel::None);
 
