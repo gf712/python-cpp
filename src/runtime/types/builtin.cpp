@@ -17,6 +17,7 @@
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyGenerator.hpp"
+#include "runtime/PyGenericAlias.hpp"
 #include "runtime/PyGetSetDescriptor.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyLLVMFunction.hpp"
@@ -70,7 +71,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_traceback(PyTraceback::type_factory()), m_frame(PyFrame::type_factory()),
 	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory()),
 	  m_generator(PyGenerator::type_factory()), m_coroutine(PyCoroutine::type_factory()),
-	  m_async_generator(PyAsyncGenerator::type_factory())
+	  m_async_generator(PyAsyncGenerator::type_factory()),
+	  m_generic_alias(PyGenericAlias::type_factory())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                                                         \
@@ -147,4 +149,6 @@ INITIALIZE_TYPE(namespace_)
 INITIALIZE_TYPE(generator)
 INITIALIZE_TYPE(coroutine)
 INITIALIZE_TYPE(async_generator)
+
+INITIALIZE_TYPE(generic_alias)
 }// namespace py

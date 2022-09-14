@@ -30,6 +30,8 @@ class PyList : public PyBaseObject
 	PyResult<PyObject *> append(PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> extend(PyTuple *args, PyDict *kwargs);
 
+	PyResult<PyObject*> __class_getitem__(PyType* cls, PyObject* args);
+
 	void sort();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();

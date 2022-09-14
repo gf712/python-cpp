@@ -3,6 +3,7 @@
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
+#include "PyGenericAlias.hpp"
 #include "PyInteger.hpp"
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
@@ -210,16 +211,26 @@ std::once_flag list_flag;
 
 std::unique_ptr<TypePrototype> register_list()
 {
-	return std::move(klass<PyList>("list")
-						 .def("append", &PyList::append)
-						 .def("extend", &PyList::extend)
-						 //  .def(
-						 // 	 "sort",
-						 // 	 +[](PyObject *self) {
-						 // 		 self->sort();
-						 // 		 return py_none();
-						 // 	 })
-						 .type);
+	return std::move(
+		klass<PyList>("list")
+			.def("append", &PyList::append)
+			.def("extend", &PyList::extend)
+			//  .def(
+			// 	 "sort",
+			// 	 +[](PyObject *self) {
+			// 		 self->sort();
+			// 		 return py_none();
+			// 	 })
+			.classmethod(
+				"__class_getitem__",
+				+[](PyType *type, PyTuple *args, PyDict *kwargs) {
+					ASSERT(args && args->elements().size() == 1);
+					ASSERT(!kwargs || kwargs->map().empty());
+					return PyObject::from(args->elements()[0]).and_then([type](PyObject *arg) {
+						return PyGenericAlias::create(type, arg);
+					});
+				})
+			.type);
 }
 }// namespace
 

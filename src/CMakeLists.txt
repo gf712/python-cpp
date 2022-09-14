@@ -135,6 +135,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyFrame.cpp
     runtime/PyFunction.cpp
     runtime/PyGenerator.cpp
+    runtime/PyGenericAlias.cpp
     runtime/PyGetSetDescriptor.cpp
     runtime/PyInteger.cpp
     runtime/PyList.cpp
