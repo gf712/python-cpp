@@ -21,3 +21,15 @@ def comprehension_with_capture():
     assert f() == [2,3,4]
 
 comprehension_with_capture()
+
+def comprehension_nested():
+    l = [[0,1,2,3], [4, 5], [6]]
+    f = [y for x in l if len(x) > 1 for y in x if y != 0]
+    assert len(f) == 5
+    assert f[0] == 1
+    assert f[1] == 2
+    assert f[2] == 3
+    assert f[3] == 4
+    assert f[4] == 5
+
+comprehension_nested()

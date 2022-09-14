@@ -2297,61 +2297,82 @@ Value *BytecodeGenerator::visit(const FormattedValue *) { TODO(); }
 
 Value *BytecodeGenerator::visit(const Comprehension *) { TODO(); }
 
-std::tuple<std::shared_ptr<Label>, std::shared_ptr<Label>, BytecodeValue *>
-	BytecodeGenerator::visit_comprehension(const Comprehension *node,
+std::
+	tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>, BytecodeValue *>
+	BytecodeGenerator::visit_comprehension(
+		const std::vector<std::shared_ptr<Comprehension>> &comprehensions,
 		std::function<BytecodeValue *()> container_builder)
 {
 	static size_t comprehension_count = 0;
 
-	auto start_label =
-		make_label(fmt::format("COMPREHENSION_START_{}", comprehension_count), m_function_id);
-	auto end_label =
-		make_label(fmt::format("COMPREHENSION_END_{}", comprehension_count++), m_function_id);
+	std::vector<std::shared_ptr<Label>> start_labels;
+	std::vector<std::shared_ptr<Label>> end_labels;
 
 	auto *container = container_builder();
-	auto *arg0 = create_stack_value();
+
+	auto *src = create_stack_value();
 	auto *it = create_value();
-	emit<LoadFast>(it->get_register(), arg0->get_stack_index(), "comprehension_iterator");
-	auto *dst = create_value();
-	bind(*start_label);
-	emit<ForIter>(dst->get_register(), it->get_register(), end_label);
-	if (node->target()->node_type() == ASTNodeType::Name) {
-		const auto name = std::static_pointer_cast<Name>(node->target());
-		ASSERT(name->ids().size() == 1)
-		store_name(name->ids()[0], dst);
-	} else if (auto target = as<Tuple>(node->target())) {
-		std::vector<Register> unpack_dst;
-		std::vector<BytecodeValue *> values;
-		std::vector<std::string> names;
-		unpack_dst.reserve(target->elements().size());
-		values.reserve(target->elements().size());
-		names.reserve(target->elements().size());
+	emit<LoadFast>(it->get_register(), src->get_stack_index(), ".0");
 
-		for (const auto &el : target->elements()) {
-			ASSERT(el->node_type() == ASTNodeType::Name);
-			ASSERT(as<Name>(el)->ids().size() == 1);
+	for (bool first = true; const auto &comprehension : comprehensions) {
+		auto *node = comprehension.get();
+		auto start_label =
+			make_label(fmt::format("COMPREHENSION_START_{}", comprehension_count), m_function_id);
+		auto end_label =
+			make_label(fmt::format("COMPREHENSION_END_{}", comprehension_count++), m_function_id);
 
-			names.push_back(as<Name>(el)->ids()[0]);
-			values.push_back(create_value(names.back()));
-			unpack_dst.push_back(values.back()->get_register());
+		if (!first) {
+			auto iterable = generate(comprehension->iter().get(), m_function_id);
+			it = create_value();
+			emit<GetIter>(it->get_register(), iterable->get_register());
 		}
-		emit<UnpackSequence>(unpack_dst, dst->get_register());
 
-		for (auto name_it = names.begin(); const auto &v : values) {
-			store_name(*name_it, v);
-			++name_it;
+		auto *dst = create_value();
+		bind(*start_label);
+		emit<ForIter>(dst->get_register(), it->get_register(), end_label);
+		if (node->target()->node_type() == ASTNodeType::Name) {
+			const auto name = std::static_pointer_cast<Name>(node->target());
+			ASSERT(name->ids().size() == 1)
+			store_name(name->ids()[0], dst);
+		} else if (auto target = as<Tuple>(node->target())) {
+			std::vector<Register> unpack_dst;
+			std::vector<BytecodeValue *> values;
+			std::vector<std::string> names;
+			unpack_dst.reserve(target->elements().size());
+			values.reserve(target->elements().size());
+			names.reserve(target->elements().size());
+
+			for (const auto &el : target->elements()) {
+				ASSERT(el->node_type() == ASTNodeType::Name);
+				ASSERT(as<Name>(el)->ids().size() == 1);
+
+				names.push_back(as<Name>(el)->ids()[0]);
+				values.push_back(create_value(names.back()));
+				unpack_dst.push_back(values.back()->get_register());
+			}
+			emit<UnpackSequence>(unpack_dst, dst->get_register());
+
+			for (auto name_it = names.begin(); const auto &v : values) {
+				store_name(*name_it, v);
+				++name_it;
+			}
+		} else {
+			TODO();
 		}
-	} else {
-		TODO();
+
+		for (const auto &if_ : node->ifs()) {
+			auto *result = generate(if_.get(), m_function_id);
+			ASSERT(result);
+			emit<JumpIfFalse>(result->get_register(), start_label);
+		}
+
+		start_labels.push_back(std::move(start_label));
+		end_labels.push_back(std::move(end_label));
+
+		first = false;
 	}
 
-	for (const auto &if_ : node->ifs()) {
-		auto *result = generate(if_.get(), m_function_id);
-		ASSERT(result);
-		emit<JumpIfFalse>(result->get_register(), start_label);
-	}
-
-	return { start_label, end_label, container };
+	return { start_labels, end_labels, container };
 }
 
 Value *BytecodeGenerator::visit(const ListComp *node)
@@ -2374,15 +2395,20 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	ASSERT(node->generators().size() == 1)
-	const auto &generator = node->generators()[0];
-	auto [start_label, end_label, list] =
-		visit_comprehension(generator.get(), [this]() { return build_list({}); });
+	auto [start_labels, end_labels, list] =
+		visit_comprehension(node->generators(), [this]() { return build_list({}); });
 	auto *element = generate(node->elt().get(), m_function_id);
 	ASSERT(element)
 	emit<ListAppend>(list->get_register(), element->get_register());
-	emit<Jump>(start_label);
-	bind(*end_label);
+	ASSERT(start_labels.size() == end_labels.size());
+	while (!start_labels.empty()) {
+		auto start_label = start_labels.back();
+		auto end_label = end_labels.back();
+		emit<Jump>(start_label);
+		bind(*end_label);
+		start_labels.pop_back();
+		end_labels.pop_back();
+	}
 	emit<ReturnValue>(list->get_register());
 
 	m_stack.pop();
@@ -2438,6 +2464,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
+	auto *generator = node->generators()[0].get();
 	auto *iterable = generate(generator->iter().get(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
@@ -2466,15 +2493,20 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	ASSERT(node->generators().size() == 1)
-	const auto &generator = node->generators()[0];
-	auto [start_label, end_label, list] =
-		visit_comprehension(generator.get(), [this]() { return build_list({}); });
+	auto [start_labels, end_labels, list] =
+		visit_comprehension(node->generators(), [this]() { return build_list({}); });
 	auto *element = generate(node->elt().get(), m_function_id);
 	ASSERT(element)
 	emit<ListAppend>(list->get_register(), element->get_register());
-	emit<Jump>(start_label);
-	bind(*end_label);
+	ASSERT(start_labels.size() == end_labels.size());
+	while (!start_labels.empty()) {
+		auto start_label = start_labels.back();
+		auto end_label = end_labels.back();
+		emit<Jump>(start_label);
+		bind(*end_label);
+		start_labels.pop_back();
+		end_labels.pop_back();
+	}
 	emit<ReturnValue>(list->get_register());
 
 	m_stack.pop();
@@ -2530,6 +2562,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
+	auto *generator = node->generators()[0].get();
 	auto *iterable = generate(generator->iter().get(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
@@ -2557,15 +2590,20 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	ASSERT(node->generators().size() == 1)
-	const auto &generator = node->generators()[0];
-	auto [start_label, end_label, list] =
-		visit_comprehension(generator.get(), [this]() { return build_set({}); });
+	auto [start_labels, end_labels, list] =
+		visit_comprehension(node->generators(), [this]() { return build_set({}); });
 	auto *element = generate(node->elt().get(), m_function_id);
 	ASSERT(element)
 	emit<SetAdd>(list->get_register(), element->get_register());
-	emit<Jump>(start_label);
-	bind(*end_label);
+	ASSERT(start_labels.size() == end_labels.size());
+	while (!start_labels.empty()) {
+		auto start_label = start_labels.back();
+		auto end_label = end_labels.back();
+		emit<Jump>(start_label);
+		bind(*end_label);
+		start_labels.pop_back();
+		end_labels.pop_back();
+	}
 	emit<ReturnValue>(list->get_register());
 
 	m_stack.pop();
@@ -2621,6 +2659,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
+	auto *generator = node->generators()[0].get();
 	auto *iterable = generate(generator->iter().get(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
