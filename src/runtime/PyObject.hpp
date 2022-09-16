@@ -414,6 +414,15 @@ class PyObject : public Cell
 	std::string to_string() const override;
 };
 
+// avoid explicit specialization after instantiations
+template<> PyResult<PyObject *> PyObject::from(PyObject *const &value);
+template<> PyResult<PyObject *> PyObject::from(const Number &value);
+template<> PyResult<PyObject *> PyObject::from(const String &value);
+template<> PyResult<PyObject *> PyObject::from(const Bytes &value);
+template<> PyResult<PyObject *> PyObject::from(const Ellipsis &value);
+template<> PyResult<PyObject *> PyObject::from(const NameConstant &value);
+template<> PyResult<PyObject *> PyObject::from(const Value &value);
+
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
 {
 	using namespace concepts;

@@ -196,7 +196,7 @@ class BaseException;
 template<typename T> struct Ok
 {
 	T value;
-	Ok(T value_) : value(value_) {}
+	constexpr Ok(T value_) : value(value_) {}
 };
 
 template<typename T> Ok(T) -> Ok<T>;
@@ -204,7 +204,7 @@ template<typename T> Ok(T) -> Ok<T>;
 struct Err
 {
 	BaseException *exc;
-	Err(BaseException *value_) : exc(value_) {}
+	constexpr Err(BaseException *value_) : exc(value_) {}
 };
 
 template<typename T> class PyResult;
@@ -242,13 +242,13 @@ template<typename T> class PyResult
 
   public:
 	PyResult(Ok<T> result_) : result(result_) {}
-	template<typename U> PyResult(Ok<U> result_) : result(Ok<T>(result_.value))
+	template<typename U> constexpr PyResult(Ok<U> result_) : result(Ok<T>(result_.value))
 	{
 		static_assert(std::is_convertible_v<U, T>);
 	}
-	PyResult(Err result_) : result(result_) {}
+	constexpr PyResult(Err result_) : result(result_) {}
 
-	template<typename U> PyResult(const PyResult<U> &other) : result(Err(nullptr))
+	template<typename U> constexpr PyResult(const PyResult<U> &other) : result(Err(nullptr))
 	{
 		static_assert(std::is_convertible_v<U, T>);
 		if (other.is_ok()) {

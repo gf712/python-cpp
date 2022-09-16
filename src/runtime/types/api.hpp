@@ -1,6 +1,7 @@
 #pragma once
 
 #include "builtin.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyModule.hpp"
@@ -188,7 +189,33 @@ template<typename T> struct klass
 					ASSERT(!kwargs || kwargs->map().empty())
 					return (static_cast<T *>(self)->*F)();
 				},
-			.flags = MethodFlags::create(),
+			.flags = MethodFlags::create(MethodFlags::Flag::NOARGS),
+			.doc = "",
+		});
+		return *this;
+	}
+
+	template<typename FuncType>
+	klass &def(std::string_view name, FuncType &&F) requires
+		requires(PyObject *self, PyObject *arg0)
+	{
+		(static_cast<T *>(self)->*F)(arg0);
+	}
+	{
+		std::string name_str{ name };
+		type->add_method(MethodDefinition{
+			.name = name_str,
+			.method = [F, name_str = std::move(name_str)](
+						  PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					name_str,
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				return (static_cast<T *>(self)->*F)(std::get<0>(result.unwrap()));
+			},
+			.flags = MethodFlags::create(MethodFlags::Flag::O),
 			.doc = "",
 		});
 		return *this;

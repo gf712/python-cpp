@@ -49,32 +49,29 @@ PyResult<PyList *> PyList::create()
 	return Ok(result);
 }
 
-PyResult<PyObject *> PyList::append(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyList::append(PyObject *element)
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs || kwargs->map().size())
-	return PyObject::from(args->elements()[0]).and_then([this](auto *obj) {
-		m_elements.push_back(obj);
-		return Ok(py_none());
-	});
+	m_elements.push_back(element);
+	return Ok(py_none());
 }
 
-PyResult<PyObject *> PyList::extend(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PyList::extend(PyObject *iterable)
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs || kwargs->map().size())
+	auto iterator = iterable->iter();
+	if (iterator.is_err()) return iterator;
 
-	// FIXME: should check if object it iterable and the iterate
-	return PyObject::from(args->elements()[0]).and_then([this](auto *iterable) {
-		if (as<PyTuple>(iterable)) {
-			for (const auto &el : as<PyTuple>(iterable)->elements()) { m_elements.push_back(el); }
-		} else if (as<PyList>(iterable)) {
-			for (const auto &el : as<PyList>(iterable)->elements()) { m_elements.push_back(el); }
-		} else {
-			TODO();
-		}
-		return Ok(py_none());
-	});
+	auto tmp_list = PyList::create().unwrap();
+	auto value = iterator.unwrap()->next();
+	while (value.is_ok()) {
+		tmp_list->elements().push_back(value.unwrap());
+		value = iterator.unwrap()->next();
+	}
+
+	if (!value.unwrap_err()->type()->issubclass(stop_iteration()->type())) { return value; }
+
+	m_elements.insert(m_elements.end(), tmp_list->elements().begin(), tmp_list->elements().end());
+
+	return Ok(py_none());
 }
 
 std::string PyList::to_string() const

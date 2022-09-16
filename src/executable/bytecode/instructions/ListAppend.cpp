@@ -16,14 +16,8 @@ PyResult<Value> ListAppend::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(pylist)
 	ASSERT(as<PyList>(pylist))
 
-	auto result = PyTuple::create(value);
-	if (result.is_err()) { return Err(result.unwrap_err()); }
-
-	if (auto r = as<PyList>(pylist)->append(result.unwrap(), nullptr); r.is_ok()) {
-		return Ok(Value{ r.unwrap() });
-	} else {
-		return Err(r.unwrap_err());
-	}
+	return PyObject::from(value).and_then(
+		[pylist](PyObject *element) { return as<PyList>(pylist)->append(element); });
 }
 
 std::vector<uint8_t> ListAppend::serialize() const

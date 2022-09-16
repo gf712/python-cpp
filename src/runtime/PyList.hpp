@@ -27,10 +27,10 @@ class PyList : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	PyResult<PyObject *> append(PyTuple *args, PyDict *kwargs);
-	PyResult<PyObject *> extend(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> append(PyObject *element);
+	PyResult<PyObject *> extend(PyObject *iterable);
 
-	PyResult<PyObject*> __class_getitem__(PyType* cls, PyObject* args);
+	PyResult<PyObject *> __class_getitem__(PyType *cls, PyObject *args);
 
 	void sort();
 
