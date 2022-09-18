@@ -58,6 +58,8 @@ constexpr std::string_view platform()
 {
 #if defined(__linux__)
 	return "linux";
+#elif defined(__APPLE__)
+	return "darwin";
 #else
 	static_assert(false, "Unsupported platform");
 #endif

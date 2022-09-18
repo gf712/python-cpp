@@ -60,7 +60,7 @@ class DefaultMangler : public Mangler
 
 		const auto start = module_function.size() - std::distance(module_function.rbegin(), mf_it);
 
-		std::string_view mangled_class{ mangled_name.begin() + start, mangled_name.begin() + end };
+		std::string_view mangled_class{ mangled_name.c_str() + start, end - start };
 
 		ASSERT(mangled_class.starts_with("__class__"))
 		ASSERT(mangled_class.ends_with("__"))

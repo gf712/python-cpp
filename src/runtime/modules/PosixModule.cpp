@@ -48,12 +48,23 @@ namespace {
 			m_st_uid = stat_->st_uid;
 			m_st_gid = stat_->st_gid;
 			m_st_size = stat_->st_size;
+#if defined(__APPLE__)
+			m_st_atime_sec = stat_->st_atimespec.tv_sec;
+			m_st_mtime_sec = stat_->st_mtimespec.tv_sec;
+			m_st_ctime_sec = stat_->st_ctimespec.tv_sec;
+			m_st_atime_nsec = stat_->st_atimespec.tv_nsec;
+			m_st_mtime_nsec = stat_->st_mtimespec.tv_nsec;
+			m_st_ctime_nsec = stat_->st_ctimespec.tv_nsec;
+#elif defined(__linux__)
 			m_st_atime_sec = stat_->st_atim.tv_sec;
 			m_st_mtime_sec = stat_->st_mtim.tv_sec;
 			m_st_ctime_sec = stat_->st_ctim.tv_sec;
 			m_st_atime_nsec = stat_->st_atim.tv_nsec;
 			m_st_mtime_nsec = stat_->st_mtim.tv_nsec;
 			m_st_ctime_nsec = stat_->st_ctim.tv_nsec;
+#else
+			static_assert(false, "Unsupported platform");
+#endif
 		}
 
 	  public:

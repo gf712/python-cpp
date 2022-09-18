@@ -12,7 +12,9 @@
 #include "runtime/types/api.hpp"
 #include "vm/VM.hpp"
 
+#if defined(__GLIBCXX__) || defined(__GLIBCPP__)
 #include <ext/stdio_filebuf.h>
+#endif
 #include <filesystem>
 #include <fstream>
 
@@ -1230,6 +1232,7 @@ class BytesIO : public BufferedIOBase
 	}
 };
 
+#if defined(__GLIBCXX__) || defined(__GLIBCPP__)
 // taken from https://stackoverflow.com/a/19749019
 typedef std::basic_ofstream<char>::__filebuf_type buffer_t;
 typedef __gnu_cxx::stdio_filebuf<char> io_buffer_t;
@@ -1239,6 +1242,10 @@ FILE *cfile_impl(buffer_t *const fb)
 }
 
 FILE *cfile(std::fstream const &fs) { return cfile_impl(fs.rdbuf()); }
+#else
+// FIXME: find a way to get the file descriptor using libc++
+FILE *cfile(std::fstream const &) { return nullptr; }
+#endif
 
 enum Mode {
 	CREATE = 0,
@@ -1432,7 +1439,18 @@ class FileIO : public RawIOBase
 			// FIXME: should be OSError
 			return Err(value_error("{}", msg));
 		}
-		m_file_descriptor = cfile(m_filestream)->_fileno;
+
+		if (auto* file_ptr = cfile(m_filestream)) {
+#if defined(__linux__)
+			m_file_descriptor = file_ptr->_fileno;
+#elif defined(__APPLE__)
+			m_file_descriptor = file_ptr->_file;
+#else
+			static_assert(false, "unsupported platform");
+#endif
+		} else {
+			m_file_descriptor = -1;
+		}
 
 		{
 			std::error_code ec;
