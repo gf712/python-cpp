@@ -151,8 +151,19 @@ PyResult<PyObject *>
 	if (args->size() < 2) {
 		return Err(type_error("__build_class__: not enough arguments, got {}", args->size()));
 	}
-	// FIXME: should accept metaclass keyword
-	ASSERT(!kwargs || kwargs->map().empty())
+	// FIXME
+	if (kwargs && kwargs->map().size() != 1) { TODO(); }
+	auto metaclass_ = [kwargs]() -> PyResult<PyObject *> {
+		if (kwargs && kwargs->map().size() == 1) {
+			auto it = kwargs->map().find(String{"metaclass"});
+			ASSERT(it != kwargs->map().end());
+			return PyObject::from(it->second);
+		} else {
+			return Ok(type());
+		}
+	}();
+	if (metaclass_.is_err()) return metaclass_;
+	auto *metaclass = metaclass_.unwrap();
 	auto maybe_function_location_ = args->operator[](0);
 	if (maybe_function_location_.is_err()) return maybe_function_location_;
 	auto *maybe_function_location = maybe_function_location_.unwrap();
@@ -247,11 +258,7 @@ PyResult<PyObject *>
 	auto call_args = PyTuple::create(class_name.unwrap(), bases, ns);
 	if (call_args.is_err()) { return Err(call_args.unwrap_err()); }
 
-	// FIXME: determine what the actual metaclass is
-	auto *metaclass = type();
-
-	auto cls = metaclass->__call__(call_args.unwrap(), nullptr);
-	if (cls.is_ok()) { ASSERT(as<PyType>(cls.unwrap())) }
+	auto cls = metaclass->call(call_args.unwrap(), nullptr);
 	return cls;
 }
 
