@@ -31,6 +31,7 @@ void initialize_types()
 	[[maybe_unused]] auto scope_static_alloc =
 		VirtualMachine::the().heap().scoped_static_allocation();
 	type();
+	super();
 	bool_();
 	bytes();
 	ellipsis();

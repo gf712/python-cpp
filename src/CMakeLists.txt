@@ -154,6 +154,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PySlice.cpp
     runtime/PySlotWrapper.cpp
     runtime/PyString.cpp
+    runtime/PySuper.cpp
     runtime/PyStaticMethod.cpp
     runtime/PyTraceback.cpp
     runtime/PyTuple.cpp

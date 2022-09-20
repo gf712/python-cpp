@@ -404,7 +404,7 @@ class PyObject : public Cell
 	bool is_callable() const;
 	const std::string &name() const;
 	const TypePrototype &type_prototype() const;
-	const PyDict &attributes() const { return *m_attributes; }
+	const PyDict *attributes() const { return m_attributes; }
 	PyResult<PyObject *> get_method(PyObject *name) const;
 	PyResult<PyObject *> get_attribute(PyObject *name) const;
 	std::tuple<PyResult<PyObject *>, LookupAttrResult> lookup_attribute(PyObject *name) const;

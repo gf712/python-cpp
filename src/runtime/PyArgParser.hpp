@@ -25,13 +25,7 @@ template<typename... ArgTypes> struct PyArgsParser
 		using ExpectedType = std::tuple_element_t<Idx, ResultType>;
 		if constexpr (std::is_base_of_v<PyObject,
 						  std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
-			if (args.size() < Idx) {
-				if constexpr (Idx > MaxSize - 1) {
-					std::get<Idx>(result) = std::get<Idx - MinSize>(
-						std::forward_as_tuple(std::forward<DefaultArgs>(default_args)...));
-				} else {
-				}
-			} else {
+			if (args.size() > Idx) {
 				using PyObjectType = std::remove_pointer_t<std::remove_cv_t<ExpectedType>>;
 				const auto &arg = PyObject::from(args[Idx]);
 				if (arg.is_err()) return Err(arg.unwrap_err());
@@ -40,6 +34,13 @@ template<typename... ArgTypes> struct PyArgsParser
 				} else {
 					if (!as<PyObjectType>(arg.unwrap())) return Err(type_error("Unexpected type"));
 					std::get<Idx>(result) = as<PyObjectType>(arg.unwrap());
+				}
+			} else {
+				if constexpr (Idx >= MinSize && (Idx - MinSize) < sizeof...(DefaultArgs)) {
+					std::get<Idx>(result) = std::get<Idx - MinSize>(
+						std::forward_as_tuple(std::forward<DefaultArgs>(default_args)...));
+				} else {
+					TODO();
 				}
 			}
 
@@ -68,11 +69,11 @@ template<typename... ArgTypes> struct PyArgsParser
 		DefaultArgs &&...default_values)
 	{
 		if constexpr (max_size() - min_size() > sizeof...(DefaultArgs)) {
-			[]<bool flag = false>() { static_assert(flag, "Too many default values"); }
+			[]<bool flag = false>() { static_assert(flag, "Not enough default values"); }
 			();
 		}
 		if constexpr (max_size() - min_size() < sizeof...(DefaultArgs)) {
-			[]<bool flag = false>() { static_assert(flag, "Not enough default values"); }
+			[]<bool flag = false>() { static_assert(flag, "Too many default values"); }
 			();
 		}
 
@@ -108,7 +109,7 @@ template<typename... ArgTypes> struct PyArgsParser
 			min_size,
 			max_size,
 			unpacked_args,
-			std::forward<DefaultArgs...>(default_values)...);
+			std::forward<DefaultArgs>(default_values)...);
 
 		if (result.is_err()) return Err(result.unwrap_err());
 		return Ok(unpacked_args);

@@ -34,6 +34,7 @@
 #include "runtime/PySlotWrapper.hpp"
 #include "runtime/PyStaticMethod.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PySuper.hpp"
 #include "runtime/PyTraceback.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
@@ -41,13 +42,13 @@
 using namespace py;
 
 BuiltinTypes::BuiltinTypes()
-	: m_type(PyType::type_factory()), m_str(PyString::type_factory()),
-	  m_str_iterator(PyStringIterator::type_factory()), m_integer(PyInteger::type_factory()),
-	  m_bool(PyBool::type_factory()), m_bytes(PyBytes::type_factory()),
-	  m_ellipsis(PyEllipsis::type_factory()), m_float(PyFloat::type_factory()),
-	  m_none(PyNone::type_factory()), m_module(PyModule::type_factory()),
-	  m_object(PyObject::type_factory()), m_function(PyFunction::type_factory()),
-	  m_native_function(PyNativeFunction::type_factory()),
+	: m_type(PyType::type_factory()), m_super(PySuper::type_factory()),
+	  m_str(PyString::type_factory()), m_str_iterator(PyStringIterator::type_factory()),
+	  m_integer(PyInteger::type_factory()), m_bool(PyBool::type_factory()),
+	  m_bytes(PyBytes::type_factory()), m_ellipsis(PyEllipsis::type_factory()),
+	  m_float(PyFloat::type_factory()), m_none(PyNone::type_factory()),
+	  m_module(PyModule::type_factory()), m_object(PyObject::type_factory()),
+	  m_function(PyFunction::type_factory()), m_native_function(PyNativeFunction::type_factory()),
 	  m_llvm_function(PyLLVMFunction::type_factory()), m_code(PyCode::type_factory()),
 	  m_cell(PyCell::type_factory()), m_dict(PyDict::type_factory()),
 	  m_dict_items(PyDictItems::type_factory()),
@@ -89,6 +90,8 @@ BuiltinTypes::BuiltinTypes()
 
 namespace py {
 INITIALIZE_TYPE(type)
+INITIALIZE_TYPE(super)
+
 INITIALIZE_TYPE(bool_)
 INITIALIZE_TYPE(bytes)
 INITIALIZE_TYPE(ellipsis)

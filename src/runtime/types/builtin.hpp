@@ -11,6 +11,8 @@ class BuiltinTypes
 	using Type = std::variant<std::function<std::unique_ptr<TypePrototype>()>,
 		std::unique_ptr<TypePrototype>>;
 	mutable Type m_type;
+	mutable Type m_super;
+
 	mutable Type m_str;
 	mutable Type m_str_iterator;
 	mutable Type m_integer;
@@ -95,6 +97,8 @@ class BuiltinTypes
 	}
 
 	TypePrototype &type() const { return get_type(m_type); }
+	TypePrototype &super() const { return get_type(m_super); }
+
 	TypePrototype &bool_() const { return get_type(m_bool); }
 	TypePrototype &bytes() const { return get_type(m_bytes); }
 	TypePrototype &ellipsis() const { return get_type(m_ellipsis); }
@@ -162,6 +166,7 @@ class BuiltinTypes
 };
 
 PyType *type();
+PyType *super();
 PyType *bool_();
 PyType *bytes();
 PyType *ellipsis();

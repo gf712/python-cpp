@@ -155,7 +155,7 @@ PyResult<PyObject *>
 	if (kwargs && kwargs->map().size() != 1) { TODO(); }
 	auto metaclass_ = [kwargs]() -> PyResult<PyObject *> {
 		if (kwargs && kwargs->map().size() == 1) {
-			auto it = kwargs->map().find(String{"metaclass"});
+			auto it = kwargs->map().find(String{ "metaclass" });
 			ASSERT(it != kwargs->map().end());
 			return PyObject::from(it->second);
 		} else {
@@ -543,7 +543,7 @@ PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &inter
 			auto object_ = PyObject::from(arg);
 			if (object_.is_err()) return object_;
 			auto *object = object_.unwrap();
-			for (const auto &[k, _] : object->attributes().map()) {
+			for (const auto &[k, _] : object->attributes()->map()) {
 				dir_list->elements().push_back(k);
 			}
 		}
@@ -872,6 +872,7 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 auto builtin_types()
 {
 	return std::array{ type(),
+		super(),
 		bool_(),
 		bytes(),
 		ellipsis(),
