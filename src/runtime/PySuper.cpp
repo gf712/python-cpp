@@ -1,6 +1,8 @@
 #include "PySuper.hpp"
 #include "MemoryError.hpp"
 #include "PyArgParser.hpp"
+#include "PyCell.hpp"
+#include "PyCode.hpp"
 #include "PyFrame.hpp"
 #include "PyList.hpp"
 #include "PyString.hpp"

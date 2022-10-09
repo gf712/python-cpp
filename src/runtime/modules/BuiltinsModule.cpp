@@ -10,6 +10,7 @@
 #include "runtime/OSError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBytes.hpp"
+#include "runtime/PyCell.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFrame.hpp"
@@ -181,6 +182,7 @@ PyResult<PyObject *>
 	const auto mangled_class_name_as_string = as<PyString>(mangled_class_name)->value();
 
 	PyResult<PyFunction *> callable = [&]() -> PyResult<PyFunction *> {
+		// TODO: Remove as<PyInteger>(maybe_function_location) branch. This is deprecated
 		if (as<PyInteger>(maybe_function_location)) {
 			// auto function_id = std::get<int64_t>(pynumber->value().value);
 			// FIXME: what should be the global dictionary for this?
@@ -246,8 +248,8 @@ PyResult<PyObject *>
 	auto kwargs_ = PyDict::create();
 	if (kwargs_.is_err()) { return Err(kwargs_.unwrap_err()); }
 	auto *empty_kwargs = kwargs_.unwrap();
-	auto result = callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
-	if (result.is_err()) { TODO(); }
+	auto classcell = callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
+	if (classcell.is_err()) { return classcell; }
 
 	const std::string class_name_str =
 		Mangler::default_mangler().class_demangle(mangled_class_name_as_string);
@@ -259,7 +261,13 @@ PyResult<PyObject *>
 	if (call_args.is_err()) { return Err(call_args.unwrap_err()); }
 
 	auto cls = metaclass->call(call_args.unwrap(), nullptr);
-	return cls;
+
+	// FIXME: according to CPython this is *not* how you do it, but RustPython does it this way
+	//        what are the implications? Find out how CPython sets __classcell__.
+	return cls.and_then([&classcell](PyObject *cls) {
+		if (as<PyCell>(classcell.unwrap())) { as<PyCell>(classcell.unwrap())->set_cell(cls); }
+		return Ok(cls);
+	});
 }
 
 PyResult<PyObject *> globals(const PyTuple *, const PyDict *, Interpreter &interpreter)

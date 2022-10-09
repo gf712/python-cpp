@@ -318,6 +318,9 @@ PyResult<PyObject *> PyType::lookup(PyObject *name) const
 bool PyType::update_if_special(const std::string &name, const Value &value)
 {
 	if (!name.starts_with("__")) { return false; }
+
+	// FIXME: hack to avoid converting a nullptr to a PyObject*
+	if (std::holds_alternative<PyObject *>(value) && !std::get<PyObject *>(value)) { return false; }
 	auto obj_ = PyObject::from(value);
 	if (obj_.is_err()) { TODO(); }
 	auto *obj = obj_.unwrap();

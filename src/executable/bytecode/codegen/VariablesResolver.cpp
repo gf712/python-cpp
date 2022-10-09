@@ -71,21 +71,17 @@ void VariablesResolver::store(const std::string &name, SourceLocation source_loc
 		auto *parent = m_current_scope->get().parent;
 		bool found = false;
 		while (parent) {
-			if (parent->type == Scope::Type::CLASS) {
-				parent = parent->parent;
-			} else {
-				auto &visibility = parent->visibility;
-				if (auto it = visibility.find(name); it != visibility.end()) {
-					if (it->second == Visibility::CELL) {
-						annotate_free_and_cell_variables(name);
-						found = true;
-					} else if (it->second == Visibility::GLOBAL || it->second == Visibility::FREE) {
-						found = true;
-					}
-					break;
+			auto &visibility = parent->visibility;
+			if (auto it = visibility.find(name); it != visibility.end()) {
+				if (it->second == Visibility::CELL) {
+					annotate_free_and_cell_variables(name);
+					found = true;
+				} else if (it->second == Visibility::GLOBAL || it->second == Visibility::FREE) {
+					found = true;
 				}
-				parent = parent->parent;
+				break;
 			}
+			parent = parent->parent;
 		}
 		if (!found) { current_scope_vars[name] = Visibility::LOCAL; }
 	} else if (m_current_scope->get().type == Scope::Type::CLASS) {
@@ -108,7 +104,8 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 		current_scope_vars[name] = Visibility::NAME;
 	} else if (m_current_scope->get().type == Scope::Type::FUNCTION) {
 		current_scope_vars[name] = Visibility::GLOBAL;
-	} else if (m_current_scope->get().type == Scope::Type::CLOSURE) {
+	} else if (m_current_scope->get().type == Scope::Type::CLOSURE
+			   || m_current_scope->get().type == Scope::Type::CLASS) {
 		auto *parent = m_current_scope->get().parent;
 		bool found = false;
 		while (parent) {
@@ -119,6 +116,12 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 					found = true;
 				} else if (it->second == Visibility::CELL || it->second == Visibility::LOCAL) {
 					annotate_free_and_cell_variables(name);
+					if (parent->type == Scope::Type::CLASS) {
+						if (name == "__class__") {
+							// TODO: is this assumption always correct?
+							parent->requires_class_ref = true;
+						}
+					}
 					found = true;
 				}
 				break;
@@ -126,8 +129,6 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 			parent = parent->parent;
 		}
 		if (!found) { current_scope_vars[name] = Visibility::GLOBAL; }
-	} else if (m_current_scope->get().type == Scope::Type::CLASS) {
-		current_scope_vars[name] = Visibility::NAME;
 	} else {
 		TODO();
 	}
@@ -223,6 +224,8 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 		.parent = &m_current_scope->get() });
 	m_current_scope = std::ref(*m_visibility.at(class_name));
 
+	m_visibility[class_name]->visibility["__class__"] = Visibility::CELL;
+
 	for (const auto &statement : node->body()) {
 		m_to_visit.emplace_back(*m_current_scope, statement);
 	}
@@ -311,13 +314,16 @@ template<typename FunctionType> void VariablesResolver::visit_function(FunctionT
 
 	ASSERT(!m_visibility.contains(function_name))
 
-	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE
+		|| caller->get().type == Scope::Type::CLASS) {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
 			.namespace_ = std::move(ns),
 			.type = Scope::Type::CLOSURE,
 			.parent = &caller->get() });
 		m_current_scope = std::ref(*m_visibility.at(function_name));
-		caller->get().visibility[node->name()] = Visibility::LOCAL;
+		if (caller->get().type != Scope::Type::CLASS) {
+			caller->get().visibility[node->name()] = Visibility::LOCAL;
+		}
 	} else {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
 			.namespace_ = std::move(ns),

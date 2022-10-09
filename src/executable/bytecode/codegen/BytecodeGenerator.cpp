@@ -1548,42 +1548,69 @@ Value *BytecodeGenerator::visit(const Set *node)
 Value *BytecodeGenerator::visit(const ClassDefinition *node)
 {
 	if (!node->decorator_list().empty()) { TODO(); }
-	std::string class_mangled_name;
-	size_t class_id;
-	{
-		class_mangled_name = Mangler::default_mangler().class_mangle(
-			mangle_namespace(m_stack), node->name(), node->source_location());
+	auto class_mangled_name = Mangler::default_mangler().class_mangle(
+		mangle_namespace(m_stack), node->name(), node->source_location());
 
-		auto *class_builder_func = create_function(class_mangled_name);
-		create_nested_scope(node->name(), class_mangled_name);
-		class_id = class_builder_func->function_info().function_id;
+	const auto &name_visibility_it = m_variable_visibility.find(class_mangled_name);
+	ASSERT(name_visibility_it != m_variable_visibility.end())
+	const auto &class_scope = name_visibility_it->second;
 
-		auto *block = allocate_block(class_id);
-		auto *old_block = m_current_block;
-		set_insert_point(block);
+	auto *class_builder_func = create_function(class_mangled_name);
+	create_nested_scope(node->name(), class_mangled_name);
+	size_t class_id = class_builder_func->function_info().function_id;
 
-		const auto name_register = allocate_register();
-		const auto qualname_register = allocate_register();
-		const auto return_none_register = allocate_register();
+	auto *block = allocate_block(class_id);
+	auto *old_block = m_current_block;
+	set_insert_point(block);
 
-		// class definition preamble, a la CPython
-		emit<LoadName>(name_register, "__name__");
-		emit<StoreName>("__module__", name_register);
-		emit<LoadConst>(
-			qualname_register, load_const(py::String{ node->name() }, class_id)->get_index());
-		emit<StoreName>("__qualname__", qualname_register);
+	const auto name_register = allocate_register();
+	const auto qualname_register = allocate_register();
+	const auto return_none_register = allocate_register();
 
-		// the actual class definition
-		for (const auto &el : node->body()) { generate(el.get(), class_id); }
+	// class definition preamble, a la CPython
+	emit<LoadName>(name_register, "__name__");
+	emit<StoreName>("__module__", name_register);
+	emit<LoadConst>(
+		qualname_register, load_const(py::String{ node->name() }, class_id)->get_index());
+	emit<StoreName>("__qualname__", qualname_register);
 
+	if (class_scope->requires_class_ref) {
+		auto *__class__ = create_free_value("__class__");
+		ASSERT(__class__->get_free_var_index() == 0);
+		m_stack.top().locals.emplace("__class__", __class__);
+	}
+
+	// the actual class definition
+	for (const auto &el : node->body()) { generate(el.get(), class_id); }
+
+	if (class_scope->requires_class_ref) {
+		auto it = m_stack.top().locals.find("__class__");
+		ASSERT(it != m_stack.top().locals.end());
+		ASSERT(std::holds_alternative<BytecodeFreeValue *>(it->second));
+		auto *__class__ = std::get<BytecodeFreeValue *>(it->second);
+		auto *class_value = create_value();
+		emit<LoadClosure>(class_value->get_register(), __class__->get_free_var_index());
+		emit<StoreName>("__classcell__", class_value->get_register());
+		emit<ReturnValue>(class_value->get_register());
+	} else {
 		emit<LoadConst>(return_none_register,
 			load_const(py::NameConstant{ py::NoneType{} }, class_id)->get_index());
 		emit<ReturnValue>(return_none_register);
-		m_stack.pop();
-		exit_function(class_builder_func->function_info().function_id);
-
-		set_insert_point(old_block);
 	}
+
+	m_stack.pop();
+	exit_function(class_builder_func->function_info().function_id);
+
+	set_insert_point(old_block);
+
+	class_builder_func->function_info().function.metadata.arg_count = 0;
+	class_builder_func->function_info().function.metadata.kwonly_arg_count = 0;
+	class_builder_func->function_info().function.metadata.cell2arg = {};
+	class_builder_func->function_info().function.metadata.nlocals = 0;
+	class_builder_func->function_info().function.metadata.flags = CodeFlags::create();
+	class_builder_func->function_info().function.metadata.cellvars =
+		class_scope->requires_class_ref ? std::vector<std::string>{ "__class__" }
+										: std::vector<std::string>{};
 
 	std::vector<Register> arg_registers;
 	arg_registers.reserve(2 + node->bases().size());
@@ -1591,10 +1618,9 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	std::vector<Register> keyword_names;
 
 	const auto builtin_build_class_register = allocate_register();
-	const auto class_location_register = allocate_register();
 	const auto class_name_register = allocate_register();
 
-	arg_registers.push_back(class_location_register);
+	arg_registers.push_back(class_builder_func->get_register());
 	arg_registers.push_back(class_name_register);
 
 	for (const auto &base : node->bases()) {
@@ -1611,8 +1637,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	emit<LoadBuildClass>(builtin_build_class_register);
 	emit<LoadConst>(class_name_register,
 		load_const(py::String{ class_mangled_name }, m_function_id)->get_index());
-	emit<LoadConst>(class_location_register,
-		load_const(py::Number{ static_cast<int64_t>(class_id) }, m_function_id)->get_index());
+	make_function(class_builder_func->get_register(), class_mangled_name, {}, {}, {});
 
 	if (kwarg_registers.empty()) {
 		emit_call(builtin_build_class_register, std::move(arg_registers));

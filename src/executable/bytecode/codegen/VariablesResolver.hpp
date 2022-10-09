@@ -23,6 +23,7 @@ class VariablesResolver : public ast::CodeGenerator
 		// this is beyond the scope of this class, but it is simple and cheap to check if a function
 		// is a generator at this stage
 		bool is_generator{ false };
+		bool requires_class_ref{ false };
 	};
 
 	using VisibilityMap = std::unordered_map<std::string, std::unique_ptr<Scope>>;
@@ -42,8 +43,7 @@ class VariablesResolver : public ast::CodeGenerator
 	void annotate_free_and_cell_variables(const std::string &name);
 	Scope *top_level_node(const std::string &name) const;
 
-	template <typename FunctionType>
-	void visit_function(FunctionType* function);
+	template<typename FunctionType> void visit_function(FunctionType *function);
 
   public:
 	static VisibilityMap resolve(ast::Module *node)

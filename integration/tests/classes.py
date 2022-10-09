@@ -51,3 +51,9 @@ class A:
 
 assert A(10).a == 20
 assert A.new(10).a == 20
+
+class D:
+    def test(self):
+        return __class__ == D
+
+assert D().test()
