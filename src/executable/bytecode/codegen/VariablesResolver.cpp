@@ -100,6 +100,13 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 
 	if (auto it = current_scope_vars.find(name); it != current_scope_vars.end()) { return; }
 
+	const bool outer_is_class = m_current_scope->get().parent && m_current_scope->get().parent->type == Scope::Type::CLASS;
+	if (outer_is_class && (name == "__class__" || name == "super")) {
+		m_current_scope->get().parent->requires_class_ref = true;
+		// artificially lookup __class__
+		if (name == "super") load("__class__", source_location);
+	}
+
 	if (m_current_scope->get().type == Scope::Type::MODULE) {
 		current_scope_vars[name] = Visibility::NAME;
 	} else if (m_current_scope->get().type == Scope::Type::FUNCTION) {
@@ -116,12 +123,6 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 					found = true;
 				} else if (it->second == Visibility::CELL || it->second == Visibility::LOCAL) {
 					annotate_free_and_cell_variables(name);
-					if (parent->type == Scope::Type::CLASS) {
-						if (name == "__class__") {
-							// TODO: is this assumption always correct?
-							parent->requires_class_ref = true;
-						}
-					}
 					found = true;
 				}
 				break;

@@ -20,7 +20,8 @@ class PySuper : public PyBaseObject
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 
 	PyResult<PyObject *> __repr__() const;
-	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
+	PyResult<PyObject *> __getattribute__(PyObject *name) const;
+	PyResult<PyObject *> __get__(PyObject *object, PyObject *type) const;
 
 	std::string to_string() const override;
 
@@ -30,6 +31,10 @@ class PySuper : public PyBaseObject
 
   private:
 	static PyResult<PyType *> check(PyType *type, PyObject *object);
+
+	static PyResult<PyObject *> infer_object(PyFrame *, PyCode *);
+
+	static PyResult<PyType *> infer_type(PyFrame *, PyCode *);
 
 	void visit_graph(Visitor &) override;
 };

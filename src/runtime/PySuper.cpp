@@ -41,16 +41,27 @@ PyResult<int32_t> PySuper::__init__(PyTuple *args, PyDict *kwargs)
 		nullptr);
 	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
 
-	const auto [type_, obj] = parse_result.unwrap();
+	auto [type_, obj] = parse_result.unwrap();
 
+	// call to super without arguments
 	if (!type_) {
 		auto &interpreter = VirtualMachine::the().interpreter();
 		auto *frame = interpreter.execution_frame();
 		// This should never happen?
 		if (!frame) { return Err(runtime_error("super(): no current frame")); }
 		auto *code = frame->code();
-		(void)code;
-		TODO();
+
+		if (code->arg_count() == 0) {
+			return Err(runtime_error("super(): caller takes no arguments"));
+		}
+
+		auto obj_ = infer_object(frame, code);
+		if (obj_.is_err()) return Err(obj_.unwrap_err());
+		obj = obj_.unwrap();
+
+		auto type__ = infer_type(frame, code);
+		if (type__.is_err()) return Err(type__.unwrap_err());
+		type_ = type__.unwrap();
 	}
 
 	if (obj) {
@@ -110,9 +121,35 @@ PyResult<PyObject *> PySuper::__getattribute__(PyObject *name) const
 	return PyObject::__getattribute__(name);
 }
 
+PyResult<PyObject *> PySuper::__get__(PyObject *object, PyObject *) const
+{
+	if (!object || object == py_none() || !m_object) { return Ok(const_cast<PySuper *>(this)); }
+
+	// untested code!
+	TODO();
+
+	if (PySuper::type() != super()) {
+		return PySuper::type()->call(PyTuple::create(PySuper::type(), object).unwrap(), nullptr);
+	}
+
+	auto object_type_ = check(PySuper::type(), object);
+	if (object_type_.is_err()) return object_type_;
+	auto *object_type = object_type_.unwrap();
+
+	auto newobj_ = PySuper::__new__(super(), nullptr, nullptr);
+	if (newobj_.is_err()) return newobj_;
+	auto *newobj = static_cast<PySuper *>(newobj_.unwrap());
+	newobj->m_type = m_type;
+	newobj->m_object = object;
+	newobj->m_object_type = object_type;
+	return Ok(newobj);
+}
+
 PyResult<PyType *> PySuper::check(PyType *type, PyObject *object)
 {
-	if (as<PyType>(object) && object->type()->issubclass(type)) { return Ok(as<PyType>(object)); }
+	if (as<PyType>(object) && as<PyType>(object)->issubclass(type)) {
+		return Ok(as<PyType>(object));
+	}
 
 	if (object->type()->issubclass(type)) {
 		return Ok(object->type());
@@ -129,7 +166,43 @@ PyResult<PyType *> PySuper::check(PyType *type, PyObject *object)
 		}
 	}
 
-	return Err(type_error("super(type, obj: obj must be an instance or subtype of type"));
+	return Err(type_error("super(type, obj): obj must be an instance or subtype of type"));
+}
+
+PyResult<PyObject *> PySuper::infer_object(PyFrame *, PyCode *)
+{
+	auto first_arg = VirtualMachine::the().stack_local(0);
+	if (std::holds_alternative<PyObject *>(first_arg) && !std::get<PyObject *>(first_arg)) {
+		TODO();
+	}
+	return PyObject::from(first_arg);
+}
+
+PyResult<PyType *> PySuper::infer_type(PyFrame *frame, PyCode *code)
+{
+	for (size_t i = 0; const auto &name : code->m_freevars) {
+		if (name == "__class__") {
+			auto *cell = frame->freevars()[i];
+			if (!cell || !as<PyCell>(cell)) {
+				return Err(runtime_error("super(): bad __class__ cell"));
+			}
+
+			auto content = as<PyCell>(cell)->content();
+			ASSERT(std::holds_alternative<PyObject *>(content));
+			auto type = std::get<PyObject *>(content);
+			if (!type) { return Err(runtime_error("super(): empty __class__ cell")); }
+
+			if (!as<PyType>(type)) {
+				return Err(
+					runtime_error("super(): __class__ is not a type ({})", type->type()->name()));
+			}
+
+			return Ok(as<PyType>(type));
+		}
+		i++;
+	}
+
+	return Err(runtime_error("super(): __class__ cell not found"));
 }
 
 std::string PySuper::to_string() const
