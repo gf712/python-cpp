@@ -169,6 +169,12 @@ namespace concepts {
 	};
 
 	template<typename T>
+	concept HasOr = requires(T *self, PyObject *other)
+	{
+		self->__or__(other);
+	};
+
+	template<typename T>
 	concept HasBool = requires(const T *obj)
 	{
 		obj->__bool__();

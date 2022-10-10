@@ -619,10 +619,20 @@ PyResult<PyObject *> PyObject::and_(PyObject *other)
 		return call_slot(*type_prototype().__and__, this, other);
 	} else if (other->type_prototype().__and__.has_value()) {
 		return call_slot(*other->type_prototype().__and__, other, this);
-	} else if (auto seq = as_sequence(); seq.is_ok()) {
-		return seq.unwrap().concat(other);
 	}
 	return Err(type_error("unsupported operand type(s) for &: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<PyObject *> PyObject::or_(PyObject *other)
+{
+	if (type_prototype().__or__.has_value()) {
+		return call_slot(*type_prototype().__or__, this, other);
+	} else if (other->type_prototype().__or__.has_value()) {
+		return call_slot(*other->type_prototype().__or__, other, this);
+	}
+	return Err(type_error("unsupported operand type(s) for |: \'{}\' and \'{}\'",
 		type_prototype().__name__,
 		other->type_prototype().__name__));
 }

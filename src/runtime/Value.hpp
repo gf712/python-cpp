@@ -325,6 +325,7 @@ PyResult<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &inter
 PyResult<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> or_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &interpreter);

@@ -520,32 +520,56 @@ PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpre
 PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	return std::visit(
-		overloaded{ [](const NoneType &, const auto &) -> PyResult<Value> {
-					   return Ok(NameConstant{ NoneType{} });
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   if (std::holds_alternative<int64_t>(lhs_value.value)
+						   && std::holds_alternative<int64_t>(rhs_value.value)) {
+						   return Ok(Number{ std::get<int64_t>(lhs_value.value)
+											 & std::get<int64_t>(rhs_value.value) });
+					   } else {
+						   const std::string lhs_type =
+							   std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
+						   const std::string rhs_type =
+							   std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
+						   return Err(type_error("unsupported operand type(s) for &: '{}' and '{}'",
+							   lhs_type,
+							   rhs_type));
+					   }
 				   },
-			[](const auto &, const NoneType &) -> PyResult<Value> {
-				return Ok(NameConstant{ NoneType{} });
-			},
-			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
-				if (std::holds_alternative<int64_t>(lhs_value.value)
-					&& std::holds_alternative<int64_t>(rhs_value.value)) {
-					return Ok(Number{
-						std::get<int64_t>(lhs_value.value) & std::get<int64_t>(rhs_value.value) });
-				} else {
-					const std::string lhs_type =
-						std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
-					const std::string rhs_type =
-						std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
-					return Err(type_error(
-						"unsupported operand type(s) for &: '{}' and '{}'", lhs_type, rhs_type));
-				}
-			},
 			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				if (py_lhs.is_err()) return py_lhs;
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (py_rhs.is_err()) return py_rhs;
 				return py_lhs.unwrap()->and_(py_rhs.unwrap());
+			} },
+		lhs,
+		rhs);
+}
+
+PyResult<Value> or_(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   if (std::holds_alternative<int64_t>(lhs_value.value)
+						   && std::holds_alternative<int64_t>(rhs_value.value)) {
+						   return Ok(Number{ std::get<int64_t>(lhs_value.value)
+											 | std::get<int64_t>(rhs_value.value) });
+					   } else {
+						   const std::string lhs_type =
+							   std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
+						   const std::string rhs_type =
+							   std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
+						   return Err(type_error("unsupported operand type(s) for &: '{}' and '{}'",
+							   lhs_type,
+							   rhs_type));
+					   }
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->or_(py_rhs.unwrap());
 			} },
 		lhs,
 		rhs);

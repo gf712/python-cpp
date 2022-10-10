@@ -88,6 +88,14 @@ PyResult<PyObject *> PyInteger::__and__(PyObject *obj)
 	return PyInteger::create((as_i64() & as<PyInteger>(obj)->as_i64() ));
 }
 
+PyResult<PyObject *> PyInteger::__or__(PyObject *obj)
+{
+	if (obj->type() != integer()) {
+		return Err(type_error("unsupported operand type(s) for |: 'int' and '{}'", obj->type()->name()));
+	}
+
+	return PyInteger::create((as_i64() | as<PyInteger>(obj)->as_i64() ));
+}
 
 PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
 {

@@ -21,6 +21,7 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 	PyResult<int64_t> __hash__() const;
 
 	PyResult<PyObject *> __and__(PyObject *obj);
+	PyResult<PyObject *> __or__(PyObject *obj);
 
 	PyResult<PyObject *> to_bytes(PyTuple *args, PyDict *kwargs) const;
 

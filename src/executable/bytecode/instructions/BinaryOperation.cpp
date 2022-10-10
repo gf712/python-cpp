@@ -42,7 +42,7 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 			return and_(lhs, rhs, interpreter);
 		} break;
 		case Operation::OR: {
-			TODO();
+			return or_(lhs, rhs, interpreter);
 		} break;
 		case Operation::XOR: {
 			TODO();
