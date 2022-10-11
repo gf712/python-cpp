@@ -240,13 +240,15 @@ PyResult<PyObject *> PyDict::fromkeys(PyObject *iterable, PyObject *value)
 	auto iterator = iterable->iter();
 	if (iterator.is_err()) return iterator;
 
-	PyDict::MapType map;
+	auto map_ = PyDict::create();
+	if (map_.is_err()) return map_;
+	auto *map = map_.unwrap();
 
 	if (!value) { value = py_none(); }
 
 	auto key = iterator.unwrap()->next();
 	while (key.is_ok()) {
-		map.emplace(key.unwrap(), value);
+		map->m_map.emplace(key.unwrap(), value);
 		key = iterator.unwrap()->next();
 	}
 
@@ -254,7 +256,7 @@ PyResult<PyObject *> PyDict::fromkeys(PyObject *iterable, PyObject *value)
 		return key;
 	}
 
-	return PyDict::create(map);
+	return Ok(map);
 }
 
 namespace {
