@@ -531,9 +531,9 @@ Value *VariablesResolver::visit(const Module *node)
 		m_to_visit.emplace_back(*m_current_scope, statement);
 	}
 	while (!m_to_visit.empty()) {
-		const auto &[scope, node] = m_to_visit.front();
+		const auto [scope, node] = m_to_visit.front();
 		m_to_visit.pop_front();
-		m_current_scope = scope;
+		m_current_scope = std::move(scope);
 		node->codegen(this);
 	}
 	return nullptr;

@@ -863,7 +863,7 @@ struct TPrimaryPattern_ : Pattern<TPrimaryPattern_>
 				LookAhead<TLookahead>>;
 			if (pattern4::match(p)) {
 				DEBUG_LOG("'(' [arguments] ')' &t_lookahead")
-				const auto &caller = scope.parent().back();
+				const auto caller = scope.parent().back();
 				scope.parent().pop_back();
 				std::vector<std::shared_ptr<ASTNode>> args;
 				std::vector<std::shared_ptr<Keyword>> kwargs;
