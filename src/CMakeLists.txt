@@ -1,5 +1,3 @@
-find_package(LLVM CONFIG 10.0)
-
 set(AST_SOURCE_FILES # cmake-format: sortable
                      ast/AST.cpp ast/optimizers/ConstantFolding.cpp)
 
@@ -198,23 +196,29 @@ add_library(
 
 add_executable(unittests_ ${UNITTEST_SOURCES})
 
-target_link_libraries(python-cpp PUBLIC spdlog_header_only ICU::uc)
+target_link_libraries(python-cpp
+  PUBLIC spdlog_header_only
+  PRIVATE project_options project_warnings ICU::uc
+)
 
 target_include_directories(python-cpp PUBLIC .)
 
-# -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
 target_compile_options(
   python-cpp
   PRIVATE -Wall
-          -Wextra
-          -Werror
-          -fno-omit-frame-pointer)
+  -Wextra
+  -Werror
+  # -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
+  -fno-omit-frame-pointer)
 
 if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
 endif()
 
-if(LLVM_FOUND)
+find_package(LLVM CONFIG 10.0)
+if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
+  message(FATAL_ERROR "Could not find LLVM in the local environment")
+elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
   message(STATUS "Configuring LLVM backend")
   add_library(python-cpp-llvm ${LLVM_BACKEND_FILES})
 
@@ -227,7 +231,9 @@ if(LLVM_FOUND)
             -fno-omit-frame-pointer)
 
   add_library(llvm-interface INTERFACE)
-  target_include_directories(llvm-interface INTERFACE . ${LLVM_INCLUDE_DIRS})
+  target_include_directories(llvm-interface INTERFACE . )
+  # include llvm include directories as system paths to silence compiler warnings
+  target_include_directories(llvm-interface SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
   target_link_libraries(llvm-interface INTERFACE spdlog_header_only)
   separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
   target_compile_definitions(llvm-interface INTERFACE ${LLVM_DEFINITIONS_LIST})
@@ -241,7 +247,7 @@ if(LLVM_FOUND)
     orcjit
     x86asmparser
     x86codegen)
-  target_link_libraries(llvm-interface INTERFACE ${llvm_libs})
+  target_link_libraries(llvm-interface INTERFACE ${llvm_libs} project_options project_warnings)
   # TODO: not all versions of llvm are ready for C++20, figure out when to use this
   set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)
 
@@ -249,9 +255,9 @@ if(LLVM_FOUND)
   add_library(python-cpp-llvm-glue OBJECT "executable/llvm/LLVMPyUtils.cpp" "executable/llvm/LLVMFunction.cpp")
 
   target_link_libraries(python-cpp-llvm-glue PRIVATE llvm-interface)
-  target_link_libraries(python-cpp-llvm PUBLIC llvm-interface)
+  target_link_libraries(python-cpp-llvm PRIVATE llvm-interface)
   target_sources(python-cpp-llvm PRIVATE $<TARGET_OBJECTS:python-cpp-llvm-glue>)
-  target_link_libraries(python-cpp-llvm-tests PRIVATE python-cpp-llvm gtest)
+  target_link_libraries(python-cpp-llvm-tests PRIVATE python-cpp-llvm gtest llvm-interface)
   target_link_libraries(python-cpp PRIVATE python-cpp-llvm)
   target_compile_definitions(python-cpp PUBLIC USE_LLVM)
 
@@ -259,12 +265,12 @@ if(LLVM_FOUND)
   target_link_libraries(unittests_ PRIVATE python-cpp-llvm)
 endif()
 
-target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts)
+target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings)
 set_target_properties(unittests_ PROPERTIES OUTPUT_NAME "unittests")
 add_custom_target(run-unittests COMMAND $<TARGET_FILE:unittests_> DEPENDS unittests_)
 
 add_executable(python repl/repl.cpp)
-target_link_libraries(python PRIVATE linenoise cxxopts python-cpp)
+target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings)
 
 add_executable(freeze utilities/freeze.cpp)
-target_link_libraries(freeze PRIVATE python-cpp cxxopts)
+target_link_libraries(freeze PRIVATE python-cpp cxxopts  project_options project_warnings)
