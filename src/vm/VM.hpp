@@ -64,8 +64,8 @@ class VirtualMachine
 	std::deque<std::vector<const py::Value *>> m_stack_objects;
 
 	InstructionBlock::const_iterator m_instruction_pointer;
-	Heap &m_heap;
 	std::unique_ptr<Interpreter> m_interpreter;
+	std::unique_ptr<Heap> m_heap;
 	State *m_state{ nullptr };
 
 	friend StackFrame;
@@ -138,7 +138,7 @@ class VirtualMachine
 	const State &state() const { return *m_state; }
 	State &state() { return *m_state; }
 
-	Heap &heap() { return m_heap; }
+	Heap &heap() { return *m_heap; }
 
 	Interpreter &initialize_interpreter(std::shared_ptr<Program> &&);
 	Interpreter &interpreter();

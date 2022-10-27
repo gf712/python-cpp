@@ -1,15 +1,15 @@
-#include "gtest/gtest.h"
-
 #include "GarbageCollector.hpp"
-#include "Heap.hpp"
+#include "Heap_test.hpp"
 
 namespace {
+
+static int64_t g_counter = 0;
+
 struct Data : Cell
 {
 	int64_t foo;
-	int64_t &m_counter;
-	Data(int64_t foo_, int64_t &counter) : foo(foo_), m_counter(counter) {}
-	~Data() { m_counter++; }
+	Data(int64_t foo_) : foo(foo_) {}
+	~Data() { g_counter++; }
 	std::string to_string() const override { return "Data"; }
 	void visit_graph(Visitor &visitor) override { visitor.visit(*this); }
 };
@@ -20,69 +20,61 @@ static_assert(
 // helper function that makes sure all the allocations are performed in a new stack frame that is
 // popped (and therefore the allocated GC pointers can be GC'ed)
 #if defined(__clang__)
-__attribute__((noinline, optnone)) void new_stack_frame_function(int64_t &counter)
+__attribute__((noinline, optnone)) void new_stack_frame_function(Heap &heap)
 #elif defined(__GNUC__)
-__attribute__((noinline, optimize("-O0"))) void new_stack_frame_function(int64_t &counter)
+__attribute__((noinline, optimize("-O0"))) void new_stack_frame_function(Heap &heap)
 #else
 static_assert(false, "compiler not supported");
 #endif
 {
-	auto &heap = Heap::the();
-
-	auto *ptr1 = heap.allocate<Data>(1, counter);
+	auto *ptr1 = heap.allocate<Data>(1);
 	heap.collect_garbage();
-	ASSERT_EQ(counter, 0);
-	auto *ptr2 = heap.allocate<Data>(2, counter);
+	ASSERT_EQ(g_counter, 0);
+	auto *ptr2 = heap.allocate<Data>(2);
 	heap.collect_garbage();
-	ASSERT_EQ(counter, 0);
-	auto *ptr3 = heap.allocate<Data>(3, counter);
+	ASSERT_EQ(g_counter, 0);
+	auto *ptr3 = heap.allocate<Data>(3);
 	heap.collect_garbage();
-	ASSERT_EQ(counter, 0);
-	auto *ptr4 = heap.allocate<Data>(4, counter);
+	ASSERT_EQ(g_counter, 0);
+	auto *ptr4 = heap.allocate<Data>(4);
 	heap.collect_garbage();
-	ASSERT_EQ(counter, 0);
-	auto *ptr5 = heap.allocate<Data>(5, counter);
+	ASSERT_EQ(g_counter, 0);
+	auto *ptr5 = heap.allocate<Data>(5);
 	heap.collect_garbage();
-	ASSERT_EQ(counter, 0);
+	ASSERT_EQ(g_counter, 0);
 
 	ASSERT_EQ(ptr1->foo, 1);
 	ASSERT_EQ(ptr2->foo, 2);
 	ASSERT_EQ(ptr3->foo, 3);
 	ASSERT_EQ(ptr4->foo, 4);
 	ASSERT_EQ(ptr5->foo, 5);
-};
+}
 }// namespace
 
-TEST(GarbageCollector, DoesNotDeallocateGCPointersOnTheStack)
+TEST_F(TestHeap, GarbageCollectorDoesNotDeallocateGCPointersOnTheStack)
 {
-	int64_t counter = 0;
+	g_counter = 0;
 
-	auto &heap = Heap::the();
-	heap.garbage_collector().set_frequency(1);
+	m_heap->garbage_collector().set_frequency(1);
 
-	ASSERT_EQ(counter, 0);
-	heap.collect_garbage();
+	ASSERT_EQ(g_counter, 0);
+	m_heap->collect_garbage();
 
-	new_stack_frame_function(counter);
-
-	heap.reset();
+	new_stack_frame_function(*m_heap);
 }
 
-TEST(GarbageCollector, DeallocatesGCPointersWhenStackFrameIsPopped)
+TEST_F(TestHeap, GarbageCollectorDeallocatesGCPointersWhenStackFrameIsPopped)
 {
-	int64_t counter = 0;
+	g_counter = 0;
 
-	auto &heap = Heap::the();
-	heap.garbage_collector().set_frequency(1);
+	m_heap->garbage_collector().set_frequency(1);
 
-	ASSERT_EQ(counter, 0);
-	heap.collect_garbage();
+	ASSERT_EQ(g_counter, 0);
+	m_heap->collect_garbage();
 
-	new_stack_frame_function(counter);
+	new_stack_frame_function(*m_heap);
 
-	heap.collect_garbage();
+	m_heap->collect_garbage();
 
-	ASSERT_EQ(counter, 5);
-
-	heap.reset();
+	ASSERT_EQ(g_counter, 5);
 }

@@ -40,7 +40,7 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	const std::vector<std::string> &names,
 	PyObject *generator)
 {
-	auto *new_frame = Heap::the().allocate<PyFrame>(names);
+	auto *new_frame = VirtualMachine::the().heap().allocate<PyFrame>(names);
 	new_frame->m_f_back = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;

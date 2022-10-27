@@ -660,12 +660,12 @@ template<typename T>
 struct Buffered
 {
 	PyObject *raw{ nullptr };
-	bool ok;
-	bool detached;
-	bool readable_;
-	bool writable_;
-	bool finalizing;
-	bool fast_closed_checks;
+	bool ok{ false };
+	bool detached{ false };
+	bool readable_{ false };
+	bool writable_{ false };
+	bool finalizing{ false };
+	bool fast_closed_checks{ false };
 	std::unique_ptr<std::streambuf> buffer;
 
 	bool valid_readbuffer() { return readable_ && buffer && buffer->in_avail() != -1; }
@@ -918,7 +918,7 @@ class BufferedReader
 		if (current_size > 0) {
 			ASSERT(buffer);
 			data.resize(current_size);
-			buffer->sgetn(bit_cast<char *>(data.begin().base()), current_size);
+			buffer->sgetn(::bit_cast<char *>(data.begin().base()), current_size);
 		}
 
 		auto readall_ = raw->lookup_attribute(PyString::create("readall").unwrap());
@@ -977,7 +977,7 @@ class BufferedReader
 			ASSERT(buffer);
 			std::vector<std::byte> data;
 			data.resize(current_size);
-			buffer->sgetn(bit_cast<char *>(data.begin().base()), current_size);
+			buffer->sgetn(::bit_cast<char *>(data.begin().base()), current_size);
 			return PyBytes::create(Bytes{ std::move(data) });
 		}
 		return Ok(py_none());
@@ -1384,7 +1384,7 @@ class FileIO : public RawIOBase
 
 		do {
 			if (m_filestream.fail()) { TODO(); }
-			m_filestream.read(bit_cast<char *>(result.data()), buffer_size);
+			m_filestream.read(::bit_cast<char *>(result.data()), buffer_size);
 			bytes_read += m_filestream.gcount();
 		} while (!m_filestream.eof());
 

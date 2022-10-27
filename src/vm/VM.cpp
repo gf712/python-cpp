@@ -67,11 +67,11 @@ void StackFrame::leave()
 	vm->pop_frame();
 }
 
-VirtualMachine::VirtualMachine() : m_heap(Heap::the())
+VirtualMachine::VirtualMachine() : m_heap(Heap::create())
 {
 	uintptr_t *rbp;
 	asm volatile("movq %%rbp, %0" : "=r"(rbp));
-	m_heap.set_start_stack_pointer(rbp);
+	m_heap->set_start_stack_pointer(rbp);
 }
 
 std::unique_ptr<StackFrame> VirtualMachine::setup_call_stack(size_t register_count,
@@ -195,7 +195,7 @@ void VirtualMachine::dump() const
 
 void VirtualMachine::clear()
 {
-	m_heap.reset();
+	m_heap->reset();
 	while (!m_stack.empty()) m_stack.pop();
 	// should instruction pointer be optional?
 	// m_instruction_pointer = nullptr;

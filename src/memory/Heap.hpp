@@ -14,7 +14,7 @@ static constexpr size_t MB = 1024 * KB;
 
 class Block
 {
-	class Chunk
+	class Chunk : NonCopyable
 	{
 		template<size_t ChunkCount_ = 64> class ChunkView
 		{
@@ -68,6 +68,16 @@ class Block
 	  public:
 		Chunk(uint8_t *memory, size_t object_size) : m_memory(memory), m_object_size(object_size) {}
 
+		~Chunk();
+
+		Chunk(Chunk &&other) noexcept
+			: m_memory(other.m_memory), m_object_size(other.m_object_size),
+			  m_chunk_view(other.m_chunk_view)
+		{
+			other.m_memory = nullptr;
+			other.m_chunk_view.reset();
+		}
+
 		uint8_t *allocate()
 		{
 			if (auto chunk_idx = m_chunk_view.mark_next_free_chunk()) {
@@ -107,7 +117,7 @@ class Block
 			}
 		}
 
-		void reset() { m_chunk_view.reset(); }
+		void reset();
 
 		size_t object_size() const { return m_object_size; }
 
@@ -148,8 +158,8 @@ class Block
 	size_t object_size() const { return m_chunks.back().object_size(); }
 
   private:
+	std::vector<std::unique_ptr<uint8_t[]>> m_memory;
 	std::vector<Chunk> m_chunks;
-	std::vector<std::unique_ptr<uint8_t>> m_memory;
 };
 
 class Slab
@@ -257,7 +267,10 @@ class Heap
 	: NonCopyable
 	, NonMoveable
 {
-	uint8_t *m_static_memory;
+	friend class VirtualMachine;
+	friend struct TestHeap;
+
+	std::unique_ptr<uint8_t[]> m_static_memory;
 	size_t m_static_memory_size{ 1 * MB };
 	size_t m_static_offset{ 8 };
 	Slab m_slab;
@@ -281,18 +294,9 @@ class Heap
 
 	friend ScopedStaticAllocation;
 
-  public:
-	static Heap &the()
-	{
-		static auto heap = Heap();
-		return heap;
-	}
+	static std::unique_ptr<Heap> create() { return std::unique_ptr<Heap>(new Heap); }
 
-	~Heap()
-	{
-		free(m_static_memory);
-		m_static_memory = nullptr;
-	}
+  public:
 
 	void reset()
 	{
@@ -304,7 +308,7 @@ class Heap
 
 	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
-	template<typename T, typename... Args> T *allocate(Args &&...args)
+	template<typename T, typename... Args> T * __attribute__ ((noinline)) allocate(Args &&...args)
 	{
 		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...).get(); }
 		collect_garbage();
@@ -329,12 +333,12 @@ class Heap
 	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
-		T *ptr = new (m_static_memory + m_static_offset) T(std::forward<Args>(args)...);
+		T *ptr = new (m_static_memory.get() + m_static_offset) T(std::forward<Args>(args)...);
 		m_static_offset += sizeof(T);
 		return std::shared_ptr<T>(ptr, [](T *) { return; });
 	}
 
-	const uint8_t *static_memory() const { return m_static_memory; }
+	const uint8_t *static_memory() const { return m_static_memory.get(); }
 	size_t static_memory_size() const { return m_static_memory_size; }
 
 	Slab &slab() { return m_slab; }

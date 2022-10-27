@@ -14,7 +14,6 @@
 #include "runtime/TypeError.hpp"
 #include "vm/VM.hpp"
 
-
 namespace py {
 namespace {
 	PyResult<PyObject *> exec_builtin(PyObject *)

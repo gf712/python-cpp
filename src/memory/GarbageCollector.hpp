@@ -82,9 +82,9 @@ class MarkSweepGC : public GarbageCollector
 	void resume() override;
 	void pause() override;
 
-	std::unordered_set<Cell *> collect_roots() const;
+	std::unordered_set<Cell *> collect_roots(Heap &) const;
 	void mark_all_cell_unreachable(Heap &) const;
-	void mark_all_live_objects(const std::unordered_set<Cell *> &) const;
+	void mark_all_live_objects(Heap &, const std::unordered_set<Cell *> &) const;
 	void sweep(Heap &heap) const;
 
   private:

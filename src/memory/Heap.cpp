@@ -4,6 +4,34 @@
 
 using namespace py;
 
+Block::Chunk::~Chunk()
+{
+	for_each_cell_alive([](uint8_t *memory) {
+		auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
+		spdlog::debug("Calling destructor of object at {}", (void *)cell);
+		if (cell->is_pyobject()) {
+			auto *obj = static_cast<PyObject *>(cell);
+			spdlog::debug("Deallocating {}@{}", obj->type()->name(), (void *)obj);
+		}
+		cell->~Cell();
+	});
+}
+
+void Block::Chunk::reset()
+{
+	// before resetting make sure we are calling all the destructors
+	for_each_cell_alive([](uint8_t *memory) {
+		auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
+		spdlog::trace("Calling destructor of object at {}", (void *)cell);
+		if (cell->is_pyobject()) {
+			auto *obj = static_cast<PyObject *>(cell);
+			spdlog::trace("Deallocating {}@{}", obj->type()->name(), (void *)obj);
+		}
+		cell->~Cell();
+	});
+	m_chunk_view.reset();
+}
+
 bool Block::Chunk::has_address(uint8_t *memory) const
 {
 	auto address = bit_cast<uintptr_t>(memory);
@@ -27,7 +55,8 @@ Block::Block(size_t object_size, size_t capacity)
 		chunks_needed,
 		object_size);
 
-	auto &mem = m_memory.emplace_back(new uint8_t[chunks_needed * 64 * object_size]);
+	auto &mem =
+		m_memory.emplace_back(std::make_unique<uint8_t[]>(chunks_needed * 64 * object_size));
 	spdlog::debug(
 		"Allocated {} bytes at address {}", chunks_needed * 64 * object_size, (void *)mem.get());
 
@@ -132,7 +161,7 @@ bool Slab::has_address(uint8_t *address) const
 
 Heap::Heap()
 {
-	m_static_memory = static_cast<uint8_t *>(malloc(m_static_memory_size));
+	m_static_memory = std::make_unique<uint8_t[]>(m_static_memory_size);
 	m_gc = std::make_unique<MarkSweepGC>();
 }
 

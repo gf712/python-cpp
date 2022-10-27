@@ -16,11 +16,25 @@ using namespace py;
 
 MarkSweepGC::MarkSweepGC() : GarbageCollector() { set_frequency(10'000); }
 
-std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
+namespace {
+template<class To, class From>
+__attribute__((no_sanitize_address)) typename std::enable_if_t<
+	sizeof(To) == sizeof(From)
+		&& std::is_trivially_copyable_v<From> && std::is_trivially_copyable_v<To>,
+	To>
+	bit_cast_without_sanitizer(const From &src) noexcept
 {
-	if (!m_stack_bottom) {
-		m_stack_bottom = bit_cast<uint8_t *>(Heap::the().start_stack_pointer());
-	}
+	static_assert(std::is_trivially_constructible_v<To>,
+		"This implementation additionally requires destination type to be trivially constructible");
+
+	To dst;
+	std::memcpy(&dst, &src, sizeof(To));
+	return dst;
+}
+
+__attribute__((no_sanitize_address)) std::unordered_set<Cell *>
+	collect_roots_on_the_stack(Heap &heap, uint8_t *stack_bottom)
+{
 	std::unordered_set<Cell *> roots;
 
 	// push register values onto the stack
@@ -28,24 +42,36 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 	setjmp(jump_buffer);
 
 	// traverse the stack from the stack pointer to the stack origin/bottom
-	uintptr_t *rsp_;
-	asm volatile("movq %%rsp, %0" : "=r"(rsp_));
+	// uintptr_t *rsp_;
+	// asm volatile("movq %%rsp, %0" : "=r"(rsp_));
 
-	uint8_t *rsp = static_cast<uint8_t *>(static_cast<void *>(rsp_));
-	for (; rsp < m_stack_bottom; rsp += sizeof(uintptr_t)) {
+	// uint8_t *rsp = bit_cast<uint8_t *>(rsp_);
+	uint8_t *rsp = bit_cast_without_sanitizer<uint8_t*>(__builtin_frame_address(0));
+	for (; rsp < stack_bottom; rsp += sizeof(uintptr_t)) {
 		uint8_t *address =
-			bit_cast<uint8_t *>(*bit_cast<uintptr_t *>(rsp)) - sizeof(GarbageCollected);
+			bit_cast_without_sanitizer<uint8_t *>(*bit_cast_without_sanitizer<uintptr_t *>(rsp))
+			- sizeof(GarbageCollected);
 		spdlog::trace("checking address {}, pointer address={}", (void *)address, (void *)rsp);
-		if (VirtualMachine::the().heap().slab().has_address(address)) {
+		if (heap.slab().has_address(address)) {
 			spdlog::trace("valid address {}", (void *)address);
 			auto *cell = bit_cast<Cell *>(address + sizeof(GarbageCollected));
 			if (cell->is_pyobject()) {
 				auto *obj = static_cast<PyObject *>(cell);
-				spdlog::trace("adding root {}@{}", obj->type()->name(), (void *)obj);
+				spdlog::debug("adding root {}@{}", obj->type()->name(), (void *)obj);
 			}
 			roots.insert(cell);
 		}
 	}
+	return roots;
+}
+
+}// namespace
+
+std::unordered_set<Cell *> MarkSweepGC::collect_roots(Heap &heap) const
+{
+	if (!m_stack_bottom) { m_stack_bottom = bit_cast<uint8_t *>(heap.start_stack_pointer()); }
+
+	auto roots = collect_roots_on_the_stack(heap, m_stack_bottom);
 
 	spdlog::trace("adding objects in VM stack to roots");
 	for (const auto &s : VirtualMachine::the().stack_objects()) {
@@ -53,9 +79,10 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 			if (std::holds_alternative<PyObject *>(*val)) {
 				auto *obj = std::get<PyObject *>(*val);
 				if (obj) {
-					spdlog::trace("adding root {}", (void *)obj);
-					spdlog::trace("adding root {}@{}", obj->type()->name(), (void *)obj);
-					roots.insert(obj);
+					const auto [_, inserted] = roots.insert(obj);
+					if (inserted) {
+						spdlog::debug("adding root {}@{}", obj->type()->name(), (void *)obj);
+					}
 				}
 			}
 		}
@@ -69,8 +96,8 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 			AddRoot(std::unordered_set<Cell *> &roots) : roots_(roots) {}
 			void visit(Cell &cell)
 			{
-				spdlog::debug("Adding root {}", (void *)&cell);
-				roots_.insert(&cell);
+				const auto [_, inserted] = roots_.insert(&cell);
+				if (inserted) { spdlog::debug("adding root {}", (void *)&cell); }
 			}
 		} visitor{ roots };
 		interpreter.visit_graph(visitor);
@@ -80,19 +107,22 @@ std::unordered_set<Cell *> MarkSweepGC::collect_roots() const
 
 struct MarkGCVisitor : Cell::Visitor
 {
+	Heap &m_heap;
 	std::unordered_set<Cell *> m_visited;
+
+	MarkGCVisitor(Heap &heap) : m_heap(heap) {}
+
 	void visit(Cell &cell)
 	{
 		if (m_visited.contains(&cell)) return;
 		m_visited.insert(&cell);
 
-		auto &heap = VirtualMachine::the().heap();
 		uint8_t *cell_start = bit_cast<uint8_t *>(&cell);
 
 		const bool static_memory =
-			bit_cast<uintptr_t>(cell_start) >= bit_cast<uintptr_t>(heap.static_memory())
+			bit_cast<uintptr_t>(cell_start) >= bit_cast<uintptr_t>(m_heap.static_memory())
 			&& bit_cast<uintptr_t>(cell_start)
-				   < bit_cast<uintptr_t>(heap.static_memory() + heap.static_memory_size());
+				   < bit_cast<uintptr_t>(m_heap.static_memory() + m_heap.static_memory_size());
 
 		if (!static_memory) {
 			auto *obj_header = bit_cast<GarbageCollected *>(cell_start - sizeof(GarbageCollected));
@@ -142,9 +172,9 @@ void MarkSweepGC::mark_all_cell_unreachable(Heap &heap) const
 }
 
 
-void MarkSweepGC::mark_all_live_objects(const std::unordered_set<Cell *> &roots) const
+void MarkSweepGC::mark_all_live_objects(Heap &heap, const std::unordered_set<Cell *> &roots) const
 {
-	auto mark_visitor = std::make_unique<MarkGCVisitor>();
+	auto mark_visitor = std::make_unique<MarkGCVisitor>(heap);
 
 	// mark all live objects
 	for (auto *root : roots) {
@@ -179,9 +209,9 @@ void MarkSweepGC::sweep(Heap &heap) const
 					auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
 					if (cell->is_pyobject()) {
 						auto *obj = static_cast<PyObject *>(cell);
-						spdlog::trace("Deallocating {}@{}", obj->type()->name(), (void *)obj);
+						spdlog::debug("Deallocating {}@{}", obj->type()->name(), (void *)obj);
 					}
-					spdlog::trace("Calling destructor of object at {}", (void *)cell);
+					spdlog::debug("Calling destructor of object at {}", (void *)cell);
 					cell->~Cell();
 					chunk.deallocate(memory);
 				}
@@ -199,9 +229,9 @@ void MarkSweepGC::run(Heap &heap) const
 
 	mark_all_cell_unreachable(heap);
 
-	const auto roots = collect_roots();
+	const auto roots = collect_roots(heap);
 
-	mark_all_live_objects(roots);
+	mark_all_live_objects(heap, roots);
 
 	sweep(heap);
 

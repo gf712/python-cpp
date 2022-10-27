@@ -60,10 +60,12 @@ PyResult<PyObject *> PyList::extend(PyObject *iterable)
 	auto iterator = iterable->iter();
 	if (iterator.is_err()) return iterator;
 
-	auto tmp_list = PyList::create().unwrap();
+	auto tmp_list_ = PyList::create();
+	if (tmp_list_.is_err()) return tmp_list_;
+	auto *tmp_list = tmp_list_.unwrap();
 	auto value = iterator.unwrap()->next();
 	while (value.is_ok()) {
-		tmp_list->elements().push_back(value.unwrap());
+		tmp_list->append(value.unwrap());
 		value = iterator.unwrap()->next();
 	}
 

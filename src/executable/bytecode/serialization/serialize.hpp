@@ -49,7 +49,7 @@ template<> inline void serialize<bool>(const bool &value, std::vector<uint8_t> &
 
 template<> inline void serialize<std::byte>(const std::byte &value, std::vector<uint8_t> &result)
 {
-	result.push_back(bit_cast<uint8_t>(value));
+	result.push_back(::bit_cast<uint8_t>(value));
 }
 
 template<>
