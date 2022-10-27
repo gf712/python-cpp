@@ -21,7 +21,6 @@
 #include "executable/bytecode/BytecodeProgram.hpp"
 
 #include <filesystem>
-#include <iostream>
 
 namespace fs = std::filesystem;
 using namespace py;

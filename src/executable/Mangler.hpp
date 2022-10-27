@@ -7,6 +7,8 @@ struct SourceLocation;
 class Mangler
 {
   public:
+	virtual ~Mangler() = default;
+
 	virtual std::string function_mangle(const std::string &module,
 		const std::string &function_name,
 		const SourceLocation &source_location) const = 0;

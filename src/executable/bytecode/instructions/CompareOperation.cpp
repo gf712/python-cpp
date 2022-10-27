@@ -67,7 +67,7 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 		vm.reg(m_dst) = result.unwrap();
 	}
 	return result;
-};
+}
 
 std::vector<uint8_t> CompareOperation::serialize() const
 {

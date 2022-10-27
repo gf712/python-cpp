@@ -137,7 +137,7 @@ class ASTNode
 
   private:
 	virtual void print_this_node(const std::string &indent) const = 0;
-	virtual void dump() const { print_this_node(""); };
+	virtual void dump() const { print_this_node(""); }
 
   public:
 	ASTNode(ASTNodeType node_type, SourceLocation source_location)
@@ -1658,6 +1658,7 @@ AST_NODE_TYPES
 
 struct CodeGenerator
 {
+	virtual ~CodeGenerator() = default;
 	std::vector<std::unique_ptr<Value>> m_values;
 #define __AST_NODE_TYPE(NodeType) virtual Value *visit(const NodeType *node) = 0;
 	AST_NODE_TYPES
@@ -1666,6 +1667,8 @@ struct CodeGenerator
 
 struct NodeVisitor
 {
+	virtual ~NodeVisitor() = default;
+
 #define __AST_NODE_TYPE(NodeType) virtual void visit(NodeType *node);
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
@@ -1679,6 +1682,8 @@ struct NodeVisitor
 
 struct NodeTransformVisitor
 {
+	virtual ~NodeTransformVisitor() = default;
+
 	bool m_can_return_multiple_nodes{ false };
 #define __AST_NODE_TYPE(NodeType) \
 	virtual std::vector<std::shared_ptr<ASTNode>> visit(std::shared_ptr<NodeType> node);

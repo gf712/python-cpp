@@ -1440,7 +1440,7 @@ class FileIO : public RawIOBase
 			return Err(value_error("{}", msg));
 		}
 
-		if (auto* file_ptr = cfile(m_filestream)) {
+		if (auto *file_ptr = cfile(m_filestream)) {
 #if defined(__linux__)
 			m_file_descriptor = file_ptr->_fileno;
 #elif defined(__APPLE__)

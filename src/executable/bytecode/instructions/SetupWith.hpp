@@ -1,4 +1,8 @@
+#pragma once
+
 #include "Instructions.hpp"
+
+#include <optional>
 
 class SetupWith final : public Instruction
 {

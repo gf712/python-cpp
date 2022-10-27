@@ -1,5 +1,8 @@
+#pragma once
+
 #include "Instructions.hpp"
 
+#include <optional>
 
 class JumpIfTrue final : public Instruction
 {

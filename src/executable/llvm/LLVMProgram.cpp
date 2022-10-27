@@ -88,7 +88,8 @@ struct LLVMProgram::InternalConfig
 		orc::JITDylib &jitlib,
 		std::unique_ptr<DataLayout> &&dl)
 		: execution_session(std::move(es)), object_layer(std::move(ol)), main_jitlib(jitlib),
-		  compile_layer(std::move(cl)), data_layout(std::move(dl)){};
+		  compile_layer(std::move(cl)), data_layout(std::move(dl))
+	{}
 
 	static std::unique_ptr<InternalConfig> create(std::unique_ptr<llvm::Module> &&module,
 		std::unique_ptr<llvm::LLVMContext> &&ctx)

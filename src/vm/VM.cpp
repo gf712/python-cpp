@@ -11,8 +11,6 @@
 #include "runtime/PyString.hpp"
 #include "runtime/PyTraceback.hpp"
 
-#include <iostream>
-
 using namespace py;
 
 #define DEBUG_VM 0

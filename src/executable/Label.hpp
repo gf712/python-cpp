@@ -27,7 +27,7 @@ class Label
 	}
 
   public:
-	Label(std::string name, int64_t function_id)
+	Label(std::string name, size_t function_id)
 		: m_label_name(std::move(name)), m_function_id(function_id)
 	{}
 

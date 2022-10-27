@@ -67,7 +67,7 @@ std::optional<std::string> getline(const std::string &prompt)
 
 namespace {
 
-int run_and_execute_script(int argc,
+int run_and_execute_script(size_t argc,
 	char **argv,
 	bool print_bytecode,
 	bool print_tokens,
@@ -130,19 +130,20 @@ int run_and_execute_script(int argc,
 	return vm.execute(bytecode);
 }
 
-int run_and_execute_module_as_script(int argc,
+int run_and_execute_module_as_script(size_t argc,
 	char **argv,
-	const std::string &module_name,
-	bool print_bytecode,
-	bool print_ast,
-	bool print_tokens)
+	const std::string &,// module_name
+	bool,// print_bytecode
+	bool,// print_ast
+	bool// print_tokens
+)
 {
 	size_t arg_idx{ 1 };
 	std::vector<std::string> argv_vector;
 	argv_vector.reserve(argc - 1);
 	while (arg_idx < argc) { argv_vector.emplace_back(argv[arg_idx++]); }
 
-	auto *sys = sys_module(VirtualMachine::the().interpreter());
+	TODO();
 
 	return 0;
 }

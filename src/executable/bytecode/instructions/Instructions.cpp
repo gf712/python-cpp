@@ -63,6 +63,8 @@
 
 #include "../serialization/deserialize.hpp"
 
+#include <optional>
+
 using namespace py;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer)

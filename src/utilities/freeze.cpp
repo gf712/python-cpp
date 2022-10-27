@@ -15,7 +15,7 @@
 
 using namespace py;
 
-int freeze(int argc, char **argv, const std::string &output)
+int freeze(size_t argc, char **argv, const std::string &output)
 {
 	size_t arg_idx{ 1 };
 	const char *filename = argv[arg_idx];
@@ -23,7 +23,7 @@ int freeze(int argc, char **argv, const std::string &output)
 	argv_vector.reserve(argc - 1);
 	while (arg_idx < argc) { argv_vector.emplace_back(argv[arg_idx++]); }
 
-	auto &vm = VirtualMachine::the();
+	[[maybe_unused]] auto &vm = VirtualMachine::the();
 	initialize_types();
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
 	parser::Parser p{ lexer };
@@ -75,6 +75,9 @@ int main(int argc, char **argv)
 
 	const bool debug = result["debug"].as<bool>();
 	const bool trace = result["trace"].as<bool>();
+
+	if (debug) { spdlog::set_level(spdlog::level::debug); }
+	if (trace) { spdlog::set_level(spdlog::level::trace); }
 
 	if (result.count("filename")) {
         return freeze(argc, argv, result["output"].as<std::string>());

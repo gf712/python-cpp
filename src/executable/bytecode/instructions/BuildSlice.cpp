@@ -40,7 +40,7 @@ PyResult<Value> BuildSlice::execute(VirtualMachine &vm, Interpreter &) const
 		vm.reg(m_dst) = slice.unwrap();
 		return slice;
 	}
-};
+}
 
 std::vector<uint8_t> BuildSlice::serialize() const
 {

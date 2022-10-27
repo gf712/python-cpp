@@ -21,7 +21,7 @@ bool Block::Chunk::has_address(uint8_t *memory) const
 
 Block::Block(size_t object_size, size_t capacity)
 {
-	size_t chunks_needed = std::round(capacity / 64);
+	size_t chunks_needed = capacity / 64;
 	spdlog::debug(
 		"Initialising a block with {} chunks, each managing memory for 64 objects of size {}",
 		chunks_needed,
@@ -61,7 +61,8 @@ uint8_t *Block::allocate()
 
 	// add more chunks -> new chunk count is old count multiplied by golden ration (1.618)
 	size_t old_chunk_count = m_chunks.size();
-	size_t new_chunk_count = std::round(static_cast<int32_t>(m_chunks.size() * 1.618));
+	size_t new_chunk_count =
+		static_cast<size_t>(std::round(static_cast<float>(m_chunks.size()) * 1.618f));
 	size_t new_chunks_to_allocate = new_chunk_count - old_chunk_count;
 	size_t idx{ 0 };
 	const size_t object_size = m_chunks.back().object_size();

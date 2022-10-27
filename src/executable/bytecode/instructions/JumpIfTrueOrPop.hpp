@@ -1,5 +1,7 @@
+#pragma once
 #include "Instructions.hpp"
 
+#include <optional>
 
 class JumpIfTrueOrPop final : public Instruction
 {

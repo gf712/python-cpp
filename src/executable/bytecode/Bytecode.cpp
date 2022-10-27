@@ -163,7 +163,9 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 	for (; block_view != end_function_block;) {
 		const auto begin = block_view->begin();
 		const auto end = block_view->end();
-		spdlog::debug("begin={} end={}", (void *)begin->get(), (void *)end->get());
+		spdlog::debug("begin={} end={}",
+			static_cast<void *>(begin->get()),
+			static_cast<void *>((end - 1)->get()));
 		if (!requires_block_jump) vm.set_instruction_pointer(begin);
 		requires_block_jump = false;
 		for (; vm.instruction_pointer() != end;

@@ -13,7 +13,7 @@ PyResult<Value> JumpForward::execute(VirtualMachine &vm, Interpreter &) const
 	const auto ip = vm.instruction_pointer() + *m_offset;
 	vm.set_instruction_pointer(ip);
 	return Ok(Value{ py_none() });
-};
+}
 
 
 void JumpForward::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)

@@ -98,9 +98,9 @@ struct Number
 struct String
 {
 	std::string s;
-	friend std::ostream &operator<<(std::ostream &os, const String &s)
+	friend std::ostream &operator<<(std::ostream &os, const String &str)
 	{
-		os << s.to_string();
+		os << str.to_string();
 		return os;
 	}
 
@@ -185,7 +185,7 @@ struct NameConstant
 
 	std::string to_string() const
 	{
-		return std::visit(overloaded{ [](const bool value) { return (value ? "True" : "False"); },
+		return std::visit(overloaded{ [](const bool v) { return (v ? "True" : "False"); },
 							  [](const NoneType) { return "None"; } },
 			value);
 	}

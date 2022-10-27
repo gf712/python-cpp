@@ -2,6 +2,8 @@
 
 #include "Instructions.hpp"
 
+#include <optional>
+
 class ForIter final : public Instruction
 {
 	Register m_dst;

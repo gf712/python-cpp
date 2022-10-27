@@ -59,7 +59,7 @@ struct LLVMGenerator::Context
 	// 	module->getOrInsertGlobal(name, value->)
 	// }
 
-	void push_stack() { scope_stack.push(Scope{ .parent = &scope_stack.top() }); }
+	void push_stack() { scope_stack.push(Scope{ {}, &scope_stack.top() }); }
 	void pop_stack() { scope_stack.pop(); }
 
 	void add_local(StringRef name, llvm::AllocaInst *value)

@@ -20,7 +20,7 @@ PyResult<Value> JumpIfFalse::execute(VirtualMachine &vm, Interpreter &interprete
 		return Err(test_result.unwrap_err());
 	}
 	return Ok(Value{ NameConstant{ test_result.unwrap() } });
-};
+}
 
 
 void JumpIfFalse::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)

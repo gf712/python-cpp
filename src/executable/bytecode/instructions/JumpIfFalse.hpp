@@ -2,6 +2,7 @@
 
 #include "Instructions.hpp"
 
+#include <optional>
 
 class JumpIfFalse final : public Instruction
 {

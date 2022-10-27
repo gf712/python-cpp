@@ -2088,7 +2088,6 @@ Value *BytecodeGenerator::visit(const Try *node)
 
 	emit<SetupExceptionHandling>(next_exception_label);
 
-	auto start_block_idx = function(m_function_id).size();
 	auto *body_block = allocate_block(m_function_id);
 	set_insert_point(body_block);
 
@@ -2124,12 +2123,9 @@ Value *BytecodeGenerator::visit(const Try *node)
 			emit<Jump>(finally_label);
 		}
 
-		auto end_block_idx = function(m_function_id).size();
-
 		const size_t exception_depth = m_current_exception_depth[m_function_id];
 
 		for (const auto &handler : node->handlers()) {
-			start_block_idx = function(m_function_id).size();
 			auto *exception_handler_block = allocate_block(m_function_id);
 			set_insert_point(exception_handler_block);
 			bind(*next_exception_label);
@@ -2157,7 +2153,6 @@ Value *BytecodeGenerator::visit(const Try *node)
 				m_current_exception_depth[m_function_id] = exception_depth;
 				emit<ClearExceptionState>();
 			}
-			end_block_idx = function(m_function_id).size();
 			emit<Jump>(finally_label);
 		}
 

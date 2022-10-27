@@ -52,7 +52,7 @@ PyResult<PyObject *> PyNumber::__pos__() const
 
 PyResult<PyObject *> PyNumber::__invert__() const
 {
-	if (std::get<double>(m_value.value)) {
+	if (std::holds_alternative<double>(m_value.value)) {
 		return Err(type_error("bad operand type for unary ~: 'float'"));
 	}
 	return PyNumber::create(Number{ ~std::get<int64_t>(m_value.value) });

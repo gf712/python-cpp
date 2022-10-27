@@ -18,7 +18,7 @@ PyResult<Value> BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 	if (result.is_err()) return Err(result.unwrap_err());
 	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
 	return Ok(Value{ result.unwrap() });
-};
+}
 
 std::vector<uint8_t> BuildTuple::serialize() const
 {

@@ -798,7 +798,7 @@ void compare_starred(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
-void compare_pass(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_pass(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Pass);
 }
