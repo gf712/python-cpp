@@ -25,7 +25,7 @@ PyResult<PyObject *> PyLLVMFunction::__repr__() const { return PyString::create(
 void PyLLVMFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	for (auto *obj : m_captures) { obj->visit_graph(visitor); }
+	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
 PyType *PyLLVMFunction::type() const { return llvm_function(); }

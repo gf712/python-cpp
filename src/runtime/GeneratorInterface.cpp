@@ -108,14 +108,14 @@ template<typename T> void GeneratorInterface<T>::visit_graph(Visitor &visitor)
 		for (const auto &el : m_stack_frame->registers) {
 			if (std::holds_alternative<PyObject *>(el)) {
 				auto *obj = std::get<PyObject *>(el);
-				if (obj) obj->visit_graph(visitor);
+				if (obj) { visitor.visit(*obj); }
 			}
 		}
 
 		for (const auto &el : m_stack_frame->locals) {
 			if (std::holds_alternative<PyObject *>(el)) {
 				auto *obj = std::get<PyObject *>(el);
-				if (obj) obj->visit_graph(visitor);
+				if (obj) { visitor.visit(*obj); }
 			}
 		}
 	}

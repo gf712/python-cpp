@@ -342,6 +342,7 @@ class Heap
 	size_t static_memory_size() const { return m_static_memory_size; }
 
 	Slab &slab() { return m_slab; }
+	const Slab &slab() const { return m_slab; }
 
 	[[nodiscard]] ScopedGCPause scoped_gc_pause() { return ScopedGCPause(*m_gc); }
 

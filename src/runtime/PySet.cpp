@@ -115,9 +115,7 @@ PyResult<int32_t> PySet::__init__(PyTuple *args, PyDict *kwargs)
 		value = iterator.unwrap()->next();
 	}
 
-	if (value.unwrap_err()->type() != stop_iteration()->type()) {
-		return Err(value.unwrap_err());
-	}
+	if (value.unwrap_err()->type() != stop_iteration()->type()) { return Err(value.unwrap_err()); }
 
 	return Ok(0);
 }
@@ -153,7 +151,7 @@ void PySet::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &el : m_elements) {
 		if (std::holds_alternative<PyObject *>(el)) {
-			if (std::get<PyObject *>(el) != this) std::get<PyObject *>(el)->visit_graph(visitor);
+			if (std::get<PyObject *>(el) != this) visitor.visit(*std::get<PyObject *>(el));
 		}
 	}
 }

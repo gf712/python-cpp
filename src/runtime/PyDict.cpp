@@ -189,11 +189,10 @@ void PyDict::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &[key, value] : m_map) {
 		if (std::holds_alternative<PyObject *>(value)) {
-			if (std::get<PyObject *>(value) != this)
-				std::get<PyObject *>(value)->visit_graph(visitor);
+			if (std::get<PyObject *>(value) != this) visitor.visit(*std::get<PyObject *>(value));
 		}
 		if (std::holds_alternative<PyObject *>(key)) {
-			if (std::get<PyObject *>(key) != this) std::get<PyObject *>(key)->visit_graph(visitor);
+			if (std::get<PyObject *>(key) != this) visitor.visit(*std::get<PyObject *>(key));
 		}
 	}
 }

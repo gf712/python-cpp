@@ -305,7 +305,6 @@ const TypePrototype &PyObject::type_prototype() const
 
 void PyObject::visit_graph(Visitor &visitor)
 {
-	visitor.visit(*this);
 	if (m_attributes) { visitor.visit(*m_attributes); }
 	if (std::holds_alternative<PyType *>(m_type)) {
 		if (auto *t = std::get<PyType *>(m_type)) { visitor.visit(*t); }

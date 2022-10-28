@@ -20,6 +20,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+#include <unordered_set>
+
 namespace py {
 template<> PyType *as(PyObject *obj)
 {

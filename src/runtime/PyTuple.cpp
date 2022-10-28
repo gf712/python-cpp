@@ -223,7 +223,9 @@ void PyTuple::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &el : m_elements) {
 		if (std::holds_alternative<PyObject *>(el)) {
-			if (std::get<PyObject *>(el) != this) std::get<PyObject *>(el)->visit_graph(visitor);
+			if (std::get<PyObject *>(el) != this) {
+				visitor.visit(*std::get<PyObject *>(el));
+			}
 		}
 	}
 }

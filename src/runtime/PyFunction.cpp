@@ -41,7 +41,7 @@ PyFunction::PyFunction(std::string name,
 void PyFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	m_code->visit_graph(visitor);
+	visitor.visit(*m_code);
 	if (m_globals) visitor.visit(*m_globals);
 	if (m_module) visitor.visit(*m_module);
 	if (m_dict) visitor.visit(*m_dict);
@@ -130,7 +130,7 @@ PyResult<PyObject *> PyNativeFunction::__repr__() const { return PyString::creat
 void PyNativeFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	for (auto *obj : m_captures) { obj->visit_graph(visitor); }
+	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
 PyType *PyNativeFunction::type() const { return native_function(); }

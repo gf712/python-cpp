@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PyObject.hpp"
+#include <unordered_set>
 
 namespace py {
 
