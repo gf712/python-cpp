@@ -170,7 +170,7 @@ void NodeVisitor::visit(While *node)
 void NodeVisitor::visit(Compare *node)
 {
 	dispatch(node->lhs().get());
-	dispatch(node->rhs().get());
+	for (auto &el : node->comparators()) { dispatch(el.get()); }
 }
 
 void NodeVisitor::visit(Attribute *node) { dispatch(node->value().get()); }
@@ -537,7 +537,7 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_pt
 std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Compare> node)
 {
 	transform_single_node(node->lhs());
-	transform_single_node(node->rhs());
+	transform_multiple_nodes(node->comparators());
 	return { node };
 }
 
@@ -924,9 +924,9 @@ void Return::print_this_node(const std::string &indent) const
 		source_location().start.column + 1,
 		source_location().end.row + 1,
 		source_location().end.column + 1);
-	spdlog::debug("{}  - value:", indent);
+	spdlog::debug("{}  - value: {}", indent, m_value ? "" : "null");
 	std::string new_indent = indent + std::string(6, ' ');
-	m_value->print_node(new_indent);
+	if (m_value) { m_value->print_node(new_indent); }
 }
 
 void Yield::print_this_node(const std::string &indent) const
@@ -1197,9 +1197,16 @@ void Compare::print_this_node(const std::string &indent) const
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - lhs:", indent);
 	m_lhs->print_node(new_indent);
-	spdlog::debug("{}  - op: {}", indent, op_type_to_string(m_op));
-	spdlog::debug("{}  - rhs:", indent);
-	m_rhs->print_node(new_indent);
+	spdlog::debug("{}  - op:", indent);
+	for (size_t i = 0; i < m_ops.size(); ++i) {
+		const auto op = op_type_to_string(m_ops[i]);
+		spdlog::debug("{}        - {}", indent, op);
+	}
+	spdlog::debug("{}  - comparators:", indent);
+	for (size_t i = 0; i < m_comparators.size(); ++i) {
+		const auto &comparator = m_comparators[i];
+		comparator->print_node(new_indent);
+	}
 }
 
 void Attribute::print_this_node(const std::string &indent) const

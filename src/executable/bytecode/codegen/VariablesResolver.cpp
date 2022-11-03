@@ -100,7 +100,8 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 
 	if (auto it = current_scope_vars.find(name); it != current_scope_vars.end()) { return; }
 
-	const bool outer_is_class = m_current_scope->get().parent && m_current_scope->get().parent->type == Scope::Type::CLASS;
+	const bool outer_is_class =
+		m_current_scope->get().parent && m_current_scope->get().parent->type == Scope::Type::CLASS;
 	if (outer_is_class && (name == "__class__" || name == "super")) {
 		m_current_scope->get().parent->requires_class_ref = true;
 		// artificially lookup __class__
@@ -239,7 +240,7 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 Value *VariablesResolver::visit(const Compare *node)
 {
 	node->lhs()->codegen(this);
-	node->rhs()->codegen(this);
+	for (const auto &el : node->comparators()) { el->codegen(this); }
 	return nullptr;
 }
 
@@ -459,7 +460,7 @@ Value *VariablesResolver::visit(const Import *node)
 		} else {
 			auto idx = name.name.find('.');
 			if (idx != std::string::npos) {
-				std::string imported_name = name.name.substr(idx + 1);
+				std::string imported_name = name.name.substr(0, idx);
 				store(imported_name, node->source_location());
 			} else {
 				store(name.name, node->source_location());
@@ -571,7 +572,7 @@ Value *VariablesResolver::visit(const Raise *node)
 
 Value *VariablesResolver::visit(const Return *node)
 {
-	node->value()->codegen(this);
+	if (node->value()) { node->value()->codegen(this); }
 	return nullptr;
 }
 

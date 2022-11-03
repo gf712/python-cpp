@@ -1052,7 +1052,16 @@ Value *BytecodeGenerator::visit(const Starred *node)
 
 Value *BytecodeGenerator::visit(const Return *node)
 {
-	auto *src = generate(node->value().get(), m_function_id);
+	auto *src = [&]() -> BytecodeValue * {
+		if (node->value()) {
+			return generate(node->value().get(), m_function_id);
+		} else {
+			auto *none_value = create_value();
+			auto *value = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+			emit<LoadConst>(none_value->get_register(), value->get_index());
+			return none_value;
+		}
+	}();
 	if (m_clear_exception_before_return_functions.contains(m_function_id)) {
 		emit<ClearExceptionState>();
 	}
@@ -1437,70 +1446,78 @@ Value *BytecodeGenerator::visit(const While *node)
 Value *BytecodeGenerator::visit(const Compare *node)
 {
 	const auto *lhs = generate(node->lhs().get(), m_function_id);
-	const auto *rhs = generate(node->rhs().get(), m_function_id);
-	auto *result = create_value();
+	const auto &comparators = node->comparators();
+	const auto &ops = node->ops();
+	BytecodeValue *result{ nullptr };
 
-	switch (node->op()) {
-	case Compare::OpType::Eq: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::Eq);
-	} break;
-	case Compare::OpType::NotEq: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::NotEq);
-	} break;
-	case Compare::OpType::Lt: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::Lt);
-	} break;
-	case Compare::OpType::LtE: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::LtE);
-	} break;
-	case Compare::OpType::Gt: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::Gt);
-	} break;
-	case Compare::OpType::GtE: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::GtE);
-	} break;
-	case Compare::OpType::Is: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::Is);
-	} break;
-	case Compare::OpType::IsNot: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::IsNot);
-	} break;
-	case Compare::OpType::In: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::In);
-	} break;
-	case Compare::OpType::NotIn: {
-		emit<CompareOperation>(result->get_register(),
-			lhs->get_register(),
-			rhs->get_register(),
-			CompareOperation::Comparisson::NotIn);
-	} break;
+	for (size_t idx = 0; idx < comparators.size(); ++idx) {
+		const auto *rhs = generate(comparators[idx].get(), m_function_id);
+		const auto op = ops[idx];
+		result = create_value();
+
+		switch (op) {
+		case Compare::OpType::Eq: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::Eq);
+		} break;
+		case Compare::OpType::NotEq: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::NotEq);
+		} break;
+		case Compare::OpType::Lt: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::Lt);
+		} break;
+		case Compare::OpType::LtE: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::LtE);
+		} break;
+		case Compare::OpType::Gt: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::Gt);
+		} break;
+		case Compare::OpType::GtE: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::GtE);
+		} break;
+		case Compare::OpType::Is: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::Is);
+		} break;
+		case Compare::OpType::IsNot: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::IsNot);
+		} break;
+		case Compare::OpType::In: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::In);
+		} break;
+		case Compare::OpType::NotIn: {
+			emit<CompareOperation>(result->get_register(),
+				lhs->get_register(),
+				rhs->get_register(),
+				CompareOperation::Comparisson::NotIn);
+		} break;
+		}
+		lhs = rhs;
 	}
 
 	return result;

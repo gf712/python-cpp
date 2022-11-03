@@ -261,13 +261,20 @@ void compare_compare(const std::shared_ptr<ASTNode> &result,
 	const auto expected_lhs = as<Compare>(expected)->lhs();
 	dispatch(result_lhs, expected_lhs);
 
-	const auto result_op = as<Compare>(result)->op();
-	const auto expected_op = as<Compare>(expected)->op();
-	ASSERT_EQ(result_op, expected_op);
+	ASSERT_EQ(as<Compare>(result)->ops().size(), as<Compare>(expected)->ops().size());
+	for (size_t i = 0; i < as<Compare>(result)->ops().size(); ++i) {
+		const auto result_op = as<Compare>(result)->ops()[i];
+		const auto expected_op = as<Compare>(expected)->ops()[i];
+		ASSERT_EQ(result_op, expected_op);
+	}
 
-	const auto result_rhs = as<Compare>(result)->rhs();
-	const auto expected_rhs = as<Compare>(expected)->rhs();
-	dispatch(result_rhs, expected_rhs);
+	ASSERT_EQ(
+		as<Compare>(result)->comparators().size(), as<Compare>(expected)->comparators().size());
+	for (size_t i = 0; i < as<Compare>(result)->comparators().size(); ++i) {
+		const auto result_cmp = as<Compare>(result)->comparators()[i];
+		const auto expected_cmp = as<Compare>(expected)->comparators()[i];
+		dispatch(result_cmp, expected_cmp);
+	}
 }
 
 

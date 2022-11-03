@@ -970,21 +970,22 @@ class Compare : public ASTNode
 
   private:
 	std::shared_ptr<ASTNode> m_lhs;
-	OpType m_op;
-	std::shared_ptr<ASTNode> m_rhs;
+	std::vector<OpType> m_ops;
+	std::vector<std::shared_ptr<ASTNode>> m_comparators;
 
   public:
 	Compare(std::shared_ptr<ASTNode> lhs,
-		OpType op,
-		std::shared_ptr<ASTNode> rhs,
+		std::vector<OpType> &&ops,
+		std::vector<std::shared_ptr<ASTNode>> &&comparators,
 		SourceLocation source_location)
-		: ASTNode(ASTNodeType::Compare, source_location), m_lhs(std::move(lhs)), m_op(op),
-		  m_rhs(std::move(rhs))
+		: ASTNode(ASTNodeType::Compare, source_location), m_lhs(std::move(lhs)),
+		  m_ops(std::move(ops)), m_comparators(std::move(comparators))
 	{}
 
 	const std::shared_ptr<ASTNode> &lhs() const { return m_lhs; }
-	OpType op() const { return m_op; }
-	const std::shared_ptr<ASTNode> &rhs() const { return m_rhs; }
+	std::vector<OpType> ops() const { return m_ops; }
+	const std::vector<std::shared_ptr<ASTNode>> &comparators() const { return m_comparators; }
+	std::vector<std::shared_ptr<ASTNode>> &comparators() { return m_comparators; }
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1042,15 +1043,9 @@ class ImportBase : public ASTNode
 	std::vector<alias> m_names;
 
   public:
-	ImportBase(ASTNodeType node_type, SourceLocation source_location)
-		: ASTNode(node_type, source_location)
-	{}
-
-	ImportBase(ASTNodeType node_type, SourceLocation source_location, std::vector<alias> &&names)
+	ImportBase(ASTNodeType node_type, std::vector<alias> &&names, SourceLocation source_location)
 		: ASTNode(node_type, source_location), m_names(std::move(names))
 	{}
-
-	void add_alias(alias alias_) { m_names.push_back(std::move(alias_)); }
 
 	const std::vector<alias> &names() const { return m_names; }
 };
@@ -1058,7 +1053,9 @@ class ImportBase : public ASTNode
 class Import : public ImportBase
 {
   public:
-	Import(SourceLocation source_location) : ImportBase(ASTNodeType::Import, source_location) {}
+	Import(std::vector<alias> &&names, SourceLocation source_location)
+		: ImportBase(ASTNodeType::Import, std::move(names), source_location)
+	{}
 
 	Value *codegen(CodeGenerator *) const override;
 
@@ -1072,15 +1069,16 @@ class ImportFrom : public ImportBase
 	size_t m_level{ 0 };
 
   public:
-	ImportFrom(SourceLocation source_location)
-		: ImportBase(ASTNodeType::ImportFrom, source_location)
+	ImportFrom(std::string module,
+		std::vector<alias> &&names,
+		size_t level,
+		SourceLocation source_location)
+		: ImportBase(ASTNodeType::ImportFrom, std::move(names), source_location),
+		  m_module(std::move(module)), m_level(level)
 	{}
 
 	const std::string &module() const { return m_module; }
 	size_t level() const { return m_level; }
-
-	void set_module(std::string module) { m_module = std::move(module); }
-	void increment_level() { m_level++; }
 
 	Value *codegen(CodeGenerator *) const override;
 
