@@ -15,6 +15,7 @@
 #include "runtime/PyEllipsis.hpp"
 #include "runtime/PyFloat.hpp"
 #include "runtime/PyFrame.hpp"
+#include "runtime/PyFrozenSet.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyGenerator.hpp"
 #include "runtime/PyGenericAlias.hpp"
@@ -59,9 +60,9 @@ BuiltinTypes::BuiltinTypes()
 	  m_dict_value_iterator(PyDictValueIterator::type_factory()), m_list(PyList::type_factory()),
 	  m_list_iterator(PyListIterator::type_factory()), m_tuple(PyTuple::type_factory()),
 	  m_tuple_iterator(PyTupleIterator::type_factory()), m_set(PySet::type_factory()),
-	  m_set_iterator(PySetIterator::type_factory()), m_range(PyRange::type_factory()),
-	  m_range_iterator(PyRangeIterator::type_factory()), m_slice(PySlice::type_factory()),
-	  m_builtin_method(PyBuiltInMethod::type_factory()),
+	  m_frozenset(PyFrozenSet::type_factory()), m_set_iterator(PySetIterator::type_factory()),
+	  m_range(PyRange::type_factory()), m_range_iterator(PyRangeIterator::type_factory()),
+	  m_slice(PySlice::type_factory()), m_builtin_method(PyBuiltInMethod::type_factory()),
 	  m_slot_wrapper(PySlotWrapper::type_factory()), m_bound_method(PyBoundMethod::type_factory()),
 	  m_method_wrapper(PyMethodDescriptor::type_factory()),
 	  m_classmethod_descriptor(PyClassMethodDescriptor::type_factory()),
@@ -118,6 +119,7 @@ INITIALIZE_TYPE(tuple)
 INITIALIZE_TYPE(tuple_iterator)
 
 INITIALIZE_TYPE(set)
+INITIALIZE_TYPE(frozenset)
 INITIALIZE_TYPE(set_iterator)
 
 INITIALIZE_TYPE(range)

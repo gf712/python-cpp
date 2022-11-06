@@ -131,6 +131,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyEllipsis.cpp
     runtime/PyFloat.cpp
     runtime/PyFrame.cpp
+    runtime/PyFrozenSet.cpp
     runtime/PyFunction.cpp
     runtime/PyGenerator.cpp
     runtime/PyGenericAlias.cpp

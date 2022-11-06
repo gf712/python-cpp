@@ -5,7 +5,7 @@
 
 namespace py {
 
-class PySet : public PyBaseObject
+class PyFrozenSet : public PyBaseObject
 {
 	friend class ::Heap;
 
@@ -16,8 +16,8 @@ class PySet : public PyBaseObject
 	SetType m_elements;
 
   public:
-	static PyResult<PySet *> create(SetType elements);
-	static PyResult<PySet *> create();
+	static PyResult<PyFrozenSet *> create(SetType elements);
+	static PyResult<PyFrozenSet *> create();
 
 	std::string to_string() const override;
 
@@ -36,39 +36,12 @@ class PySet : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	PyResult<PyObject *> add(PyTuple *args, PyDict *kwargs);
-
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:
-	PySet();
-	PySet(SetType elements);
-};
-
-
-class PySetIterator : public PyBaseObject
-{
-	friend class ::Heap;
-
-	const std::variant<std::reference_wrapper<const PySet>,
-		std::reference_wrapper<const PyFrozenSet>>
-		m_pyset;
-	size_t m_current_index{ 0 };
-
-  public:
-	PySetIterator(const PySet &pyset);
-	PySetIterator(const PyFrozenSet &pyset);
-
-	std::string to_string() const override;
-
-	void visit_graph(Visitor &) override;
-
-	PyResult<PyObject *> __repr__() const;
-	PyResult<PyObject *> __next__();
-
-	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyFrozenSet();
+	PyFrozenSet(SetType elements);
 };
 
 }// namespace py

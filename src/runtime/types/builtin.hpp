@@ -45,6 +45,7 @@ class BuiltinTypes
 	mutable Type m_tuple_iterator;
 
 	mutable Type m_set;
+	mutable Type m_frozenset;
 	mutable Type m_set_iterator;
 
 	mutable Type m_range;
@@ -125,6 +126,7 @@ class BuiltinTypes
 	TypePrototype &tuple_iterator() const { return get_type(m_tuple_iterator); }
 
 	TypePrototype &set() const { return get_type(m_set); }
+	TypePrototype &frozenset() const { return get_type(m_frozenset); }
 	TypePrototype &set_iterator() const { return get_type(m_set_iterator); }
 
 	TypePrototype &range() const { return get_type(m_range); }
@@ -189,6 +191,7 @@ PyType *list_iterator();
 PyType *tuple();
 PyType *tuple_iterator();
 PyType *set();
+PyType *frozenset();
 PyType *set_iterator();
 PyType *range();
 PyType *range_iterator();

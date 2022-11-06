@@ -53,6 +53,7 @@ void initialize_types()
 	tuple();
 	tuple_iterator();
 	set();
+	frozenset();
 	set_iterator();
 	range();
 	range_iterator();

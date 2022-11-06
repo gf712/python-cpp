@@ -2,6 +2,7 @@
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
+#include "PyFrozenSet.hpp"
 #include "PyFunction.hpp"
 #include "PyInteger.hpp"
 #include "PyNone.hpp"
@@ -13,8 +14,6 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
-
-#include "iostream"
 
 namespace py {
 
@@ -182,6 +181,10 @@ PySetIterator::PySetIterator(const PySet &pyset)
 	: PyBaseObject(BuiltinTypes::the().set_iterator()), m_pyset(pyset)
 {}
 
+PySetIterator::PySetIterator(const PyFrozenSet &pyset)
+	: PyBaseObject(BuiltinTypes::the().set_iterator()), m_pyset(pyset)
+{}
+
 std::string PySetIterator::to_string() const
 {
 	return fmt::format("<set_iterator at {}>", static_cast<const void *>(this));
@@ -191,17 +194,28 @@ void PySetIterator::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	// TODO: should visit_graph be const and the bit flags mutable?
-	const_cast<PySet &>(m_pyset).visit_graph(visitor);
+	std::visit(
+		[&visitor]<typename T>(const T &el) {
+			const_cast<typename std::remove_cv_t<typename T::type> &>(el.get()).visit_graph(
+				visitor);
+		},
+		m_pyset);
 }
 
 PyResult<PyObject *> PySetIterator::__repr__() const { return PyString::create(to_string()); }
 
 PyResult<PyObject *> PySetIterator::__next__()
 {
-	if (m_current_index < m_pyset.elements().size())
-		return std::visit([](const auto &element) { return PyObject::from(element); },
-			*std::next(m_pyset.elements().begin(), m_current_index++));
-	return Err(stop_iteration());
+	return std::visit(
+		[&](const auto &set_ref) -> PyResult<PyObject *> {
+			const auto &set = set_ref.get();
+			if (m_current_index < set.elements().size()) {
+				return std::visit([](const auto &element) { return PyObject::from(element); },
+					*std::next(set.elements().begin(), m_current_index++));
+			}
+			return Err(stop_iteration());
+		},
+		m_pyset);
 }
 
 PyType *PySetIterator::type() const { return set_iterator(); }

@@ -894,6 +894,7 @@ auto builtin_types()
 		tuple(),
 		range(),
 		set(),
+		frozenset(),
 		property(),
 		static_method(),
 		classmethod(),
