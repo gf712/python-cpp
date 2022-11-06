@@ -10,3 +10,6 @@ def func2(a, b, c, d):
 args = [2]
 kwargs = {"c": 3, "d": 4}
 assert func2(1, *args, **kwargs) == 3
+
+kwargs = {"b": 2, "c": 3, "d": 4}
+assert func2(1, **kwargs) == 3

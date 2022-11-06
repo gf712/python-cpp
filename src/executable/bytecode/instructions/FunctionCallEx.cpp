@@ -36,7 +36,10 @@ PyResult<Value> FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 	}();
 	if (kwargs.is_err()) { return Err(args.unwrap_err()); }
 
-	spdlog::debug("calling function with argument expansion: \'{}\'", callable_object->to_string());
+	spdlog::debug("calling function '{}' with argument expansion: args='{}', kwargs='{}'",
+		callable_object->to_string(),
+		args.unwrap()->to_string(),
+		kwargs.unwrap()->to_string());
 
 	auto result = callable_object->call(args.unwrap(), kwargs.unwrap());
 	if (result.is_ok()) {

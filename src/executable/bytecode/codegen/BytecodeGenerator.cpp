@@ -1175,6 +1175,7 @@ Value *BytecodeGenerator::visit(const Call *node)
 		std::any_of(node->keywords().begin(), node->keywords().end(), is_kwargs_expansion);
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
+		if (!node->args().empty()) { requires_args_expansion = true; }
 		BytecodeValue *list_value = nullptr;
 		bool first_args_expansion = true;
 		std::vector<Register> args_lhs;
