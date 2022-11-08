@@ -81,7 +81,7 @@ struct MemberDefinition
 struct PropertyDefinition
 {
 	std::string name;
-	std::optional<std::function<PyObject *(PyObject *)>> member_getter;
+	std::optional<std::function<PyResult<PyObject *>(PyObject *)>> member_getter;
 	std::optional<std::function<PyResult<std::monostate>(PyObject *, PyObject *)>> member_setter;
 };
 

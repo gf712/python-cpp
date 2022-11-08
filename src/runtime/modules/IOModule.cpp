@@ -365,9 +365,9 @@ class IOBase : public PyBaseObject
 						[](IOBase *self) {
 							auto closed = self->is_closed();
 							if (closed.is_err()) { TODO(); }
-							return closed.unwrap() ? py_true() : py_false();
+							return Ok(closed.unwrap() ? py_true() : py_false());
 						})
-					.property_readonly("__dict__", [](IOBase *self) { return self->dict(); })
+					.property_readonly("__dict__", [](IOBase *self) { return Ok(self->dict()); })
 					.def("fileno", &IOBase::fileno)
 					.def("flush", &IOBase::flush)
 					.def("isatty", &IOBase::isatty)
@@ -1198,8 +1198,7 @@ class BufferedReader
 							if (self->check_initialized().is_err()) { TODO(); }
 							ASSERT(self->raw);
 							auto attr = self->raw->get_attribute(PyString::create("name").unwrap());
-							if (attr.is_err()) { TODO(); }
-							return attr.unwrap();
+							return attr;
 						})
 					// .property_readonly("mode")
 					.finalize();
@@ -2237,18 +2236,16 @@ class TextIOBase : public IOBase
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_textiobase) {
-			s_io_textiobase = klass<TextIOBase>(module, "_TextIOBase", s_io_base)
-								  .def("detach", &TextIOBase::detach)
-								  .def("read", &TextIOBase::read)
-								  .def("readline", &TextIOBase::readline)
-								  .def("write", &TextIOBase::write)
-								  .property_readonly(
-									  "encoding", +[](TextIOBase *) { return py_none(); })
-								  .property_readonly(
-									  "newlines", +[](TextIOBase *) { return py_none(); })
-								  .property_readonly(
-									  "errors", +[](TextIOBase *) { return py_none(); })
-								  .finalize();
+			s_io_textiobase =
+				klass<TextIOBase>(module, "_TextIOBase", s_io_base)
+					.def("detach", &TextIOBase::detach)
+					.def("read", &TextIOBase::read)
+					.def("readline", &TextIOBase::readline)
+					.def("write", &TextIOBase::write)
+					.property_readonly("encoding", [](TextIOBase *) { return Ok(py_none()); })
+					.property_readonly("newlines", [](TextIOBase *) { return Ok(py_none()); })
+					.property_readonly("errors", [](TextIOBase *) { return Ok(py_none()); })
+					.finalize();
 		}
 		module->add_symbol(PyString::create("_TextIOBase").unwrap(), s_io_textiobase);
 		return s_io_textiobase;
@@ -2612,25 +2609,24 @@ class StringIO : public TextIOBase
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_stringio) {
-			s_io_stringio = klass<StringIO>(module, "StringIO", s_io_textiobase)
-								.def("close", &StringIO::close)
-								.def("getvalue", &StringIO::getvalue)
-								.def("read", &StringIO::read)
-								.def("readline", &StringIO::readline)
-								.def("tell", &StringIO::tell)
-								// .def("truncate", &StringIO::truncate)
-								.def("seek", &StringIO::seek)
-								.def("write", &StringIO::write)
-								.def("seekable", &StringIO::seekable)
-								.def("readable", &StringIO::readable)
-								.def("writable", &StringIO::writable)
-								.property_readonly("closed",
-									[](StringIO *self) { return self->closed().unwrap(); })
-								.property_readonly("newlines",
-									[](StringIO *self) { return self->newlines().unwrap(); })
-								.property_readonly("line_buffering",
-									[](StringIO *self) { return self->line_buffering().unwrap(); })
-								.finalize();
+			s_io_stringio =
+				klass<StringIO>(module, "StringIO", s_io_textiobase)
+					.def("close", &StringIO::close)
+					.def("getvalue", &StringIO::getvalue)
+					.def("read", &StringIO::read)
+					.def("readline", &StringIO::readline)
+					.def("tell", &StringIO::tell)
+					// .def("truncate", &StringIO::truncate)
+					.def("seek", &StringIO::seek)
+					.def("write", &StringIO::write)
+					.def("seekable", &StringIO::seekable)
+					.def("readable", &StringIO::readable)
+					.def("writable", &StringIO::writable)
+					.property_readonly("closed", [](StringIO *self) { return self->closed(); })
+					.property_readonly("newlines", [](StringIO *self) { return self->newlines(); })
+					.property_readonly(
+						"line_buffering", [](StringIO *self) { return self->line_buffering(); })
+					.finalize();
 		}
 		module->add_symbol(PyString::create("StringIO").unwrap(), s_io_stringio);
 		return s_io_stringio;

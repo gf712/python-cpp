@@ -67,9 +67,7 @@ PyResult<PyObject *> PyGetSetDescriptor::__get__(PyObject *instance, PyObject * 
 				instance->type()->underlying_type().__name__));
 	}
 
-	if (m_getset.member_getter.has_value()) {
-		return Ok(m_getset.member_getter->operator()(instance));
-	}
+	if (m_getset.member_getter.has_value()) { return m_getset.member_getter->operator()(instance); }
 
 	return Err(attribute_error("attribute '{}' of '{}' objects is not readable",
 		m_name->value(),

@@ -228,14 +228,14 @@ namespace {
 				.attr("__mro__", &PyType::__mro__)
 				.property(
 					"__name__",
-					[](PyType *self) { return PyString::create(self->name()).unwrap(); },
+					[](PyType *self) { return PyString::create(self->name()); },
 					[](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
 						(void)self;
 						(void)value;
 						TODO();
 					})
-				.property_readonly("__dict__", [](PyType *self) { return self->dict(); })
-				.property_readonly("__bases__", [](PyType *self) { return self->__bases__; })
+				.property_readonly("__dict__", [](PyType *self) { return Ok(self->dict()); })
+				.property_readonly("__bases__", [](PyType *self) { return Ok(self->__bases__); })
 				.type);
 	}
 }// namespace

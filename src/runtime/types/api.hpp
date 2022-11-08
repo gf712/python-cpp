@@ -40,7 +40,7 @@ template<typename T> struct klass
 		type->__bases__ = std::vector<PyObject *>{ bases... };
 	}
 
-	using AttributeGetterType = std::function<PyObject *(T *)>;
+	using AttributeGetterType = std::function<PyResult<PyObject *>(T *)>;
 	using AttributeSetterType = std::function<PyResult<std::monostate>(T *, PyObject *)>;
 
 	klass &property(std::string_view name,
@@ -49,16 +49,17 @@ template<typename T> struct klass
 	{
 		type->add_property(PropertyDefinition{
 			.name = std::string(name),
-			.member_getter = [&getter]() -> std::optional<std::function<PyObject *(PyObject *)>> {
+			.member_getter = [getter = std::move(getter)]()
+				-> std::optional<std::function<PyResult<PyObject *>(PyObject *)>> {
 				if (getter.has_value()) {
-					return [getter_ = std::move(getter)](PyObject *self) -> PyObject * {
+					return [getter_ = std::move(getter)](PyObject *self) -> PyResult<PyObject *> {
 						return getter_->operator()(static_cast<T *>(self));
 					};
 				} else {
 					return std::nullopt;
 				}
 			}(),
-			.member_setter = [&setter]()
+			.member_setter = [setter = std::move(setter)]()
 				-> std::optional<std::function<PyResult<std::monostate>(PyObject *, PyObject *)>> {
 				if (setter.has_value()) {
 					return [setter_ = std::move(setter)](

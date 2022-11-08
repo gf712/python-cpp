@@ -1088,7 +1088,7 @@ std::unique_ptr<TypePrototype> register_type()
 	return std::move(klass<PyObject>("object")
 						 .property(
 							 "__class__",
-							 [](PyObject *self) { return self->type(); },
+							 [](PyObject *self) { return Ok(self->type()); },
 							 [](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
 								 (void)self;
 								 (void)value;
