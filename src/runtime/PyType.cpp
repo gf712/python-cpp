@@ -236,6 +236,24 @@ namespace {
 					})
 				.property_readonly("__dict__", [](PyType *self) { return Ok(self->dict()); })
 				.property_readonly("__bases__", [](PyType *self) { return Ok(self->__bases__); })
+				.property(
+					"__abstractmethods__",
+					[](PyType *self) -> PyResult<PyObject *> {
+						if (self != py::type()) {
+							if (auto result =
+									(*self->attributes())[String{ "__abstractmethods__" }];
+								result.has_value()) {
+								return PyObject::from(*result);
+							}
+						}
+						return Err(attribute_error("__abstractmethods__"));
+					},
+					[](PyType *self, PyObject *value) -> PyResult<std::monostate> {
+						auto abstract = truthy(value, VirtualMachine::the().interpreter());
+						if (abstract.is_err()) { return Err(abstract.unwrap_err()); }
+						self->attributes()->insert(String{ "__abstractmethods__" }, value);
+						return Ok(std::monostate{});
+					})
 				.type);
 	}
 }// namespace
