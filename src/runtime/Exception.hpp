@@ -30,6 +30,8 @@ class Exception : public BaseException
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
+
+	static PyType *static_type();
 };
 
 

@@ -16,6 +16,9 @@ class OSError : public Exception
   private:
 	OSError(PyTuple *args);
 
+  protected:
+	OSError(PyType *, PyTuple *args);
+
   public:
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	static PyResult<OSError *> create(PyTuple *args);
@@ -23,6 +26,8 @@ class OSError : public Exception
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
+
+	static PyType *static_type();
 };
 
 template<typename... Args>

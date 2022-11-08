@@ -17,6 +17,12 @@ PyType *Exception::type() const
 	return s_exception_type;
 }
 
+PyType *Exception::static_type()
+{
+	ASSERT(s_exception_type)
+	return s_exception_type;
+}
+
 PyType *Exception::register_type(PyModule *module)
 {
 	if (!s_exception_type) {

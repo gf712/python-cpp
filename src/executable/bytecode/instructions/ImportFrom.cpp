@@ -16,9 +16,10 @@ PyResult<Value> ImportFrom::execute(VirtualMachine &vm, Interpreter &interpreter
 
 	auto obj_ = PyObject::from(from).unwrap()->get_attribute(PyString::create(name).unwrap());
 
-	if (obj_.is_err()) { TODO(); }
-	vm.reg(m_destination) = obj_.unwrap();
-	return obj_;
+	return obj_.and_then([&vm, this](PyObject *obj) {
+		vm.reg(m_destination) = obj;
+		return Ok(obj);
+	});
 }
 
 std::vector<uint8_t> ImportFrom::serialize() const

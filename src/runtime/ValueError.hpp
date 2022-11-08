@@ -23,6 +23,8 @@ class ValueError : public Exception
 	static PyType *register_type(PyModule *);
 
 	PyType *type() const override;
+
+	static PyType *static_type();
 };
 
 template<typename... Args>

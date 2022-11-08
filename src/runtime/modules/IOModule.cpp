@@ -1,6 +1,7 @@
 #include "Modules.hpp"
 #include "runtime/MemoryError.hpp"
 #include "runtime/NotImplementedError.hpp"
+#include "runtime/OSError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyDict.hpp"
@@ -27,9 +28,27 @@ namespace {
 	static PyType *s_io_raw_iobase = nullptr;
 	static PyType *s_io_buffered_io_base = nullptr;
 	static PyType *s_io_buffered_reader = nullptr;
+	static PyType *s_io_buffered_writer = nullptr;
+	static PyType *s_io_buffered_rwpair = nullptr;
+	static PyType *s_io_buffered_random = nullptr;
+	static PyType *s_io_textiobase = nullptr;
+	static PyType *s_io_incremental_newline_decoder = nullptr;
 	static PyType *s_io_bytesio = nullptr;
 	static PyType *s_io_fileio = nullptr;
+	static PyType *s_io_stringio = nullptr;
+	static PyType *s_io_textiowrapper = nullptr;
+
+	static PyType *s_blocking_io_error = nullptr;
+	static PyType *s_unsupported_operation_type = nullptr;
 }// namespace
+
+Exception *unsupported_operation(PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(s_unsupported_operation_type);
+	auto *obj = s_unsupported_operation_type->call(args, kwargs).unwrap();
+	ASSERT(obj->type()->issubclass(Exception::static_type()));
+	return static_cast<Exception *>(obj);
+}
 
 class IOBase : public PyBaseObject
 {
@@ -124,8 +143,7 @@ class IOBase : public PyBaseObject
 
 	PyResult<PyObject *> fileno() const
 	{
-		// FIXME: should return io.UnsupportedOperation error
-		return Err(value_error("io.UnsupportedOperation: fileno"));
+		return Err(unsupported_operation(PyTuple::create(String{ "fileno" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> flush() const
@@ -233,7 +251,7 @@ class IOBase : public PyBaseObject
 	PyResult<PyObject *> seek() const
 	{
 		// FIXME
-		return Err(value_error("io.UnsupportedOperation: seek"));
+		return Err(unsupported_operation(PyTuple::create(String{ "seek" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> seekable() const { return Ok(py_false()); }
@@ -248,8 +266,7 @@ class IOBase : public PyBaseObject
 
 	PyResult<PyObject *> truncate() const
 	{
-		// FIXME
-		return Err(value_error("io.UnsupportedOperation: truncate"));
+		return Err(unsupported_operation(PyTuple::create(String{ "truncate" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> writable() const { return Ok(py_false()); }
@@ -281,6 +298,12 @@ class IOBase : public PyBaseObject
 		}
 		return Ok(py_none());
 	}
+
+	PyResult<PyObject *> check_seekable_() { return check_seekable(this); }
+
+	PyResult<PyObject *> check_readable_() { return check_readable(this); }
+
+	PyResult<PyObject *> check_writable_() { return check_writable(this); }
 
 	PyObject *dict() const { return m_attributes; }
 
@@ -375,12 +398,58 @@ class IOBase : public PyBaseObject
 									});
 							}
 						})
+					.def("_checkSeekable", &IOBase::check_seekable_)
+					.def("_checkReadable", &IOBase::check_readable_)
+					.def("_checkReadable", &IOBase::check_writable_)
 					.def("__enter__", &IOBase::__enter__)
 					.def("__exit__", &IOBase::__exit__)
 					.finalize();
 		}
 		module->add_symbol(PyString::create("_IOBase").unwrap(), s_io_base);
 		return s_io_base;
+	}
+
+  protected:
+	static PyResult<PyObject *> check_seekable(PyObject *self)
+	{
+		return self->get_method(PyString::create("seekable").unwrap())
+			.and_then([](auto *seekable) { return seekable->call(nullptr, nullptr); })
+			.and_then([](auto *result) -> PyResult<PyObject *> {
+				if (result != py_true()) {
+					return Err(unsupported_operation(
+						PyTuple::create(String{ "File or stream is not seekable." }).unwrap(),
+						nullptr));
+				}
+				return Ok(py_true());
+			});
+	}
+
+	static PyResult<PyObject *> check_readable(PyObject *self)
+	{
+		return self->get_method(PyString::create("readable").unwrap())
+			.and_then([](auto *readable) { return readable->call(nullptr, nullptr); })
+			.and_then([](auto *result) -> PyResult<PyObject *> {
+				if (result != py_true()) {
+					return Err(unsupported_operation(
+						PyTuple::create(String{ "File or stream is not readable." }).unwrap(),
+						nullptr));
+				}
+				return Ok(py_true());
+			});
+	}
+
+	static PyResult<PyObject *> check_writable(PyObject *self)
+	{
+		return self->get_method(PyString::create("writable").unwrap())
+			.and_then([](auto *writable) { return writable->call(nullptr, nullptr); })
+			.and_then([](auto *result) -> PyResult<PyObject *> {
+				if (result != py_true()) {
+					return Err(unsupported_operation(
+						PyTuple::create(String{ "File or stream is not writable." }).unwrap(),
+						nullptr));
+				}
+				return Ok(py_true());
+			});
 	}
 };
 
@@ -509,17 +578,17 @@ class BufferedIOBase : public IOBase
 
 	PyResult<PyObject *> detach() const
 	{
-		return Err(value_error("io.UnsupportedOperation: detach"));
+		return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> read(PyTuple *, PyDict *) const
 	{
-		return Err(value_error("io.UnsupportedOperation: read"));
+		return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> read1(PyTuple *, PyDict *) const
 	{
-		return Err(value_error("io.UnsupportedOperation: read1"));
+		return Err(unsupported_operation(PyTuple::create(String{ "read1" }).unwrap(), nullptr));
 	}
 
 	PyResult<PyObject *> readinto_generic(PyBuffer &buffer, bool readinto1) const
@@ -562,7 +631,7 @@ class BufferedIOBase : public IOBase
 
 	PyResult<PyObject *> write(PyTuple *, PyDict *) const
 	{
-		return Err(value_error("io.UnsupportedOperation: write"));
+		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
 	}
 
 	PyType *type() const override { return s_io_buffered_io_base; }
@@ -757,13 +826,13 @@ struct Buffered
 			});
 	}
 
-	PyResult<PyObject *> writeable() const
+	PyResult<PyObject *> writable() const
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("writeable").unwrap())
-			.and_then([](PyObject *writeable) -> PyResult<PyObject *> {
-				return writeable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
+			->get_method(PyString::create("writable").unwrap())
+			.and_then([](PyObject *writable) -> PyResult<PyObject *> {
+				return writable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
 	}
 
@@ -1085,6 +1154,438 @@ class BufferedReader
 	}
 
 	PyType *type() const override { return s_io_buffered_reader; }
+
+	static PyType *static_type() { return s_io_buffered_reader; }
+
+	void visit_graph(Visitor &visitor) override
+	{
+		PyObject::visit_graph(visitor);
+		visit_graph_buffered(visitor);
+	}
+};
+
+class BufferedWriter
+	: public BufferedIOBase
+	, public Buffered<BufferedWriter>
+{
+	friend class ::Heap;
+
+	BufferedWriter(PyType *type, PyObject *raw, int buffer_size) : BufferedIOBase(type)
+	{
+		this->raw = raw;
+		(void)buffer_size;
+		this->readable_ = false;
+		this->writable_ = true;
+		this->fast_closed_checks = false;
+		this->ok = true;
+	}
+
+	BufferedWriter(PyType *type) : BufferedWriter(type, nullptr, 0) {}
+
+  protected:
+	static PyResult<BufferedWriter *> create(PyType *type, PyObject *raw, int buffer_size)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedWriter>(type, raw, buffer_size)) { return Ok(obj); }
+		return Err(memory_error(sizeof(BufferedWriter)));
+	}
+
+	static PyResult<BufferedWriter *> create(PyType *type)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedWriter>(type)) { return Ok(obj); }
+		return Err(memory_error(sizeof(BufferedWriter)));
+	}
+
+  public:
+	static PyResult<BufferedWriter *> create(PyObject *raw, int buffer_size)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedWriter>(s_io_buffered_reader, raw, buffer_size)) {
+			return Ok(obj);
+		}
+		return Err(memory_error(sizeof(BufferedWriter)));
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		return BufferedWriter::create(const_cast<PyType *>(type));
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->map().empty());
+		if (!args || args->elements().empty()) {
+			return Err(type_error("missing required argument 'raw'"));
+		}
+		if (args->elements().size() > 1) { TODO(); }
+		return PyObject::from(args->elements()[0])
+			.and_then([this](PyObject *raw) -> PyResult<int32_t> {
+				this->raw = raw;
+				this->readable_ = false;
+				this->writable_ = true;
+				this->fast_closed_checks = false;
+				this->ok = true;
+				this->buffer = std::make_unique<std::stringbuf>();
+				return Ok(0);
+			});
+	}
+
+	PyResult<PyObject *> __repr__() const
+	{
+		auto attr = lookup_attribute(PyString::create("name").unwrap());
+		if (std::get<0>(attr).is_err()
+			&& std::get<0>(attr).unwrap_err()->type() != value_error("")->type()) {
+			return std::get<0>(attr);
+		}
+		if (std::get<1>(attr) == LookupAttrResult::NOT_FOUND) {
+			return PyString::create(fmt::format("<{}>", type_prototype().__name__));
+		}
+		auto *nameobj = std::get<0>(attr).unwrap();
+		return nameobj->repr().and_then([this](PyObject *nameobj_repr) {
+			return PyString::create(
+				fmt::format("<{} name={}>", type_prototype().__name__, nameobj_repr->to_string()));
+		});
+	}
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_buffered_writer) {
+			s_io_buffered_writer =
+				klass<BufferedWriter>(module, "BufferedWriter", s_io_buffered_io_base).finalize();
+		}
+		module->add_symbol(PyString::create("BufferedWriter").unwrap(), s_io_buffered_writer);
+		return s_io_buffered_writer;
+	}
+
+	PyType *type() const override { return s_io_buffered_writer; }
+
+	static PyType *static_type() { return s_io_buffered_writer; }
+
+	void visit_graph(Visitor &visitor) override
+	{
+		PyObject::visit_graph(visitor);
+		visit_graph_buffered(visitor);
+	}
+};
+
+template<> BufferedReader *as(PyObject *obj)
+{
+	if (obj->type() == BufferedReader::static_type()) { return static_cast<BufferedReader *>(obj); }
+	return nullptr;
+}
+
+template<> const BufferedReader *as(const PyObject *obj)
+{
+	if (obj->type() == BufferedReader::static_type()) {
+		return static_cast<const BufferedReader *>(obj);
+	}
+	return nullptr;
+}
+
+template<> BufferedWriter *as(PyObject *obj)
+{
+	if (obj->type() == BufferedWriter::static_type()) { return static_cast<BufferedWriter *>(obj); }
+	return nullptr;
+}
+
+template<> const BufferedWriter *as(const PyObject *obj)
+{
+	if (obj->type() == BufferedWriter::static_type()) {
+		return static_cast<const BufferedWriter *>(obj);
+	}
+	return nullptr;
+}
+
+class BufferedRWPair : public BufferedIOBase
+{
+	friend class ::Heap;
+	BufferedReader *m_reader;
+	BufferedWriter *m_writer;
+	size_t m_buffer_size;
+
+	BufferedRWPair(PyType *type) : BufferedIOBase(type) {}
+
+  protected:
+	static PyResult<BufferedRWPair *> create(PyType *type)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedRWPair>(type)) { return Ok(obj); }
+		return Err(memory_error(sizeof(BufferedRWPair)));
+	}
+
+  public:
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		return BufferedRWPair::create(const_cast<PyType *>(type));
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		if (this->type() != s_io_buffered_rwpair && kwargs && !kwargs->map().empty()) {
+			return Err(type_error("BufferedRWPair() takes no keyword arguments"));
+		}
+
+		auto parse_result = PyArgsParser<PyObject *, PyObject *, PyInteger *>::unpack_tuple(args,
+			kwargs,
+			"BufferedRWPair",
+			std::integral_constant<size_t, 2>{},
+			std::integral_constant<size_t, 3>{},
+			PyInteger::create(8 * 1024).unwrap());
+
+		if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+		auto [reader, writer, buffer_size] = parse_result.unwrap();
+
+		if (auto readable = check_readable(reader); readable.is_err()) {
+			return Err(readable.unwrap_err());
+		}
+		if (auto writable = check_writable(reader); writable.is_err()) {
+			return Err(writable.unwrap_err());
+		}
+
+		auto reader_ = BufferedReader::static_type()->call(
+			PyTuple::create(reader, buffer_size).unwrap(), nullptr);
+		if (reader_.is_err()) return Err(reader_.unwrap_err());
+		m_reader = as<BufferedReader>(reader_.unwrap());
+		ASSERT(m_reader);
+
+		auto writer_ = BufferedWriter::static_type()->call(
+			PyTuple::create(writer, buffer_size).unwrap(), nullptr);
+		if (writer_.is_err()) return Err(writer_.unwrap_err());
+		m_writer = as<BufferedWriter>(writer_.unwrap());
+		ASSERT(m_writer);
+
+		m_buffer_size = buffer_size->as_size_t();
+
+		return Ok(0);
+	}
+
+	PyResult<PyObject *> read(PyTuple *args, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("read").unwrap()).and_then([args](auto *read) {
+			return read->call(args, nullptr);
+		});
+	}
+
+	PyResult<PyObject *> peek(PyTuple *args, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("peek").unwrap()).and_then([args](auto *peek) {
+			return peek->call(args, nullptr);
+		});
+	}
+
+	PyResult<PyObject *> read1(PyTuple *args, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("read1").unwrap())
+			.and_then([args](auto *read1) { return read1->call(args, nullptr); });
+	}
+
+	PyResult<PyObject *> readinto(PyTuple *args, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("readinto").unwrap())
+			.and_then([args](auto *readinto) { return readinto->call(args, nullptr); });
+	}
+
+	PyResult<PyObject *> write(PyTuple *args, PyDict *)
+	{
+		return m_writer->get_method(PyString::create("write").unwrap())
+			.and_then([args](auto *write) { return write->call(args, nullptr); });
+	}
+
+	PyResult<PyObject *> flush(PyTuple *, PyDict *)
+	{
+		return m_writer->get_method(PyString::create("flush").unwrap()).and_then([](auto *write) {
+			return write->call(nullptr, nullptr);
+		});
+	}
+
+	PyResult<PyObject *> readable(PyTuple *, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("readable").unwrap())
+			.and_then([](auto *readable) { return readable->call(nullptr, nullptr); });
+	}
+
+	PyResult<PyObject *> writable(PyTuple *, PyDict *)
+	{
+		return m_reader->get_method(PyString::create("writable").unwrap())
+			.and_then([](auto *writable) { return writable->call(nullptr, nullptr); });
+	}
+
+	PyResult<PyObject *> close(PyTuple *, PyDict *)
+	{
+		auto writer_result =
+			m_reader->get_method(PyString::create("close").unwrap()).and_then([](auto *close) {
+				return close->call(nullptr, nullptr);
+			});
+
+		auto reader_result =
+			m_reader->get_method(PyString::create("close").unwrap()).and_then([](auto *close) {
+				return close->call(nullptr, nullptr);
+			});
+
+		if (writer_result.is_err()) {
+			// TODO: chain reader and writer exceptions
+			return writer_result;
+		}
+
+		return reader_result;
+	}
+
+	PyResult<PyObject *> isatty(PyTuple *, PyDict *)
+	{
+		return m_writer->get_method(PyString::create("isatty").unwrap())
+			.and_then([](auto *isatty) { return isatty->call(nullptr, nullptr); })
+			.and_then([this](auto *result) -> PyResult<PyObject *> {
+				if (result == py_false()) {
+					return m_reader->get_method(PyString::create("isatty").unwrap())
+						.and_then([](auto *isatty) { return isatty->call(nullptr, nullptr); });
+				}
+				return Ok(result);
+			});
+	}
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_buffered_rwpair) {
+			s_io_buffered_rwpair =
+				klass<BufferedRWPair>(module, "BufferedRWPair", s_io_buffered_io_base).finalize();
+		}
+		module->add_symbol(PyString::create("BufferedRWPair").unwrap(), s_io_buffered_rwpair);
+		return s_io_buffered_rwpair;
+	}
+
+	PyType *type() const override { return s_io_buffered_rwpair; }
+
+	void visit_graph(Visitor &visitor) override
+	{
+		PyObject::visit_graph(visitor);
+		if (m_reader) m_reader->visit_graph(visitor);
+		if (m_writer) m_writer->visit_graph(visitor);
+	}
+};
+
+
+class BufferedRandom
+	: public BufferedIOBase
+	, public Buffered<BufferedRandom>
+{
+	friend class ::Heap;
+
+	BufferedRandom(PyType *type, PyObject *raw, int buffer_size) : BufferedIOBase(type)
+	{
+		this->raw = raw;
+		(void)buffer_size;
+		this->readable_ = true;
+		this->writable_ = true;
+		this->detached = true;
+		this->fast_closed_checks = false;
+		this->ok = false;
+	}
+
+	BufferedRandom(PyType *type) : BufferedRandom(type, nullptr, 0) {}
+
+  protected:
+	static PyResult<BufferedRandom *> create(PyType *type, PyObject *raw, int buffer_size)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedRandom>(type, raw, buffer_size)) { return Ok(obj); }
+		return Err(memory_error(sizeof(BufferedRandom)));
+	}
+
+	static PyResult<BufferedRandom *> create(PyType *type)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedRandom>(type)) { return Ok(obj); }
+		return Err(memory_error(sizeof(BufferedRandom)));
+	}
+
+  public:
+	static PyResult<BufferedRandom *> create(PyObject *raw, int buffer_size)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<BufferedRandom>(s_io_buffered_reader, raw, buffer_size)) {
+			return Ok(obj);
+		}
+		return Err(memory_error(sizeof(BufferedRandom)));
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		return BufferedRandom::create(const_cast<PyType *>(type));
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		auto parse_result = PyArgsParser<PyObject *, PyInteger *>::unpack_tuple(args,
+			kwargs,
+			"BufferedRandom",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 2>{},
+			PyInteger::create(8 * 1024).unwrap());
+
+		if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+		auto [raw, buffer_size] = parse_result.unwrap();
+
+		if (auto seekable = check_seekable(raw); seekable.is_err()) {
+			return Err(seekable.unwrap_err());
+		}
+		if (auto readable = check_readable(raw); readable.is_err()) {
+			return Err(readable.unwrap_err());
+		}
+		if (auto writable = check_writable(raw); writable.is_err()) {
+			return Err(writable.unwrap_err());
+		}
+
+		this->raw = raw;
+
+		this->raw = raw;
+		this->readable_ = true;
+		this->writable_ = true;
+		this->fast_closed_checks = false;
+		this->ok = true;
+		this->buffer = std::make_unique<std::stringbuf>();
+
+		return Ok(0);
+	}
+
+	PyResult<PyObject *> __repr__() const
+	{
+		auto attr = lookup_attribute(PyString::create("name").unwrap());
+		if (std::get<0>(attr).is_err()
+			&& std::get<0>(attr).unwrap_err()->type() != value_error("")->type()) {
+			return std::get<0>(attr);
+		}
+		if (std::get<1>(attr) == LookupAttrResult::NOT_FOUND) {
+			return PyString::create(fmt::format("<{}>", type_prototype().__name__));
+		}
+		auto *nameobj = std::get<0>(attr).unwrap();
+		return nameobj->repr().and_then([this](PyObject *nameobj_repr) {
+			return PyString::create(
+				fmt::format("<{} name={}>", type_prototype().__name__, nameobj_repr->to_string()));
+		});
+	}
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_buffered_random) {
+			s_io_buffered_random =
+				klass<BufferedRandom>(module, "BufferedRandom", s_io_buffered_io_base)
+					.def("close", &Buffered<BufferedRandom>::close)
+					.def("detach", &Buffered<BufferedRandom>::detach)
+					.def("seekable", &Buffered<BufferedRandom>::seekable)
+					.def("readable", &Buffered<BufferedRandom>::readable)
+					.def("writable", &Buffered<BufferedRandom>::writable)
+					.def("fileno", &Buffered<BufferedRandom>::fileno)
+					.def("isatty", &Buffered<BufferedRandom>::isatty)
+					.finalize();
+		}
+		module->add_symbol(PyString::create("BufferedRandom").unwrap(), s_io_buffered_random);
+		return s_io_buffered_random;
+	}
+
+	PyType *type() const override { return s_io_buffered_random; }
+
+	static PyType *static_type() { return s_io_buffered_random; }
 
 	void visit_graph(Visitor &visitor) override
 	{
@@ -1568,6 +2069,596 @@ class FileIO : public RawIOBase
 	}
 };
 
+class TextIOBase : public IOBase
+{
+	friend class ::Heap;
+
+	TextIOBase() : TextIOBase(s_io_textiobase) {}
+
+  protected:
+	TextIOBase(PyType *type) : IOBase(type) {}
+
+  public:
+	static PyResult<TextIOBase *> create(const PyType *type)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		auto *result = heap.allocate<TextIOBase>(const_cast<PyType *>(type));
+		if (!result) { return Err(memory_error(sizeof(TextIOBase))); }
+		return Ok(result);
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		return TextIOBase::create(type);
+	}
+
+	PyResult<PyObject *> detach() const
+	{
+		return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr));
+	}
+
+	PyResult<PyObject *> read(PyTuple *, PyDict *) const
+	{
+		return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr));
+	}
+
+	PyResult<PyObject *> readline(PyTuple *, PyDict *) const
+	{
+		return Err(unsupported_operation(PyTuple::create(String{ "readline" }).unwrap(), nullptr));
+	}
+
+	PyResult<PyObject *> write(PyTuple *, PyDict *) const
+	{
+		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
+	}
+
+	PyType *type() const override { return s_io_textiobase; }
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_textiobase) {
+			s_io_textiobase = klass<TextIOBase>(module, "_TextIOBase", s_io_base)
+								  .def("detach", &TextIOBase::detach)
+								  .def("read", &TextIOBase::read)
+								  .def("readline", &TextIOBase::readline)
+								  .def("write", &TextIOBase::write)
+								  .property_readonly(
+									  "encoding", +[](TextIOBase *) { return py_none(); })
+								  .property_readonly(
+									  "newlines", +[](TextIOBase *) { return py_none(); })
+								  .property_readonly(
+									  "errors", +[](TextIOBase *) { return py_none(); })
+								  .finalize();
+		}
+		module->add_symbol(PyString::create("_TextIOBase").unwrap(), s_io_textiobase);
+		return s_io_textiobase;
+	}
+};
+
+class IncrementalNewlineDecoder : public PyBaseObject
+{
+	friend class ::Heap;
+	PyObject *m_decoder{ nullptr };
+	PyObject *m_errors{ nullptr };
+	bool m_translate{ false };
+
+	IncrementalNewlineDecoder() : IncrementalNewlineDecoder(s_io_incremental_newline_decoder) {}
+
+  protected:
+	IncrementalNewlineDecoder(PyType *type) : PyBaseObject(type) {}
+
+  public:
+	static PyResult<IncrementalNewlineDecoder *> create(const PyType *type)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		auto *result = heap.allocate<IncrementalNewlineDecoder>(const_cast<PyType *>(type));
+		if (!result) { return Err(memory_error(sizeof(IncrementalNewlineDecoder))); }
+		return Ok(result);
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		return IncrementalNewlineDecoder::create(type);
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		(void)args;
+		(void)kwargs;
+		TODO();
+	}
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_incremental_newline_decoder) {
+			s_io_incremental_newline_decoder =
+				klass<IncrementalNewlineDecoder>(module, "IncrementalNewlineDecoder").finalize();
+		}
+		module->add_symbol(PyString::create("IncrementalNewlineDecoder").unwrap(),
+			s_io_incremental_newline_decoder);
+		return s_io_incremental_newline_decoder;
+	}
+
+	void visit_graph(Visitor &visitor) override
+	{
+		PyObject::visit_graph(visitor);
+		if (m_decoder) visitor.visit(*m_decoder);
+		if (m_errors) visitor.visit(*m_errors);
+	}
+};
+
+class StringIO : public TextIOBase
+{
+	friend ::Heap;
+
+	std::stringstream m_stringstream;
+	std::string m_newline;
+	bool m_closed{ false };
+	bool m_ok{ false };
+
+	StringIO(PyType *type) : TextIOBase(type) {}
+
+  public:
+	static PyResult<StringIO *> create(PyString *initial_value, PyString *newline)
+	{
+		return StringIO::__new__(s_io_stringio, nullptr, nullptr)
+			.and_then([initial_value, newline](PyObject *stringio) -> PyResult<StringIO *> {
+				auto result = static_cast<StringIO *>(stringio)->init(initial_value, newline);
+				if (result.is_err()) return Err(result.unwrap_err());
+				if (result.unwrap() != 0) { TODO(); }
+				return Ok(static_cast<StringIO *>(stringio));
+			});
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<StringIO>(const_cast<PyType *>(type))) { return Ok(obj); }
+		return Err(memory_error(sizeof(StringIO)));
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->map().empty());
+
+		if (args->size() > 2) {
+			return Err(type_error("StringIO() takes at most 2 arguments ({} given)", args->size()));
+		}
+
+		auto *initial_value = [args]() -> PyObject * {
+			if (args->size() > 0) {
+				return PyObject::from(args->elements()[0]).unwrap();
+			} else {
+				return PyString::create("").unwrap();
+			}
+		}();
+
+		auto *newline = [args]() -> PyObject * {
+			if (args->size() > 1) {
+				return PyObject::from(args->elements()[1]).unwrap();
+			} else {
+				return PyString::create("\n").unwrap();
+			}
+		}();
+
+		if (initial_value == py_none()) {
+			initial_value = PyString::create("").unwrap();
+		} else if (!as<PyString>(initial_value)) {
+			return Err(
+				type_error("newline must be str or None, not '{}'", initial_value->type()->name()));
+		}
+
+		if (newline == py_none()) {
+			newline = PyString::create("\n").unwrap();
+		} else if (!as<PyString>(newline)) {
+			return Err(
+				type_error("newline must be str or None, not '{}'", newline->type()->name()));
+		}
+
+		return init(as<PyString>(initial_value), as<PyString>(newline));
+	}
+
+	PyType *type() const override { return s_io_stringio; }
+
+	PyResult<PyObject *> readable() const
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([](auto) { return Ok(py_true()); });
+	}
+
+	PyResult<PyObject *> writable() const
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([](auto) { return Ok(py_true()); });
+	}
+
+	PyResult<PyObject *> seekable() const
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([](auto) { return Ok(py_true()); });
+	}
+
+	PyResult<PyObject *> closed() const
+	{
+		return check_initialized().and_then(
+			[this](auto) { return Ok(m_closed ? py_true() : py_false()); });
+	}
+
+	PyResult<PyObject *> line_buffering() const
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([](auto) { return Ok(py_false()); });
+	}
+
+	PyResult<PyObject *> newlines() const
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([](auto) { return Ok(py_none()); });
+	}
+
+	PyResult<PyObject *> close()
+	{
+		m_closed = true;
+		m_stringstream.clear();
+		return Ok(py_none());
+	}
+
+	PyResult<PyObject *> tell()
+	{
+		return check_initialized()
+			.and_then([this](auto) { return check_closed(); })
+			.and_then([this](auto) { return PyInteger::create(m_stringstream.tellg()); });
+	}
+
+	PyResult<PyObject *> read(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->size() == 0);
+
+		if (auto result = check_initialized().or_else([this](auto) { return check_closed(); });
+			result.is_err()) {
+			return result;
+		}
+
+		auto size_ = [args, this]() -> PyResult<size_t> {
+			const auto initial_pos = m_stringstream.tellg();
+			m_stringstream.seekg(0, std::ios_base::end);
+			ASSERT(m_stringstream.tellg() >= initial_pos);
+			const size_t str_size = m_stringstream.tellg() - initial_pos;
+			m_stringstream.seekg(initial_pos);
+			if (args->size() == 0) {
+				return Ok(str_size);
+			} else if (args->size() == 1) {
+				auto obj = PyObject::from(args->elements()[0]);
+				if (obj.is_err()) return Err(obj.unwrap_err());
+				if (!as<PyInteger>(obj.unwrap())) {
+					return Err(type_error("argument should be integer or None, not '{}'",
+						obj.unwrap()->type()->to_string()));
+				}
+				auto size = as<PyInteger>(obj.unwrap())->as_size_t();
+				return Ok(std::clamp(size, size_t{ 0 }, str_size));
+			} else {
+				return Err(type_error("read expected at most 1 argument, got {}", args->size()));
+			}
+		}();
+
+		if (size_.is_err()) return Err(size_.unwrap_err());
+		auto size = size_.unwrap();
+
+		auto *result = new char[size];
+		m_stringstream.read(result, size);
+		return PyString::create(std::string{ result, size });
+	}
+
+	PyResult<PyObject *> readline(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->size() == 0);
+
+		if (auto result = check_initialized().or_else([this](auto) { return check_closed(); });
+			result.is_err()) {
+			return result;
+		}
+
+		auto limit_ = [args, this]() -> PyResult<size_t> {
+			const auto initial_pos = m_stringstream.tellg();
+			m_stringstream.seekg(0, std::ios_base::end);
+			ASSERT(m_stringstream.tellg() >= initial_pos);
+			const size_t str_size = m_stringstream.tellg() - initial_pos;
+			m_stringstream.seekg(initial_pos);
+			if (args->size() == 0) {
+				return Ok(str_size);
+			} else if (args->size() == 1) {
+				auto obj = PyObject::from(args->elements()[0]);
+				if (obj.is_err()) return Err(obj.unwrap_err());
+				if (!as<PyInteger>(obj.unwrap())) {
+					return Err(type_error("argument should be integer or None, not '{}'",
+						obj.unwrap()->type()->to_string()));
+				}
+				auto size = as<PyInteger>(obj.unwrap())->as_size_t();
+				return Ok(std::clamp(size, size_t{ 0 }, str_size));
+			} else {
+				return Err(type_error("read expected at most 1 argument, got {}", args->size()));
+			}
+		}();
+
+		if (limit_.is_err()) return Err(limit_.unwrap_err());
+		auto limit = limit_.unwrap();
+
+		if (m_newline == "\r\n") {
+			TODO();
+		} else if (m_newline.size() == 1) {
+			// +1 for null terminator. I think?
+			char *result = new char[limit + 1];
+			m_stringstream.getline(result, limit + 1, m_newline.back());
+			return PyString::create(std::string{ result, limit });
+		} else {
+			// +1 for null terminator. I think?
+			char *result = new char[limit + 1];
+			m_stringstream.getline(result, limit + 1);
+			return PyString::create(std::string{ result, limit });
+		}
+	}
+
+	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
+	{
+		if (auto result = check_initialized(); result.is_err()) { return result; }
+
+		auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
+			kwargs,
+			"write",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 1>{});
+
+		if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+
+		auto [obj] = parse_result.unwrap();
+
+		if (auto result = check_closed(); result.is_err()) { return result; }
+
+		const auto size = obj->size();
+		m_stringstream << obj->value();
+		m_stringstream.seekg(m_stringstream.tellp());
+
+		return PyInteger::create(size);
+	}
+
+	PyResult<PyObject *> seek(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->size() == 0);
+
+		if (auto result = check_initialized(); result.is_err()) { return result; }
+
+		auto parse_result = PyArgsParser<PyInteger *, PyInteger *>::unpack_tuple(args,
+			kwargs,
+			"seek",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 2>{},
+			PyInteger::create(0).unwrap());
+
+		if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+
+		auto [pos_, whence] = parse_result.unwrap();
+
+		if (whence->as_i64() < 0 || whence->as_i64() > 2) {
+			return Err(value_error("Invalid whence ('{}', should be 0, 1 or 2)", whence->as_i64()));
+		} else if (pos_->as_i64() < 0 && whence->as_i64() == 0) {
+			return Err(value_error("Negative seek position '{}'", pos_->as_i64()));
+		} else if (whence->as_i64() != 0 && pos_->as_i64() == 0) {
+			return Err(value_error("Can't do nonzero cur-relative seeks"));
+		}
+
+		if (whence->as_size_t() == 0) {
+			const auto pos = pos_->as_i64();
+			m_stringstream.seekp(pos, std::ios_base::beg);
+			m_stringstream.seekg(pos, std::ios_base::beg);
+		} else if (whence->as_size_t() == 1) {
+		} else if (whence->as_size_t() == 2) {
+			m_stringstream.seekp(0, std::ios_base::end);
+			m_stringstream.seekg(0, std::ios_base::end);
+		}
+
+		const auto new_pos = m_stringstream.tellg();
+		return PyInteger::create(new_pos);
+	}
+
+	PyResult<PyObject *> getvalue() { return PyString::create(m_stringstream.str()); }
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_stringio) {
+			s_io_stringio = klass<StringIO>(module, "StringIO", s_io_textiobase)
+								.def("close", &StringIO::close)
+								.def("getvalue", &StringIO::getvalue)
+								.def("read", &StringIO::read)
+								.def("readline", &StringIO::readline)
+								.def("tell", &StringIO::tell)
+								// .def("truncate", &StringIO::truncate)
+								.def("seek", &StringIO::seek)
+								.def("write", &StringIO::write)
+								.def("seekable", &StringIO::seekable)
+								.def("readable", &StringIO::readable)
+								.def("writable", &StringIO::writable)
+								.property_readonly("closed",
+									[](StringIO *self) { return self->closed().unwrap(); })
+								.property_readonly("newlines",
+									[](StringIO *self) { return self->newlines().unwrap(); })
+								.property_readonly("line_buffering",
+									[](StringIO *self) { return self->line_buffering().unwrap(); })
+								.finalize();
+		}
+		module->add_symbol(PyString::create("StringIO").unwrap(), s_io_stringio);
+		return s_io_stringio;
+	}
+
+
+  private:
+	PyResult<int32_t> init(PyString *initial_value, PyString *newline)
+	{
+		(void)initial_value;
+		if (!newline->value().empty() && newline->value() != "\n" && newline->value() != "\r"
+			&& newline->value() != "\r\n") {
+			return Err(value_error("illegal newline value: '{}'", newline->to_string()));
+		}
+		m_newline = newline->value();
+		const auto initial_str = initial_value->to_string();
+		m_stringstream << initial_str;
+		m_closed = false;
+		m_ok = true;
+
+		return Ok(0);
+	}
+
+	PyResult<PyObject *> check_initialized() const
+	{
+		if (!m_ok) { return Err(value_error("I/O operation on uninitialized object")); }
+		return Ok(py_true());
+	}
+
+	PyResult<PyObject *> check_closed() const
+	{
+		if (m_closed) { return Err(value_error("I/O operation on closed file")); }
+		return Ok(py_true());
+	}
+};
+
+
+class TextIOWrapper : public TextIOBase
+{
+	friend ::Heap;
+
+	PyObject *m_buffer{ nullptr };
+	std::string m_errors;
+	std::string m_encoding;
+	std::string m_newline;
+	bool m_line_buffering;
+	bool m_write_through;
+
+	TextIOWrapper(PyType *type) : TextIOBase(type) {}
+
+  public:
+	static PyResult<TextIOWrapper *> create()
+	{
+		return StringIO::__new__(s_io_stringio, nullptr, nullptr).and_then([](auto *obj) {
+			return Ok(static_cast<TextIOWrapper *>(obj));
+		});
+	}
+
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<TextIOWrapper>(const_cast<PyType *>(type))) {
+			return Ok(obj);
+		}
+		return Err(memory_error(sizeof(TextIOWrapper)));
+	}
+
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
+	{
+		auto parse_result =
+			PyArgsParser<PyObject *, PyObject *, PyObject *, PyObject *, PyBool *, PyBool *>::
+				unpack_tuple(args,
+					kwargs,
+					"TextIOWrapper",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 6>{},
+					py_none(),
+					py_none(),
+					py_none(),
+					static_cast<PyBool *>(py_false()),
+					static_cast<PyBool *>(py_false()));
+
+		if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+		auto buffer = std::get<0>(parse_result.unwrap());
+		auto encoding_ = std::get<1>(parse_result.unwrap());
+		auto errors_ = std::get<2>(parse_result.unwrap());
+		auto newline_ = std::get<3>(parse_result.unwrap());
+		auto line_buffering = std::get<4>(parse_result.unwrap());
+		auto write_through = std::get<5>(parse_result.unwrap());
+
+		auto encoding = [&]() -> PyResult<std::optional<std::string>> {
+			if (encoding_ == py_none()) { return Ok(std::nullopt); }
+			if (!as<PyString>(encoding_)) {
+				return Err(
+					type_error("TextIOWrapper() argument 'encoding' must be str or None, not '{}'",
+						encoding_->type()->name()));
+			} else {
+				return Ok(as<PyString>(encoding_)->value());
+			}
+		}();
+		if (encoding.is_err()) { return Err(encoding.unwrap_err()); }
+
+		auto newline = [&]() -> PyResult<std::optional<std::string>> {
+			if (newline_ == py_none()) { return Ok(std::nullopt); }
+			if (!as<PyString>(newline_)) {
+				return Err(
+					type_error("TextIOWrapper() argument 'newline' must be str or None, not '{}'",
+						newline_->type()->name()));
+			} else {
+				return Ok(as<PyString>(newline_)->value());
+			}
+		}();
+		if (newline.is_err()) { return Err(newline.unwrap_err()); }
+
+		auto errors = [&]() -> PyResult<std::optional<std::string>> {
+			if (errors_ == py_none()) { return Ok(std::nullopt); }
+			if (!as<PyString>(errors_)) {
+				return Err(
+					type_error("TextIOWrapper() argument 'errors' must be str or None, not '{}'",
+						errors_->type()->name()));
+			} else {
+				return Ok(as<PyString>(errors_)->value());
+			}
+		}();
+		if (errors.is_err()) { return Err(errors.unwrap_err()); }
+
+		return init(buffer,
+			encoding.unwrap(),
+			errors.unwrap(),
+			newline.unwrap(),
+			line_buffering == py_true(),
+			write_through == py_true());
+	}
+
+	PyType *type() const override { return s_io_textiowrapper; }
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_io_textiowrapper) {
+			s_io_textiowrapper =
+				klass<TextIOWrapper>(module, "TextIOWrapper", s_io_textiobase).finalize();
+		}
+		module->add_symbol(PyString::create("StringIO").unwrap(), s_io_textiowrapper);
+		return s_io_textiowrapper;
+	}
+
+	void visit_graph(Visitor &visitor) override
+	{
+		PyObject::visit_graph(visitor);
+		if (m_buffer) visitor.visit(*m_buffer);
+	}
+
+  private:
+	PyResult<int32_t> init(PyObject *buffer,
+		const std::optional<std::string> &encoding,
+		const std::optional<std::string> &errors,
+		const std::optional<std::string> &newline,
+		bool line_buffering,
+		bool write_through)
+	{
+		(void)buffer;
+		(void)encoding;
+		(void)errors;
+		(void)newline;
+		(void)line_buffering;
+		(void)write_through;
+		TODO();
+	}
+};
+
 PyResult<PyObject *> open(PyObject *file, const std::string &mode)
 {
 	const auto flag_ = read_flags(mode);
@@ -1598,6 +2689,45 @@ PyResult<PyObject *> open(PyObject *file, const std::string &mode)
 	TODO();
 }
 
+class BlockingIOError : public OSError
+{
+	friend class ::Heap;
+
+  private:
+	BlockingIOError(PyTuple *args) : OSError(s_blocking_io_error, args) {}
+
+	static BlockingIOError *create(PyTuple *args)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		return heap.allocate<BlockingIOError>(args);
+	}
+
+  public:
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(type == s_blocking_io_error);
+		ASSERT(!kwargs || kwargs->map().empty());
+		return Ok(BlockingIOError::create(args));
+	}
+
+	static PyType *register_type(PyModule *module)
+	{
+		if (!s_blocking_io_error) {
+			s_blocking_io_error =
+				klass<BlockingIOError>(module, "BlockingIOError", OSError::static_type())
+					.finalize();
+		} else {
+			module->add_symbol(PyString::create("BlockingIOError").unwrap(), s_blocking_io_error);
+		}
+		return s_blocking_io_error;
+	}
+
+	PyType *type() const override
+	{
+		ASSERT(s_blocking_io_error);
+		return s_blocking_io_error;
+	}
+};
 
 PyModule *io_module()
 {
@@ -1609,9 +2739,18 @@ PyModule *io_module()
 	(void)IOBase::register_type(s_io_module);
 	(void)RawIOBase::register_type(s_io_module);
 	(void)BufferedIOBase::register_type(s_io_module);
+	(void)TextIOBase::register_type(s_io_module);
 	(void)BufferedReader::register_type(s_io_module);
+	(void)BufferedWriter::register_type(s_io_module);
+	(void)BufferedRWPair::register_type(s_io_module);
+	(void)BufferedRandom::register_type(s_io_module);
+	(void)IncrementalNewlineDecoder::register_type(s_io_module);
 	(void)BytesIO::register_type(s_io_module);
 	(void)FileIO::register_type(s_io_module);
+	(void)StringIO::register_type(s_io_module);
+	(void)TextIOWrapper::register_type(s_io_module);
+
+	(void)BlockingIOError::register_type(s_io_module);
 
 	s_io_module->add_symbol(PyString::create("open").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
@@ -1636,6 +2775,26 @@ PyModule *io_module()
 
 				return open(arg0, "rb");
 			}));
+
+	// C++ standard streams currently do not provide an API to get default buffer size, and C's
+	// BUFSIZE doesn't have to be respected
+	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(), Number{ 0 });
+
+	// >> type("UnsupportedOperation", (_io.OSError, ValueError), {})
+	auto unsupported_operation_type = type()->call(
+		PyTuple::create(PyString::create("UnsupportedOperation").unwrap(),
+			PyTuple::create(OSError::static_type(), ValueError::static_type()).unwrap(),
+			PyDict::create().unwrap())
+			.unwrap(),
+		PyDict::create().unwrap());
+
+	ASSERT(unsupported_operation_type.is_ok());
+	ASSERT(as<PyType>(unsupported_operation_type.unwrap()));
+
+	s_unsupported_operation_type = as<PyType>(unsupported_operation_type.unwrap());
+
+	s_io_module->add_symbol(
+		PyString::create("UnsupportedOperation").unwrap(), s_unsupported_operation_type);
 
 	return s_io_module;
 }

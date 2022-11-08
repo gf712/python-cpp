@@ -46,6 +46,12 @@ PyType *ValueError::type() const
 	return s_value_error;
 }
 
+PyType *ValueError::static_type()
+{
+	ASSERT(s_value_error)
+	return s_value_error;
+}
+
 PyType *ValueError::register_type(PyModule *module)
 {
 	if (!s_value_error) {
