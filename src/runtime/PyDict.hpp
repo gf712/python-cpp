@@ -54,7 +54,7 @@ class PyDict : public PyBaseObject
 	PyResult<PyObject *> update(PyDict *other);
 	static PyResult<PyObject *> fromkeys(PyObject *iterable, PyObject *value);
 
-	Value operator[](Value key) const;
+	std::optional<Value> operator[](Value key) const;
 
 	PyResult<PyObject *> get(PyObject *, PyObject *) const;
 	PyResult<PyObject *> pop(PyObject *, PyObject *);

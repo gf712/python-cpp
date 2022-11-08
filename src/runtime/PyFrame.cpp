@@ -53,12 +53,12 @@ PyFrame *PyFrame::create(PyFrame *parent,
 		new_frame->m_builtins = new_frame->m_f_back->m_builtins;
 		new_frame->m_exception_stack = new_frame->m_f_back->m_exception_stack;
 	} else {
-		ASSERT(new_frame->locals()->map().contains(String{ "__builtins__" }))
-		ASSERT(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }])->type()
-			   == py::module())
+		const auto builtins = (*new_frame->m_locals)[String{ "__builtins__" }];
+		ASSERT(builtins.has_value());
+		ASSERT(std::holds_alternative<PyObject *>(*builtins));
+		ASSERT(as<PyModule>(std::get<PyObject *>(*builtins)));
 		// TODO: could this just return the builtin singleton?
-		new_frame->m_builtins =
-			as<PyModule>(std::get<PyObject *>((*new_frame->m_locals)[String{ "__builtins__" }]));
+		new_frame->m_builtins = as<PyModule>(std::get<PyObject *>(*builtins));
 		new_frame->m_exception_stack = std::make_shared<std::vector<ExceptionStackItem>>();
 	}
 

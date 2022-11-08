@@ -150,12 +150,12 @@ PyDictItems *PyDict::items() const
 	return VirtualMachine::the().heap().allocate<PyDictItems>(*this);
 }
 
-Value PyDict::operator[](Value key) const
+std::optional<Value> PyDict::operator[](Value key) const
 {
 	if (auto iter = m_map.find(key); iter != m_map.end()) {
 		return iter->second;
 	} else {
-		return py_none();
+		return {};
 	}
 }
 
