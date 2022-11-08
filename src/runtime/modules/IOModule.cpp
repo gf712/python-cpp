@@ -84,6 +84,38 @@ class IOBase : public PyBaseObject
 	}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"The abstract base class for all I/O classes, acting on streams of\n"
+		"bytes. There is no public constructor.\n"
+		"\n"
+		"This class provides dummy implementations for many methods that\n"
+		"derived classes can override selectively; the default implementations\n"
+		"represent a file that cannot be read, written or seeked.\n"
+		"\n"
+		"Even though IOBase does not declare read, readinto, or write because\n"
+		"their signatures will vary, implementations and clients should\n"
+		"consider those methods part of the interface. Also, implementations\n"
+		"may raise UnsupportedOperation when operations they do not support are\n"
+		"called.\n"
+		"\n"
+		"The basic type used for binary data read from or written to a file is\n"
+		"bytes. Other bytes-like objects are accepted as method arguments too.\n"
+		"In some cases (such as readinto), a writable object is required. Text\n"
+		"I/O classes work with str data.\n"
+		"\n"
+		"Note that calling any method (except additional calls to close(),\n"
+		"which are ignored) on a closed stream should raise a ValueError.\n"
+		"\n"
+		"IOBase (and its subclasses) support the iterator protocol, meaning\n"
+		"that an IOBase object can be iterated over yielding the lines in a\n"
+		"stream.\n"
+		"\n"
+		"IOBase also supports the :keyword:`with` statement. In this example,\n"
+		"fp is closed after the suite of the with statement is complete:\n"
+		"\n"
+		"with open('spam.txt', 'r') as fp:\n"
+		"    fp.write('Spam and eggs!')\n";
+
 	static PyResult<IOBase *> create(const PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -464,6 +496,8 @@ class RawIOBase : public PyBaseObject
 	RawIOBase(const PyType *type) : PyBaseObject(type->underlying_type()) {}
 
   public:
+	static constexpr std::string_view __doc__ = "Base class for raw binary I/O.";
+
 	static PyResult<RawIOBase *> create(const PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -563,6 +597,21 @@ class BufferedIOBase : public IOBase
 	BufferedIOBase(PyType *type) : IOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"Base class for buffered IO objects.\n"
+		"\n"
+		"The main difference with RawIOBase is that the read() method\n"
+		"supports omitting the size argument, and does not have a default\n"
+		"implementation that defers to readinto().\n"
+		"\n"
+		"In addition, read(), readinto() and write() may raise\n"
+		"BlockingIOError if the underlying raw stream is in non-blocking\n"
+		"mode and not ready; unlike their raw counterparts, they will never\n"
+		"return None.\n"
+		"\n"
+		"A typical implementation should not inherit from a RawIOBase\n"
+		"implementation, but wrap one.\n";
+
 	static PyResult<BufferedIOBase *> create(const PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -945,6 +994,12 @@ class BufferedReader
 	}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"BufferedReader(raw, buffer_size=DEFAULT_BUFFER_SIZE)\n"
+		"--\n"
+		"\n"
+		"Create a new buffered reader using the given readable raw IO object.";
+
 	static PyResult<BufferedReader *> create(PyObject *raw, int buffer_size)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -1198,6 +1253,16 @@ class BufferedWriter
 	}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"BufferedWriter(raw, buffer_size=DEFAULT_BUFFER_SIZE)\n"
+		"--\n"
+		"\n"
+		"A buffer for a writeable sequential RawIO object.\n"
+		"\n"
+		"The constructor creates a BufferedWriter for the given writeable raw\n"
+		"stream. If the buffer_size is not given, it defaults to\n"
+		"DEFAULT_BUFFER_SIZE.";
+
 	static PyResult<BufferedWriter *> create(PyObject *raw, int buffer_size)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -1315,6 +1380,20 @@ class BufferedRWPair : public BufferedIOBase
 	}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"BufferedRWPair(reader, writer, buffer_size=DEFAULT_BUFFER_SIZE, /)\n"
+		"--\n"
+		"\n"
+		"A buffered reader and writer object together.\n"
+		"\n"
+		"A buffered reader object and buffered writer object put together to\n"
+		"form a sequential IO object that can read and write. This is typically\n"
+		"used with a socket or two-way pipe.\n"
+		"\n"
+		"reader and writer are RawIOBase objects that are readable and\n"
+		"writeable respectively. If the buffer_size is omitted it defaults to\n"
+		"DEFAULT_BUFFER_SIZE.";
+
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
 	{
 		return BufferedRWPair::create(const_cast<PyType *>(type));
@@ -1500,6 +1579,16 @@ class BufferedRandom
 	}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"BufferedRandom(raw, buffer_size=DEFAULT_BUFFER_SIZE)\n"
+		"--\n"
+		"\n"
+		"A buffered interface to random access streams.\n"
+		"\n"
+		"The constructor creates a reader and writer for a seekable stream,\n"
+		"raw, given in the first argument. If the buffer_size is omitted it\n"
+		"defaults to DEFAULT_BUFFER_SIZE.";
+
 	static PyResult<BufferedRandom *> create(PyObject *raw, int buffer_size)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -1604,6 +1693,12 @@ class BytesIO : public BufferedIOBase
 	BytesIO(PyType *type) : BufferedIOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"BytesIO(initial_bytes=b\'\')\n"
+		"--\n"
+		"\n"
+		"Buffered I/O implementation using an in-memory bytes buffer.";
+
 	static PyResult<PyObject *> create(PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -1814,6 +1909,24 @@ class FileIO : public RawIOBase
 	FileIO(const PyType *type) : RawIOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"FileIO(file, mode=\'r\', closefd=True, opener=None)\n"
+		"--\n"
+		"\n"
+		"Open a file.\n"
+		"\n"
+		"The mode can be \'r\' (default), \'w\', \'x\' or \'a\' for reading,\n"
+		"writing, exclusive creation or appending.  The file will be created if it\n"
+		"doesn\'t exist when opened for writing or appending; it will be truncated\n"
+		"when opened for writing.  A FileExistsError will be raised if it already\n"
+		"exists when opened for creating. Opening a file for creating implies\n"
+		"writing so this mode behaves in a similar way to \'w\'.Add a \'+\' to the mode\n"
+		"to allow simultaneous reading and writing. A custom opener can be used by\n"
+		"passing a callable as *opener*. The underlying file descriptor for the file\n"
+		"object is then obtained by calling opener with (*name*, *flags*).\n"
+		"*opener* must return an open file descriptor (passing os.open as *opener*\n"
+		"results in functionality similar to passing None).";
+
 	static PyResult<FileIO *>
 		create(PyObject *file, std::bitset<8> rawmode, bool close, PyObject *opener)
 	{
@@ -2079,6 +2192,13 @@ class TextIOBase : public IOBase
 	TextIOBase(PyType *type) : IOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"Base class for text I/O.\n"
+		"\n"
+		"This class provides a character and line based interface to stream\n"
+		"I/O. There is no readinto method because Python's character strings\n"
+		"are immutable. There is no public constructor.\n";
+
 	static PyResult<TextIOBase *> create(const PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -2148,6 +2268,19 @@ class IncrementalNewlineDecoder : public PyBaseObject
 	IncrementalNewlineDecoder(PyType *type) : PyBaseObject(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"IncrementalNewlineDecoder(decoder, translate, errors=\'strict\')\n"
+		"--\n"
+		"\n"
+		"Codec used when reading a file in universal newlines mode.\n"
+		"\n"
+		"It wraps another incremental decoder, translating \\r\\n and \\r into \\n.\n"
+		"It also records the types of newlines encountered.  When used with\n"
+		"translate=False, it ensures that the newline sequence is returned in\n"
+		"one piece. When used with decoder=None, it expects unicode strings as\n"
+		"decode input and translates newlines without first invoking an external\n"
+		"decoder.";
+
 	static PyResult<IncrementalNewlineDecoder *> create(const PyType *type)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -2199,6 +2332,15 @@ class StringIO : public TextIOBase
 	StringIO(PyType *type) : TextIOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"StringIO(initial_value=\'\', newline=\'\\n\')\n"
+		"--\n"
+		"\n"
+		"Text I/O implementation using an in-memory buffer.\n"
+		"\n"
+		"The initial_value argument sets the value of object.  The newline\n"
+		"argument is like the one of TextIOWrapper\'s constructor.";
+
 	static PyResult<StringIO *> create(PyString *initial_value, PyString *newline)
 	{
 		return StringIO::__new__(s_io_stringio, nullptr, nullptr)
@@ -2540,6 +2682,40 @@ class TextIOWrapper : public TextIOBase
 	TextIOWrapper(PyType *type) : TextIOBase(type) {}
 
   public:
+	static constexpr std::string_view __doc__ =
+		"TextIOWrapper(buffer, encoding=None, errors=None, newline=None,\n"
+		"              line_buffering=False, write_through=False)\n"
+		"--\n"
+		"\n"
+		"Character and line based layer over a BufferedIOBase object, buffer.\n"
+		"\n"
+		"encoding gives the name of the encoding that the stream will be\n"
+		"decoded or encoded with. It defaults to locale.getpreferredencoding(False).\n"
+		"\n"
+		"errors determines the strictness of encoding and decoding (see\n"
+		"help(codecs.Codec) or the documentation for codecs.register) and\n"
+		"defaults to \"strict\".\n"
+		"\n"
+		"newline controls how line endings are handled. It can be None, \'\',\n"
+		"\'\\n\', \'\\r\', and \'\\r\\n\'.  It works as follows:\n"
+		"\n"
+		"* On input, if newline is None, universal newlines mode is\n"
+		"  enabled. Lines in the input can end in \'\\n\', \'\\r\', or \'\\r\\n\', and\n"
+		"  these are translated into \'\\n\' before being returned to the\n"
+		"  caller. If it is \'\', universal newline mode is enabled, but line\n"
+		"  endings are returned to the caller untranslated. If it has any of\n"
+		"  the other legal values, input lines are only terminated by the given\n"
+		"  string, and the line ending is returned to the caller untranslated.\n"
+		"\n"
+		"* On output, if newline is None, any \'\\n\' characters written are\n"
+		"  translated to the system default line separator, os.linesep. If\n"
+		"  newline is \'\' or \'\\n\', no translation takes place. If newline is any\n"
+		"  of the other legal values, any \'\\n\' characters written are translated\n"
+		"  to the given string.\n"
+		"\n"
+		"If line_buffering is True, a call to flush is implied when a call to\n"
+		"write contains a newline character.";
+
 	static PyResult<TextIOWrapper *> create()
 	{
 		return StringIO::__new__(s_io_stringio, nullptr, nullptr).and_then([](auto *obj) {
@@ -2689,6 +2865,7 @@ PyResult<PyObject *> open(PyObject *file, const std::string &mode)
 	TODO();
 }
 
+// TODO: move this to a header file since it is part of builtin module
 class BlockingIOError : public OSError
 {
 	friend class ::Heap;
@@ -2703,6 +2880,8 @@ class BlockingIOError : public OSError
 	}
 
   public:
+	static constexpr std::string_view __doc__ = "I/O operation would block.";
+
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 	{
 		ASSERT(type == s_blocking_io_error);
