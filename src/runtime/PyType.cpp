@@ -414,6 +414,12 @@ void PyType::initialize(PyDict *ns)
 	// m_attributes should be a "mappingproxy" object, not dict for PyType
 	m_attributes = underlying_type().__dict__;
 
+	if (underlying_type().__doc__.has_value()) {
+		m_attributes->insert(String{ "__doc__" }, String{ std::string{ *underlying_type().__doc__ } });
+	} else {
+		m_attributes->insert(String{ "__doc__" }, String{});
+	}
+
 	if (!__bases__) {
 		if (underlying_type().__bases__.empty()) {
 			// not ideal, but avoids recursively calling object()

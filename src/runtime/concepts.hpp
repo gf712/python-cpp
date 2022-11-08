@@ -2,6 +2,8 @@
 
 #include "runtime/forward.hpp"
 
+#include <concepts>
+
 namespace py {
 
 template<typename _Interface, typename _Interfacing> struct Interface : public _Interface
@@ -39,6 +41,12 @@ namespace concepts {
 	concept HasInit = requires(T *self, PyTuple *args, PyDict *kwargs)
 	{
 		self->__init__(args, kwargs);
+	};
+
+	template<typename T>
+	concept HasDoc = requires
+	{
+		{ T::__doc__ } -> std::convertible_to<std::string_view>;
 	};
 
 	template<typename T>

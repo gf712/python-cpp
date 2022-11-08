@@ -7,7 +7,6 @@
 #include "runtime/forward.hpp"
 #include "utilities.hpp"
 
-#include <concepts>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -209,6 +208,7 @@ struct TypePrototype
 	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
 	std::optional<std::variant<InitSlotFunctionType, PyObject *>> __init__;
 	PyType *__class__{ nullptr };
+	std::optional<std::string_view> __doc__;
 
 	std::optional<NumberTypePrototype> number_type_protocol;
 	std::optional<MappingTypePrototype> mapping_type_protocol;
@@ -456,6 +456,7 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 			return static_cast<Type *>(self)->__init__(args, kwargs);
 		};
 	}
+	if constexpr (HasDoc<Type>) { type_prototype->__doc__ = Type::__doc__; }
 	if constexpr (HasHash<Type>) {
 		type_prototype->__hash__ = +[](const PyObject *self) -> PyResult<int64_t> {
 			return static_cast<const Type *>(self)->__hash__();
