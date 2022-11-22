@@ -81,9 +81,10 @@ class Block
 		uint8_t *allocate()
 		{
 			if (auto chunk_idx = m_chunk_view.mark_next_free_chunk()) {
-				spdlog::trace("Allocating memory at index {}, address {}",
+				spdlog::trace("Allocating memory at index {}, address {} (chunk base address @{})",
 					*chunk_idx,
-					(void *)(m_memory + *chunk_idx * m_object_size));
+					(void *)(m_memory + *chunk_idx * m_object_size),
+					(void *)m_memory);
 				return m_memory + *chunk_idx * m_object_size;
 			} else {
 				return nullptr;
@@ -106,6 +107,9 @@ class Block
 			spdlog::debug("Marking memory at index {} as free, address {}",
 				ptr_idx,
 				(void *)(m_memory + ptr_idx * m_object_size));
+
+			// TODO: this should only be needed for debug builds
+			std::fill_n(ptr, m_object_size, 0xDD);
 		}
 
 		void set_all_in_mask(bool value)

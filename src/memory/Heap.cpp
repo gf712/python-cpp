@@ -36,9 +36,9 @@ bool Block::Chunk::has_address(uint8_t *memory) const
 {
 	auto address = bit_cast<uintptr_t>(memory);
 	uintptr_t start = bit_cast<uintptr_t>(m_memory);
-	uintptr_t end = bit_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
+	uintptr_t end = bit_cast<uintptr_t>(m_memory + m_object_size * ChunkView<>::ChunkCount);
 
-	if (address < start || address > end) { return false; }
+	if (address < start || address >= end) { return false; }
 
 	if ((address - start) % m_object_size == 0) {
 		return m_chunk_view.m_occupied_chunks[(address - start) / m_object_size];
@@ -128,8 +128,6 @@ void Block::deallocate(uint8_t *ptr)
 
 		m_chunks[chunk_idx].deallocate(ptr);
 
-		// TODO: this should only be needed for debug builds
-		memset(ptr, 0xDD, object_size);
 		return;
 	}
 	spdlog::error("Failed to find memory piece of ptr {}", (void *)ptr);
