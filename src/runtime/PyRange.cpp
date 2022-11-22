@@ -21,8 +21,7 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 		if (args->size() == 1) {
 			if (auto arg1 = PyObject::from(args->elements()[0]); arg1.is_ok()) {
 				auto stop = as<PyInteger>(arg1.unwrap());
-				return VirtualMachine::the().heap().allocate<PyRange>(
-					std::get<int64_t>(stop->value().value));
+				return VirtualMachine::the().heap().allocate<PyRange>(stop);
 			} else {
 				return Err(arg1.unwrap_err());
 			}
@@ -33,8 +32,7 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 			auto stop_ = PyObject::from(args->elements()[1]);
 			if (stop_.is_err()) return Err(stop_.unwrap_err());
 			auto *stop = as<PyInteger>(stop_.unwrap());
-			return VirtualMachine::the().heap().allocate<PyRange>(
-				std::get<int64_t>(start->value().value), std::get<int64_t>(stop->value().value));
+			return VirtualMachine::the().heap().allocate<PyRange>(start, stop);
 		} else if (args->size() == 3) {
 			auto start_ = PyObject::from(args->elements()[0]);
 			if (start_.is_err()) return Err(start_.unwrap_err());
@@ -45,10 +43,7 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 			auto step_ = PyObject::from(args->elements()[2]);
 			if (step_.is_err()) return Err(step_.unwrap_err());
 			auto *step = as<PyInteger>(step_.unwrap());
-			return VirtualMachine::the().heap().allocate<PyRange>(
-				std::get<int64_t>(start->value().value),
-				std::get<int64_t>(stop->value().value),
-				std::get<int64_t>(step->value().value));
+			return VirtualMachine::the().heap().allocate<PyRange>(start, stop, step);
 		}
 		ASSERT_NOT_REACHED();
 	}();
@@ -59,12 +54,18 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 }
 
 
-PyRange::PyRange(int64_t stop) : PyRange(0, stop, 1) {}
+PyRange::PyRange(PyInteger *stop)
+	: PyBaseObject(BuiltinTypes::the().range()), m_stop(std::get<int64_t>(stop->value().value))
+{}
 
-PyRange::PyRange(int64_t start, int64_t stop) : PyRange(start, stop, 1) {}
+PyRange::PyRange(PyInteger *start, PyInteger *stop)
+	: PyBaseObject(BuiltinTypes::the().range()), m_start(std::get<int64_t>(start->value().value)),
+	  m_stop(std::get<int64_t>(stop->value().value))
+{}
 
-PyRange::PyRange(int64_t start, int64_t stop, int64_t step)
-	: PyBaseObject(BuiltinTypes::the().range()), m_start(start), m_stop(stop), m_step(step)
+PyRange::PyRange(PyInteger *start, PyInteger *stop, PyInteger *step)
+	: PyBaseObject(BuiltinTypes::the().range()), m_start(std::get<int64_t>(start->value().value)),
+	  m_stop(std::get<int64_t>(stop->value().value)), m_step(std::get<int64_t>(step->value().value))
 {}
 
 std::string PyRange::to_string() const

@@ -8,9 +8,9 @@ class PyRange : public PyBaseObject
 {
 	friend class ::Heap;
 
-	int64_t m_start;
+	int64_t m_start{ 0 };
 	int64_t m_stop;
-	int64_t m_step;
+	int64_t m_step{ 1 };
 
   public:
 	std::string to_string() const override;
@@ -27,9 +27,9 @@ class PyRange : public PyBaseObject
 	PyType *type() const override;
 
   private:
-	PyRange(int64_t stop);
-	PyRange(int64_t start, int64_t stop);
-	PyRange(int64_t start, int64_t stop, int64_t step);
+	PyRange(PyInteger *stop);
+	PyRange(PyInteger *start, PyInteger *stop);
+	PyRange(PyInteger *start, PyInteger *stop, PyInteger *step);
 };
 
 
