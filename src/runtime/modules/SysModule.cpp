@@ -48,14 +48,15 @@ PyResult<PyList *> create_sys_argv(Interpreter &interpreter)
 
 PyResult<PyTuple *> builtin_module_names()
 {
-	std::vector<Value> module_names;
-	module_names.reserve(builtin_modules.size());
+	auto module_names_ = PyList::create();
+	if (module_names_.is_err()) { return Err(module_names_.unwrap_err()); }
+	PyList *module_names = module_names_.unwrap();
 	for (const auto &[name, _] : builtin_modules) {
 		auto name_str = PyString::create(std::string{ name });
 		if (name_str.is_err()) return Err(name_str.unwrap_err());
-		module_names.push_back(name_str.unwrap());
+		module_names->elements().push_back(name_str.unwrap());
 	}
-	return PyTuple::create(module_names);
+	return PyTuple::create(module_names->elements());
 }
 
 constexpr std::string_view platform()

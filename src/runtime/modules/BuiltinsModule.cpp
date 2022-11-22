@@ -242,11 +242,11 @@ PyResult<PyObject *>
 	// so we have a reference to all class attributes and methods
 	// i.e. {__module__: __name__, __qualname__: 'A', foo: <function A.foo>}
 	auto args_ = PyTuple::create();
-	if (args_.is_err()) { return Err(args_.unwrap_err()); }
+	if (args_.is_err()) { return args_; }
 	auto *empty_args = args_.unwrap();
 
 	auto kwargs_ = PyDict::create();
-	if (kwargs_.is_err()) { return Err(kwargs_.unwrap_err()); }
+	if (kwargs_.is_err()) { return kwargs_; }
 	auto *empty_kwargs = kwargs_.unwrap();
 	auto classcell = callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
 	if (classcell.is_err()) { return classcell; }

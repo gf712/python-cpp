@@ -432,7 +432,7 @@ class IOBase : public PyBaseObject
 						})
 					.def("_checkSeekable", &IOBase::check_seekable_)
 					.def("_checkReadable", &IOBase::check_readable_)
-					.def("_checkReadable", &IOBase::check_writable_)
+					.def("_checkWritable", &IOBase::check_writable_)
 					.def("__enter__", &IOBase::__enter__)
 					.def("__exit__", &IOBase::__exit__)
 					.finalize();
