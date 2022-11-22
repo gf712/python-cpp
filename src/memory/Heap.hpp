@@ -285,8 +285,18 @@ class Heap
 	struct ScopedGCPause
 	{
 		GarbageCollector &gc_;
-		ScopedGCPause(GarbageCollector &gc) : gc_(gc) { gc_.pause(); }
-		~ScopedGCPause() { gc_.resume(); }
+		bool m_needs_to_be_resumed{ false };
+		ScopedGCPause(GarbageCollector &gc) : gc_(gc)
+		{
+			if (gc_.is_active()) {
+				m_needs_to_be_resumed = true;
+				gc_.pause();
+			}
+		}
+		~ScopedGCPause()
+		{
+			if (m_needs_to_be_resumed) { gc_.resume(); }
+		}
 	};
 
 	struct ScopedStaticAllocation
@@ -301,7 +311,6 @@ class Heap
 	static std::unique_ptr<Heap> create() { return std::unique_ptr<Heap>(new Heap); }
 
   public:
-
 	void reset()
 	{
 		collect_garbage();

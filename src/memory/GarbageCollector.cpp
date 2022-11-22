@@ -283,6 +283,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 					spdlog::debug("Calling destructor of object at {}", (void *)cell);
 					cell->~Cell();
 					chunk.deallocate(memory);
+					new (header) GarbageCollected();
 				}
 			});
 		}
@@ -309,12 +310,14 @@ void MarkSweepGC::run(Heap &heap) const
 
 void MarkSweepGC::resume()
 {
-	ASSERT(m_pause)
+	ASSERT(!is_active())
 	m_pause = false;
 }
 
 void MarkSweepGC::pause()
 {
-	ASSERT(!m_pause)
+	ASSERT(is_active())
 	m_pause = true;
 }
+
+bool MarkSweepGC::is_active() const { return !m_pause; }

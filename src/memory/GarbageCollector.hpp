@@ -67,6 +67,7 @@ class GarbageCollector
 	virtual void run(Heap &) const = 0;
 	virtual void resume() = 0;
 	virtual void pause() = 0;
+	virtual bool is_active() const = 0;
 
 	void set_frequency(size_t new_frequency) { m_frequency = new_frequency; }
 
@@ -81,6 +82,7 @@ class MarkSweepGC : public GarbageCollector
 	void run(Heap &) const override;
 	void resume() override;
 	void pause() override;
+	bool is_active() const override;
 
 	std::stack<Cell *> collect_roots(const Heap &) const;
 	void mark_all_cell_unreachable(Heap &) const;
