@@ -179,7 +179,9 @@ set(UNITTEST_SOURCES
     memory/GarbageCollector_tests.cpp
     memory/Heap_tests.cpp
     parser/Parser_tests.cpp
+    runtime/PyDict_tests.cpp
     runtime/PyNumber_tests.cpp
+    runtime/PyString_tests.cpp
     runtime/PyType_tests.cpp
     testing/main.cpp)
 
