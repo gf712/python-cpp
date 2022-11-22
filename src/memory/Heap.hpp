@@ -321,7 +321,7 @@ class Heap
 
 	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
 
-	template<typename T, typename... Args> T * __attribute__ ((noinline)) allocate(Args &&...args)
+	template<typename T, typename... Args> T *__attribute__((noinline)) allocate(Args &&...args)
 	{
 		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...).get(); }
 		collect_garbage();

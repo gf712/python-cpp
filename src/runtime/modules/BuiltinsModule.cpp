@@ -221,8 +221,8 @@ PyResult<PyObject *>
 	// this calls a function that defines a call
 	// For example:
 	// class A:
-	// 	def foo(self):
-	//		pass
+	//   def foo(self):
+	//     pass
 	//
 	// becomes something like this (in bytecode):
 	//   1           0 LOAD_NAME                0 (__name__)

@@ -1210,7 +1210,6 @@ struct TLookahead : PatternV2<TLookahead>
 	}
 };
 
-struct AtomPattern;
 template<> struct traits<struct AtomPattern>
 {
 	using result_type = std::shared_ptr<ASTNode>;
