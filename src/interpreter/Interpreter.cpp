@@ -275,7 +275,20 @@ PyResult<PyObject *> Interpreter::call(const std::unique_ptr<Function> &func,
 PyResult<PyObject *> Interpreter::call(PyNativeFunction *native_func, PyTuple *args, PyDict *kwargs)
 {
 	auto &vm = VirtualMachine::the();
+	ASSERT(native_func->is_function());
 	return native_func->operator()(args, kwargs).and_then([&vm](PyObject *result) {
+		spdlog::debug("Native function return value: {}", result->to_string());
+		vm.reg(0) = result;
+		return Ok(result);
+	});
+}
+
+PyResult<PyObject *>
+	Interpreter::call(PyNativeFunction *native_func, PyObject *self, PyTuple *args, PyDict *kwargs)
+{
+	auto &vm = VirtualMachine::the();
+	ASSERT(native_func->is_method());
+	return native_func->operator()(self, args, kwargs).and_then([&vm](PyObject *result) {
 		spdlog::debug("Native function return value: {}", result->to_string());
 		vm.reg(0) = result;
 		return Ok(result);

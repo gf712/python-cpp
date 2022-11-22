@@ -117,12 +117,24 @@ PyNativeFunction::PyNativeFunction(std::string &&name, FunctionType &&function)
 
 std::string PyNativeFunction::to_string() const
 {
-	return fmt::format("built-in method {} at {}", m_name, (void *)this);
+	if (is_method()) {
+		return fmt::format("<built-in method {} of {} object at {}>",
+			m_name,
+			m_self->type()->name(),
+			(void *)this);
+	} else {
+		return fmt::format("<built-in function {} at {}>", m_name, (void *)this);
+	}
 }
 
 PyResult<PyObject *> PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
-	return VirtualMachine::the().interpreter().call(this, args, kwargs);
+	if (is_method()) {
+		ASSERT(m_self);
+		return VirtualMachine::the().interpreter().call(this, m_self, args, kwargs);
+	} else {
+		return VirtualMachine::the().interpreter().call(this, args, kwargs);
+	}
 }
 
 PyResult<PyObject *> PyNativeFunction::__repr__() const { return PyString::create(to_string()); }
@@ -130,6 +142,7 @@ PyResult<PyObject *> PyNativeFunction::__repr__() const { return PyString::creat
 void PyNativeFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
+	if (m_self) { visitor.visit(*m_self); }
 	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
