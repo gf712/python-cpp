@@ -22,6 +22,7 @@ class PyModule;
 class PyObject;
 class PySet;
 class PySlice;
+class PySlotWrapper;
 class PyString;
 class PyTraceback;
 class PyTuple;

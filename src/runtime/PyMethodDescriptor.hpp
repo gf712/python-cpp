@@ -8,8 +8,8 @@ namespace py {
 
 class PyMethodDescriptor : public PyBaseObject
 {
-	PyString *m_name;
-	PyType *m_underlying_type;
+	PyString *m_name{ nullptr };
+	PyType *m_underlying_type{ nullptr };
 	MethodDefinition &m_method;
 	std::vector<PyObject *> m_captures;
 
@@ -21,14 +21,17 @@ class PyMethodDescriptor : public PyBaseObject
 		std::vector<PyObject *> &&captures);
 
   public:
+	static PyResult<PyMethodDescriptor *> create(PyString *name,
+		PyType *underlying_type,
+		MethodDefinition &method,
+		std::vector<PyObject *> &&captures);
+
 	template<typename... Args>
 	static PyResult<PyMethodDescriptor *>
 		create(PyString *name, PyType *underlying_type, MethodDefinition &method, Args &&...args)
 	{
-		auto *obj = VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
+		return PyMethodDescriptor::create(
 			name, underlying_type, method, std::vector<PyObject *>{ args... });
-		if (!obj) { return Err(memory_error(sizeof(PyMethodDescriptor))); }
-		return Ok(obj);
 	}
 
 	PyString *name() { return m_name; }

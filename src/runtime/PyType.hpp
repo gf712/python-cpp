@@ -15,8 +15,11 @@ class PyType : public PyBaseObject
 		m_underlying_type;
 
   public:
-	PyTuple *__mro__{ nullptr };
-	PyTuple *__bases__{ nullptr };
+	PyString *__name__{ nullptr };
+	PyString *__qualname__{ nullptr };
+	std::vector<PyObject *> __slots__;
+	PyString *__module__{ nullptr };
+	mutable PyTuple *__mro__{ nullptr };
 
   private:
 	PyType(TypePrototype &type_prototype);
@@ -64,7 +67,7 @@ class PyType : public PyBaseObject
 
 	PyResult<PyList *> mro();
 
-	bool issubclass(const PyType *);
+	bool issubclass(const PyType *) const;
 
 	PyResult<PyObject *> lookup(PyObject *name) const;
 
@@ -74,11 +77,27 @@ class PyType : public PyBaseObject
 	PyResult<PyTuple *> mro_internal() const;
 
   private:
-	void initialize(PyDict *ns);
-	void update_methods_and_class_attributes(PyDict *ns);
-	bool update_if_special(const std::string &name, const Value &value);
+	PyResult<std::monostate> ready();
+	PyResult<std::monostate> add_operators();
+	PyResult<std::monostate> add_methods();
+	PyResult<std::monostate> add_members();
+	PyResult<std::monostate> add_properties();
+	PyResult<std::monostate> inherit_slots(PyType *base);
+	void inherit_special(PyType *base);
+    void fixup_slots();
 
-	static PyResult<PyType *> build_type(PyString *type_name, PyTuple *bases, PyDict *ns);
+	void initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns);
+
+	static PyResult<PyType *>
+		build_type(PyString *type_name, PyType *base, PyTuple *bases, PyDict *ns);
+
+	using BasePair = std::tuple<PyType *, PyTuple *>;
+	static PyResult<std::variant<BasePair, PyObject *>>
+		compute_bases(const PyType *type_, PyTuple *bases, PyTuple *args, PyDict *kwargs);
+
+	static PyResult<PyType *> best_base(PyTuple *bases);
+
+	static PyResult<const PyType *> calculate_metaclass(const PyType *type_, PyTuple *bases);
 };
 
 }// namespace py

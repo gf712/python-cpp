@@ -51,7 +51,8 @@ void TypePrototype::visit_graph(::Cell::Visitor &visitor)
 {
 	if (__class__) { visitor.visit(*__class__); }
 	if (__dict__) { visitor.visit(*__dict__); }
-	if (__mro__) { visitor.visit(*__mro__); }
+	if (__base__) { visitor.visit(*__base__); }
+	if (__bases__) { visitor.visit(*__bases__); }
 }
 
 size_t ValueHash::operator()(const Value &value) const
@@ -121,6 +122,8 @@ ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
 	} else if (std::holds_alternative<PyObject *>(slot)) {
+		auto *callable = std::get<PyObject *>(slot);
+		ASSERT(callable);
 		// FIXME: this const_cast is needed since in Python land there is no concept of
 		//		  PyObject constness (right?). But for the internal calls handled above
 		//		  which are resolved in the C++ runtime, we want to enforce constness
@@ -130,21 +133,21 @@ ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 		if (args.is_err()) { return Err(args.unwrap_err()); }
 		PyDict *kwargs = nullptr;
 		if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			auto result = callable->call(args.unwrap(), kwargs);
 			if (result.is_err()) return Err(result.unwrap_err());
 			if (!as<PyBool>(result.unwrap())) {
 				return Err(type_error(std::string(conversion_error_message)));
 			}
 			return Ok(as<PyBool>(result.unwrap())->value());
 		} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			auto result = callable->call(args.unwrap(), kwargs);
 			if (result.is_err()) return Err(result.unwrap_err());
 			if (!as<PyInteger>(result.unwrap())) {
 				return Err(type_error(std::string(conversion_error_message)));
 			}
 			return Ok(as<PyInteger>(result.unwrap())->as_i64());
 		} else if constexpr (std::is_same_v<typename ResultType::OkType, std::monostate>) {
-			auto result = std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+			auto result = callable->call(args.unwrap(), kwargs);
 			if (result.is_err()) {
 				return Err(result.unwrap_err());
 			} else {
@@ -999,8 +1002,7 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 {
 	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
 
-		if (!type->underlying_type().__dict__->map().contains(String{ "__new__" })) {
-			ASSERT(type->underlying_type().__new__)
+		if (!type->underlying_type().__new__.has_value()) {
 			const auto new_fn = get_address(*type->underlying_type().__new__);
 			ASSERT(new_fn)
 
@@ -1014,7 +1016,7 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 			}
 		}
 
-		if (!type->underlying_type().__dict__->map().contains(String{ "__init__" })) {
+		if (!type->underlying_type().__init__.has_value()) {
 			ASSERT(type->underlying_type().__init__)
 			const auto init_fn = get_address(*type->underlying_type().__init__);
 			ASSERT(init_fn)
@@ -1036,7 +1038,7 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 {
 	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
-		if (!type()->underlying_type().__dict__->map().contains(String{ "__new__" })) {
+		if (!type()->underlying_type().__new__.has_value()) {
 			ASSERT(type()->underlying_type().__new__)
 			const auto new_fn = get_address(*type()->underlying_type().__new__);
 			ASSERT(new_fn)
@@ -1051,7 +1053,7 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 			}
 		}
 
-		if (!type()->underlying_type().__dict__->map().contains(String{ "__init__" })) {
+		if (!type()->underlying_type().__init__.has_value()) {
 			ASSERT(type()->underlying_type().__init__)
 			const auto init_fn = get_address(*type()->underlying_type().__init__);
 			ASSERT(init_fn)
@@ -1075,8 +1077,9 @@ std::string PyObject::to_string() const
 
 PyType *PyObject::type() const
 {
-	if (std::holds_alternative<PyType *>(m_type)) { return std::get<PyType *>(m_type); }
-	ASSERT(false && "Static types should overload PyObject::type!");
+	ASSERT(
+		std::holds_alternative<PyType *>(m_type) && "Static types should overload PyObject::type!");
+	return std::get<PyType *>(m_type);
 }
 
 namespace {

@@ -205,10 +205,13 @@ struct TypePrototype
 
   public:
 	std::string __name__;
+	PyType *__base__{ nullptr };
+	PyTuple *__bases__{ nullptr };
+
 	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
 	std::optional<std::variant<InitSlotFunctionType, PyObject *>> __init__;
 	PyType *__class__{ nullptr };
-	std::optional<std::string_view> __doc__;
+	std::optional<std::string> __doc__;
 
 	std::optional<NumberTypePrototype> number_type_protocol;
 	std::optional<MappingTypePrototype> mapping_type_protocol;
@@ -257,9 +260,10 @@ struct TypePrototype
 
 	PyDict *__dict__{ nullptr };
 
-	PyTuple *__mro__{ nullptr };
-	std::vector<PyObject *> __bases__;
 	std::optional<TraverseFunctionType> traverse;
+
+	bool is_ready{ false };
+	bool is_heaptype{ false };
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
@@ -325,9 +329,8 @@ class PyObject : public Cell
 	friend PyMappingWrapper;
 	friend PySequenceWrapper;
 
-	std::variant<std::reference_wrapper<const TypePrototype>, PyType *> m_type;
-
   protected:
+	std::variant<std::reference_wrapper<const TypePrototype>, PyType *> m_type;
 	PyDict *m_attributes{ nullptr };
 
   public:

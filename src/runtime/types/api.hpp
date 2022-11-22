@@ -16,6 +16,7 @@ PyObject *py_none();
 template<typename T> struct klass
 {
 	std::unique_ptr<TypePrototype> type;
+	std::vector<Value> m_bases;
 	PyModule *m_module;
 
 	klass(PyModule *module, std::string_view name)
@@ -25,20 +26,17 @@ template<typename T> struct klass
 	template<typename... BaseType>
 	requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> &&...)
 		klass(PyModule *module, std::string_view name, BaseType &&...bases)
-		: type(TypePrototype::create<T>(name)), m_module(module)
-	{
-		type->__bases__ = std::vector<PyObject *>{ bases... };
-	}
+		: type(TypePrototype::create<T>(name)), m_bases(std::vector<Value>{ bases... }),
+		  m_module(module)
+	{}
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
 
 	template<typename... BaseType>
 	requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> &&...)
 		klass(std::string_view name, BaseType &&...bases)
-		: type(TypePrototype::create<T>(name))
-	{
-		type->__bases__ = std::vector<PyObject *>{ bases... };
-	}
+		: type(TypePrototype::create<T>(name)), m_bases(std::vector<Value>{ bases... })
+	{}
 
 	using AttributeGetterType = std::function<PyResult<PyObject *>(T *)>;
 	using AttributeSetterType = std::function<PyResult<std::monostate>(T *, PyObject *)>;
@@ -302,6 +300,12 @@ template<typename T> struct klass
 
 	PyType *finalize()
 	{
+		// FIXME: if we ever add persistent gc pointers this is a place to use them.
+		//        klass isn't visited by the GC visitors so `type` is not visited, and
+		//        and the allocated `__bases__` tuple can be GC'ed before PyType takes
+		//        ownership
+		[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
+		type->__bases__ = PyTuple::create(std::move(m_bases)).unwrap();
 		auto *type_ = PyType::initialize(std::move(type));
 		spdlog::trace("Added type@{} with name {}", (void *)type_, type_->name());
 		auto name = PyString::create(type_->name());

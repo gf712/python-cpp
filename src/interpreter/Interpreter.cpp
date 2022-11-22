@@ -29,6 +29,7 @@ void initialize_types()
 {
 	[[maybe_unused]] auto scope_static_alloc =
 		VirtualMachine::the().heap().scoped_static_allocation();
+	object();
 	type();
 	super();
 	bool_();
@@ -40,7 +41,6 @@ void initialize_types()
 	integer();
 	none();
 	module();
-	object();
 	dict();
 	dict_items();
 	dict_items_iterator();
@@ -100,7 +100,9 @@ void Interpreter::internal_setup(const std::string &name,
 
 	// initialize the standard types by initializing the builtins module
 	m_builtins = builtins_module(*this);
+	m_modules->insert(String{ "builtins" }, m_builtins);
 	auto *sys = sys_module(*this);
+	m_modules->insert(String{ "sys" }, sys);
 
 	auto name_ = PyString::create(name);
 	if (name_.is_err()) { TODO(); }
@@ -108,25 +110,23 @@ void Interpreter::internal_setup(const std::string &name,
 		PyModule::create(PyDict::create().unwrap(), name_.unwrap(), PyString::create("").unwrap())
 			.unwrap();
 	if (!main_module) { TODO(); }
-	main_module->set_program(std::move(program));
 	m_module = main_module;
+	main_module->set_program(std::move(program));
+	main_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
+	m_modules->insert(name_.unwrap(), main_module);
 
 	auto code = PyCode::create(main_module->program());
 	if (code.is_err()) { TODO(); }
 
-	m_modules->insert(name_.unwrap(), main_module);
-	m_modules->insert(String{ "builtins" }, m_builtins);
-	m_modules->insert(String{ "sys" }, sys);
-	for (const auto &[name, module_factory] : builtin_modules) {
-		if (module_factory) { m_modules->insert(String{ std::string{ name } }, module_factory()); }
-	}
-
-	main_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
 	auto *globals = main_module->symbol_table();
 	auto *locals = globals;
 	m_current_frame = PyFrame::create(
 		nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names, nullptr);
 	m_global_frame = m_current_frame;
+
+	for (const auto &[name, module_factory] : builtin_modules) {
+		if (module_factory) { m_modules->insert(String{ std::string{ name } }, module_factory()); }
+	}
 
 	if (config.requires_importlib) {
 		auto *_imp = imp_module();
@@ -144,14 +144,21 @@ void Interpreter::internal_setup(const std::string &name,
 		auto args = PyTuple::create(sys, _imp);
 		if (args.is_err()) { TODO(); }
 		auto result = install.unwrap()->call(args.unwrap(), nullptr);
-		if (result.is_err()) { TODO(); }
+		if (result.is_err()) {
+			spdlog::error("Error calling _install: {}", result.unwrap_err()->to_string());
+			TODO();
+		}
 
 		auto install_external =
 			m_importlib->get_method(PyString::create("_install_external_importers").unwrap());
 		if (install_external.is_err()) { TODO(); }
 
 		result = install_external.unwrap()->call(PyTuple::create().unwrap(), nullptr);
-		if (result.is_err()) { TODO(); }
+		if (result.is_err()) {
+			spdlog::error(
+				"Error calling _install_external_importers: {}", result.unwrap_err()->to_string());
+			TODO();
+		}
 	}
 }
 

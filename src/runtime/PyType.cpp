@@ -2,8 +2,10 @@
 #include "AttributeError.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"
+#include "PyCell.hpp"
 #include "PyClassMethodDescriptor.hpp"
 #include "PyDict.hpp"
+#include "PyFrame.hpp"
 #include "PyFunction.hpp"
 #include "PyGetSetDescriptor.hpp"
 #include "PyInteger.hpp"
@@ -15,6 +17,7 @@
 #include "PyStaticMethod.hpp"
 #include "PyString.hpp"
 #include "TypeError.hpp"
+#include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -25,13 +28,17 @@
 namespace py {
 template<> PyType *as(PyObject *obj)
 {
-	if (obj->type() == py::type()) { return static_cast<PyType *>(obj); }
+	if (&obj->type()->underlying_type() == &BuiltinTypes::the().type()) {
+		return static_cast<PyType *>(obj);
+	}
 	return nullptr;
 }
 
 template<> const PyType *as(const PyObject *obj)
 {
-	if (obj->type() == py::type()) { return static_cast<const PyType *>(obj); }
+	if (&obj->type()->underlying_type() == &BuiltinTypes::the().type()) {
+		return static_cast<const PyType *>(obj);
+	}
 	return nullptr;
 }
 
@@ -154,17 +161,18 @@ std::vector<PyObject *> merge(const std::vector<std::vector<PyObject *>> &mros)
 
 std::vector<PyObject *> mro_(PyType *type)
 {
-	if (type == object()) { return { type }; }
+	if (&type->underlying_type() == &BuiltinTypes::the().object()) { return { type }; }
 
 	std::vector<PyObject *> mro_types;
 	mro_types.push_back(type);
 
 	std::vector<std::vector<PyObject *>> bases_mro;
 
-	ASSERT(type->__bases__)
-	for (const auto &base : type->__bases__->elements()) {
-		if (auto *precomputed_mro =
-				static_cast<PyType *>(std::get<PyObject *>(base))->underlying_type().__mro__) {
+	auto *bases = type->underlying_type().__bases__;
+	spdlog::debug("bases [mro]: @{}", (void *)bases);
+	ASSERT(bases);
+	for (const auto &base : bases->elements()) {
+		if (auto *precomputed_mro = static_cast<PyType *>(std::get<PyObject *>(base))->__mro__) {
 			std::vector<PyObject *> base_mro;
 			base_mro.reserve(precomputed_mro->size());
 			for (const auto &el : precomputed_mro->elements()) {
@@ -194,9 +202,7 @@ PyType::PyType(std::unique_ptr<TypePrototype> &&type_prototype)
 
 PyType *PyType::type() const
 {
-	// FIXME: probably not the best way to do this
-	//		  this avoids infinite recursion where PyType representing "type" has type "type"
-	if (name() == "type") {
+	if (&underlying_type() == &BuiltinTypes::the().type()) {
 		return const_cast<PyType *>(this);// :(
 	} else {
 		return py::type();
@@ -206,14 +212,16 @@ PyType *PyType::type() const
 PyType *PyType::initialize(TypePrototype &type_prototype)
 {
 	auto *type = VirtualMachine::the().heap().allocate<PyType>(type_prototype);
-	type->initialize(nullptr);
+	auto result = type->ready();
+	ASSERT(result.is_ok());
 	return type;
 }
 
 PyType *PyType::initialize(std::unique_ptr<TypePrototype> &&type_prototype)
 {
 	auto *type = VirtualMachine::the().heap().allocate<PyType>(std::move(type_prototype));
-	type->initialize(nullptr);
+	auto result = type->ready();
+	ASSERT(result.is_ok());
 	return type;
 }
 
@@ -235,7 +243,8 @@ namespace {
 						TODO();
 					})
 				.property_readonly("__dict__", [](PyType *self) { return Ok(self->dict()); })
-				.property_readonly("__bases__", [](PyType *self) { return Ok(self->__bases__); })
+				.property_readonly(
+					"__bases__", [](PyType *self) { return Ok(self->underlying_type().__bases__); })
 				.property(
 					"__abstractmethods__",
 					[](PyType *self) -> PyResult<PyObject *> {
@@ -335,340 +344,705 @@ PyResult<PyObject *> PyType::lookup(PyObject *name) const
 		name->to_string()));
 }
 
-bool PyType::update_if_special(const std::string &name, const Value &value)
+void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns)
 {
-	if (!name.starts_with("__")) { return false; }
-
-	// FIXME: hack to avoid converting a nullptr to a PyObject*
-	if (std::holds_alternative<PyObject *>(value) && !std::get<PyObject *>(value)) { return false; }
-	auto obj_ = PyObject::from(value);
-	if (obj_.is_err()) { TODO(); }
-	auto *obj = obj_.unwrap();
-
-	if (name == "__new__") {
-		underlying_type().__new__ = obj;
-		return true;
-	}
-	if (name == "__init__") {
-		underlying_type().__init__ = obj;
-		return true;
-	}
-	if (name == "__repr__") {
-		underlying_type().__repr__ = obj;
-		return true;
-	}
-	return false;
-}
-
-void PyType::update_methods_and_class_attributes(PyDict *ns)
-{
-	if (ns) {
-		for (const auto &[key, v] : ns->map()) {
-			auto attr_method_name = [](const auto &k) -> PyResult<PyString *> {
-				if (std::holds_alternative<String>(k)) {
-					return PyString::create(std::get<String>(k).s);
-				} else if (std::holds_alternative<PyObject *>(k)) {
-					auto *obj = std::get<PyObject *>(k);
-					ASSERT(as<PyString>(obj))
-					return Ok(as<PyString>(obj));
-				} else {
-					TODO();
-				}
-			}(key);
-
-			if (attr_method_name.is_err()) {
-				// TODO: return error
-				TODO();
+	auto dict = PyDict::create(ns->map()).unwrap();
+	bool may_add_dict = base->attributes() == nullptr;
+	if (auto it = dict->map().find(String{ "__slots__" }); it != dict->map().end()) {
+		// has slots
+		auto slots_ = PyObject::from(it->second);
+		ASSERT(slots_.is_ok());
+		auto *slots = slots_.unwrap();
+		if (as<PyString>(slots)) {
+			slots = PyTuple::create(slots).unwrap();
+		} else {
+			// TODO: can slots be a sequence rather than a tuple?
+			if (!as<PyTuple>(slots)) { TODO(); }
+		}
+		ASSERT(as<PyTuple>(slots));
+		for (const auto &el : as<PyTuple>(slots)->elements()) {
+			auto slot_ = PyObject::from(el);
+			ASSERT(slot_.is_ok());
+			auto *slot = slot_.unwrap();
+			ASSERT(as<PyString>(slot));
+			if (as<PyString>(slot)->value() == "__dict__") {
+				ASSERT(may_add_dict && "__dict__ slot disallowed: we already got one");
+				may_add_dict = false;
 			}
+		}
 
-			update_if_special(static_cast<PyString *>(attr_method_name.unwrap())->value(), v);
-			underlying_type().__dict__->insert(
-				static_cast<PyString *>(attr_method_name.unwrap()), v);
+		// support slots
+		// TODO();
+		const auto nslots = 0;
+		__slots__.reserve(nslots);
+	}
+
+	underlying_type().__name__ = name;
+	underlying_type().__bases__ = bases;
+	underlying_type().__base__ = base;
+
+	underlying_type().__dict__ = ns;
+	m_attributes = ns;
+
+	if (!m_attributes->map().contains(String{ "__module__" })) {
+		auto *globals = VirtualMachine::the().interpreter().execution_frame()->globals();
+		if (auto it = globals->map().find(String{ "__name__" }); it != globals->map().end()) {
+			m_attributes->insert(String{ "__module__" }, it->second);
 		}
 	}
+
+	if (auto it = m_attributes->map().find(String{ "__qualname__" });
+		it != m_attributes->map().end()) {
+		auto qualname_ = PyObject::from(it->second);
+		ASSERT(qualname_.is_ok());
+		if (!as<PyString>(qualname_.unwrap())) {
+			TODO();
+			// return Err(type_error(
+			// 	"type __qualname__ must be a str, not '{}'", qualname_.unwrap()->type()->name()));
+		}
+		__qualname__ = as<PyString>(qualname_.unwrap());
+	} else {
+		__qualname__ = PyString::create(underlying_type().__name__).unwrap();
+	}
+
+	if (auto it = m_attributes->map().find(String{ "__doc__" }); it != m_attributes->map().end()) {
+		auto doc_ = PyObject::from(it->second);
+		ASSERT(doc_.is_ok());
+		if (auto doc_str = as<PyString>(doc_.unwrap())) {
+			// unlike CPython we don't truncate if the string has a null terminator
+			underlying_type().__doc__ = doc_str->value();
+		}
+	}
+
+	if (auto it = m_attributes->map().find(String{ "__new__" }); it != m_attributes->map().end()) {
+		auto new_slot_ = PyObject::from(it->second);
+		ASSERT(new_slot_.is_ok());
+		auto *new_slot = new_slot_.unwrap();
+		if (auto fn = as<PyFunction>(new_slot)) {
+			auto new_fn = PyStaticMethod::create(fn);
+			ASSERT(new_fn.is_ok());
+			m_attributes->insert(String{ "__new__" }, new_fn.unwrap());
+		}
+	}
+
+	// TODO: uncomment when classmethod is fixed
+	// if (auto it = m_attributes->map().find(String{ "__init_subclass__" });
+	// 	it != m_attributes->map().end()) {
+	// 	auto init_subclass_slot_ = PyObject::from(it->second);
+	// 	ASSERT(init_subclass_slot_.is_ok());
+	// 	auto *init_subclass_slot = init_subclass_slot_.unwrap();
+	// 	if (auto fn = as<PyFunction>(init_subclass_slot)) {
+	// 		auto new_fn = PyClassMethod::create(fn);
+	// 		ASSERT(new_fn.is_ok());
+	// 		underlying_type().__new__ = new_fn.unwrap();
+	// 		m_attributes->insert(String{ "__init_subclass__" }, new_fn.unwrap());
+	// 	}
+	// }
+
+	// TODO: uncomment when classmethod is fixed
+	// if (auto it = m_attributes->map().find(String{ "___class_getitem__" });
+	// 	it != m_attributes->map().end()) {
+	// 	auto class_getitem_slot_ = PyObject::from(it->second);
+	// 	ASSERT(class_getitem_slot_.is_ok());
+	// 	auto *class_getitem_slot = class_getitem_slot_.unwrap();
+	// 	if (auto fn = as<PyFunction>(class_getitem_slot)) {
+	// 		auto new_fn = PyClassMethod::create(fn);
+	// 		ASSERT(new_fn.is_ok());
+	// 		underlying_type().__new__ = new_fn.unwrap();
+	// 		m_attributes->insert(String{ "___class_getitem__" }, new_fn.unwrap());
+	// 	}
+	// }
+
+	if (auto it = m_attributes->map().find(String{ "__classcell__" });
+		it != m_attributes->map().end()) {
+		auto classcell_ = PyObject::from(it->second);
+		ASSERT(classcell_.is_ok());
+		auto *classcell = classcell_.unwrap();
+		if (auto *cell = as<PyCell>(classcell)) {
+			cell->set_cell(this);
+			auto r = m_attributes->delete_item(PyString::create("__classcell__").unwrap());
+			ASSERT(r.is_ok());
+		}
+	}
+
+	auto result = ready();
+	ASSERT(result.is_ok());
+
+	fixup_slots();
 }
+
+static std::array slotdefs = {
+	Slot{ "__getattribute__", &TypePrototype::__getattribute__ },
+	Slot{ "__getattr__", &TypePrototype::__getattribute__ },
+	Slot{ "__setattr__", &TypePrototype::__setattribute__ },
+	// Slot{"__delattr__", &TypePrototype::__delattribute__},
+	Slot{ "__repr__", &TypePrototype::__repr__, "__repr__($self, /)\n--\n\nReturn repr(self)." },
+	Slot{ "__hash__", &TypePrototype::__hash__, "__hash__($self, /)\n--\n\nReturn hash(self)." },
+	Slot::with_keyword("__call__",
+		&TypePrototype::__call__,
+		"__call__($self, /, *args, **kwargs)\n--\n\nCall self as a function."),
+	Slot{ "__str__", &TypePrototype::__str__, "__str__($self, /)\n--\n\nReturn str(self)." },
+	Slot{ "__lt__", &TypePrototype::__lt__, "__lt__($self, value, /)\n--\n\nReturn self<value." },
+	Slot{ "__le__", &TypePrototype::__le__, "__le__($self, value, /)\n--\n\nReturn self<=value." },
+	Slot{ "__eq__", &TypePrototype::__eq__, "__eq__($self, value, /)\n--\n\nReturn self==value." },
+	Slot{ "__ne__", &TypePrototype::__ne__, "__ne__($self, value, /)\n--\n\nReturn self!=value." },
+	Slot{ "__gt__", &TypePrototype::__gt__, "__gt__($self, value, /)\n--\n\nReturn self>value." },
+	Slot{ "__ge__", &TypePrototype::__ge__, "__ge__($self, value, /)\n--\n\nReturn self>=value." },
+	Slot{ "__iter__", &TypePrototype::__iter__, "__iter__($self, /)\n--\n\nImplement iter(self)." },
+	Slot{ "__next__", &TypePrototype::__next__, "__next__($self, /)\n--\n\nImplement next(self)." },
+	Slot{ "__get__",
+		&TypePrototype::__get__,
+		"__get__($self, instance, owner, /)\n--\n\nReturn an attribute of instance, which is "
+		"of "
+		"type owner." },
+	Slot{ "__set__",
+		&TypePrototype::__set__,
+		"__set__($self, instance, value, /)\n--\n\nSet an attribute of instance to value." },
+	// Slot{ "__delete__",
+	// 	&TypePrototype::__delete__,
+	// 	"__delete__($self, instance, /)\n--\n\nDelete an attribute of instance." },
+	Slot::with_keyword("__init__",
+		&TypePrototype::__init__,
+		"__init__($self, /, *args, **kwargs)\n--\n\n Initialize self.  See help(type(self)) "
+		"for "
+		"accurate signature."),
+	Slot::with_new("__new__",
+		&TypePrototype::__new__,
+		"__new__(type, /, *args, **kwargs)\n--\n\n Create and return new object.  See "
+		"help(type) "
+		"for accurate signature."),
+	// Slot{ "__del__", &TypePrototype::__del__ },
+
+	// await
+	// Slot{ "__await__",
+	// 	&TypePrototype::__await__,
+	// 	"__await__($self, /)\n--\n\nReturn an iterator to be used in await expression." },
+	// Slot{ "__aiter__",
+	// 	&TypePrototype::__aiter__,
+	// 	"__aiter__($self, /)\n--\n\nReturn an awaitable, that resolves in asynchronous
+	// iterator." }, Slot{ "__anext__", 	&TypePrototype::__anext__,
+	// 	"__anext__($self, /)\n--\n\nReturn a value or raise StopAsyncIteration." },
+
+	// number
+	Slot{ "__add__",
+		&TypePrototype::__add__,
+		"__add__($self, value, /)\n--\n\nReturn self + value." },
+	// Slot{ "__radd__",
+	// 	&TypePrototype::__add__,
+	// 	"__add__($self, value, /)\n--\n\nReturn value + self." },
+	Slot{ "__sub__",
+		&TypePrototype::__sub__,
+		"__sub__($self, value, /)\n--\n\nReturn self - value." },
+	// Slot{ "__rsub__",
+	// 	&TypePrototype::__sub__,
+	// 	"__rsub__($self, value, /)\n--\n\nReturn value - self." },
+	Slot{ "__mul__",
+		&TypePrototype::__mul__,
+		"__mul__($self, value, /)\n--\n\nReturn self * value." },
+	// Slot{ "__rmul__",
+	// 	&TypePrototype::__rmul__,
+	// 	"__rmul__($self, value, /)\n--\n\nReturn value * self." },
+	Slot{ "__mod__",
+		&TypePrototype::__mod__,
+		"__mod__($self, value, /)\n--\n\nReturn self % value." },
+	// Slot{ "__rmod__",
+	// 	&TypePrototype::__rmod__,
+	// 	"__rmod__($self, value, /)\n--\n\nReturn value % self." },
+	// Slot{ "__divmod__", &TypePrototype::__divmod__, "Return divmod(self, value)." },
+	// Slot{ "__rdivmod__", &TypePrototype::__rdivmod__, "Return divmod(value, self)." },
+	// Slot{ "__pow__",
+	// 	&TypePrototype::__pow__,
+	// 	"__pow__($self, value, mod=None, /)\n--\n\nReturn pow(self, value, mod)." },
+	// Slot{ "__rpow__",
+	// 	&TypePrototype::__rpow__,
+	// 	"__pow__($self, value, mod=None, /)\n--\n\nReturn pow(value, self, mod)." },
+	Slot{ "__neg__", &TypePrototype::__neg__, "__neg__($self, /)\n--\n\n-self" },
+	Slot{ "__pos__", &TypePrototype::__pos__, "__pos__($self, /)\n--\n\n+self" },
+	Slot{ "__abs__", &TypePrototype::__abs__, "__abs__($self, /)\n--\n\nabs(self)" },
+	Slot{ "__bool__", &TypePrototype::__bool__, "__bool__($self, /)\n--\n\nself != 0" },
+	Slot{ "__invert__", &TypePrototype::__invert__, "__invert__($self, /)\n--\n\n~self" },
+	Slot{ "__lshift__",
+		&TypePrototype::__lshift__,
+		"__lshift__($self, value, /)\n--\n\nReturn self << value." },
+	// Slot{ "__rlshift__",
+	// 	&TypePrototype::__lshift__,
+	// 	"__lshift__($self, value, /)\n--\n\nReturn value << self." },
+	// Slot{ "__rshift__",
+	// 	&TypePrototype::__rshift__,
+	// 	"__rshift__($self, value, /)\n--\n\nReturn self >> value." },
+	// Slot{ "__rrshift__",
+	// 	&TypePrototype::__rshift__,
+	// 	"__rshift__($self, value, /)\n--\n\nReturn value >> self." },
+	Slot{ "__and__",
+		&TypePrototype::__and__,
+		"__and__($self, value, /)\n--\n\nReturn self & value." },
+	// Slot{ "__rand__",
+	// 	&TypePrototype::__and__,
+	// 	"__and__($self, value, /)\n--\n\nReturn value & self." },
+	// Slot{ "__xor__",
+	// 	&TypePrototype::__xor__,
+	// 	"__xor__($self, value, /)\n--\n\nReturn self ^ value." },
+	// Slot{ "__rxor__",
+	// 	&TypePrototype::__xor__,
+	// 	"__xor__($self, value, /)\n--\n\nReturn value ^ self." },
+	Slot{ "__or__", &TypePrototype::__or__, "__or__($self, value, /)\n--\n\nReturn self | value." },
+	// Slot{ "__ror__",
+	// 	&TypePrototype::__or__,
+	// 	"__or__($self, value, /)\n--\n\nReturn value | self." },
+	// Slot{ "__int__", &TypePrototype::__int__, "__int__($self, /)\n--\n\n-int(self)" },
+	// Slot{ "__float__", &TypePrototype::__float__, "__float__($self, /)\n--\n\n-float(self)"
+	// }, Slot{ "__iadd__", 	&TypePrototype::__iadd__,
+	// 	"__iadd__($self, value, /)\n--\n\nReturn self+=value." },
+	// Slot{ "__isub__",
+	// 	&TypePrototype::__isub__,
+	// 	"__isub__($self, value, /)\n--\n\nReturn self-=value." },
+	// Slot{ "__imul__",
+	// 	&TypePrototype::__imul__,
+	// 	"__imul__($self, value, /)\n--\n\nReturn self*=value." },
+	// Slot{ "__imod__",
+	// 	&TypePrototype::__imod__,
+	// 	"__imod__($self, value, /)\n--\n\nReturn self%=value." },
+	// Slot{ "__ipow__",
+	// 	&TypePrototype::__ipow__,
+	// 	"__ipow__($self, value, /)\n--\n\nReturn self**=value." },
+	// Slot{ "__ilshift__",
+	// 	&TypePrototype::__ilshift__,
+	// 	"__ilshift__($self, value, /)\n--\n\nReturn self<<=value." },
+	// Slot{ "__irshift__",
+	// 	&TypePrototype::__irshift__,
+	// 	"__irshift__($self, value, /)\n--\n\nReturn self>>=value." },
+	// Slot{ "__iand__",
+	// 	&TypePrototype::__iand__,
+	// 	"__iand__($self, value, /)\n--\n\nReturn self&=value." },
+	// Slot{ "__ixor__",
+	// 	&TypePrototype::__ixor__,
+	// 	"__ixor__($self, value, /)\n--\n\nReturn self^=value." },
+	// Slot{ "__ior__",
+	// 	&TypePrototype::__ior__,
+	// 	"__ior__($self, value, /)\n--\n\nReturn self|=value." },
+	// Slot{ "__floordiv__",
+	// 	&TypePrototype::__floordiv__,
+	// 	"__floordiv__($self, value, /)\n--\n\nReturn self//value." },
+	// Slot{ "__rfloordiv__",
+	// 	&TypePrototype::__floordiv__,
+	// 	"__floordiv__($self, value, /)\n--\n\nReturn value//self." },
+	// Slot{ "__truediv__",
+	// 	&TypePrototype::__truediv__,
+	// 	"__truediv__($self, value, /)\n--\n\nReturn self/value." },
+	// Slot{ "__rtruediv__",
+	// 	&TypePrototype::__truediv__,
+	// 	"__truediv__($self, value, /)\n--\n\nReturn value/self." },
+	// Slot{ "__ifloordiv__",
+	// 	&TypePrototype::__ifloordiv__,
+	// 	"__ifloordiv__($self, value, /)\n--\n\nReturn self//=value." },
+	// Slot{ "__itruediv__",
+	// 	&TypePrototype::__itruediv__,
+	// 	"__itruediv__($self, value, /)\n--\n\nReturn self/=value." },
+	// Slot{ "__index__",
+	// 	&TypePrototype::__index__,
+	// 	"__index__($self, /)\n--\n\n"
+	// 	"Return self converted to an integer, if self is suitable for use as an index into a "
+	// 	"list." },
+	// Slot{ "__matmul__",
+	// 	&TypePrototype::__matmul__,
+	// 	"__matmul__($self, value, /)\n--\n\nReturn self@value." },
+	// Slot{ "__rmatmul__",
+	// 	&TypePrototype::__rmatmul__,
+	// 	"__rmatmul__($self, value, /)\n--\n\nReturn value@self." },
+	// Slot{ "__imatmul__",
+	// 	&TypePrototype::__imatmul__,
+	// 	"__imatmul__($self, value, /)\n--\n\nReturn value@=self." },
+
+	// mapping
+	// Slot{ "__len__", &MappingTypePrototype::__len__, "__len__($self, /)\n--\n\nReturn len(self)."
+	// }, Slot{ "__getitem__", 	&MappingTypePrototype::__getitem__,
+	// 	"__getitem__($self, key, /)\n--\n\nReturn self[key]." },
+	// Slot{ "__setitem__",
+	// 	&MappingTypePrototype::__setitem__,
+	// 	"__setitem__($self, key, value, /)\n--\n\nSet self[key] to value." },
+	// Slot{ "__delitem__",
+	// 	&MappingTypePrototype::__delitem__,
+	// 	"__delitem__($self, key, /)\n--\n\nDelete self[key]." },
+
+	// Slot{ "__len__",
+	// 	&SequenceTypePrototype::__len__,
+	// 	"__len__($self, /)\n--\n\nReturn len(self)." },
+	// Slot{ "__add__",
+	// 	&SequenceTypePrototype::__concat__,
+	// 	"__add__($self, value, /)\n--\n\nReturn self+value." },
+
+	// SQSLOT("__mul__", sq_repeat, NULL, wrap_indexargfunc,
+	//        "__mul__($self, value, /)\n--\n\nReturn self*value."),
+	// SQSLOT("__rmul__", sq_repeat, NULL, wrap_indexargfunc,
+	//        "__rmul__($self, value, /)\n--\n\nReturn value*self."),
+	// SQSLOT("__getitem__", sq_item, slot_sq_item, wrap_sq_item,
+	//        "__getitem__($self, key, /)\n--\n\nReturn self[key]."),
+	// SQSLOT("__setitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_setitem,
+	//        "__setitem__($self, key, value, /)\n--\n\nSet self[key] to value."),
+	// SQSLOT("__delitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_delitem,
+	//        "__delitem__($self, key, /)\n--\n\nDelete self[key]."),
+	// Slot{ "__contains__",
+	// 	&SequenceTypePrototype::__contains__,
+	// 	"__contains__($self, key, /)\n--\n\nReturn key in self." },
+	// SQSLOT("__iadd__", sq_inplace_concat, NULL,
+	//        wrap_binaryfunc,
+	//        "__iadd__($self, value, /)\n--\n\nImplement self+=value."),
+	// SQSLOT("__imul__", sq_inplace_repeat, NULL,
+	//        wrap_indexargfunc,
+	//        "__imul__($self, value, /)\n--\n\nImplement self*=value."),
+};
 
 namespace {
-	template<typename SlotFunctionType, typename FunctorType>
-	std::pair<String, PyObject *> wrap_slot(PyType *type,
-		std::string_view name_sv,
-		PyDict *ns,
-		std::variant<SlotFunctionType, PyObject *> &slot,
-		FunctorType &&f)
+	PyResult<PyObject *> new_wrapper(PyObject *self, PyTuple *args, PyDict *kwargs)
 	{
-		String name_str{ std::string(name_sv) };
-		if (ns) {
-			if (auto it = ns->map().find(name_str); it != ns->map().end()) {
-				auto slot_ = PyObject::from(it->second);
-				ASSERT(slot_.is_ok())
-				return { name_str, slot_.unwrap() };
-			}
+		auto *type = as<PyType>(self);
+		if (!type) {
+			// TODO: should be SystemError, not ValueError
+			return Err(value_error("__new__() called with non-type 'self'"));
 		}
-
-		if (std::holds_alternative<SlotFunctionType>(slot)) {
-			// FIXME: should PyString have a std::string_view constructor and not worry about the
-			// 		  lifetime of the string_view?
-			auto name_ = PyString::create(std::string(name_sv));
-			if (name_.is_err()) { TODO(); }
-			auto *name = static_cast<PyString *>(name_.unwrap());
-			// the lifetime of the type is extended by the slot wrapper
-			auto func_ = PySlotWrapper::create(name, type, std::move(f));
-			if (func_.is_err()) { TODO(); }
-			auto *func = static_cast<PySlotWrapper *>(func_.unwrap());
-			// FIXME: String should handle string_view, no need create a std::string here
-			return { name_str, func };
-		} else {
-			return { name_str, std::get<PyObject *>(slot) };
+		if (!args || args->elements().empty()) {
+			return Err(type_error("{}.__new__(): not enough arguments", type->name()));
 		}
+		auto arg0 = PyObject::from(args->elements()[0]);
+		if (arg0.is_err()) return arg0;
+		auto subtype = as<PyType>(arg0.unwrap());
+		if (!subtype) {
+			return Err(type_error("{}.__new__(X): X is not a type object ({})",
+				type->name(),
+				subtype->type()->name()));
+		}
+		if (subtype->issubclass(type)) {
+			return Err(type_error("{}.__new__({}): {} is not a subtype of {}",
+				type->name(),
+				subtype->name(),
+				subtype->name(),
+				type->name()));
+		}
+		auto staticbase = subtype;
+		auto same_slot = []<typename SlotFnType>(
+							 std::optional<std::variant<SlotFnType, PyObject *>> &lhs,
+							 std::variant<SlotFnType, PyObject *> rhs) -> bool {
+			ASSERT(std::holds_alternative<SlotFnType>(rhs));
+			if (!lhs.has_value()) { return false; }
+			if (std::holds_alternative<PyObject *>(*lhs)) { return false; }
+			return get_address(rhs) == get_address(*lhs);
+		};
+		ASSERT(py::type()->underlying_type().__new__.has_value());
+		while (staticbase
+			   && same_slot(
+				   staticbase->underlying_type().__new__, *py::type()->underlying_type().__new__)) {
+			staticbase = staticbase->underlying_type().__base__;
+		}
+		ASSERT(type->underlying_type().__new__.has_value());
+		if (staticbase
+			&& !same_slot(
+				staticbase->underlying_type().__new__, *type->underlying_type().__new__)) {
+			return Err(type_error("{}.__new__({}) is not safe, use {}.__new__()",
+				type->name(),
+				subtype->name(),
+				staticbase->name()));
+		}
+		std::vector<Value> new_args_vec;
+		new_args_vec.reserve(args->elements().size() - 1);
+		for (size_t i = 1; new_args_vec.size(); ++i) {
+			new_args_vec.push_back(args->elements()[i]);
+		}
+		auto new_args = PyTuple::create(std::move(new_args_vec));
+		if (new_args.is_err()) return new_args;
+		return type->__new__(subtype, new_args.unwrap(), kwargs);
 	}
 }// namespace
 
-void PyType::initialize(PyDict *ns)
+PyResult<std::monostate> PyType::add_operators()
 {
-	underlying_type().__class__ = this;
-	auto dict = PyDict::create();
-	if (dict.is_err()) { TODO(); }
-	underlying_type().__dict__ = dict.unwrap();
-	// m_attributes should be a "mappingproxy" object, not dict for PyType
-	m_attributes = underlying_type().__dict__;
-
-	if (underlying_type().__doc__.has_value()) {
-		m_attributes->insert(String{ "__doc__" }, String{ std::string{ *underlying_type().__doc__ } });
-	} else {
-		m_attributes->insert(String{ "__doc__" }, String{});
-	}
-
-	if (!__bases__) {
-		if (underlying_type().__bases__.empty()) {
-			// not ideal, but avoids recursively calling object()
-			if (underlying_type().__name__ == "object") {
-				auto bases = PyTuple::create();
-				if (bases.is_err()) { TODO(); }
-				__bases__ = bases.unwrap();
-			} else {
-				auto bases = PyTuple::create(object());
-				if (bases.is_err()) { TODO(); }
-				__bases__ = bases.unwrap();
-			}
+	for (auto &&slot : slotdefs) {
+		if (auto it = m_attributes->map().find(String{ std::string{ slot.name } });
+			it != m_attributes->map().end()) {
+			auto fn = PyObject::from(it->second);
+			if (fn.is_err()) return Err(fn.unwrap_err());
+			slot.update_member(underlying_type(), fn.unwrap());
+		} else if (!slot.has_member(underlying_type())) {
+			continue;
 		} else {
-			auto b = underlying_type().__bases__;
-			b.push_back(object());
-			auto bases = PyTuple::create(std::move(b));
-			if (bases.is_err()) { TODO(); }
-			__bases__ = bases.unwrap();
+			auto name = PyString::create(std::string{ slot.name });
+			if (name.is_err()) { return Err(name.unwrap_err()); }
+			auto descr = slot.create_slot_wrapper(this);
+			if (descr.is_err()) return Err(descr.unwrap_err());
+			m_attributes->insert(String{ std::string{ slot.name } }, descr.unwrap());
 		}
 	}
 
-	// not ideal, but avoids recursively calling object()
-	if (underlying_type().__name__ == "object") {
-		auto mro = PyTuple::create(this);
-		if (mro.is_err()) { TODO(); }
-		underlying_type().__mro__ = mro.unwrap();
-	} else {
-		auto mro = mro_internal();
-		if (mro.is_err()) { TODO(); }
-		underlying_type().__mro__ = mro.unwrap();
-	}
-
-	__mro__ = underlying_type().__mro__;
-
-	if (underlying_type().__add__.has_value()) {
-		auto [name, add_func] = wrap_slot(this,
-			"__add__",
-			ns,
-			*underlying_type().__add__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				ASSERT(args && args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().empty())
-				auto arg0 = PyObject::from(args->elements()[0]);
-				if (arg0.is_err()) return arg0;
-				return std::get<AddSlotFunctionType>(*underlying_type().__add__)(
-					self, arg0.unwrap());
-			});
-		underlying_type().__dict__->insert(name, add_func);
-	} else {
-		if (underlying_type().__name__ != "object" && underlying_type().__name__ != "type") {
-			for (const auto &el_ : __mro__->elements()) {
-				auto *el = PyObject::from(el_).unwrap();
-				ASSERT(as<PyType>(el));
-				if (auto add = as<PyType>(el)->underlying_type().__add__; add.has_value()) {
-					underlying_type().__add__ = add;
-					auto [name, add_func] = wrap_slot(this,
-						"__add__",
-						ns,
-						*underlying_type().__add__,
-						[this](
-							PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-							ASSERT(args && args->size() == 1)
-							ASSERT(!kwargs || kwargs->map().empty())
-							auto arg0 = PyObject::from(args->elements()[0]);
-							if (arg0.is_err()) return arg0;
-							return std::get<AddSlotFunctionType>(*underlying_type().__add__)(
-								self, arg0.unwrap());
-						});
-					break;
-				}
-			}
-		}
-	}
-	if (underlying_type().__repr__.has_value()) {
-		auto [name, repr_func] = wrap_slot(this,
-			"__repr__",
-			ns,
-			*underlying_type().__repr__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				if (args && args->size() > 0) {
-					return Err(type_error("expected 0 arguments, got {}", args->size()));
-				}
-				ASSERT(!kwargs || kwargs->map().empty())
-				return std::get<ReprSlotFunctionType>(*underlying_type().__repr__)(self);
-			});
-		underlying_type().__dict__->insert(name, repr_func);
-	}
-	if (underlying_type().__get__.has_value()) {
-		auto [name, get_func] = wrap_slot(this,
-			"__get__",
-			ns,
-			*underlying_type().__get__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				if (args && args->size() != 1 && args->size() != 2) {
-					return Err(
-						type_error("expected at least one or two arguments, got {}", args->size()));
-				}
-				ASSERT(!kwargs || kwargs->map().empty())
-				auto arg0 = PyObject::from(args->elements()[0]);
-				if (arg0.is_err()) return arg0;
-				if (args->size() > 1) {
-					auto arg1 = PyObject::from(args->elements()[1]);
-					if (arg1.is_err()) return arg1;
-					return std::get<GetSlotFunctionType>(*underlying_type().__get__)(
-						self, arg0.unwrap(), arg1.unwrap());
-				} else {
-					return std::get<GetSlotFunctionType>(*underlying_type().__get__)(
-						self, arg0.unwrap(), py_none());
-				}
-			});
-		underlying_type().__dict__->insert(name, get_func);
-	}
-	if (underlying_type().__call__.has_value()) {
-		auto [name, call_func] = wrap_slot(this,
-			"__call__",
-			ns,
-			*underlying_type().__call__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				return std::get<CallSlotFunctionType>(*underlying_type().__call__)(
-					self, args, kwargs);
-			});
-		underlying_type().__dict__->insert(name, call_func);
-	}
-	if (underlying_type().__str__.has_value()) {
-		auto [name, str_func] = wrap_slot(this,
-			"__str__",
-			ns,
-			*underlying_type().__str__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				if (args && args->size() > 0) {
-					return Err(type_error("expected 0 arguments, got {}", args->size()));
-				}
-				ASSERT(!kwargs || kwargs->map().empty())
-				return std::get<StrSlotFunctionType>(*underlying_type().__str__)(self);
-			});
-		underlying_type().__dict__->insert(name, str_func);
-	}
-	if (underlying_type().__init__.has_value()) {
-		auto [name, init_func] = wrap_slot(this,
-			"__init__",
-			ns,
-			*underlying_type().__init__,
-			[this](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				auto result =
-					std::get<InitSlotFunctionType>(*underlying_type().__init__)(self, args, kwargs);
-				if (result.is_ok()) {
-					ASSERT(result.unwrap() == 0);
-					return Ok(py_none());
-				}
-				return Err(result.unwrap_err());
-			});
-		underlying_type().__dict__->insert(name, init_func);
-	}
 	if (underlying_type().__new__.has_value()) {
-		if (std::holds_alternative<NewSlotFunctionType>(*underlying_type().__new__)) {
-			auto fn = PyNativeFunction::create(
-				"__new__",
-				[this](PyTuple *args_, PyDict *kwargs) -> PyResult<PyObject *> {
-					auto maybe_type = PyObject::from(args_->elements()[0]);
-					ASSERT(maybe_type.is_ok())
-					auto *type = as<PyType>(maybe_type.unwrap());
-					ASSERT(type)
-					// pop out type from args
-					std::vector<Value> new_args;
-					new_args.reserve(args_->size() - 1);
-					new_args.insert(
-						new_args.end(), args_->elements().begin() + 1, args_->elements().end());
-					auto args = PyTuple::create(new_args);
-					if (args.is_err()) { return args; }
-					return std::get<NewSlotFunctionType>(*underlying_type().__new__)(
-						type, args.unwrap(), kwargs);
-				},
-				this);
-			if (fn.is_err()) { TODO(); }
-			auto new_fn = PyStaticMethod::create(static_cast<PyNativeFunction *>(fn.unwrap()));
-			ASSERT(new_fn.is_ok())
-			underlying_type().__dict__->insert(String{ "__new__" }, new_fn.unwrap());
-		} else {
-			underlying_type().__dict__->insert(
-				String{ "__new__" }, std::get<PyObject *>(*underlying_type().__new__));
+		if (!m_attributes->map().contains(String{ "__new__" })) {
+			auto new_fn_obj = PyNativeFunction::create("__new__", new_wrapper, this);
+			if (new_fn_obj.is_err()) return Err(new_fn_obj.unwrap_err());
+			m_attributes->insert(String{ "__new__" }, new_fn_obj.unwrap());
 		}
 	}
-	for (auto member : underlying_type().__members__) {
-		auto name = PyString::create(member.name);
-		if (name.is_err()) { TODO(); }
-		auto m = PyMemberDescriptor::create(
-			name.unwrap(), this, member.member_accessor, member.member_setter);
-		ASSERT(m.is_ok())
-		underlying_type().__dict__->insert(String{ member.name }, m.unwrap());
-	}
-	for (auto &property : underlying_type().__getset__) {
-		auto name = PyString::create(property.name);
-		if (name.is_err()) { TODO(); }
-		auto m = PyGetSetDescriptor::create(name.unwrap(), this, property);
-		ASSERT(m.is_ok())
-		underlying_type().__dict__->insert(String{ property.name }, m.unwrap());
-	}
-	for (auto &method : underlying_type().__methods__) {
-		auto name = PyString::create(method.name);
-		if (name.is_err()) { TODO(); }
-		auto method_fn = [&method, name, this]() -> PyResult<PyObject *> {
-			if (method.flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
-				return PyClassMethodDescriptor::create(name.unwrap(), this, method);
-			} else {
-				return PyMethodDescriptor::create(name.unwrap(), this, method);
-			}
-		}();
-		ASSERT(method_fn.is_ok())
-		underlying_type().__dict__->insert(String{ method.name }, method_fn.unwrap());
-	}
 
-	update_methods_and_class_attributes(ns);
+	return Ok(std::monostate{});
 }
 
-PyResult<PyObject *> PyType::new_(PyTuple *args_, PyDict *kwargs) const
+PyResult<std::monostate> PyType::add_methods()
+{
+	if (underlying_type().__methods__.empty()) { return Ok(std::monostate{}); }
+	ASSERT(m_attributes);
+	for (auto &method : underlying_type().__methods__) {
+		auto [name, fn, flags, doc] = method;
+		auto name_str_ = PyString::create(name);
+		if (name_str_.is_err()) { return Err(name_str_.unwrap_err()); }
+		auto *name_str = name_str_.unwrap();
+		auto descriptor = [&, flags = flags]() -> PyResult<PyObject *> {
+			if (flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
+				return PyClassMethodDescriptor::create(name_str, this, method);
+			} else {
+				return PyMethodDescriptor::create(name_str, this, method);
+			}
+		}();
+		if (descriptor.is_err()) { return Err(descriptor.unwrap_err()); }
+
+		// TODO: Could this check be done before constructing the descriptor?
+		if (m_attributes->map().contains(String{ name })) { continue; }
+
+		m_attributes->insert(String{ name }, descriptor.unwrap());
+	}
+
+	return Ok(std::monostate{});
+}
+
+PyResult<std::monostate> PyType::add_members()
+{
+	if (underlying_type().__members__.empty()) { return Ok(std::monostate{}); }
+	ASSERT(m_attributes);
+	for (auto &member : underlying_type().__members__) {
+		auto [name, accessor, setter] = member;
+		auto name_str_ = PyString::create(name);
+		if (name_str_.is_err()) { return Err(name_str_.unwrap_err()); }
+		auto *name_str = name_str_.unwrap();
+		auto descriptor = PyMemberDescriptor::create(name_str, this, accessor, setter);
+		if (descriptor.is_err()) { return Err(descriptor.unwrap_err()); }
+
+		// TODO: Could this check be done before constructing the descriptor?
+		if (m_attributes->map().contains(String{ name })) { continue; }
+
+		m_attributes->insert(String{ name }, descriptor.unwrap());
+	}
+	return Ok(std::monostate{});
+}
+
+PyResult<std::monostate> PyType::add_properties()
+{
+	if (underlying_type().__getset__.empty()) { return Ok(std::monostate{}); }
+	ASSERT(m_attributes);
+	for (auto &getset : underlying_type().__getset__) {
+		auto [name, accessor, setter] = getset;
+
+		auto name_str_ = PyString::create(name);
+		if (name_str_.is_err()) { return Err(name_str_.unwrap_err()); }
+		auto *name_str = name_str_.unwrap();
+		auto descriptor = PyGetSetDescriptor::create(name_str, this, getset);
+		if (descriptor.is_err()) { return Err(descriptor.unwrap_err()); }
+
+		// TODO: Could this check be done before constructing the descriptor?
+		if (m_attributes->map().contains(String{ name })) { continue; }
+
+		m_attributes->insert(String{ name }, descriptor.unwrap());
+	}
+	return Ok(std::monostate{});
+}
+
+void PyType::inherit_special(PyType *base)
+{
+	if (&base->underlying_type() != &BuiltinTypes::the().type() && underlying_type().is_heaptype) {
+		if (!underlying_type().__new__.has_value()) {
+			underlying_type().__new__ = base->underlying_type().__new__;
+		}
+	}
+}
+
+PyResult<std::monostate> PyType::inherit_slots(PyType *base)
+{
+	auto *basebase = base->underlying_type().__base__;
+	auto slot_defined =
+		[base, basebase]<typename FnType>(
+			std::function<std::optional<std::variant<FnType, PyObject *>>(TypePrototype &)>
+				get_slot) {
+			auto base_slot = get_slot(base->underlying_type());
+			const bool base_has_slot = base_slot.has_value();
+			const bool basebase_exists = basebase != nullptr;
+			if (!basebase_exists) { return base_has_slot; }
+			auto basebase_slot = get_slot(basebase->underlying_type());
+			bool base_and_basebase_slots_notequal = true;
+			if (basebase_slot.has_value() && base_slot.has_value()) {
+				if (std::holds_alternative<PyObject *>(*base_slot)
+					&& std::holds_alternative<PyObject *>(*basebase_slot)) {
+					base_and_basebase_slots_notequal =
+						std::get<PyObject *>(*base_slot) != std::get<PyObject *>(*basebase_slot);
+				}
+				if (std::holds_alternative<FnType>(*base_slot)
+					&& std::holds_alternative<FnType>(*basebase_slot)) {
+					base_and_basebase_slots_notequal =
+						&std::get<FnType>(*base_slot) != &std::get<FnType>(*basebase_slot);
+				}
+			}
+
+			return base_has_slot && (basebase_exists || base_and_basebase_slots_notequal);
+		};
+
+	auto add_slot = [this, base, slot_defined]<typename FnType>(
+						std::optional<std::variant<FnType, PyObject *>> TypePrototype::*slot_ptr) {
+		auto base_slot = base->underlying_type().*slot_ptr;
+		std::function<std::optional<std::variant<FnType, PyObject *>>(TypePrototype &)> get_slot =
+			[slot_ptr](TypePrototype &t) -> std::optional<std::variant<FnType, PyObject *>> {
+			return t.*slot_ptr;
+		};
+		if (!get_slot(this->underlying_type()).has_value() && slot_defined(get_slot)) {
+			auto &this_slot = this->underlying_type().*slot_ptr;
+			this_slot = base_slot;
+		}
+	};
+
+	// FIXME: should use number_type_protocol
+	auto add_numeric_slot = add_slot;
+
+	auto add_sequence_slot = [this, base, slot_defined]<typename FnType>(
+								 std::optional<std::variant<FnType, PyObject *>>
+									 SequenceTypePrototype::*slot_ptr) {
+		if (!this->underlying_type().sequence_type_protocol.has_value()) return;
+		if (!base->underlying_type().sequence_type_protocol.has_value()) return;
+		auto base_slot = (*base->underlying_type().sequence_type_protocol).*slot_ptr;
+		std::function<std::optional<std::variant<FnType, PyObject *>>(TypePrototype &)> get_slot =
+			[slot_ptr](TypePrototype &t) -> std::optional<std::variant<FnType, PyObject *>> {
+			if (!t.sequence_type_protocol.has_value()) { return std::nullopt; }
+			return (*t.sequence_type_protocol).*slot_ptr;
+		};
+		if (!get_slot(this->underlying_type()).has_value() && slot_defined(get_slot)) {
+			auto &this_slot = (*this->underlying_type().sequence_type_protocol).*slot_ptr;
+			this_slot = base_slot;
+		}
+	};
+
+	auto add_mapping_slot = [this, base, slot_defined]<typename FnType>(
+								std::optional<std::variant<FnType, PyObject *>>
+									MappingTypePrototype::*slot_ptr) {
+		if (!this->underlying_type().mapping_type_protocol.has_value()) return;
+		if (!base->underlying_type().mapping_type_protocol.has_value()) return;
+		auto base_slot = (*base->underlying_type().mapping_type_protocol).*slot_ptr;
+		std::function<std::optional<std::variant<FnType, PyObject *>>(TypePrototype &)> get_slot =
+			[slot_ptr](TypePrototype &t) -> std::optional<std::variant<FnType, PyObject *>> {
+			if (!t.mapping_type_protocol.has_value()) { return std::nullopt; }
+			return (*t.mapping_type_protocol).*slot_ptr;
+		};
+		if (!get_slot(this->underlying_type()).has_value() && slot_defined(get_slot)) {
+			auto &this_slot = (*this->underlying_type().mapping_type_protocol).*slot_ptr;
+			this_slot = base_slot;
+		}
+	};
+
+	// auto add_buffer_slot = [this, base, slot_defined]<typename FnType>(
+	// 						   std::optional<std::variant<FnType, PyObject *>> PyBufferProcs::*
+	// 							   slot_ptr) {
+	// 	if (!this->underlying_type().as_buffer.has_value()) return;
+	// 	if (!base->underlying_type().as_buffer.has_value()) return;
+	// 	auto base_slot = (*base->underlying_type().as_buffer).*slot_ptr;
+	// 	std::function<std::optional<std::variant<FnType, PyObject *>>(TypePrototype &)> get_slot =
+	// 		[slot_ptr](TypePrototype &t) -> std::optional<std::variant<FnType, PyObject *>> {
+	// 		if (!t.as_buffer.has_value()) { return std::nullopt; }
+	// 		return (*t.as_buffer).*slot_ptr;
+	// 	};
+	// 	if (slot_defined(get_slot)) {
+	// 		auto &this_slot = (*this->underlying_type().as_buffer).*slot_ptr;
+	// 		this_slot = base_slot;
+	// 	}
+	// };
+
+	add_numeric_slot(&TypePrototype::__add__);
+	add_numeric_slot(&TypePrototype::__sub__);
+	add_numeric_slot(&TypePrototype::__mul__);
+	add_numeric_slot(&TypePrototype::__mod__);
+	// add_numeric_slot(&TypePrototype::__divmod__);
+	// add_numeric_slot(&TypePrototype::__pow__);
+	add_numeric_slot(&TypePrototype::__neg__);
+	add_numeric_slot(&TypePrototype::__pos__);
+	add_numeric_slot(&TypePrototype::__abs__);
+	add_numeric_slot(&TypePrototype::__bool__);
+	add_numeric_slot(&TypePrototype::__invert__);
+	add_numeric_slot(&TypePrototype::__lshift__);
+	// add_numeric_slot(&TypePrototype::__rshift__);
+	add_numeric_slot(&TypePrototype::__and__);
+	// add_numeric_slot(&TypePrototype::__xor__);
+	add_numeric_slot(&TypePrototype::__or__);
+	// add_numeric_slot(&TypePrototype::__int__);
+	// add_numeric_slot(&TypePrototype::__float__);
+	// add_numeric_slot(&TypePrototype::__iadd__);
+	// add_numeric_slot(&TypePrototype::__isub__);
+	// add_numeric_slot(&TypePrototype::__imul__);
+	// add_numeric_slot(&TypePrototype::__imod__);
+	// add_numeric_slot(&TypePrototype::__ipow__);
+	// add_numeric_slot(&TypePrototype::__ilshift__);
+	// add_numeric_slot(&TypePrototype::__irshift__);
+	// add_numeric_slot(&TypePrototype::__iand__);
+	// add_numeric_slot(&TypePrototype::__ixor__);
+	// add_numeric_slot(&TypePrototype::__ior__);
+	// add_numeric_slot(&TypePrototype::__truediv__);
+	// add_numeric_slot(&TypePrototype::__floordiv__);
+	// add_numeric_slot(&TypePrototype::__index__);
+	// add_numeric_slot(&TypePrototype::__matmul__ );
+	// add_numeric_slot(&TypePrototype::__imatmul__);
+	add_sequence_slot(&SequenceTypePrototype::__len__);
+	add_sequence_slot(&SequenceTypePrototype::__concat__);
+	add_sequence_slot(&SequenceTypePrototype::__contains__);
+
+	add_mapping_slot(&MappingTypePrototype::__len__);
+	add_mapping_slot(&MappingTypePrototype::__getitem__);
+	add_mapping_slot(&MappingTypePrototype::__setitem__);
+	add_mapping_slot(&MappingTypePrototype::__delitem__);
+
+	// add_buffer_slot(&PyBufferProcs::getbuffer);
+	// add_buffer_slot(&PyBufferProcs::releasebuffer);
+
+	add_slot(&TypePrototype::__getattribute__);
+	add_slot(&TypePrototype::__setattribute__);
+	add_slot(&TypePrototype::__repr__);
+	add_slot(&TypePrototype::__call__);
+	add_slot(&TypePrototype::__str__);
+	add_slot(&TypePrototype::__eq__);
+	add_slot(&TypePrototype::__gt__);
+	add_slot(&TypePrototype::__ge__);
+	add_slot(&TypePrototype::__le__);
+	add_slot(&TypePrototype::__lt__);
+	add_slot(&TypePrototype::__ne__);
+	add_slot(&TypePrototype::__hash__);
+	add_slot(&TypePrototype::__iter__);
+	add_slot(&TypePrototype::__next__);
+	add_slot(&TypePrototype::__get__);
+	add_slot(&TypePrototype::__set__);
+	add_slot(&TypePrototype::__init__);
+
+	return Ok(std::monostate{});
+}
+
+
+PyResult<PyObject *> PyType::new_(PyTuple *args, PyDict *kwargs) const
 {
 	if (underlying_type().__new__.has_value()) {
 		if (std::holds_alternative<PyObject *>(*underlying_type().__new__)) {
 			auto *obj = std::get<PyObject *>(*underlying_type().__new__);
-			// prepend class type to args tuple -> obj->call((cls, *args), kwargs)
-			std::vector<Value> args_with_type;
-			args_with_type.reserve(args_->size() + 1);
-			// FIXME: remove this const_cast. Either args are const or PyType::new_ should not be
-			// const
-			args_with_type.push_back(const_cast<PyType *>(this));
-			for (const auto &el : args_->elements()) { args_with_type.push_back(el); }
-			auto args = PyTuple::create(args_with_type);
-			if (args.is_err()) { return args; }
-			return obj->call(static_cast<PyTuple *>(args.unwrap()), kwargs);
-		} else if (underlying_type().__new__.has_value()) {
-			return std::get<NewSlotFunctionType>(*underlying_type().__new__)(this, args_, kwargs);
+			auto fn = obj->get(const_cast<PyType *>(this), nullptr);
+			return fn.and_then([this, args, kwargs](PyObject *constructor) -> PyResult<PyObject *> {
+				// pop out type from args
+				std::vector<Value> new_args;
+				new_args.reserve(args->size() + 1);
+				new_args.push_back(const_cast<PyType *>(this));
+				new_args.insert(new_args.end(), args->elements().begin(), args->elements().end());
+				auto args_ = PyTuple::create(new_args);
+				if (args_.is_err()) { return args_; }
+				return constructor->call(args_.unwrap(), kwargs);
+			});
+		} else if (std::holds_alternative<NewSlotFunctionType>(*underlying_type().__new__)) {
+			auto fn = std::get<NewSlotFunctionType>(*underlying_type().__new__);
+			ASSERT(fn);
+			return fn(this, args, kwargs);
 		} else {
 			TODO();
 		}
@@ -677,72 +1051,351 @@ PyResult<PyObject *> PyType::new_(PyTuple *args_, PyDict *kwargs) const
 	}
 }
 
+PyResult<std::monostate> PyType::ready()
+{
+	if (underlying_type().is_ready) { return Ok(std::monostate{}); }
+
+	if (underlying_type().__name__.empty()) {
+		// FIXME: should return system error
+		return Err(type_error("Type does not define the __name__ field."));
+	}
+
+	auto *base = underlying_type().__base__;
+	// default base is `object`, unless this is already `object`
+	if (!base && &underlying_type() != &BuiltinTypes::the().object()) {
+		base = py::object();
+		underlying_type().__base__ = py::object();
+	}
+
+	// initialize base class
+	if (base) { base->ready(); }
+
+	// initialize bases
+	auto *bases = underlying_type().__bases__;
+	if (!bases
+		|| (as<PyTuple>(bases)->elements().empty()
+			&& &underlying_type() != &BuiltinTypes::the().object())) {
+		auto bases_ = [&]() -> PyResult<PyTuple *> {
+			if (base) {
+				return PyTuple::create(base);
+			} else {
+				return PyTuple::create();
+			}
+		}();
+		if (bases_.is_err()) return Err(bases_.unwrap_err());
+		underlying_type().__bases__ = bases_.unwrap();
+	}
+	spdlog::debug("bases: @{}", (void *)bases);
+	// initialize dict
+	if (!underlying_type().__dict__) {
+		auto dict = PyDict::create();
+		if (dict.is_err()) return Err(dict.unwrap_err());
+		underlying_type().__dict__ = dict.unwrap();
+	}
+	m_attributes = underlying_type().__dict__;
+
+	if (auto result = add_operators(); result.is_err()) { return result; }
+	if (auto result = add_methods(); result.is_err()) { return result; }
+	if (auto result = add_members(); result.is_err()) { return result; }
+	if (auto result = add_properties(); result.is_err()) { return result; }
+
+	if (auto result = mro_internal(); result.is_err()) { return Err(result.unwrap_err()); }
+
+	if (underlying_type().__base__) { inherit_special(underlying_type().__base__); }
+
+	ASSERT(__mro__);
+
+	for (size_t i = 1; i < __mro__->elements().size(); ++i) {
+		const auto &b = __mro__->elements()[i];
+		auto base_ = PyObject::from(b);
+		ASSERT(base_.is_ok());
+		auto *base = base_.unwrap();
+
+		// type(base) == type
+		if ((std::holds_alternative<PyType *>(m_type) && std::get<PyType *>(m_type) == py::type())
+			|| (&std::get<std::reference_wrapper<const TypePrototype>>(m_type).get()
+				== &BuiltinTypes::the().type())) {
+			inherit_slots(static_cast<PyType *>(base));
+		}
+	}
+
+	if (underlying_type().__doc__.has_value()) {
+		m_attributes->insert(
+			String{ "__doc__" }, String{ std::string{ *underlying_type().__doc__ } });
+	} else {
+		m_attributes->insert(String{ "__doc__" }, py_none());
+	}
+
+	if (!underlying_type().__hash__.has_value()) {
+		if (auto it = m_attributes->map().find(String{ "__hash__" });
+			it != m_attributes->map().end()) {
+			auto hash_fn_ = PyObject::from(it->second);
+			if (hash_fn_.is_err()) return Err(hash_fn_.unwrap_err());
+			underlying_type().__hash__ = hash_fn_.unwrap();
+		} else {
+			m_attributes->insert(String{ "__hash__" }, py_none());
+		}
+	}
+
+	if (auto *base = underlying_type().__base__) {
+		if (!underlying_type().number_type_protocol.has_value()) {
+			underlying_type().number_type_protocol = base->underlying_type().number_type_protocol;
+		}
+		if (!underlying_type().sequence_type_protocol.has_value()) {
+			underlying_type().sequence_type_protocol =
+				base->underlying_type().sequence_type_protocol;
+		}
+		if (!underlying_type().mapping_type_protocol.has_value()) {
+			underlying_type().mapping_type_protocol = base->underlying_type().mapping_type_protocol;
+		}
+		if (!underlying_type().as_buffer.has_value()) {
+			underlying_type().as_buffer = base->underlying_type().as_buffer;
+		}
+	}
+
+	// TODO: add subclass
+
+	// Done!
+	underlying_type().is_ready = true;
+
+	return Ok(std::monostate{});
+}
+
+namespace {
+	std::optional<std::reference_wrapper<Slot>> resolve_slotdups(PyType *type,
+		std::string_view name)
+	{
+		std::vector<std::reference_wrapper<Slot>> slots;
+		for (auto &slotdef : slotdefs) {
+			if (slotdef.name == name) { slots.emplace_back(slotdef); }
+		}
+
+		std::optional<std::reference_wrapper<Slot>> res;
+		for (auto &slotdef : slots) {
+			if (!slotdef.get().has_member(type->underlying_type())) {
+				continue;
+			} else if (res.has_value()) {
+				return std::nullopt;
+			}
+			res = slotdef;
+		}
+
+		return res;
+	}
+
+	void update_slot(PyType *type, Slot &slot)
+	{
+		// First of all, if the slot in question does not exist, return immediately.
+		if (!slot.has_member(type->underlying_type())) { return; }
+		ASSERT(type->__mro__);
+		std::optional<PyObject *> descr_;
+		// For the given slot, we loop over all the special methods with a name corresponding to
+		// that slot and we look up these names in the MRO of the type.
+		for (const auto &b : type->__mro__->elements()) {
+			auto base_ = PyObject::from(b);
+			ASSERT(base_.is_ok());
+			auto *base = base_.unwrap();
+			ASSERT(as<PyType>(base));
+			auto *dict = as<PyType>(base)->attributes();
+			ASSERT(dict);
+			if (auto it = dict->map().find(String{ std::string{ slot.name } });
+				it != dict->map().end()) {
+				descr_ = PyObject::from(it->second).unwrap();
+				break;
+			}
+		}
+		// If we don't find any special method, the slot is set to NULL (regardless of what was
+		// in the slot before).
+		if (!descr_.has_value()) {
+			slot.reset_member(type->underlying_type());
+			return;
+		}
+
+		std::optional<std::variant<void *, PyObject *>> generic;
+		std::optional<std::variant<void *, PyObject *>> specific;
+		bool use_generic = false;
+		auto *descr = *descr_;
+		ASSERT(descr);
+		if (auto slot_wrapper = as<PySlotWrapper>(descr)) {
+			auto slotdef = resolve_slotdups(type, slot.name);
+			ASSERT(slotdef.has_value());
+			ASSERT(&slotdef->get() == &slot);
+			if (auto s = slot.get_member(descr->type()->underlying_type()); !s.has_value()) {
+				// if we don't have a specific slot we get the wrapper from descriptor we found in
+				// the MRO
+				generic = slot_wrapper->base().get().get_member(
+					slot_wrapper->base_type()->underlying_type());
+				use_generic = true;
+			} else {
+				specific = *s;
+			}
+		} else if (auto fn = as<PyNativeFunction>(descr);
+				   fn && (fn->method_pointer().has_value() && *fn->method_pointer() == &new_wrapper)
+				   && slot.name == "__new__") {
+			auto &new_slot = type->underlying_type().__new__;
+			ASSERT(new_slot.has_value());
+			if (std::holds_alternative<NewSlotFunctionType>(*new_slot)) {
+				using NewSlotFunctionPointerType =
+					PyResult<PyObject *> (*)(const PyType *, PyTuple *, PyDict *);
+				ASSERT(std::get<NewSlotFunctionType>(*new_slot));
+				auto fn_ptr =
+					std::get<NewSlotFunctionType>(*new_slot).target<NewSlotFunctionPointerType>();
+				ASSERT(fn_ptr);
+				specific = reinterpret_cast<void *>(*fn_ptr);
+			} else {
+				ASSERT(std::get<PyObject *>(*new_slot));
+				specific = std::get<PyObject *>(*new_slot);
+			}
+		} else if (descr == py_none() && slot.name == "__hash__") {
+			TODO();
+		} else {
+			use_generic = true;
+			generic = slot.get_member(type->underlying_type());
+		}
+
+		if (specific.has_value() && !use_generic) {
+			slot.set_member(type->underlying_type(), *specific);
+			ASSERT(slot.get_member(type->underlying_type()));
+		} else {
+			ASSERT(generic.has_value());
+			slot.set_member(type->underlying_type(), *generic);
+			ASSERT(slot.get_member(type->underlying_type()));
+		}
+	}
+}// namespace
+
+void PyType::fixup_slots()
+{
+	for (auto &&slot : slotdefs) { update_slot(this, slot); }
+}
 
 PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 {
-	(void)type_;
 	ASSERT(args && args->size() == 3)
 	ASSERT(!kwargs || kwargs->map().empty())
 
 	auto *name = as<PyString>(PyObject::from(args->elements()[0]).unwrap());
-	ASSERT(name)
+	ASSERT(name);
 	auto *bases = as<PyTuple>(PyObject::from(args->elements()[1]).unwrap());
-	ASSERT(bases)
+	ASSERT(bases);
 	auto *ns = as<PyDict>(PyObject::from(args->elements()[2]).unwrap());
-	ASSERT(ns)
+	ASSERT(ns);
 
+	auto bases_result = compute_bases(type_, bases, args, kwargs);
+	if (bases_result.is_err()) { return Err(bases_result.unwrap_err()); }
+
+	if (std::holds_alternative<PyObject *>(bases_result.unwrap())) {
+		// metaclass is not `type`, so we called it's new implementation
+		return Ok(std::get<PyObject *>(bases_result.unwrap()));
+	}
+	auto [base, bases_] = std::get<BasePair>(bases_result.unwrap());
+	bases = bases_;
+
+	return PyType::build_type(name, base, bases, ns);
+}
+
+PyResult<PyType *> PyType::best_base(PyTuple *bases)
+{
+	// FIXME: find the "solid base" (https://peps.python.org/pep-0253/#multiple-inheritance)
+	for (const auto &el : bases->elements()) {
+		auto base_ = PyObject::from(el);
+		if (base_.is_err()) return Err(base_.unwrap_err());
+		auto *base = base_.unwrap();
+		if (!as<PyType>(base)) { return Err(type_error("bases must be types")); }
+	}
+	auto base_ = PyObject::from(bases->elements()[0]);
+	if (base_.is_err()) return Err(base_.unwrap_err());
+	return Ok(as<PyType>(base_.unwrap()));
+}
+
+PyResult<std::variant<PyType::BasePair, PyObject *>>
+	PyType::compute_bases(const PyType *type_, PyTuple *bases, PyTuple *args, PyDict *kwargs)
+{
 	if (!bases->elements().empty()) {
 		std::unordered_set<PyObject *> bases_set;
 		for (const auto &b : bases->elements()) {
 			ASSERT(std::holds_alternative<PyObject *>(b))
-			if (bases_set.contains(std::get<PyObject *>(b))) {
-				auto *duplicate_type = as<PyType>(std::get<PyObject *>(b));
-				return Err(type_error(
-					"duplicate base class {}", duplicate_type->underlying_type().__name__));
+			auto *base = std::get<PyObject *>(b);
+			if (as<PyType>(base)) {
+				if (bases_set.contains(base)) {
+					auto *duplicate_type = as<PyType>(base);
+					return Err(type_error(
+						"duplicate base class {}", duplicate_type->underlying_type().__name__));
+				}
+				bases_set.insert(std::get<PyObject *>(b));
+				continue;
 			}
-			bases_set.insert(std::get<PyObject *>(b));
+			if (auto [attr, r] =
+					base->lookup_attribute(PyString::create("__mro_entries__").unwrap());
+				attr.is_err() || r == LookupAttrResult::NOT_FOUND) {
+				if (attr.is_err()) return attr;
+				return Err(type_error(
+					"type() doesn't support MRO entry resolution; use types.new_class()"));
+			}
 		}
-	} else {
-		// by default set object as a base if none provided
-		auto bases_ = PyTuple::create(object());
-		if (bases_.is_err()) { return bases_; }
-		bases = static_cast<PyTuple *>(bases_.unwrap());
-	}
 
-	return PyType::build_type(name, bases, ns);
+		auto winner_ = calculate_metaclass(type_, bases);
+		if (winner_.is_err()) { return Err(winner_.unwrap_err()); }
+		auto *winner = winner_.unwrap();
+
+		if (winner != type_) {
+			if (get_address(*winner->type()->underlying_type().__new__)
+				== get_address(*py::type()->underlying_type().__new__)) {
+				return call_slot(*winner->type()->underlying_type().__new__, winner, args, kwargs);
+			}
+			type_ = winner;
+		}
+
+		auto base = best_base(bases);
+		if (base.is_err()) { return Err(base.unwrap_err()); }
+		return Ok(std::make_tuple(base.unwrap(), bases));
+	}
+	// by default set object as a base if none provided
+	auto *base = object();
+	auto bases_ = PyTuple::create(object());
+	if (bases_.is_err()) { return bases_; }
+	return Ok(std::make_tuple(base, bases_.unwrap()));
 }
 
-PyResult<PyType *> PyType::build_type(PyString *type_name, PyTuple *bases, PyDict *ns)
+PyResult<PyType *> PyType::build_type(PyString *type_name, PyType *base, PyTuple *bases, PyDict *ns)
 {
+	ASSERT(!bases->elements().empty());
+
 	for (const auto &[key, value] : ns->map()) {
 		const auto key_str = PyObject::from(key);
 		if (key_str.is_err()) return Err(key_str.unwrap_err());
 		if (!key_str.unwrap()) { return Err(type_error("")); }
 	}
 
-	if (bases->elements().empty()) {
-		// all objects inherit from object by default
-		auto bases_ = PyTuple::create(object());
-		if (bases_.is_err()) { return Err(bases_.unwrap_err()); }
-		bases = bases_.unwrap();
-	}
-
-	auto base_ = PyObject::from(bases->elements()[0]);
-	if (base_.is_err()) return Err(base_.unwrap_err());
-	auto base = base_.unwrap();
-	ASSERT(as<PyType>(base))
-
-	auto new_type_prototype = as<PyType>(base)->underlying_type().clone();
+	auto new_type_prototype = std::make_unique<TypePrototype>();
+	new_type_prototype->is_heaptype = true;
 	auto *type = VirtualMachine::the().heap().allocate<PyType>(std::move(new_type_prototype));
 	if (!type) { return Err(memory_error(sizeof(PyType))); }
-	type->underlying_type().__name__ = type_name->value();
-	type->__bases__ = bases;
-	type->underlying_type().__mro__ = nullptr;
-	type->initialize(ns);
+	type->__mro__ = nullptr;
+	type->initialize(type_name->value(), base, bases, ns);
 
 	spdlog::trace("Created type@{} #{}", (void *)type, type->name());
 
 	return Ok(type);
+}
+
+PyResult<const PyType *> PyType::calculate_metaclass(const PyType *type_, PyTuple *bases)
+{
+	auto *winner = type_;
+	for (const auto &el : bases->elements()) {
+		auto base_ = PyObject::from(el);
+		if (base_.is_err()) return Err(base_.unwrap_err());
+		auto *base = base_.unwrap();
+		if (winner->issubclass(base->type())) { continue; }
+		if (base->type()->issubclass(winner)) {
+			winner = base->type();
+			continue;
+		}
+		return Err(
+			type_error("metaclass conflict: the metaclass of a derived class must be a "
+					   "(non-strict) subclass of the metaclasses of all its bases"));
+	}
+	return Ok(winner);
 }
 
 PyResult<PyObject *> PyType::__call__(PyTuple *args, PyDict *kwargs) const
@@ -761,13 +1414,13 @@ PyResult<PyObject *> PyType::__call__(PyTuple *args, PyDict *kwargs) const
 	auto obj_ = new_(args, kwargs);
 	if (obj_.is_err()) { return obj_; }
 
-	// If __new__() does not return an instance of cls, then the new instance’s __init__() method
-	// will not be invoked.
+	// If __new__() does not return an instance of cls, then the new instance’s __init__()
+	// method will not be invoked.
 	if (auto *obj = obj_.unwrap(); obj->type() == this) {
 		// If __new__() is invoked during object construction and it returns an instance of cls,
 		// then the new instance’s __init__() method will be invoked like __init__(self[, ...]),
-		// where self is the new instance and the remaining arguments are the same as were passed to
-		// the object constructor.
+		// where self is the new instance and the remaining arguments are the same as were
+		// passed to the object constructor.
 		if (const auto res = obj->init(args, kwargs); res.is_ok()) {
 			if (res.unwrap() < 0) {
 				// error
@@ -790,15 +1443,14 @@ PyResult<PyObject *> PyType::__repr__() const { return PyString::create(to_strin
 
 PyResult<PyTuple *> PyType::mro_internal() const
 {
-	if (!underlying_type().__mro__) {
+	if (!__mro__) {
 		// FIXME: is this const_cast still needed?
 		const auto &result = mro_(const_cast<PyType *>(this));
 		auto mro = PyTuple::create(result);
 		if (mro.is_err()) { return mro; }
-		const_cast<TypePrototype &>(underlying_type()).__mro__ =
-			static_cast<PyTuple *>(mro.unwrap());
+		__mro__ = static_cast<PyTuple *>(mro.unwrap());
 	}
-	return Ok(underlying_type().__mro__);
+	return Ok(__mro__);
 }
 
 PyResult<PyList *> PyType::mro()
@@ -808,7 +1460,7 @@ PyResult<PyList *> PyType::mro()
 	return PyList::create(mro.unwrap()->elements());
 }
 
-bool PyType::issubclass(const PyType *other)
+bool PyType::issubclass(const PyType *other) const
 {
 	if (this == other) { return true; }
 
@@ -850,48 +1502,59 @@ void PyType::visit_graph(Visitor &visitor)
 		visitor.visit(*std::get<PyObject *>(*underlying_type().sequence_type_protocol->__slot__)); \
 	}
 
-	VISIT_SLOT(__repr__)
-	VISIT_SLOT(__call__)
-	VISIT_SLOT(__str__)
 	VISIT_SLOT(__new__)
 	VISIT_SLOT(__init__)
-	VISIT_SLOT(__hash__)
-	VISIT_SLOT(__lt__)
-	VISIT_SLOT(__le__)
-	VISIT_SLOT(__eq__)
-	VISIT_SLOT(__ne__)
-	VISIT_SLOT(__gt__)
-	VISIT_SLOT(__ge__)
-	VISIT_SLOT(__iter__)
-	VISIT_SLOT(__next__)
+
+	VISIT_SLOT(__getattribute__)
+	VISIT_SLOT(__setattribute__)
+	VISIT_SLOT(__get__)
+	VISIT_SLOT(__set__)
+
 	VISIT_SLOT(__add__)
 	VISIT_SLOT(__sub__)
 	VISIT_SLOT(__mul__)
 	VISIT_SLOT(__exp__)
 	VISIT_SLOT(__lshift__)
 	VISIT_SLOT(__mod__)
+	VISIT_SLOT(__and__)
+	VISIT_SLOT(__or__)
 	VISIT_SLOT(__abs__)
 	VISIT_SLOT(__neg__)
 	VISIT_SLOT(__pos__)
 	VISIT_SLOT(__invert__)
+
+	VISIT_SLOT(__call__)
+	VISIT_SLOT(__str__)
 	VISIT_SLOT(__bool__)
-	VISIT_SLOT(__getattribute__)
-	VISIT_SLOT(__setattribute__)
-	VISIT_SLOT(__get__)
+	VISIT_SLOT(__repr__)
+	VISIT_SLOT(__iter__)
+	VISIT_SLOT(__next__)
+	VISIT_SLOT(__hash__)
+
+	VISIT_SLOT(__eq__)
+	VISIT_SLOT(__gt__)
+	VISIT_SLOT(__ge__)
+	VISIT_SLOT(__le__)
+	VISIT_SLOT(__lt__)
+	VISIT_SLOT(__ne__)
+
 	VISIT_MAPPING_SLOT(__len__)
 	VISIT_MAPPING_SLOT(__setitem__)
 	VISIT_MAPPING_SLOT(__getitem__)
 	VISIT_MAPPING_SLOT(__delitem__)
+
 	VISIT_SEQUENCE_SLOT(__len__)
+	VISIT_SEQUENCE_SLOT(__concat__)
 	VISIT_SEQUENCE_SLOT(__contains__)
 #undef VISIT_SLOT
 
-	if (underlying_type().__dict__) { visitor.visit(*underlying_type().__dict__); }
+	underlying_type().visit_graph(visitor);
 
-	if (underlying_type().__class__) { visitor.visit(*underlying_type().__class__); }
-
-	if (__bases__) { visitor.visit(*__bases__); }
-
+	if (__name__) { visitor.visit(*__name__); }
+	if (__qualname__) { visitor.visit(*__qualname__); }
+	if (__module__) { visitor.visit(*__module__); }
 	if (__mro__) { visitor.visit(*__mro__); }
+
+	for (auto *el : __slots__) { visitor.visit(*el); }
 }
 }// namespace py

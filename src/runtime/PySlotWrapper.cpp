@@ -12,15 +12,14 @@ using namespace py;
 
 std::string PySlotWrapper::to_string() const
 {
-	return fmt::format(
-		"<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_slot_type->name());
+	return fmt::format("<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_type->name());
 }
 
 void PySlotWrapper::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	visitor.visit(*m_name);
-	visitor.visit(*m_slot_type);
+	visitor.visit(*m_type);
 }
 
 PyResult<PyObject *> PySlotWrapper::__repr__() const { return PyString::create(to_string()); }
@@ -39,21 +38,18 @@ PyResult<PyObject *> PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 	if (args_.is_err()) return args_;
 	args = args_.unwrap();
 
-	return m_slot(self, args, kwargs).and_then([](auto *result) {
-		VirtualMachine::the().reg(0) = result;
-		return Ok(result);
-	});
+	return m_slot(self, args, kwargs);
 }
 
 PyResult<PyObject *> PySlotWrapper::__get__(PyObject *instance, PyObject * /*owner*/) const
 {
 	if (!instance) { return Ok(const_cast<PySlotWrapper *>(this)); }
-	if (!instance->type()->issubclass(m_slot_type)) {
+	if (!instance->type()->issubclass(m_type)) {
 		return Err(
 			type_error("descriptor '{}' for '{}' objects "
 					   "doesn't apply to a '{}' object",
 				m_name->value(),
-				m_slot_type->underlying_type().__name__,
+				m_type->underlying_type().__name__,
 				instance->type()->underlying_type().__name__));
 	}
 	// bind slot wrapper to the instance
@@ -72,18 +68,18 @@ PyResult<PyObject *> PySlotWrapper::__get__(PyObject *instance, PyObject * /*own
 		instance);
 }
 
-PySlotWrapper::PySlotWrapper(PyString *name, PyType *slot_type, FunctionType &&function)
-	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
-	  m_slot_type(slot_type), m_slot(std::move(function))
+PySlotWrapper::PySlotWrapper(PyString *name, PyType *slot_type, Slot &base, FunctionType &&function)
+	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)), m_type(slot_type),
+	  m_base(base), m_slot(std::move(function))
 {}
 
 PyResult<PySlotWrapper *>
-	PySlotWrapper::create(PyString *name, PyType *slot_type, FunctionType &&function)
+	PySlotWrapper::create(PyString *name, PyType *slot_type, Slot &base, FunctionType &&function)
 {
 	ASSERT(name)
 	ASSERT(slot_type)
-	auto *obj =
-		VirtualMachine::the().heap().allocate<PySlotWrapper>(name, slot_type, std::move(function));
+	auto *obj = VirtualMachine::the().heap().allocate<PySlotWrapper>(
+		name, slot_type, base, std::move(function));
 	if (!obj) return Err(memory_error(sizeof(PySlotWrapper)));
 	return Ok(obj);
 }

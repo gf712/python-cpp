@@ -30,12 +30,22 @@ PyMethodDescriptor::PyMethodDescriptor(PyString *name,
 	  m_captures(std::move(captures))
 {}
 
+PyResult<PyMethodDescriptor *> PyMethodDescriptor::create(PyString *name,
+	PyType *underlying_type,
+	MethodDefinition &method,
+	std::vector<PyObject *> &&captures)
+{
+	auto *obj = VirtualMachine::the().heap().allocate<PyMethodDescriptor>(
+		name, underlying_type, method, std::move(captures));
+	if (!obj) { return Err(memory_error(sizeof(PyMethodDescriptor))); }
+	return Ok(obj);
+}
 
 void PyMethodDescriptor::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*m_name);
-	visitor.visit(*m_underlying_type);
+	if (m_name) visitor.visit(*m_name);
+	if (m_underlying_type) visitor.visit(*m_underlying_type);
 	for (auto *capture : m_captures) { visitor.visit(*capture); }
 }
 

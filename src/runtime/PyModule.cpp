@@ -146,11 +146,12 @@ PyResult<PyObject *> PyModule::__getattribute__(PyObject *attribute) const
 void PyModule::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*m_module_name);
+	if (m_module_name) visitor.visit(*m_module_name);
 	if (m_doc) visitor.visit(*m_doc);
 	if (m_package) visitor.visit(*m_package);
 	if (m_loader) visitor.visit(*m_loader);
 	if (m_spec) visitor.visit(*m_spec);
+	if (m_dict) visitor.visit(*m_dict);
 	if (m_program) { m_program->visit_functions(visitor); }
 }
 
