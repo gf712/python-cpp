@@ -28,17 +28,13 @@
 namespace py {
 template<> PyType *as(PyObject *obj)
 {
-	if (&obj->type()->underlying_type() == &BuiltinTypes::the().type()) {
-		return static_cast<PyType *>(obj);
-	}
+	if (obj->type()->underlying_type().is_type) { return static_cast<PyType *>(obj); }
 	return nullptr;
 }
 
 template<> const PyType *as(const PyObject *obj)
 {
-	if (&obj->type()->underlying_type() == &BuiltinTypes::the().type()) {
-		return static_cast<const PyType *>(obj);
-	}
+	if (obj->type()->underlying_type().is_type) { return static_cast<const PyType *>(obj); }
 	return nullptr;
 }
 
@@ -192,20 +188,38 @@ std::vector<PyObject *> mro_(PyType *type)
 
 
 PyType::PyType(TypePrototype &type_prototype)
-	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(type_prototype)
-{}
+	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(type_prototype),
+	  m_metaclass(BuiltinTypes::the().type())
+{
+	if (&type_prototype == &BuiltinTypes::the().type()) { underlying_type().is_type = true; }
+}
 
 
 PyType::PyType(std::unique_ptr<TypePrototype> &&type_prototype)
-	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(std::move(type_prototype))
+	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(std::move(type_prototype)),
+	  m_metaclass(BuiltinTypes::the().type())
 {}
+
+PyResult<PyType *> PyType::create(PyType *type)
+{
+	auto new_type_prototype = std::make_unique<TypePrototype>();
+	auto *new_type = VirtualMachine::the().heap().allocate<PyType>(std::move(new_type_prototype));
+	new_type->m_metaclass = type;
+	if (!new_type) { return Err(memory_error(sizeof(PyType))); }
+	return Ok(new_type);
+}
 
 PyType *PyType::type() const
 {
 	if (&underlying_type() == &BuiltinTypes::the().type()) {
 		return const_cast<PyType *>(this);// :(
 	} else {
-		return py::type();
+		if (std::holds_alternative<PyType *>(m_metaclass)) {
+			return std::get<PyType *>(m_metaclass);
+		} else {
+			// all static types are of type `<class 'type'>`
+			return py::type();
+		}
 	}
 }
 
@@ -858,6 +872,8 @@ void PyType::inherit_special(PyType *base)
 			underlying_type().__new__ = base->underlying_type().__new__;
 		}
 	}
+
+	if (base->issubtype(BuiltinTypes::the().type())) { underlying_type().is_type = true; }
 }
 
 PyResult<std::monostate> PyType::inherit_slots(PyType *base)
@@ -1291,7 +1307,7 @@ PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict 
 	auto [base, bases_] = std::get<BasePair>(bases_result.unwrap());
 	bases = bases_;
 
-	return PyType::build_type(name, base, bases, ns);
+	return PyType::build_type(type_, name, base, bases, ns);
 }
 
 PyResult<PyType *> PyType::best_base(PyTuple *bases)
@@ -1357,7 +1373,11 @@ PyResult<std::variant<PyType::BasePair, PyObject *>>
 	return Ok(std::make_tuple(base, bases_.unwrap()));
 }
 
-PyResult<PyType *> PyType::build_type(PyString *type_name, PyType *base, PyTuple *bases, PyDict *ns)
+PyResult<PyType *> PyType::build_type(const PyType *metatype,
+	PyString *type_name,
+	PyType *base,
+	PyTuple *bases,
+	PyDict *ns)
 {
 	ASSERT(!bases->elements().empty());
 
@@ -1367,16 +1387,15 @@ PyResult<PyType *> PyType::build_type(PyString *type_name, PyType *base, PyTuple
 		if (!key_str.unwrap()) { return Err(type_error("")); }
 	}
 
-	auto new_type_prototype = std::make_unique<TypePrototype>();
-	new_type_prototype->is_heaptype = true;
-	auto *type = VirtualMachine::the().heap().allocate<PyType>(std::move(new_type_prototype));
-	if (!type) { return Err(memory_error(sizeof(PyType))); }
-	type->__mro__ = nullptr;
-	type->initialize(type_name->value(), base, bases, ns);
+	return PyType::create(const_cast<PyType *>(metatype)).and_then([&](PyType *type) {
+		type->underlying_type().is_heaptype = true;
+		type->__mro__ = nullptr;
+		type->initialize(type_name->value(), base, bases, ns);
 
-	spdlog::trace("Created type@{} #{}", (void *)type, type->name());
+		spdlog::trace("Created type@{} #{}", (void *)type, type->name());
 
-	return Ok(type);
+		return Ok(type);
+	});
 }
 
 PyResult<const PyType *> PyType::calculate_metaclass(const PyType *type_, PyTuple *bases)
@@ -1458,6 +1477,24 @@ PyResult<PyList *> PyType::mro()
 	auto mro = mro_internal();
 	if (mro.is_err()) { return Err(mro.unwrap_err()); }
 	return PyList::create(mro.unwrap()->elements());
+}
+
+
+bool PyType::issubtype(const TypePrototype &other) const
+{
+	if (&underlying_type() == &other) { return true; }
+
+	// every type is a subclass of object
+	if (&other == &BuiltinTypes::the().object()) { return true; }
+
+	// avoids creating PyTuple
+	const auto this_mro = mro_(const_cast<PyType *>(this));
+	for (const auto &el : this_mro) {
+		// avoid calling PyObject::type, which may call `py::type()`, resulting in recursion
+		if (&static_cast<PyType *>(el)->underlying_type() == &other) { return true; }
+	}
+
+	return false;
 }
 
 bool PyType::issubclass(const PyType *other) const
@@ -1554,6 +1591,9 @@ void PyType::visit_graph(Visitor &visitor)
 	if (__qualname__) { visitor.visit(*__qualname__); }
 	if (__module__) { visitor.visit(*__module__); }
 	if (__mro__) { visitor.visit(*__mro__); }
+	if (std::holds_alternative<PyType *>(m_metaclass) && std::get<PyType *>(m_metaclass)) {
+		visitor.visit(*std::get<PyType *>(m_metaclass));
+	}
 
 	for (auto *el : __slots__) { visitor.visit(*el); }
 }

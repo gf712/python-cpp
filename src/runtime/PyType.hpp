@@ -20,10 +20,13 @@ class PyType : public PyBaseObject
 	std::vector<PyObject *> __slots__;
 	PyString *__module__{ nullptr };
 	mutable PyTuple *__mro__{ nullptr };
+	std::variant<std::reference_wrapper<TypePrototype>, PyType *> m_metaclass;
 
   private:
 	PyType(TypePrototype &type_prototype);
 	PyType(std::unique_ptr<TypePrototype> &&type_prototype);
+
+	static PyResult<PyType *> create(PyType *);
 
   public:
 	static PyType *initialize(TypePrototype &type_prototype);
@@ -69,6 +72,8 @@ class PyType : public PyBaseObject
 
 	bool issubclass(const PyType *) const;
 
+	bool issubtype(const TypePrototype &other) const;
+
 	PyResult<PyObject *> lookup(PyObject *name) const;
 
 	PyDict *dict() { return m_attributes; }
@@ -84,12 +89,15 @@ class PyType : public PyBaseObject
 	PyResult<std::monostate> add_properties();
 	PyResult<std::monostate> inherit_slots(PyType *base);
 	void inherit_special(PyType *base);
-    void fixup_slots();
+	void fixup_slots();
 
 	void initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns);
 
-	static PyResult<PyType *>
-		build_type(PyString *type_name, PyType *base, PyTuple *bases, PyDict *ns);
+	static PyResult<PyType *> build_type(const PyType *metatype,
+		PyString *type_name,
+		PyType *base,
+		PyTuple *bases,
+		PyDict *ns);
 
 	using BasePair = std::tuple<PyType *, PyTuple *>;
 	static PyResult<std::variant<BasePair, PyObject *>>

@@ -264,6 +264,7 @@ struct TypePrototype
 
 	bool is_ready{ false };
 	bool is_heaptype{ false };
+	bool is_type{ false };
 
 	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
 
