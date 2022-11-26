@@ -29,6 +29,7 @@ class PyList : public PyBaseObject
 
 	PyResult<PyObject *> append(PyObject *element);
 	PyResult<PyObject *> extend(PyObject *iterable);
+	PyResult<PyObject *> pop(PyObject* index);
 
 	PyResult<PyObject *> __class_getitem__(PyType *cls, PyObject *args);
 

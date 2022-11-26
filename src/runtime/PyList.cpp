@@ -76,6 +76,57 @@ PyResult<PyObject *> PyList::extend(PyObject *iterable)
 	return Ok(py_none());
 }
 
+PyResult<PyObject *> PyList::pop(PyObject *index)
+{
+	if (m_elements.empty()) {
+		// TODO: should be an index error
+		return Err(value_error("pop from empty list"));
+	}
+
+	if (index) {
+		if (!as<PyInteger>(index)) {
+			return Err(type_error(
+				"'{}' object cannot be interpreted as an integer", index->type()->name()));
+		}
+		auto idx = [index, this]() -> PyResult<size_t> {
+			auto idx_value = as<PyInteger>(index)->as_i64();
+			size_t idx = m_elements.size();
+			if (idx_value < 0) {
+				if (static_cast<uint64_t>(std::abs(idx_value)) > m_elements.size()) {
+					// TODO: should be an index error
+					return Err(value_error("pop index '{}' out of range for list of size '{}'",
+						idx,
+						m_elements.size()));
+				}
+				idx += idx_value;
+			} else {
+				idx = static_cast<size_t>(idx_value);
+			}
+			if (idx >= m_elements.size()) {
+				// TODO: should be an index error
+				return Err(value_error(
+					"pop index '{}' out of range for list of size '{}'", idx, m_elements.size()));
+			}
+			return Ok(idx);
+		}();
+		return idx.and_then([this](size_t idx) {
+			return PyObject::from(m_elements[idx]).and_then([this, idx](PyObject *el) {
+				if (idx == m_elements.size()) {
+					m_elements.pop_back();
+				} else {
+					m_elements.erase(m_elements.begin() + idx);
+				}
+				return Ok(el);
+			});
+		});
+	} else {
+		return PyObject::from(m_elements.back()).and_then([this](PyObject *el) {
+			m_elements.pop_back();
+			return Ok(el);
+		});
+	}
+}
+
 std::string PyList::to_string() const
 {
 	std::ostringstream os;
@@ -214,6 +265,18 @@ std::unique_ptr<TypePrototype> register_list()
 		klass<PyList>("list")
 			.def("append", &PyList::append)
 			.def("extend", &PyList::extend)
+			.def(
+				"pop",
+				+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+					auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+						kwargs,
+						"pop",
+						std::integral_constant<size_t, 0>{},
+						std::integral_constant<size_t, 1>{},
+						nullptr);
+					if (result.is_err()) return Err(result.unwrap_err());
+					return static_cast<PyList *>(self)->pop(std::get<0>(result.unwrap()));
+				})
 			//  .def(
 			// 	 "sort",
 			// 	 +[](PyObject *self) {
