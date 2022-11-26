@@ -1,4 +1,5 @@
 #include "PyList.hpp"
+#include "IndexError.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
@@ -78,10 +79,7 @@ PyResult<PyObject *> PyList::extend(PyObject *iterable)
 
 PyResult<PyObject *> PyList::pop(PyObject *index)
 {
-	if (m_elements.empty()) {
-		// TODO: should be an index error
-		return Err(value_error("pop from empty list"));
-	}
+	if (m_elements.empty()) { return Err(index_error("pop from empty list")); }
 
 	if (index) {
 		if (!as<PyInteger>(index)) {
@@ -93,8 +91,7 @@ PyResult<PyObject *> PyList::pop(PyObject *index)
 			size_t idx = m_elements.size();
 			if (idx_value < 0) {
 				if (static_cast<uint64_t>(std::abs(idx_value)) > m_elements.size()) {
-					// TODO: should be an index error
-					return Err(value_error("pop index '{}' out of range for list of size '{}'",
+					return Err(index_error("pop index '{}' out of range for list of size '{}'",
 						idx,
 						m_elements.size()));
 				}
@@ -103,8 +100,7 @@ PyResult<PyObject *> PyList::pop(PyObject *index)
 				idx = static_cast<size_t>(idx_value);
 			}
 			if (idx >= m_elements.size()) {
-				// TODO: should be an index error
-				return Err(value_error(
+				return Err(index_error(
 					"pop index '{}' out of range for list of size '{}'", idx, m_elements.size()));
 			}
 			return Ok(idx);
@@ -169,8 +165,7 @@ PyResult<PyObject *> PyList::__getitem__(PyObject *index)
 		const auto i = index_int->as_i64();
 		if (i >= 0) {
 			if (static_cast<size_t>(i) >= m_elements.size()) {
-				// FIXME: should be IndexError
-				return Err(value_error("list index out of range"));
+				return Err(index_error("list index out of range"));
 			}
 			return PyObject::from(m_elements[i]);
 		} else {

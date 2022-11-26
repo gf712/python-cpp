@@ -15,3 +15,11 @@ assert a == [2], "list.pop should mutate the original list"
 el = a.pop(0)
 assert el == 2, "list.pop should pop with positive index"
 assert a == [], "list.pop should mutate the original list"
+
+try:
+    exception_raised = False
+    a.pop()
+except IndexError:
+    exception_raised = True
+finally:
+    assert exception_raised, "list.pop with empty list should raise an IndexError"

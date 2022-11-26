@@ -108,9 +108,11 @@ set(RUNTIME_SOURCE_FILES
     runtime/BaseException.cpp
     runtime/Exception.cpp
     runtime/GeneratorInterface.cpp
+    runtime/IndexError.cpp
     runtime/Import.cpp
     runtime/ImportError.cpp
     runtime/KeyError.cpp
+    runtime/LookupError.cpp
     runtime/MemoryError.cpp
     runtime/ModuleNotFoundError.cpp
     runtime/NameError.cpp

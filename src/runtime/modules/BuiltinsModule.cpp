@@ -3,7 +3,9 @@
 #include "runtime/AttributeError.hpp"
 #include "runtime/Import.hpp"
 #include "runtime/ImportError.hpp"
+#include "runtime/IndexError.hpp"
 #include "runtime/KeyError.hpp"
+#include "runtime/LookupError.hpp"
 #include "runtime/ModuleNotFoundError.hpp"
 #include "runtime/NameError.hpp"
 #include "runtime/NotImplementedError.hpp"
@@ -917,6 +919,8 @@ auto initialize_exceptions(PyModule *blt)
 	NotImplementedError::register_type(blt);
 	ModuleNotFoundError::register_type(blt);
 	OSError::register_type(blt);
+	LookupError::register_type(blt);
+	IndexError::register_type(blt);
 }
 
 }// namespace
