@@ -15,11 +15,10 @@ PyResult<Value> SetAdd::execute(VirtualMachine &vm, Interpreter &) const
 	auto *pyset = std::get<PyObject *>(set);
 	ASSERT(pyset)
 	ASSERT(as<PySet>(pyset))
+	auto value_obj = PyObject::from(value);
+	if (value_obj.is_err()) { return Err(value_obj.unwrap_err()); }
 
-	auto result = PyTuple::create(value);
-	if (result.is_err()) { return Err(result.unwrap_err()); }
-
-	if (auto r = as<PySet>(pyset)->add(result.unwrap(), nullptr); r.is_ok()) {
+	if (auto r = as<PySet>(pyset)->add(value_obj.unwrap()); r.is_ok()) {
 		return Ok(Value{ r.unwrap() });
 	} else {
 		return Err(r.unwrap_err());

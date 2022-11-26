@@ -47,14 +47,16 @@ PyResult<PySet *> PySet::create()
 	return Ok(result);
 }
 
-PyResult<PyObject *> PySet::add(PyTuple *args, PyDict *kwargs)
+PyResult<PyObject *> PySet::add(PyObject *element)
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs || kwargs->map().size())
-	return PyObject::from(args->elements()[0]).and_then([this](auto *obj) {
-		m_elements.insert(obj);
-		return Ok(py_none());
-	});
+	m_elements.insert(element);
+	return Ok(py_none());
+}
+
+PyResult<PyObject *> PySet::discard(PyObject *element)
+{
+	m_elements.erase(element);
+	return Ok(py_none());
 }
 
 std::string PySet::to_string() const
@@ -163,7 +165,8 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_set()
 	{
-		return std::move(klass<PySet>("set").def("add", &PySet::add).type);
+		return std::move(
+			klass<PySet>("set").def("add", &PySet::add).def("discard", &PySet::discard).type);
 	}
 }// namespace
 

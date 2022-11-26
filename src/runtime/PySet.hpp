@@ -36,7 +36,8 @@ class PySet : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	PyResult<PyObject *> add(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> add(PyObject *element);
+	PyResult<PyObject *> discard(PyObject *element);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
