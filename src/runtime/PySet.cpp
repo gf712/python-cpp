@@ -1,4 +1,5 @@
 #include "PySet.hpp"
+#include "KeyError.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
@@ -57,6 +58,17 @@ PyResult<PyObject *> PySet::discard(PyObject *element)
 {
 	m_elements.erase(element);
 	return Ok(py_none());
+}
+
+PyResult<PyObject *> PySet::remove(PyObject *element)
+{
+	if (m_elements.erase(element) == 1) {
+		return Ok(py_none());
+	} else {
+		return element->repr().and_then([](PyObject *repr) -> PyResult<PyObject *> {
+			return Err(key_error("{}", repr->to_string()));
+		});
+	}
 }
 
 std::string PySet::to_string() const
@@ -165,8 +177,11 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_set()
 	{
-		return std::move(
-			klass<PySet>("set").def("add", &PySet::add).def("discard", &PySet::discard).type);
+		return std::move(klass<PySet>("set")
+							 .def("add", &PySet::add)
+							 .def("discard", &PySet::discard)
+							 .def("remove", &PySet::remove)
+							 .type);
 	}
 }// namespace
 

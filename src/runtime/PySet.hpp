@@ -38,6 +38,7 @@ class PySet : public PyBaseObject
 
 	PyResult<PyObject *> add(PyObject *element);
 	PyResult<PyObject *> discard(PyObject *element);
+	PyResult<PyObject *> remove(PyObject *element);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
