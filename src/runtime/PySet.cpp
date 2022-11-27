@@ -75,8 +75,10 @@ std::string PySet::to_string() const
 {
 	std::ostringstream os;
 
-	os << "{";
-	if (!m_elements.empty()) {
+	if (m_elements.empty()) {
+		os << "set()";
+	} else {
+		os << "{";
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
 			std::visit(overloaded{
@@ -91,8 +93,8 @@ std::string PySet::to_string() const
 					   [&os](PyObject *value) { os << value->to_string(); },
 				   },
 			*it);
+		os << "}";
 	}
-	os << "}";
 
 	return os.str();
 }
