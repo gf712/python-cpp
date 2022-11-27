@@ -568,7 +568,7 @@ PyResult<PyObject *> repr(const PyTuple *args, const PyDict *, Interpreter &)
 	if (args->size() != 1) {
 		return Err(type_error("repr() takes exactly one argument ({} given)", args->size()));
 	}
-	return PyObject::from(args->elements()[0]).and_then([](auto *obj) { return obj->__repr__(); });
+	return PyObject::from(args->elements()[0]).and_then([](auto *obj) { return obj->repr(); });
 }
 
 PyResult<PyObject *> abs(const PyTuple *args, const PyDict *kwargs, Interpreter &)
