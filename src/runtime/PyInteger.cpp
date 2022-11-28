@@ -56,7 +56,9 @@ PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDic
 		TODO();
 	}
 
-	if (auto *int_value = as<PyInteger>(value)) {
+	if (!value) {
+		return PyInteger::create(0);
+	} else if (auto *int_value = as<PyInteger>(value)) {
 		return PyInteger::create(int_value->as_size_t());
 	} else if (auto *float_value = as<PyFloat>(value)) {
 		return PyInteger::create(static_cast<int64_t>(float_value->as_f64()));
@@ -82,19 +84,21 @@ PyResult<int64_t> PyInteger::__hash__() const
 PyResult<PyObject *> PyInteger::__and__(PyObject *obj)
 {
 	if (obj->type() != integer()) {
-		return Err(type_error("unsupported operand type(s) for &: 'int' and '{}'", obj->type()->name()));
+		return Err(
+			type_error("unsupported operand type(s) for &: 'int' and '{}'", obj->type()->name()));
 	}
 
-	return PyInteger::create((as_i64() & as<PyInteger>(obj)->as_i64() ));
+	return PyInteger::create((as_i64() & as<PyInteger>(obj)->as_i64()));
 }
 
 PyResult<PyObject *> PyInteger::__or__(PyObject *obj)
 {
 	if (obj->type() != integer()) {
-		return Err(type_error("unsupported operand type(s) for |: 'int' and '{}'", obj->type()->name()));
+		return Err(
+			type_error("unsupported operand type(s) for |: 'int' and '{}'", obj->type()->name()));
 	}
 
-	return PyInteger::create((as_i64() | as<PyInteger>(obj)->as_i64() ));
+	return PyInteger::create((as_i64() | as<PyInteger>(obj)->as_i64()));
 }
 
 PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const

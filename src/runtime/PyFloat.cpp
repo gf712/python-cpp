@@ -20,6 +20,32 @@ template<> const PyFloat *as(const PyObject *obj)
 
 PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
 
+PyResult<PyObject *> PyFloat::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	// TODO: support inheriting from float
+	ASSERT(type == float_());
+
+	ASSERT(!kwargs || kwargs->map().empty())
+	PyObject *value = nullptr;
+	if (args->elements().size() > 0) {
+		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
+			value = obj.unwrap();
+		} else {
+			return obj;
+		}
+	}
+
+	if (!value) {
+		return PyFloat::create(0.0);
+	} else if (auto *int_value = as<PyInteger>(value)) {
+		return PyFloat::create(static_cast<double>(int_value->as_size_t()));
+	} else if (auto *float_value = as<PyFloat>(value)) {
+		return PyFloat::create(float_value->as_f64());
+	}
+	TODO();
+	return Err(nullptr);
+}
+
 PyResult<PyFloat *> PyFloat::create(double value)
 {
 	auto &heap = VirtualMachine::the().heap();
