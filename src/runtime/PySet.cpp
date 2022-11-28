@@ -14,6 +14,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include "utilities.hpp"
 #include "vm/VM.hpp"
 
 namespace py {
@@ -119,20 +120,8 @@ PyResult<int32_t> PySet::__init__(PyTuple *args, PyDict *kwargs)
 
 	auto iterable = PyObject::from(args->elements()[0]);
 	if (iterable.is_err()) return Err(iterable.unwrap_err());
-
-	auto iterator = iterable.unwrap()->iter();
-	if (iterator.is_err()) return Err(iterator.unwrap_err());
-
-	auto value = iterator.unwrap()->next();
-
-	while (value.is_ok()) {
-		m_elements.insert(value.unwrap());
-		value = iterator.unwrap()->next();
-	}
-
-	if (value.unwrap_err()->type() != stop_iteration()->type()) { return Err(value.unwrap_err()); }
-
-	return Ok(0);
+	return from_iterable(iterable.unwrap(), std::inserter(m_elements, m_elements.begin()))
+		.and_then([](auto) { return Ok(0); });
 }
 
 PyResult<PyObject *> PySet::__repr__() const { return PyString::create(to_string()); }

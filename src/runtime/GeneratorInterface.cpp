@@ -74,7 +74,7 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send()
 		spdlog::debug("generator result {}", result.unwrap()->to_string());
 	} else if (result.is_err()
 			   && result.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
-		result = Err(runtime_error("generator raise StopIteration"));
+		result = Err(runtime_error("generator raised StopIteration"));
 	}
 
 	if (result.is_err()) { m_frame = nullptr; }

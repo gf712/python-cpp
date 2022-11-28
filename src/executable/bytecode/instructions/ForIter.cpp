@@ -16,19 +16,18 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &) const
 {
 	ASSERT(m_offset.has_value())
 	auto iterator = vm.reg(m_src);
-	// interpreter.execution_frame()->set_exception_to_catch(stop_iteration(""));
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
 		const auto &next_value = (*iterable_object)->next();
 		if (next_value.is_err()) {
 			auto *last_exception = next_value.unwrap_err();
-
 			if (last_exception->type()->issubclass(stop_iteration()->type())) {
 				vm.set_instruction_pointer(vm.instruction_pointer() + *m_offset);
 				return Ok(py_none());
+			} else {
+				return Err(next_value.unwrap_err());
 			}
 		}
-		if (next_value.is_err()) return Err(next_value.unwrap_err());
-		if (next_value.is_ok()) { vm.reg(m_dst) = next_value.unwrap(); }
+		vm.reg(m_dst) = next_value.unwrap();
 		return Ok(Value{ next_value.unwrap() });
 	} else {
 		// this is probably always going to be something that went wrong internally

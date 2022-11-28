@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../forward.hpp"
+#include "../utilities.hpp"
 #include "forward.hpp"
-#include "utilities.hpp"
 
 #include <cmath>
 #include <cstddef>
@@ -332,6 +332,6 @@ PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 PyResult<bool> truthy(const Value &lhs, Interpreter &interpreter);
 
-bool operator==(const Value& lhs, const Value& rhs);
+bool operator==(const Value &lhs, const Value &rhs);
 
 }// namespace py

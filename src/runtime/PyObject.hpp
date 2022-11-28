@@ -1,11 +1,11 @@
 #pragma once
 
+#include "../utilities.hpp"
 #include "Value.hpp"
 #include "concepts.hpp"
 #include "forward.hpp"
 #include "memory/GarbageCollector.hpp"
 #include "runtime/forward.hpp"
-#include "utilities.hpp"
 
 #include <functional>
 #include <memory>
