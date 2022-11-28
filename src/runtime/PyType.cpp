@@ -1236,7 +1236,7 @@ namespace {
 			auto slotdef = resolve_slotdups(type, slot.name);
 			ASSERT(slotdef.has_value());
 			ASSERT(&slotdef->get() == &slot);
-			if (auto s = slot.get_member(descr->type()->underlying_type()); !s.has_value()) {
+			if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type()); !s.has_value()) {
 				// if we don't have a specific slot we get the wrapper from descriptor we found in
 				// the MRO
 				generic = slot_wrapper->base().get().get_member(
