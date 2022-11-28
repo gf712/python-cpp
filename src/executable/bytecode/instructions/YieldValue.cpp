@@ -23,7 +23,7 @@ PyResult<Value> YieldValue::execute(VirtualMachine &vm, Interpreter &interpreter
 
 	vm.reg(0) = result;
 
-	vm.ret();
+	vm.pop_frame();
 
 	return Ok(result);
 }

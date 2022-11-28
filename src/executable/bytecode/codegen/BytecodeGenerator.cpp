@@ -1088,28 +1088,7 @@ Value *BytecodeGenerator::visit(const Return *node)
 
 Value *BytecodeGenerator::visit(const Yield *node)
 {
-	// TODO: can we just merge yield and return?
 	auto *src = generate(node->value().get(), m_function_id);
-	if (m_clear_exception_before_return_functions.contains(m_function_id)) {
-		emit<ClearExceptionState>();
-	}
-
-	// if (auto it = m_current_exception_depth.find(m_function_id);
-	// 	it != m_current_exception_depth.end()) {
-	// 	size_t depth = it->second;
-	// 	while (depth-- > 0) { emit<LeaveExceptionHandling>(); }
-	// }
-
-	const auto transforms = m_return_transform[m_function_id];
-	if (!transforms.empty()) {
-		m_return_transform[m_function_id].pop_back();
-		transforms.back()(true);
-		std::for_each(transforms.rbegin() + 1, transforms.rend(), [this](const auto &f) {
-			m_return_transform[m_function_id].pop_back();
-			f(false);
-		});
-	}
-	m_return_transform[m_function_id] = std::move(transforms);
 	emit<YieldValue>(src->get_register());
 	return src;
 }
