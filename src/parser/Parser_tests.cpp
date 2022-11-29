@@ -3500,6 +3500,32 @@ TEST(Parser, SemiColon)
 	assert_generates_ast(program, expected_ast);
 }
 
+
+TEST(Parser, UnpackKVPair)
+{
+	constexpr std::string_view program = "a = {**b, 'foo': 'bar', **c}\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+									 "a", ContextType::STORE, SourceLocation{}) },
+			std::make_shared<Dict>(
+				std::vector<std::shared_ptr<ASTNode>>{
+					nullptr,
+					std::make_shared<Constant>("foo", SourceLocation{}),
+					nullptr,
+				},
+				std::vector<std::shared_ptr<ASTNode>>{
+					std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+					std::make_shared<Constant>("bar", SourceLocation{}),
+					std::make_shared<Name>("c", ContextType::LOAD, SourceLocation{}),
+				},
+				SourceLocation{}),
+			"",
+			SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
 // TEST(Parser, FString)
 // {
 // 	constexpr std::string_view program = "f\"sin({a}) is {sin(a):.3}\"\n";

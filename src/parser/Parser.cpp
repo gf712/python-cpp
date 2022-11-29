@@ -1869,7 +1869,8 @@ struct DoubleStarredKVPairPattern : PatternV2<DoubleStarredKVPairPattern>
 			PatternMatchV2<SingleTokenPatternV2<Token::TokenType::DOUBLESTAR>, BitwiseOrPattern>;
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'**' bitwise_or");
-			TODO_NO_FAIL();
+			auto [_, value] = *result;
+			return { { nullptr, value } };
 		}
 
 		using pattern2 = PatternMatchV2<KVPairPattern>;

@@ -837,7 +837,13 @@ void Dict::print_this_node(const std::string &indent) const
 		source_location().end.column + 1);
 	spdlog::debug("{}  keys:", indent);
 	std::string new_indent = indent + std::string(6, ' ');
-	for (const auto &el : m_keys) { el->print_node(new_indent); }
+	for (const auto &el : m_keys) {
+		if (!el) {
+			spdlog::debug("{}None", new_indent);
+		} else {
+			el->print_node(new_indent);
+		}
+	}
 	spdlog::debug("{}  values:", indent);
 	for (const auto &el : m_values) { el->print_node(new_indent); }
 }
