@@ -472,22 +472,6 @@ struct ZeroOrOnePatternV2 : PatternV2<ZeroOrOnePatternV2<PatternTypes...>>
 	}
 };
 
-template<size_t TypeIdx, typename PatternTuple> struct OrPattern_
-{
-	static bool match(Parser &p)
-	{
-		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
-			return std::tuple_element_t<TypeIdx, PatternTuple>::matches(p);
-		} else {
-			if (std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
-				return true;
-			} else {
-				return OrPattern_<TypeIdx + 1, PatternTuple>::match(p);
-			}
-		}
-	}
-};
-
 template<typename T> struct equal_types;
 template<typename T> struct ast_nodes;
 
@@ -558,12 +542,20 @@ template<size_t TypeIdx, typename... PatternTypes> struct OrPatternV2_
 	static std::optional<ResultType> match(Parser &p)
 	{
 		using PatternTuple = std::tuple<PatternTypes...>;
-
+		using Pattern = typename std::tuple_element_t<TypeIdx, PatternTuple>;
+		using PatternMatcher = PatternMatchV2<Pattern>;
+		static_assert(
+			std::tuple_size_v<typename std::invoke_result_t<decltype(PatternMatcher::match),
+				Parser &>::value_type> == 1);
 		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
-			return std::tuple_element_t<TypeIdx, PatternTuple>::matches(p);
+			if (auto result = PatternMatcher::match(p)) {
+				return std::get<0>(*result);
+			} else {
+				return std::nullopt;
+			}
 		} else {
-			if (auto result = std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
-				return result;
+			if (auto result = PatternMatcher::match(p)) {
+				return std::get<0>(*result);
 			} else {
 				return OrPatternV2_<TypeIdx + 1, PatternTypes...>::match(p);
 			}
@@ -585,27 +577,6 @@ template<typename... PatternTypes> struct OrPatternV2 : PatternV2<OrPatternV2<Pa
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		return OrPatternV2_<0, PatternTypes...>::match(p);
-	}
-};
-
-template<size_t TypeIdx, typename PatternTuple> struct AndPattern_
-{
-	static bool match(Parser &p)
-	{
-		auto original_token_position = p.token_position();
-		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
-			return std::tuple_element_t<TypeIdx, PatternTuple>::matches(p);
-		} else {
-			if (!std::tuple_element_t<TypeIdx, PatternTuple>::matches(p)) {
-				return false;
-			} else {
-				// reset to the original token as there was a match
-				// and we need to now check if that same token matches
-				// the other patterns
-				p.token_position() = original_token_position;
-				return AndPattern_<TypeIdx + 1, PatternTuple>::match(p);
-			}
-		}
 	}
 };
 
@@ -723,8 +694,10 @@ struct NegativeLookAheadV2 : PatternV2<NegativeLookAheadV2<PatternType>>
 
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		return !PatternType::matches(p).has_value() ? std::make_optional(ResultType{})
-													: std::nullopt;
+		const auto start = p.token_position();
+		auto result = PatternType::matches(p);
+		p.token_position() = start;
+		return !result.has_value() ? std::make_optional(ResultType{}) : std::nullopt;
 	}
 };
 
@@ -742,8 +715,10 @@ template<typename PatternType> struct LookAheadV2 : PatternV2<LookAheadV2<Patter
 	static constexpr size_t advance_by = 0;
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		return PatternType::matches(p).has_value() ? std::make_optional(ResultType{})
-												   : std::nullopt;
+		const auto start = p.token_position();
+		auto result = PatternType::matches(p);
+		p.token_position() = start;
+		return result.has_value() ? std::make_optional(ResultType{}) : std::nullopt;
 	}
 };
 
