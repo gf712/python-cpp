@@ -2100,6 +2100,74 @@ TEST(Parser, ImportFromDottedMutipleInParen)
 	assert_generates_ast(program, expected_ast);
 }
 
+TEST(Parser, ImportFromParent)
+{
+	constexpr std::string_view program = "from .fibonacci.impl import fibonacci_cpu as fib\n";
+
+	auto expected_ast = create_test_module();
+
+	std::vector<alias> names{ alias{
+		.name = "fibonacci_cpu",
+		.asname = "fib",
+	} };
+	auto import =
+		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 1, SourceLocation{});
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFromParentLevel2)
+{
+	constexpr std::string_view program = "from ..fibonacci.impl import fibonacci_cpu as fib\n";
+
+	auto expected_ast = create_test_module();
+
+	std::vector<alias> names{ alias{
+		.name = "fibonacci_cpu",
+		.asname = "fib",
+	} };
+	auto import =
+		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 2, SourceLocation{});
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFromParentLevel3)
+{
+	constexpr std::string_view program = "from ...fibonacci.impl import fibonacci_cpu as fib\n";
+
+	auto expected_ast = create_test_module();
+
+	std::vector<alias> names{ alias{
+		.name = "fibonacci_cpu",
+		.asname = "fib",
+	} };
+	auto import =
+		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 3, SourceLocation{});
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, ImportFromParentLevel4)
+{
+	constexpr std::string_view program = "from ....fibonacci.impl import fibonacci_cpu as fib\n";
+
+	auto expected_ast = create_test_module();
+
+	std::vector<alias> names{ alias{
+		.name = "fibonacci_cpu",
+		.asname = "fib",
+	} };
+	auto import =
+		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 4, SourceLocation{});
+	expected_ast->emplace(import);
+
+	assert_generates_ast(program, expected_ast);
+}
+
 TEST(Parser, SubscriptIndexExpression)
 {
 	constexpr std::string_view program = "a[0]\n";
