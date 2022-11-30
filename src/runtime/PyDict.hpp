@@ -45,6 +45,7 @@ class PyDict : public PyBaseObject
 	PyResult<std::monostate> __setitem__(PyObject *key, PyObject *value);
 	PyResult<std::monostate> __delitem__(PyObject *key);
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
+	PyResult<size_t> __len__() const;
 
 	const MapType &map() const { return m_map; }
 

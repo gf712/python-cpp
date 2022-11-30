@@ -46,10 +46,11 @@ BuiltinTypes::BuiltinTypes()
 	: m_type(PyType::type_factory()), m_super(PySuper::type_factory()),
 	  m_str(PyString::type_factory()), m_str_iterator(PyStringIterator::type_factory()),
 	  m_integer(PyInteger::type_factory()), m_bool(PyBool::type_factory()),
-	  m_bytes(PyBytes::type_factory()), m_ellipsis(PyEllipsis::type_factory()),
-	  m_float(PyFloat::type_factory()), m_none(PyNone::type_factory()),
-	  m_module(PyModule::type_factory()), m_object(PyObject::type_factory()),
-	  m_function(PyFunction::type_factory()), m_native_function(PyNativeFunction::type_factory()),
+	  m_bytes(PyBytes::type_factory()), m_bytes_iterator(PyBytesIterator::type_factory()),
+	  m_ellipsis(PyEllipsis::type_factory()), m_float(PyFloat::type_factory()),
+	  m_none(PyNone::type_factory()), m_module(PyModule::type_factory()),
+	  m_object(PyObject::type_factory()), m_function(PyFunction::type_factory()),
+	  m_native_function(PyNativeFunction::type_factory()),
 	  m_llvm_function(PyLLVMFunction::type_factory()), m_code(PyCode::type_factory()),
 	  m_cell(PyCell::type_factory()), m_dict(PyDict::type_factory()),
 	  m_dict_items(PyDictItems::type_factory()),
@@ -95,6 +96,7 @@ INITIALIZE_TYPE(super)
 
 INITIALIZE_TYPE(bool_)
 INITIALIZE_TYPE(bytes)
+INITIALIZE_TYPE(bytes_iterator)
 INITIALIZE_TYPE(ellipsis)
 INITIALIZE_TYPE(str)
 INITIALIZE_TYPE(str_iterator)

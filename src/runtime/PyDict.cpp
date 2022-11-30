@@ -145,6 +145,8 @@ PyResult<PyObject *> PyDict::__eq__(const PyObject *other) const
 	return Ok(m_map == as<PyDict>(other)->map() ? py_true() : py_false());
 }
 
+PyResult<size_t> PyDict::__len__() const { return Ok(m_map.size()); }
+
 PyDictItems *PyDict::items() const
 {
 	return VirtualMachine::the().heap().allocate<PyDictItems>(*this);

@@ -23,11 +23,7 @@ PyResult<Value> DictMerge::execute(VirtualMachine &vm, Interpreter &) const
 
 	auto args = PyTuple::create(other_pydict);
 	if (args.is_err()) { return Err(args.unwrap_err()); }
-	if (auto result = as<PyDict>(this_pydict)->merge(args.unwrap(), nullptr); result.is_ok()) {
-		return Ok(Value{ result.unwrap() });
-	} else {
-		return Err(result.unwrap_err());
-	}
+	return as<PyDict>(this_pydict)->merge(args.unwrap(), nullptr);
 }
 
 std::vector<uint8_t> DictMerge::serialize() const

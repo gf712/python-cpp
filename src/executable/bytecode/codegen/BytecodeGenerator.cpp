@@ -13,6 +13,7 @@
 #include "executable/bytecode/instructions/DeleteName.hpp"
 #include "executable/bytecode/instructions/DeleteSubscript.hpp"
 #include "executable/bytecode/instructions/DictMerge.hpp"
+#include "executable/bytecode/instructions/DictUpdate.hpp"
 #include "executable/bytecode/instructions/ForIter.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
@@ -154,10 +155,13 @@ namespace {
 	}
 }// namespace
 
-
-BytecodeValue *BytecodeGenerator::build_dict(const std::vector<Register> &key_registers,
+BytecodeValue *BytecodeGenerator::build_dict_simple(
+	const std::vector<std::optional<Register>> &key_registers,
 	const std::vector<Register> &value_registers)
 {
+	ASSERT(std::all_of(
+		key_registers.begin(), key_registers.end(), [](const auto &el) { return el.has_value(); }));
+
 	auto *result = create_value();
 
 	// FIXME: the move instructions below guarantee that the dictionary keys/values are contiguosly
@@ -172,14 +176,13 @@ BytecodeValue *BytecodeGenerator::build_dict(const std::vector<Register> &key_re
 				offset = dst->get_register();
 				first = false;
 			}
-			emit<Move>(dst->get_register(), key);
+			emit<Move>(dst->get_register(), *key);
 		}
 
 		for (const auto &value : value_registers) {
 			auto *dst = create_value();
 			emit<Move>(dst->get_register(), value);
 		}
-
 
 		ASSERT(offset.has_value())
 		ASSERT(key_registers.size() == value_registers.size())
@@ -189,7 +192,45 @@ BytecodeValue *BytecodeGenerator::build_dict(const std::vector<Register> &key_re
 	} else {
 		emit<BuildDict>(result->get_register(), 0, 0);
 	}
+
 	return result;
+}
+
+BytecodeValue *BytecodeGenerator::build_dict(
+	const std::vector<std::optional<Register>> &key_registers,
+	const std::vector<Register> &value_registers)
+{
+	if (std::any_of(key_registers.begin(), key_registers.end(), [](const auto &el) {
+			return !el.has_value();
+		})) {
+		ASSERT(key_registers.size() == value_registers.size());
+		size_t begin_key_index = 0;
+		size_t last_key_index = begin_key_index;
+		BytecodeValue *dict = nullptr;
+		while (last_key_index != key_registers.size()) {
+			begin_key_index = last_key_index;
+			for (; last_key_index < key_registers.size(); ++last_key_index) {
+				if (!key_registers[last_key_index].has_value()) { break; }
+			}
+			std::vector<std::optional<Register>> simple_key_registers{
+				key_registers.begin() + begin_key_index, key_registers.begin() + last_key_index
+			};
+			std::vector<Register> simple_value_registers{ value_registers.begin() + begin_key_index,
+				value_registers.begin() + last_key_index };
+			auto *tmp_dict = build_dict_simple(simple_key_registers, simple_value_registers);
+			if (!dict) {
+				dict = tmp_dict;
+			} else {
+				emit<DictUpdate>(dict->get_register(), tmp_dict->get_register());
+			}
+			const auto &value = value_registers[last_key_index++];
+			emit<DictUpdate>(dict->get_register(), value);
+		}
+		ASSERT(dict);
+		return dict;
+	} else {
+		return build_dict_simple(key_registers, value_registers);
+	}
 }
 
 BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &element_registers)
@@ -1185,7 +1226,7 @@ Value *BytecodeGenerator::visit(const Call *node)
 
 		if (requires_kwargs_expansion) {
 			BytecodeValue *dict_value = nullptr;
-			std::vector<Register> key_registers;
+			std::vector<std::optional<Register>> key_registers;
 			std::vector<Register> value_registers;
 			bool first_kwargs_expansion = true;
 
@@ -1654,12 +1695,16 @@ Value *BytecodeGenerator::visit(const Dict *node)
 {
 	ASSERT(node->keys().size() == node->values().size())
 
-	std::vector<Register> key_registers;
+	std::vector<std::optional<Register>> key_registers;
 	std::vector<Register> value_registers;
 
 	for (const auto &key : node->keys()) {
-		auto *key_value = generate(key.get(), m_function_id);
-		key_registers.push_back(key_value->get_register());
+		if (key) {
+			auto *key_value = generate(key.get(), m_function_id);
+			key_registers.emplace_back(key_value->get_register());
+		} else {
+			key_registers.push_back(std::nullopt);
+		}
 	}
 	for (const auto &value : node->values()) {
 		auto *v = generate(value.get(), m_function_id);

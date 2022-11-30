@@ -24,3 +24,15 @@ def dict_from_keys():
     assert a == {1: "a", 2: "a", 3: "a"}
 
 dict_from_keys()
+
+def dict_from_map():
+    b = {"a": 42, "b": 1}
+    c = {"a": 43, "c": 10}
+    a = {"a": 1, **b, 'foo': 'bar', **c}
+    assert a["a"] == 43
+    assert a["b"] == 1
+    assert a["c"] == 10
+    assert a["foo"] == "bar"
+    assert len(a) == 4
+
+dict_from_map()

@@ -256,8 +256,10 @@ Value *VariablesResolver::visit(const Dict *node)
 {
 	ASSERT(node->keys().size() == node->values().size())
 	for (size_t i = 0; i < node->keys().size(); ++i) {
-		node->keys()[i]->codegen(this);
-		node->values()[i]->codegen(this);
+		if (auto key = node->keys()[i]) { key->codegen(this); }
+		auto value = node->values()[i];
+		ASSERT(value);
+		value->codegen(this);
 	}
 	return nullptr;
 }

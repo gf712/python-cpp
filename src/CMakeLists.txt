@@ -18,6 +18,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/ClearTopCleanup.cpp
     executable/bytecode/instructions/DictMerge.cpp
+    executable/bytecode/instructions/DictUpdate.cpp
     executable/bytecode/instructions/DeleteName.cpp
     executable/bytecode/instructions/DeleteSubscript.cpp
     executable/bytecode/instructions/ForIter.cpp

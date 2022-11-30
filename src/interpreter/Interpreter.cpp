@@ -34,6 +34,7 @@ void initialize_types()
 	super();
 	bool_();
 	bytes();
+	bytes_iterator();
 	ellipsis();
 	str();
 	str_iterator();

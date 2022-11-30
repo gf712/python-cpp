@@ -1,6 +1,7 @@
 #include "PyBytes.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
+#include "StopIteration.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -67,6 +68,11 @@ PyResult<PyObject *> PyBytes::__eq__(const PyObject *obj) const
 	}
 }
 
+PyResult<PyObject *> PyBytes::__iter__() const
+{
+	return PyBytesIterator::create(const_cast<PyBytes *>(this));
+}
+
 PyResult<PyObject *> PyBytes::__repr__() const { return PyString::create(to_string()); }
 
 PyType *PyBytes::type() const { return bytes(); }
@@ -86,6 +92,59 @@ std::function<std::unique_ptr<TypePrototype>()> PyBytes::type_factory()
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
 		std::call_once(bytes_flag, []() { type = register_bytes(); });
+		return std::move(type);
+	};
+}
+
+PyBytesIterator::PyBytesIterator(PyBytes *bytes, size_t index)
+	: PyBaseObject(BuiltinTypes::the().bytes_iterator()), m_bytes(bytes), m_index(index)
+{}
+
+PyResult<PyBytesIterator *> PyBytesIterator::create(PyBytes *bytes)
+{
+	auto &heap = VirtualMachine::the().heap();
+	auto *obj = heap.allocate<PyBytesIterator>(bytes, 0);
+	if (!obj) { return Err(memory_error(sizeof(PyBytesIterator))); }
+	return Ok(obj);
+}
+
+std::string PyBytesIterator::to_string() const
+{
+	return fmt::format("<bytes_iterator object at {}>", static_cast<const void *>(this));
+}
+
+PyResult<PyObject *> PyBytesIterator::__repr__() const { return PyString::create(to_string()); }
+
+PyResult<PyObject *> PyBytesIterator::__next__()
+{
+	if (m_index >= m_bytes->value().b.size()) { return Err(stop_iteration()); }
+	const auto next_value = m_bytes->value().b[m_index++];
+	return PyInteger::create(static_cast<int64_t>(next_value));
+}
+
+PyType *PyBytesIterator::type() const { return bytes_iterator(); }
+
+void PyBytesIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (m_bytes) { visitor.visit(*m_bytes); }
+}
+
+namespace {
+
+	std::once_flag bytes_iterator_flag;
+
+	std::unique_ptr<TypePrototype> register_bytes_iterator()
+	{
+		return std::move(klass<PyBytesIterator>("bytes_iterator").type);
+	}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyBytesIterator::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(bytes_iterator_flag, []() { type = register_bytes_iterator(); });
 		return std::move(type);
 	};
 }

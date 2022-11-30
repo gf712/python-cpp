@@ -18,6 +18,7 @@ class BuiltinTypes
 	mutable Type m_integer;
 	mutable Type m_bool;
 	mutable Type m_bytes;
+	mutable Type m_bytes_iterator;
 	mutable Type m_ellipsis;
 	mutable Type m_float;
 	mutable Type m_none;
@@ -102,6 +103,7 @@ class BuiltinTypes
 
 	TypePrototype &bool_() const { return get_type(m_bool); }
 	TypePrototype &bytes() const { return get_type(m_bytes); }
+	TypePrototype &bytes_iterator() const { return get_type(m_bytes_iterator); }
 	TypePrototype &ellipsis() const { return get_type(m_ellipsis); }
 	TypePrototype &str() const { return get_type(m_str); }
 	TypePrototype &str_iterator() const { return get_type(m_str_iterator); }
@@ -171,6 +173,7 @@ PyType *type();
 PyType *super();
 PyType *bool_();
 PyType *bytes();
+PyType *bytes_iterator();
 PyType *ellipsis();
 PyType *str();
 PyType *str_iterator();
