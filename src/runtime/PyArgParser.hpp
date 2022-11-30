@@ -4,6 +4,7 @@
 #include "PyNone.hpp"
 #include "PyTuple.hpp"
 #include "TypeError.hpp"
+#include "vm/VM.hpp"
 
 namespace py {
 
@@ -23,9 +24,9 @@ template<typename... ArgTypes> struct PyArgsParser
 		DefaultArgs &&...default_args)
 	{
 		using ExpectedType = std::tuple_element_t<Idx, ResultType>;
-		if constexpr (std::is_base_of_v<PyObject,
-						  std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
-			if (args.size() > Idx) {
+		if (args.size() > Idx) {
+			if constexpr (std::is_base_of_v<PyObject,
+							  std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
 				using PyObjectType = std::remove_pointer_t<std::remove_cv_t<ExpectedType>>;
 				const auto &arg = PyObject::from(args[Idx]);
 				if (arg.is_err()) return Err(arg.unwrap_err());
@@ -35,27 +36,39 @@ template<typename... ArgTypes> struct PyArgsParser
 					if (!as<PyObjectType>(arg.unwrap())) return Err(type_error("Unexpected type"));
 					std::get<Idx>(result) = as<PyObjectType>(arg.unwrap());
 				}
-			} else {
-				if constexpr (Idx >= MinSize && (Idx - MinSize) < sizeof...(DefaultArgs)) {
-					std::get<Idx>(result) = std::get<Idx - MinSize>(
-						std::forward_as_tuple(std::forward<DefaultArgs>(default_args)...));
+			} else if constexpr (std::is_same_v<bool,
+									 std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
+				if (auto bool_arg = truthy(args[Idx], VirtualMachine::the().interpreter());
+					bool_arg.is_ok()) {
+					std::get<Idx>(result) = bool_arg.unwrap();
 				} else {
-					TODO();
+					return Err(bool_arg.unwrap_err());
 				}
-			}
-
-			if constexpr (Idx + 1 == std::tuple_size_v<ResultType>) {
-				return Ok(std::monostate{});
 			} else {
-				return unpack_tuple_helper<Idx + 1>(args,
-					function_name,
-					min_size,
-					max_size,
-					result,
-					std::forward<DefaultArgs>(default_args)...);
+				[]<bool flag = false>()
+				{
+					static_assert(flag, "unsupported Python to native conversion");
+				}
+				();
 			}
 		} else {
-			TODO();
+			if constexpr (Idx >= MinSize && (Idx - MinSize) < sizeof...(DefaultArgs)) {
+				std::get<Idx>(result) = std::get<Idx - MinSize>(
+					std::forward_as_tuple(std::forward<DefaultArgs>(default_args)...));
+			} else {
+				TODO();
+			}
+		}
+
+		if constexpr (Idx + 1 == std::tuple_size_v<ResultType>) {
+			return Ok(std::monostate{});
+		} else {
+			return unpack_tuple_helper<Idx + 1>(args,
+				function_name,
+				min_size,
+				max_size,
+				result,
+				std::forward<DefaultArgs>(default_args)...);
 		}
 	}
 
