@@ -512,10 +512,15 @@ template<size_t TypeIdx, typename... PatternTypes>
 struct traits<OrPatternV2_<TypeIdx, PatternTypes...>>
 {
   private:
-	using _result_types = std::tuple<
-		typename std::invoke_result_t<decltype(PatternTypes::matches), Parser &>::value_type...>;
+	template<typename T> struct TypeExtractor_;
 
-	// using _first_type = typename std::tuple_element_t<0, _result_types>;
+	template<typename... T> struct TypeExtractor_<std::tuple<T...>>
+	{
+		using type = std::tuple<typename traits<T>::result_type...>;
+		using type_variant = std::variant<typename traits<T>::result_type...>;
+	};
+
+	using _result_types = typename TypeExtractor_<std::tuple<PatternTypes...>>::type;
 
 	static constexpr bool same_type = equal_types<_result_types>::value;
 
@@ -523,13 +528,7 @@ struct traits<OrPatternV2_<TypeIdx, PatternTypes...>>
 		typename std::tuple_element_t<0, _result_types>,
 		typename std::conditional_t<ast_nodes<_result_types>::value,
 			std::shared_ptr<ASTNode>,
-			std::variant<typename std::invoke_result_t<decltype(PatternTypes::matches),
-				Parser &>::value_type...>>>;
-
-	// using _first_result = typename std::invoke_result_t<
-	// 	decltype(std::tuple_element_t<TypeIdx, PatternTuple>::matches),
-	// 	Parser &>::value_type;
-	// static_assert(std::conjunction_v<>);
+			typename TypeExtractor_<std::tuple<PatternTypes...>>::type_variant>>;
 
   public:
 	using result_type = _result_type;
@@ -1773,6 +1772,11 @@ template<> struct traits<struct GroupPattern>
 	using result_type = std::shared_ptr<ASTNode>;
 };
 
+template<> struct traits<struct YieldExpressionPattern>
+{
+	using result_type = std::shared_ptr<Yield>;
+};
+
 struct GroupPattern : PatternV2<GroupPattern>
 {
 	using ResultType = typename traits<GroupPattern>::result_type;
@@ -1785,7 +1789,7 @@ struct GroupPattern : PatternV2<GroupPattern>
 
 		// TODO: add yield_expr
 		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LPAREN>,
-			NamedExpressionPattern,
+			OrPatternV2<YieldExpressionPattern, NamedExpressionPattern>,
 			SingleTokenPatternV2<Token::TokenType::RPAREN>>;
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'(' (yield_expr | named_expression) ')'");
@@ -4257,11 +4261,6 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 
 		return {};
 	}
-};
-
-template<> struct traits<struct YieldExpressionPattern>
-{
-	using result_type = std::shared_ptr<Yield>;
 };
 
 struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
