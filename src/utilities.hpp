@@ -54,7 +54,8 @@ template<class T, class U> struct member_pointer_helper<T U::*> : std::true_type
 };
 }// namespace detail
 
-template<class T> struct member_pointer : detail::member_pointer_helper<typename std::remove_cv<T>::type>
+template<class T>
+struct member_pointer : detail::member_pointer_helper<typename std::remove_cv<T>::type>
 {
 };
 

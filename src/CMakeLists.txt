@@ -125,6 +125,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyBool.cpp
     runtime/PyBuiltInMethod.cpp
     runtime/PyBytes.cpp
+    runtime/PyByteArray.cpp
     runtime/PyCell.cpp
     runtime/PyClassMethod.cpp
     runtime/PyClassMethodDescriptor.cpp

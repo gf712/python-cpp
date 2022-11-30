@@ -5,6 +5,7 @@
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
 #include "runtime/PyBuiltInMethod.hpp"
+#include "runtime/PyByteArray.hpp"
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyCell.hpp"
 #include "runtime/PyClassMethod.hpp"
@@ -47,6 +48,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_str(PyString::type_factory()), m_str_iterator(PyStringIterator::type_factory()),
 	  m_integer(PyInteger::type_factory()), m_bool(PyBool::type_factory()),
 	  m_bytes(PyBytes::type_factory()), m_bytes_iterator(PyBytesIterator::type_factory()),
+	  m_bytearray(PyByteArray::type_factory()),
+	  m_bytearray_iterator(PyByteArrayIterator::type_factory()),
 	  m_ellipsis(PyEllipsis::type_factory()), m_float(PyFloat::type_factory()),
 	  m_none(PyNone::type_factory()), m_module(PyModule::type_factory()),
 	  m_object(PyObject::type_factory()), m_function(PyFunction::type_factory()),
@@ -97,6 +100,8 @@ INITIALIZE_TYPE(super)
 INITIALIZE_TYPE(bool_)
 INITIALIZE_TYPE(bytes)
 INITIALIZE_TYPE(bytes_iterator)
+INITIALIZE_TYPE(bytearray)
+INITIALIZE_TYPE(bytearray_iterator)
 INITIALIZE_TYPE(ellipsis)
 INITIALIZE_TYPE(str)
 INITIALIZE_TYPE(str_iterator)

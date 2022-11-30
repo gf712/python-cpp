@@ -117,7 +117,7 @@ PyResult<PyObject *> PyBytesIterator::__repr__() const { return PyString::create
 
 PyResult<PyObject *> PyBytesIterator::__next__()
 {
-	if (m_index >= m_bytes->value().b.size()) { return Err(stop_iteration()); }
+	if (!m_bytes || m_index >= m_bytes->value().b.size()) { return Err(stop_iteration()); }
 	const auto next_value = m_bytes->value().b[m_index++];
 	return PyInteger::create(static_cast<int64_t>(next_value));
 }

@@ -35,6 +35,8 @@ void initialize_types()
 	bool_();
 	bytes();
 	bytes_iterator();
+	bytearray();
+	bytearray_iterator();
 	ellipsis();
 	str();
 	str_iterator();

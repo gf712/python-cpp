@@ -881,10 +881,12 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 
 auto builtin_types()
 {
-	return std::array{ type(),
+	return std::array{
+		type(),
 		super(),
 		bool_(),
 		bytes(),
+		bytearray(),
 		ellipsis(),
 		str(),
 		float_(),
@@ -900,7 +902,8 @@ auto builtin_types()
 		property(),
 		static_method(),
 		classmethod(),
-		slice() };
+		slice(),
+	};
 }
 
 auto initialize_exceptions(PyModule *blt)
