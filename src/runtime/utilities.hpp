@@ -8,9 +8,22 @@
 
 namespace py {
 
+namespace detail {
+	template<typename T>
+	concept has_output_iterator_error = requires(const T iterator)
+	{
+		{
+			iterator.last_error()
+			} -> std::convertible_to<BaseException *>;
+	};
+}// namespace detail
+
 template<typename OutputIterator>
 PyResult<std::monostate> from_iterable(PyObject *iterable, OutputIterator result)
 {
+	static constexpr bool OutputIteratorCanError =
+		detail::has_output_iterator_error<OutputIterator>;
+
 	auto &vm = VirtualMachine::the();
 	auto exc = vm.interpreter().execution_frame()->exception_info();
 
@@ -21,6 +34,9 @@ PyResult<std::monostate> from_iterable(PyObject *iterable, OutputIterator result
 
 	while (value.is_ok()) {
 		result = value.unwrap();
+		if constexpr (OutputIteratorCanError) {
+			if (result.last_error()) { return Err(result.last_error()); }
+		}
 		value = iterator.unwrap()->next();
 	}
 
