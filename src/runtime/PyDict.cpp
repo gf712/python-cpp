@@ -223,6 +223,10 @@ void PyDict::visit_graph(Visitor &visitor)
 	}
 }
 
+PyResult<PyDictKeys *> PyDict::keys() const { return PyDictKeys::create(*this); }
+
+PyResult<PyDictValues *> PyDict::values() const { return PyDictValues::create(*this); }
+
 PyType *PyDict::type() const { return dict(); }
 
 PyResult<PyObject *> PyDict::get(PyObject *key, PyObject *default_value) const
@@ -340,6 +344,8 @@ namespace {
 					+[](PyDict *self, PyTuple *, PyDict *) -> PyResult<PyObject *> {
 						return PyDictItems::create(*self);
 					})
+				.def("keys", &PyDict::keys)
+				.def("values", &PyDict::values)
 				.classmethod(
 					"fromkeys",
 					+[](PyType *cls, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
