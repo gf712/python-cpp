@@ -151,8 +151,9 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyNone.cpp
     runtime/PyNumber.cpp
     runtime/PyObject.cpp
-    runtime/PyRange.cpp
     runtime/PyProperty.cpp
+    runtime/PyRange.cpp
+    runtime/PyReversed.cpp
     runtime/PySet.cpp
     runtime/PySlice.cpp
     runtime/PySlotWrapper.cpp

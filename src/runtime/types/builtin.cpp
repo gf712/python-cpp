@@ -31,6 +31,7 @@
 #include "runtime/PyNone.hpp"
 #include "runtime/PyProperty.hpp"
 #include "runtime/PyRange.hpp"
+#include "runtime/PyReversed.hpp"
 #include "runtime/PySet.hpp"
 #include "runtime/PySlice.hpp"
 #include "runtime/PySlotWrapper.hpp"
@@ -62,10 +63,12 @@ BuiltinTypes::BuiltinTypes()
 	  m_dict_key_iterator(PyDictKeyIterator::type_factory()),
 	  m_dict_values(PyDictValues::type_factory()),
 	  m_dict_value_iterator(PyDictValueIterator::type_factory()), m_list(PyList::type_factory()),
-	  m_list_iterator(PyListIterator::type_factory()), m_tuple(PyTuple::type_factory()),
-	  m_tuple_iterator(PyTupleIterator::type_factory()), m_set(PySet::type_factory()),
-	  m_frozenset(PyFrozenSet::type_factory()), m_set_iterator(PySetIterator::type_factory()),
-	  m_range(PyRange::type_factory()), m_range_iterator(PyRangeIterator::type_factory()),
+	  m_list_iterator(PyListIterator::type_factory()),
+	  m_list_reverseiterator(PyListReverseIterator::type_factory()),
+	  m_tuple(PyTuple::type_factory()), m_tuple_iterator(PyTupleIterator::type_factory()),
+	  m_set(PySet::type_factory()), m_frozenset(PyFrozenSet::type_factory()),
+	  m_set_iterator(PySetIterator::type_factory()), m_range(PyRange::type_factory()),
+	  m_range_iterator(PyRangeIterator::type_factory()), m_reversed(PyReversed::type_factory()),
 	  m_slice(PySlice::type_factory()), m_builtin_method(PyBuiltInMethod::type_factory()),
 	  m_slot_wrapper(PySlotWrapper::type_factory()), m_bound_method(PyBoundMethod::type_factory()),
 	  m_method_wrapper(PyMethodDescriptor::type_factory()),
@@ -121,6 +124,7 @@ INITIALIZE_TYPE(dict_value_iterator)
 
 INITIALIZE_TYPE(list)
 INITIALIZE_TYPE(list_iterator)
+INITIALIZE_TYPE(list_reverseiterator)
 
 INITIALIZE_TYPE(tuple)
 INITIALIZE_TYPE(tuple_iterator)
@@ -131,6 +135,8 @@ INITIALIZE_TYPE(set_iterator)
 
 INITIALIZE_TYPE(range)
 INITIALIZE_TYPE(range_iterator)
+
+INITIALIZE_TYPE(reversed)
 
 INITIALIZE_TYPE(slice)
 

@@ -90,10 +90,12 @@ PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * 
 		m_name->value(),
 		[this, instance](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 			std::vector<Value> new_args_vector;
-			new_args_vector.reserve(args->size() + 1);
+			new_args_vector.reserve((args ? args->size() : 0) + 1);
 			new_args_vector.push_back(instance);
-			new_args_vector.insert(
-				new_args_vector.end(), args->elements().begin(), args->elements().end());
+			if (args) {
+				new_args_vector.insert(
+					new_args_vector.end(), args->elements().begin(), args->elements().end());
+			}
 			auto args_ = PyTuple::create(new_args_vector);
 			if (args_.is_err()) return args_;
 			args = args_.unwrap();

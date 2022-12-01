@@ -903,6 +903,7 @@ auto builtin_types()
 		static_method(),
 		classmethod(),
 		slice(),
+		reversed(),
 	};
 }
 

@@ -53,6 +53,7 @@ void initialize_types()
 	dict_value_iterator();
 	list();
 	list_iterator();
+	list_reverseiterator();
 	tuple();
 	tuple_iterator();
 	set();
@@ -60,6 +61,7 @@ void initialize_types()
 	set_iterator();
 	range();
 	range_iterator();
+	reversed();
 	slice();
 	function();
 	native_function();

@@ -222,6 +222,11 @@ PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
 	return Ok(result ? py_true() : py_false());
 }
 
+PyResult<PyObject *> PyList::__reversed__() const
+{
+	return PyListReverseIterator::create(*const_cast<PyList *>(this));
+}
+
 void PyList::sort()
 {
 	std::sort(m_elements.begin(), m_elements.end(), [](const Value &lhs, const Value &rhs) -> bool {
@@ -287,6 +292,7 @@ std::unique_ptr<TypePrototype> register_list()
 						return PyGenericAlias::create(type, arg);
 					});
 				})
+			.def("__reversed__", &PyList::__reversed__)
 			.type);
 }
 }// namespace
@@ -346,6 +352,63 @@ std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
 		std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
+		return std::move(type);
+	};
+}
+
+PyListReverseIterator::PyListReverseIterator(PyList &pylist, size_t start_index)
+	: PyBaseObject(BuiltinTypes::the().list_reverseiterator()), m_pylist(pylist),
+	  m_current_index(start_index)
+{}
+
+PyResult<PyListReverseIterator *> PyListReverseIterator::create(PyList &lst)
+{
+	auto list_size = lst.elements().size();
+	auto *result = VirtualMachine::the().heap().allocate<PyListReverseIterator>(lst, list_size - 1);
+	if (!result) { return Err(memory_error(sizeof(PyListReverseIterator))); }
+	return Ok(result);
+}
+
+void PyListReverseIterator::visit_graph(Visitor &visitor)
+{
+	PyObject::visit_graph(visitor);
+	if (m_pylist.has_value()) { visitor.visit(m_pylist->get()); }
+}
+
+PyResult<PyObject *> PyListReverseIterator::__iter__() const
+{
+	return Ok(const_cast<PyListReverseIterator *>(this));
+}
+
+PyResult<PyObject *> PyListReverseIterator::__next__()
+{
+	if (m_pylist.has_value()) {
+		if (m_current_index < m_pylist->get().elements().size())
+			return std::visit([](const auto &element) { return PyObject::from(element); },
+				m_pylist->get().elements()[m_current_index--]);
+		m_pylist = std::nullopt;
+	}
+	return Err(stop_iteration());
+}
+
+PyType *PyListReverseIterator::type() const { return list_reverseiterator(); }
+
+namespace {
+
+std::once_flag list_reverseiterator_flag;
+
+std::unique_ptr<TypePrototype> register_list_reverseiterator()
+{
+	return std::move(klass<PyListReverseIterator>("list_reverseiterator").type);
+}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> PyListReverseIterator::type_factory()
+{
+	return [] {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(
+			list_reverseiterator_flag, []() { type = ::register_list_reverseiterator(); });
 		return std::move(type);
 	};
 }

@@ -43,6 +43,7 @@ class BuiltinTypes
 
 	mutable Type m_list;
 	mutable Type m_list_iterator;
+	mutable Type m_list_reverseiterator;
 
 	mutable Type m_tuple;
 	mutable Type m_tuple_iterator;
@@ -53,6 +54,8 @@ class BuiltinTypes
 
 	mutable Type m_range;
 	mutable Type m_range_iterator;
+
+	mutable Type m_reversed;
 
 	mutable Type m_slice;
 
@@ -127,6 +130,7 @@ class BuiltinTypes
 
 	TypePrototype &list() const { return get_type(m_list); }
 	TypePrototype &list_iterator() const { return get_type(m_list_iterator); }
+	TypePrototype &list_reverseiterator() const { return get_type(m_list_reverseiterator); }
 
 	TypePrototype &tuple() const { return get_type(m_tuple); }
 	TypePrototype &tuple_iterator() const { return get_type(m_tuple_iterator); }
@@ -137,6 +141,8 @@ class BuiltinTypes
 
 	TypePrototype &range() const { return get_type(m_range); }
 	TypePrototype &range_iterator() const { return get_type(m_range_iterator); }
+
+	TypePrototype &reversed() const { return get_type(m_reversed); }
 
 	TypePrototype &slice() const { return get_type(m_slice); }
 
@@ -197,6 +203,7 @@ PyType *dict_values();
 PyType *dict_value_iterator();
 PyType *list();
 PyType *list_iterator();
+PyType *list_reverseiterator();
 PyType *tuple();
 PyType *tuple_iterator();
 PyType *set();
@@ -204,6 +211,7 @@ PyType *frozenset();
 PyType *set_iterator();
 PyType *range();
 PyType *range_iterator();
+PyType *reversed();
 PyType *slice();
 PyType *function();
 PyType *native_function();

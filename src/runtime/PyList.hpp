@@ -29,9 +29,10 @@ class PyList : public PyBaseObject
 
 	PyResult<PyObject *> append(PyObject *element);
 	PyResult<PyObject *> extend(PyObject *iterable);
-	PyResult<PyObject *> pop(PyObject* index);
+	PyResult<PyObject *> pop(PyObject *index);
 
 	PyResult<PyObject *> __class_getitem__(PyType *cls, PyObject *args);
+	PyResult<PyObject *> __reversed__() const;
 
 	void sort();
 
@@ -59,6 +60,28 @@ class PyListIterator : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __next__();
+
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
+	PyType *type() const override;
+};
+
+class PyListReverseIterator : public PyBaseObject
+{
+	friend class ::Heap;
+
+	std::optional<std::reference_wrapper<PyList>> m_pylist;
+	size_t m_current_index{ 0 };
+
+  private:
+	PyListReverseIterator(PyList &pylist, size_t start_index);
+
+  public:
+	static PyResult<PyListReverseIterator *> create(PyList &);
+
+	void visit_graph(Visitor &) override;
+
+	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
