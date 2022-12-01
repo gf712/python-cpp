@@ -873,6 +873,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
 	ASSERT(name_visibility_it != m_variable_visibility.end())
 	const auto &name_visibility = name_visibility_it->second->visibility;
+	const bool is_generator = name_visibility_it->second->is_generator;
 
 	for (const auto &arg_name : node->args()->argument_names()) {
 		if (auto it = name_visibility.find(arg_name);
@@ -1016,6 +1017,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	auto flags = CodeFlags::create();
 	if (node->args()->vararg() != nullptr) { flags.set(CodeFlags::Flag::VARARGS); }
 	if (node->args()->kwarg() != nullptr) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
+	if (is_generator) { flags.set(CodeFlags::Flag::GENERATOR); }
 
 	f->function_info().function.metadata.varnames = varnames;
 
