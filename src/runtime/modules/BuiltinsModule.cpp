@@ -904,6 +904,7 @@ auto builtin_types()
 		classmethod(),
 		slice(),
 		reversed(),
+		zip(),
 	};
 }
 

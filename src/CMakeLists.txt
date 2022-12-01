@@ -164,6 +164,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyTuple.cpp
     runtime/PyType.cpp
     runtime/PyWeakRef.cpp
+    runtime/PyZip.cpp
     runtime/RuntimeError.cpp
     runtime/StopIteration.cpp
     runtime/TypeError.cpp
