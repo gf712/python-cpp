@@ -24,6 +24,7 @@
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyLLVMFunction.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyMappingProxy.hpp"
 #include "runtime/PyMemberDescriptor.hpp"
 #include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PyModule.hpp"
@@ -63,7 +64,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_dict_keys(PyDictKeys::type_factory()),
 	  m_dict_key_iterator(PyDictKeyIterator::type_factory()),
 	  m_dict_values(PyDictValues::type_factory()),
-	  m_dict_value_iterator(PyDictValueIterator::type_factory()), m_list(PyList::type_factory()),
+	  m_dict_value_iterator(PyDictValueIterator::type_factory()),
+	  m_mappingproxy(PyMappingProxy::type_factory()), m_list(PyList::type_factory()),
 	  m_list_iterator(PyListIterator::type_factory()),
 	  m_list_reverseiterator(PyListReverseIterator::type_factory()),
 	  m_tuple(PyTuple::type_factory()), m_tuple_iterator(PyTupleIterator::type_factory()),
@@ -123,6 +125,7 @@ INITIALIZE_TYPE(dict_keys)
 INITIALIZE_TYPE(dict_key_iterator)
 INITIALIZE_TYPE(dict_values)
 INITIALIZE_TYPE(dict_value_iterator)
+INITIALIZE_TYPE(mappingproxy)
 
 INITIALIZE_TYPE(list)
 INITIALIZE_TYPE(list_iterator)

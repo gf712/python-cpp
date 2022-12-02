@@ -27,15 +27,26 @@ PyFunction::PyFunction(std::string name,
 	PyDict *globals)
 	: PyBaseObject(BuiltinTypes::the().function()), m_code(code), m_globals(globals),
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
-	  m_closure(std::move(closure))
+	  m_closure(closure)
 {
 	auto name_ = PyString::create(name);
 	if (name_.is_err()) { TODO(); }
 	m_name = name_.unwrap();
 
+	// FIXME: get the docstring from PyCode
+	auto doc_ = PyString::create("");
+	if (doc_.is_err()) { TODO(); }
+	m_doc = doc_.unwrap();
+
 	auto dict_ = PyDict::create();
 	if (dict_.is_err()) { TODO(); }
 	m_dict = dict_.unwrap();
+	m_attributes = m_dict;
+
+	if (!m_closure) { m_closure = PyTuple::create().unwrap(); }
+
+	m_dict->insert(String{ "__closure__" }, m_closure);
+	m_dict->insert(String{ "__doc__" }, m_doc);
 }
 
 void PyFunction::visit_graph(Visitor &visitor)
@@ -46,6 +57,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_module) visitor.visit(*m_module);
 	if (m_dict) visitor.visit(*m_dict);
 	if (m_name) visitor.visit(*m_name);
+	if (m_doc) visitor.visit(*m_doc);
 	if (m_closure) visitor.visit(*m_closure);
 }
 
@@ -102,6 +114,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 								 .attr("__globals__", &PyFunction::m_globals)
 								 .attr("__dict__", &PyFunction::m_dict)
 								 .attr("__name__", &PyFunction::m_name)
+								 .attr("__doc__", &PyFunction::m_doc)
 								 .attribute_readonly("__closure__", &PyFunction::m_closure)
 								 .type);
 		});

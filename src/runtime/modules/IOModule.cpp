@@ -2075,6 +2075,12 @@ class FileIO : public RawIOBase
 			}
 		}
 
+		if (auto dict = PyDict::create(); dict.is_ok()) {
+			m_attributes = dict.unwrap();
+		} else {
+			return Err(dict.unwrap_err());
+		}
+
 		if (auto err = setattribute(PyString::create("name").unwrap(), filename); err.is_err()) {
 			return Err(err.unwrap_err());
 		}

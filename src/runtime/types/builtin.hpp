@@ -40,6 +40,7 @@ class BuiltinTypes
 	mutable Type m_dict_key_iterator;
 	mutable Type m_dict_values;
 	mutable Type m_dict_value_iterator;
+	mutable Type m_mappingproxy;
 
 	mutable Type m_list;
 	mutable Type m_list_iterator;
@@ -129,6 +130,7 @@ class BuiltinTypes
 	TypePrototype &dict_key_iterator() const { return get_type(m_dict_key_iterator); }
 	TypePrototype &dict_values() const { return get_type(m_dict_values); }
 	TypePrototype &dict_value_iterator() const { return get_type(m_dict_value_iterator); }
+	TypePrototype &mappingproxy() const { return get_type(m_mappingproxy); }
 
 	TypePrototype &list() const { return get_type(m_list); }
 	TypePrototype &list_iterator() const { return get_type(m_list_iterator); }
@@ -205,6 +207,7 @@ PyType *dict_keys();
 PyType *dict_key_iterator();
 PyType *dict_values();
 PyType *dict_value_iterator();
+PyType *mappingproxy();
 PyType *list();
 PyType *list_iterator();
 PyType *list_reverseiterator();

@@ -12,6 +12,7 @@ class PyFunction : public PyBaseObject
 	// friend std::unique_ptr<TypePrototype> register_type();
 
 	PyString *m_name = nullptr;
+	PyString *m_doc = nullptr;
 	PyCode *m_code = nullptr;
 	PyDict *m_globals = nullptr;
 	PyDict *m_dict = nullptr;

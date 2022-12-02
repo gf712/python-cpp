@@ -509,9 +509,14 @@ PyResult<std::monostate> PyObject::setattribute(PyObject *attribute, PyObject *v
 	if (auto setattr_method = type()->underlying_type().__setattribute__;
 		setattr_method.has_value()) {
 		return call_slot(*setattr_method, "", this, attribute, value);
+	}
+	if (type()->underlying_type().__getattribute__.has_value()) {
+		return Err(type_error("'{}' object has only read-only attributes (assign to {})",
+			type()->name(),
+			attribute->to_string()));
 	} else {
 		return Err(type_error("'{}' object has no attributes (assign to {})",
-			type()->underlying_type().__name__,
+			type()->name(),
 			attribute->to_string()));
 	}
 }
@@ -969,7 +974,9 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
 	}
 
-	if (auto descriptor_ = type()->lookup(attribute); descriptor_.is_ok()) {
+	auto descriptor_ = type()->lookup(attribute);
+
+	if (descriptor_.is_ok()) {
 		auto *descriptor = descriptor_.unwrap();
 		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
 		if (descriptor_set.has_value()) {
@@ -978,10 +985,12 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 	}
 
 	if (!m_attributes) {
-		if (auto dict = PyDict::create(); dict.is_ok()) {
-			m_attributes = dict.unwrap();
+		if (descriptor_.is_ok()) {
+			return Err(attribute_error(
+				"'{}' object attribute '{}' is read-only", type()->name(), attribute->to_string()));
 		} else {
-			return Err(dict.unwrap_err());
+			return Err(attribute_error(
+				"'{}' object has no attribute '{}'", type()->name(), attribute->to_string()));
 		}
 	}
 

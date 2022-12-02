@@ -10,6 +10,7 @@
 #include "PyGetSetDescriptor.hpp"
 #include "PyInteger.hpp"
 #include "PyList.hpp"
+#include "PyMappingProxy.hpp"
 #include "PyMemberDescriptor.hpp"
 #include "PyMethodDescriptor.hpp"
 #include "PyNone.hpp"
@@ -256,7 +257,8 @@ namespace {
 						(void)value;
 						TODO();
 					})
-				.property_readonly("__dict__", [](PyType *self) { return Ok(self->dict()); })
+				.property_readonly(
+					"__dict__", [](PyType *self) { return PyMappingProxy::create(self->dict()); })
 				.property_readonly(
 					"__bases__", [](PyType *self) { return Ok(self->underlying_type().__bases__); })
 				.property(
@@ -1236,7 +1238,8 @@ namespace {
 			auto slotdef = resolve_slotdups(type, slot.name);
 			ASSERT(slotdef.has_value());
 			ASSERT(&slotdef->get() == &slot);
-			if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type()); !s.has_value()) {
+			if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type());
+				!s.has_value()) {
 				// if we don't have a specific slot we get the wrapper from descriptor we found in
 				// the MRO
 				generic = slot_wrapper->base().get().get_member(
