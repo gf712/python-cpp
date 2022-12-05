@@ -133,6 +133,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyCoroutine.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp
+    runtime/PyEnumerate.cpp
     runtime/PyFloat.cpp
     runtime/PyFrame.cpp
     runtime/PyFrozenSet.cpp

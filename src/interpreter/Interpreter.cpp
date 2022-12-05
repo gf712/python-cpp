@@ -63,6 +63,7 @@ void initialize_types()
 	range_iterator();
 	reversed();
 	zip();
+	enumerate();
 	slice();
 	function();
 	native_function();

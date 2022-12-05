@@ -905,6 +905,7 @@ auto builtin_types()
 		slice(),
 		reversed(),
 		zip(),
+		enumerate(),
 	};
 }
 

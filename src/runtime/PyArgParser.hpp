@@ -1,8 +1,10 @@
 #pragma once
 
 #include "PyDict.hpp"
+#include "PyInteger.hpp"
 #include "PyNone.hpp"
 #include "PyTuple.hpp"
+#include "PyType.hpp"
 #include "TypeError.hpp"
 #include "vm/VM.hpp"
 
@@ -43,6 +45,16 @@ template<typename... ArgTypes> struct PyArgsParser
 					std::get<Idx>(result) = bool_arg.unwrap();
 				} else {
 					return Err(bool_arg.unwrap_err());
+				}
+			} else if constexpr (std::is_same_v<int64_t,
+									 std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
+				auto int_obj = PyObject::from(args[Idx]);
+				if (int_obj.is_err()) { return Err(int_obj.unwrap_err()); }
+				if (!as<PyInteger>(int_obj.unwrap())) {
+					return Err(type_error("'{}' object cannot be interpreted as an integer",
+						int_obj.unwrap()->type()->name()));
+				} else {
+					std::get<Idx>(result) = as<PyInteger>(int_obj.unwrap())->as_i64();
 				}
 			} else {
 				[]<bool flag = false>()
