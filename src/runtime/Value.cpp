@@ -15,30 +15,134 @@
 
 using namespace py;
 
+std::string Number::to_string() const
+{
+	return std::visit([](const auto &value) { return fmt::format("{}", value); }, value);
+}
+
+Number Number::exp(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  if(rhs_value.fits_ulong_p()) {
+							  	mpz_class result{};
+								mpz_pow_ui(
+									result.get_mpz_t(), lhs_value.get_mpz_t(), rhs_value.get_ui());
+							  	return Number{ std::move(result) };
+							  } else {
+								return Number{ std::pow(lhs_value.get_d(), rhs_value.get_d()) };
+							  }
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ std::pow(lhs_value.get_d(), rhs_value) };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ std::pow(lhs_value, rhs_value.get_d()) };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ std::pow(lhs_value, rhs_value) };
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
+Number Number::operator+(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value + rhs_value };
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value.get_d() + rhs_value };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value + rhs_value.get_d() };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value + rhs_value };
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
+Number Number::operator-(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value - rhs_value };
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value.get_d() - rhs_value };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value - rhs_value.get_d() };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value - rhs_value };
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
+Number Number::operator%(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value % rhs_value };
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ std::fmod(lhs_value.get_d(), rhs_value) };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ std::fmod(lhs_value, rhs_value.get_d()) };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ std::fmod(lhs_value, rhs_value) };
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
 Number Number::operator/(const Number &other) const
 {
-	return std::visit(
-		overloaded{ [](const auto &lhs, const auto &rhs) {
-					   return Number{ static_cast<double>(lhs) / static_cast<double>(rhs) };
-				   },
-			[](const int64_t &lhs, const int64_t &rhs) {
-				if (lhs % rhs == 0) {
-					return Number{ lhs / rhs };
-				} else {
-					return Number{ static_cast<double>(lhs) / static_cast<double>(rhs) };
-				}
-			} },
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value / rhs_value };
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value.get_d() / rhs_value };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value / rhs_value.get_d() };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value / rhs_value };
+						  },
+					  },
 		value,
 		other.value);
 }
 
 Number Number::operator*(const Number &other) const
 {
-	return std::visit(
-		overloaded{ [](const auto &lhs, const auto &rhs) {
-					   return Number{ static_cast<double>(lhs) * static_cast<double>(rhs) };
-				   },
-			[](const int64_t &lhs, const int64_t &rhs) { return Number{ lhs * rhs }; } },
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value * rhs_value };
+						  },
+						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value.get_d() * rhs_value };
+						  },
+						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+							  return Number{ lhs_value * rhs_value.get_d() };
+						  },
+						  [](const double &lhs_value, const double &rhs_value) -> Number {
+							  return Number{ lhs_value * rhs_value };
+						  },
+					  },
 		value,
 		other.value);
 }
@@ -69,17 +173,42 @@ bool Number::operator==(const Number &rhs) const
 		value,
 		rhs.value);
 }
+
+Number Number::operator<<(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+							  ASSERT(rhs_value.fits_ulong_p());
+							  return Number{ lhs_value << rhs_value.get_ui() };
+						  },
+						  [](const mpz_class &, const double &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+						  [](const double &, const mpz_class &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+						  [](const double &, const double &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
 bool Number::operator<=(const Number &rhs) const
 {
 	return std::visit(
-		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value <= rhs_value; },
+		[](const auto &lhs_value, const auto &rhs_value) -> bool { return lhs_value <= rhs_value; },
 		value,
 		rhs.value);
 }
 bool Number::operator<(const Number &rhs) const
 {
 	return std::visit(
-		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value < rhs_value; },
+		[](const auto &lhs_value, const auto &rhs_value) -> bool { return lhs_value < rhs_value; },
 		value,
 		rhs.value);
 }
@@ -87,7 +216,7 @@ bool Number::operator<(const Number &rhs) const
 bool Number::operator>(const Number &rhs) const
 {
 	return std::visit(
-		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value > rhs_value; },
+		[](const auto &lhs_value, const auto &rhs_value) -> bool { return lhs_value > rhs_value; },
 		value,
 		rhs.value);
 }
@@ -95,7 +224,7 @@ bool Number::operator>(const Number &rhs) const
 bool Number::operator>=(const Number &rhs) const
 {
 	return std::visit(
-		[](const auto &lhs_value, const auto &rhs_value) { return lhs_value >= rhs_value; },
+		[](const auto &lhs_value, const auto &rhs_value) -> bool { return lhs_value >= rhs_value; },
 		value,
 		rhs.value);
 }
@@ -520,21 +649,21 @@ PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpre
 PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	return std::visit(
-		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
-					   if (std::holds_alternative<int64_t>(lhs_value.value)
-						   && std::holds_alternative<int64_t>(rhs_value.value)) {
-						   return Ok(Number{ std::get<int64_t>(lhs_value.value)
-											 & std::get<int64_t>(rhs_value.value) });
-					   } else {
-						   const std::string lhs_type =
-							   std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
-						   const std::string rhs_type =
-							   std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
-						   return Err(type_error("unsupported operand type(s) for &: '{}' and '{}'",
-							   lhs_type,
-							   rhs_type));
-					   }
-				   },
+		overloaded{
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				if (std::holds_alternative<BigIntType>(lhs_value.value)
+					&& std::holds_alternative<BigIntType>(rhs_value.value)) {
+					return Ok(Number{ std::get<BigIntType>(lhs_value.value)
+									  & std::get<BigIntType>(rhs_value.value) });
+				} else {
+					const std::string lhs_type =
+						std::holds_alternative<BigIntType>(lhs_value.value) ? "int" : "float";
+					const std::string rhs_type =
+						std::holds_alternative<BigIntType>(rhs_value.value) ? "int" : "float";
+					return Err(type_error(
+						"unsupported operand type(s) for &: '{}' and '{}'", lhs_type, rhs_type));
+				}
+			},
 			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				if (py_lhs.is_err()) return py_lhs;
@@ -549,21 +678,21 @@ PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &)
 PyResult<Value> or_(const Value &lhs, const Value &rhs, Interpreter &)
 {
 	return std::visit(
-		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
-					   if (std::holds_alternative<int64_t>(lhs_value.value)
-						   && std::holds_alternative<int64_t>(rhs_value.value)) {
-						   return Ok(Number{ std::get<int64_t>(lhs_value.value)
-											 | std::get<int64_t>(rhs_value.value) });
-					   } else {
-						   const std::string lhs_type =
-							   std::holds_alternative<int64_t>(lhs_value.value) ? "int" : "float";
-						   const std::string rhs_type =
-							   std::holds_alternative<int64_t>(rhs_value.value) ? "int" : "float";
-						   return Err(type_error("unsupported operand type(s) for &: '{}' and '{}'",
-							   lhs_type,
-							   rhs_type));
-					   }
-				   },
+		overloaded{
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				if (std::holds_alternative<BigIntType>(lhs_value.value)
+					&& std::holds_alternative<BigIntType>(rhs_value.value)) {
+					return Ok(Number{ std::get<BigIntType>(lhs_value.value)
+									  | std::get<BigIntType>(rhs_value.value) });
+				} else {
+					const std::string lhs_type =
+						std::holds_alternative<BigIntType>(lhs_value.value) ? "int" : "float";
+					const std::string rhs_type =
+						std::holds_alternative<BigIntType>(rhs_value.value) ? "int" : "float";
+					return Err(type_error(
+						"unsupported operand type(s) for &: '{}' and '{}'", lhs_type, rhs_type));
+				}
+			},
 			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
 				if (py_lhs.is_err()) return py_lhs;

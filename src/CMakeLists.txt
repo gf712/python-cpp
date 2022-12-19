@@ -209,16 +209,16 @@ add_executable(unittests_ ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp
   PUBLIC spdlog_header_only
-  PRIVATE project_options project_warnings ICU::uc
+  PRIVATE project_options project_warnings ICU::uc ${GMP_LIBRARIES} ${GMPXX_LIBRARIES}
 )
 
-target_include_directories(python-cpp PUBLIC .)
+target_include_directories(python-cpp
+  PUBLIC .
+  PRIVATE ${GMP_INCLUDES})
 
 target_compile_options(
   python-cpp
-  PRIVATE -Wall
-  -Wextra
-  -Werror
+  PRIVATE
   # -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
   -fno-omit-frame-pointer)
 

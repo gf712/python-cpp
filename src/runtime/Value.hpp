@@ -4,6 +4,9 @@
 #include "../utilities.hpp"
 #include "forward.hpp"
 
+#include <gmpxx.h>
+#include <spdlog/fmt/bundled/format.h>
+
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -11,77 +14,45 @@
 #include <variant>
 #include <vector>
 
+template<> struct fmt::formatter<mpz_class> : fmt::formatter<std::string>
+{
+	template<typename FormatContext> auto format(const mpz_class &number, FormatContext &ctx)
+	{
+		std::ostringstream os;
+		os << number;
+		return fmt::formatter<std::string>::format(os.str(), ctx);
+	}
+};
+
 namespace py {
+
+using BigIntType = mpz_class;
 
 struct Number
 {
-	std::variant<int64_t, double> value;
+	// Should we use `mpf_class` instead of `double`?
+	std::variant<double, BigIntType> value;
 	friend std::ostream &operator<<(std::ostream &os, const Number &number)
 	{
 		os << number.to_string();
 		return os;
 	}
 
-	std::string to_string() const
-	{
-		return std::visit([](const auto &value) { return std::to_string(value); }, value);
-	}
+	std::string to_string() const;
 
-	Number exp(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				return Number{ static_cast<decltype(lhs_value)>(
-					std::pow(static_cast<double>(lhs_value), static_cast<double>(rhs_value))) };
-			},
-			value,
-			rhs.value);
-	}
+	Number exp(const Number &rhs) const;
 
-	Number operator+(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				return Number{ static_cast<decltype(lhs_value)>(
-					static_cast<double>(lhs_value) + static_cast<double>(rhs_value)) };
-			},
-			value,
-			rhs.value);
-	}
-	Number operator-(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				return Number{ static_cast<decltype(lhs_value)>(
-					static_cast<double>(lhs_value) - static_cast<double>(rhs_value)) };
-			},
-			value,
-			rhs.value);
-	}
+	Number operator+(const Number &rhs) const;
+
+	Number operator-(const Number &rhs) const;
 
 	Number operator*(const Number &rhs) const;
 
-	Number operator%(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				return Number{ static_cast<decltype(lhs_value)>(
-					std::fmod(static_cast<double>(lhs_value), static_cast<double>(rhs_value))) };
-			},
-			value,
-			rhs.value);
-	}
+	Number operator%(const Number &rhs) const;
+
 	Number operator/(const Number &rhs) const;
-	Number operator<<(const Number &rhs) const
-	{
-		return std::visit(
-			[](const auto &lhs_value, const auto &rhs_value) {
-				// FIXME
-				return Number{ static_cast<int64_t>(lhs_value) << static_cast<int64_t>(rhs_value) };
-			},
-			value,
-			rhs.value);
-	}
+
+	Number operator<<(const Number &rhs) const;
 
 	bool operator==(const Number &rhs) const;
 	bool operator<=(const Number &rhs) const;

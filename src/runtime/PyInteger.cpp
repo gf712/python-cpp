@@ -24,11 +24,20 @@ template<> const PyInteger *as(const PyObject *obj)
 }
 
 
-PyInteger::PyInteger(int64_t value) : Interface(Number{ value }, BuiltinTypes::the().integer()) {}
+PyInteger::PyInteger(BigIntType value)
+	: Interface(Number{ std::move(value) }, BuiltinTypes::the().integer())
+{}
 
-PyInteger::PyInteger(TypePrototype &type, int64_t value) : Interface(Number{ value }, type) {}
+PyInteger::PyInteger(TypePrototype &type, BigIntType value)
+	: Interface(Number{ std::move(value) }, type)
+{}
 
 PyResult<PyInteger *> PyInteger::create(int64_t value)
+{
+	return PyInteger::create(BigIntType{ value });
+}
+
+PyResult<PyInteger *> PyInteger::create(BigIntType value)
 {
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<PyInteger>(value);
@@ -131,27 +140,27 @@ PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
 		return Err(value_error("byteorder must be either 'little' or 'big'"));
 	}
 
-	std::vector<std::byte> bytes;
-	bytes.resize(length, std::byte{ '\0' });
-	const std::byte *bytes_ = bit_cast<std::byte *>(&std::get<int64_t>(m_value.value));
-	const auto copy_len = std::min(sizeof(int64_t), length);
-	if constexpr (std::endian::native == std::endian::big) {
-		if (byteorder == "big") {
-			std::copy_n(bytes_, copy_len, bytes.begin());
-		} else {
-			auto it = bytes.rbegin();
-			for (size_t i = 0; i < copy_len; i++) { *(it++) = bytes_[i]; }
-		}
-	} else if constexpr (std::endian::native == std::endian::little) {
-		if (byteorder == "little") {
-			std::copy_n(bytes_, copy_len, bytes.begin());
-		} else {
-			auto it = bytes.rbegin();
-			for (size_t i = 0; i < copy_len; i++) { *(it++) = bytes_[i]; }
-		}
+	std::unique_ptr<std::byte[]> bytes = std::make_unique<std::byte[]>(length);
+	const int32_t order = byteorder == "big" ? 1 : -1;
+	auto l = length;
+	void *result = mpz_export(
+		bytes.get(), &l, order, 1, order, 0, std::get<BigIntType>(m_value.value).get_mpz_t());
+	ASSERT(result);
+	if (l > length) {
+		// FIXME: should be an OverflowError
+		return Err(value_error("int too big to convert"));
 	}
 
-	return PyBytes::create(Bytes{ bytes });
+	std::vector<std::byte> bytes_result;
+	if (byteorder == "little") {
+		bytes_result = std::vector<std::byte>{ bytes.get(), bytes.get() + length };
+	} else {
+		bytes_result.reserve(length);
+		bytes_result.resize(length - l);
+		bytes_result.insert(bytes_result.end(), bytes.get(), bytes.get() + l);
+	}
+
+	return PyBytes::create(Bytes{ std::move(bytes_result) });
 }
 
 PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *kwargs)
@@ -209,14 +218,16 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 
 int64_t PyInteger::as_i64() const
 {
-	ASSERT(std::holds_alternative<int64_t>(m_value.value))
-	return std::get<int64_t>(m_value.value);
+	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
+	ASSERT(std::get<BigIntType>(m_value.value).fits_slong_p());
+	return std::get<BigIntType>(m_value.value).get_si();
 }
 
 size_t PyInteger::as_size_t() const
 {
-	ASSERT(std::holds_alternative<int64_t>(m_value.value))
-	return static_cast<size_t>(std::get<int64_t>(m_value.value));
+	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
+	ASSERT(std::get<BigIntType>(m_value.value).fits_ulong_p());
+	return std::get<BigIntType>(m_value.value).get_ui();
 }
 
 PyType *PyInteger::type() const { return integer(); }

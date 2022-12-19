@@ -64,8 +64,9 @@ size_t ValueHash::operator()(const Value &value) const
 								  if (std::holds_alternative<double>(number.value)) {
 									  return std::hash<double>{}(std::get<double>(number.value));
 								  } else {
-									  if (std::get<int64_t>(number.value) == -1) return -2;
-									  return std::get<int64_t>(number.value);
+									  if (std::get<BigIntType>(number.value) == -1) return -2;
+									  ASSERT(std::get<BigIntType>(number.value).fits_ulong_p());
+									  return std::get<BigIntType>(number.value).get_ui();
 								  }
 							  },
 					   [](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },

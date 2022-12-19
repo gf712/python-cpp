@@ -23,9 +23,9 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_value->index(), expected_value->index());
 	std::visit(
 		overloaded{ [&](const Number &number_value) {
-					   if (auto *int_result = std::get_if<int64_t>(&number_value.value)) {
+					   if (auto *int_result = std::get_if<BigIntType>(&number_value.value)) {
 						   ASSERT_EQ(*int_result,
-							   std::get<int64_t>(std::get<Number>(*expected_value).value));
+							   std::get<BigIntType>(std::get<Number>(*expected_value).value));
 					   } else if (auto *double_result = std::get_if<double>(&number_value.value)) {
 						   ASSERT_EQ(*double_result,
 							   std::get<double>(std::get<Number>(*expected_value).value));
@@ -501,7 +501,7 @@ TEST(Optimizer, ConstantFoldIntegerAddition)
 	expected_ast->emplace(
 		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
 									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(static_cast<int64_t>(2), SourceLocation{}),
+			std::make_shared<Constant>(BigIntType{2}, SourceLocation{}),
 			"",
 			SourceLocation{}));
 

@@ -73,15 +73,18 @@ template<> inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<u
 		std::visit(
 			overloaded{
 				[&](const Number &val) {
-					std::visit(overloaded{ [&](const int64_t &v) {
-											  serialize(
-												  static_cast<uint8_t>(ValueType::INT64), result);
-											  serialize(v, result);
-										  },
+					std::visit(overloaded{
+								   [&](const BigIntType &v) {
+									   ASSERT(v.fits_ulong_p());
+									   const auto int_value = v.get_ui();
+									   serialize(static_cast<uint8_t>(ValueType::INT64), result);
+									   serialize(int_value, result);
+								   },
 								   [&](const double &v) {
 									   serialize(static_cast<uint8_t>(ValueType::F64), result);
 									   serialize(v, result);
-								   } },
+								   },
+							   },
 						val.value);
 				},
 				[&](const String &val) {

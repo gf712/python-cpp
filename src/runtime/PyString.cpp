@@ -331,16 +331,39 @@ PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 	if (!start && !end) {
 		result = m_value.find(pattern->value().c_str());
 	} else if (!end) {
-		size_t start_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
-			start->value().value);
+		size_t start_ =
+			std::visit(overloaded{
+						   [this](const auto &val) -> size_t {
+							   return get_position_from_slice(static_cast<int64_t>(val));
+						   },
+						   [this](const mpz_class &val) -> size_t {
+							   ASSERT(val.fits_slong_p());
+							   return get_position_from_slice(val.get_si());
+						   },
+					   },
+				start->value().value);
 		result = m_value.find(pattern->value().c_str(), start_);
 	} else {
-		size_t start_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
-			start->value().value);
-		size_t end_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+		size_t start_ =
+			std::visit(overloaded{
+						   [this](const auto &val) -> size_t {
+							   return get_position_from_slice(static_cast<int64_t>(val));
+						   },
+						   [this](const mpz_class &val) -> size_t {
+							   ASSERT(val.fits_slong_p());
+							   return get_position_from_slice(val.get_si());
+						   },
+					   },
+				start->value().value);
+		size_t end_ = std::visit(overloaded{
+									 [this](const auto &val) -> size_t {
+										 return get_position_from_slice(static_cast<int64_t>(val));
+									 },
+									 [this](const mpz_class &val) -> size_t {
+										 ASSERT(val.fits_slong_p());
+										 return get_position_from_slice(val.get_si());
+									 },
+								 },
 			end->value().value);
 		size_t subtring_size = end_ - start_;
 		result = m_value.find(pattern->value().c_str(), start_, subtring_size);
@@ -386,16 +409,37 @@ PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 		start_idx = 0;
 		end_idx = m_value.size();
 	} else if (!end) {
-		start_idx = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+		start_idx = std::visit(overloaded{
+								   [this](const auto &val) -> size_t {
+									   return get_position_from_slice(static_cast<int64_t>(val));
+								   },
+								   [this](const mpz_class &val) -> size_t {
+									   ASSERT(val.fits_slong_p());
+									   return get_position_from_slice(val.get_si());
+								   },
+							   },
 			start->value().value);
 		end_idx = m_value.size();
 	} else {
-		start_idx = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+		start_idx = std::visit(overloaded{
+								   [this](const auto &val) -> size_t {
+									   return get_position_from_slice(static_cast<int64_t>(val));
+								   },
+								   [this](const mpz_class &val) -> size_t {
+									   ASSERT(val.fits_slong_p());
+									   return get_position_from_slice(val.get_si());
+								   },
+							   },
 			start->value().value);
-		end_idx = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+		end_idx = std::visit(overloaded{
+								 [this](const auto &val) -> size_t {
+									 return get_position_from_slice(static_cast<int64_t>(val));
+								 },
+								 [this](const mpz_class &val) -> size_t {
+									 ASSERT(val.fits_slong_p());
+									 return get_position_from_slice(val.get_si());
+								 },
+							 },
 			end->value().value);
 	}
 
@@ -443,9 +487,15 @@ PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 
 	const size_t start_ = [start, this]() {
 		if (start) {
-			return std::visit(
-				[this](
-					const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+			return std::visit(overloaded{
+								  [this](const auto &val) -> size_t {
+									  return get_position_from_slice(static_cast<int64_t>(val));
+								  },
+								  [this](const mpz_class &val) -> size_t {
+									  ASSERT(val.fits_slong_p());
+									  return get_position_from_slice(val.get_si());
+								  },
+							  },
 				start->value().value);
 		} else {
 			return size_t{ 0 };
@@ -454,9 +504,15 @@ PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 
 	const size_t end_ = [end, this]() {
 		if (end) {
-			return std::visit(
-				[this](
-					const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+			return std::visit(overloaded{
+								  [this](const auto &val) -> size_t {
+									  return get_position_from_slice(static_cast<int64_t>(val));
+								  },
+								  [this](const mpz_class &val) -> size_t {
+									  ASSERT(val.fits_slong_p());
+									  return get_position_from_slice(val.get_si());
+								  },
+							  },
 				end->value().value);
 		} else {
 			return m_value.size();
@@ -542,24 +598,42 @@ PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 			if (!start && !end) {
 				return m_value.starts_with(prefix);
 			} else if (!end) {
-				size_t start_ = std::visit(
-					[this](const auto &val) {
-						return get_position_from_slice(static_cast<int64_t>(val));
-					},
-					start->value().value);
+				size_t start_ =
+					std::visit(overloaded{
+								   [this](const auto &val) -> size_t {
+									   return get_position_from_slice(static_cast<int64_t>(val));
+								   },
+								   [this](const mpz_class &val) -> size_t {
+									   ASSERT(val.fits_slong_p());
+									   return get_position_from_slice(val.get_si());
+								   },
+							   },
+						start->value().value);
 				std::string_view substring{ m_value.c_str() + start_, m_value.size() - start_ };
 				return substring.starts_with(prefix);
 			} else {
-				size_t start_ = std::visit(
-					[this](const auto &val) {
-						return get_position_from_slice(static_cast<int64_t>(val));
-					},
-					start->value().value);
-				size_t end_ = std::visit(
-					[this](const auto &val) {
-						return get_position_from_slice(static_cast<int64_t>(val));
-					},
-					end->value().value);
+				size_t start_ =
+					std::visit(overloaded{
+								   [this](const auto &val) -> size_t {
+									   return get_position_from_slice(static_cast<int64_t>(val));
+								   },
+								   [this](const mpz_class &val) -> size_t {
+									   ASSERT(val.fits_slong_p());
+									   return get_position_from_slice(val.get_si());
+								   },
+							   },
+						start->value().value);
+				size_t end_ =
+					std::visit(overloaded{
+								   [this](const auto &val) -> size_t {
+									   return get_position_from_slice(static_cast<int64_t>(val));
+								   },
+								   [this](const mpz_class &val) -> size_t {
+									   ASSERT(val.fits_slong_p());
+									   return get_position_from_slice(val.get_si());
+								   },
+							   },
+						end->value().value);
 				std::string_view substring{ m_value.c_str() + start_, end_ - start_ };
 				return substring.starts_with(prefix);
 			}
@@ -599,17 +673,40 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 	if (!start && !end) {
 		result = m_value.ends_with(suffix->value());
 	} else if (!end) {
-		size_t start_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
-			start->value().value);
+		size_t start_ =
+			std::visit(overloaded{
+						   [this](const auto &val) -> size_t {
+							   return get_position_from_slice(static_cast<int64_t>(val));
+						   },
+						   [this](const mpz_class &val) -> size_t {
+							   ASSERT(val.fits_slong_p());
+							   return get_position_from_slice(val.get_si());
+						   },
+					   },
+				start->value().value);
 		std::string_view substring{ m_value.c_str() + start_, m_value.size() - start_ };
 		result = substring.ends_with(suffix->value());
 	} else {
-		size_t start_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
-			start->value().value);
-		size_t end_ = std::visit(
-			[this](const auto &val) { return get_position_from_slice(static_cast<int64_t>(val)); },
+		size_t start_ =
+			std::visit(overloaded{
+						   [this](const auto &val) -> size_t {
+							   return get_position_from_slice(static_cast<int64_t>(val));
+						   },
+						   [this](const mpz_class &val) -> size_t {
+							   ASSERT(val.fits_slong_p());
+							   return get_position_from_slice(val.get_si());
+						   },
+					   },
+				start->value().value);
+		size_t end_ = std::visit(overloaded{
+									 [this](const auto &val) -> size_t {
+										 return get_position_from_slice(static_cast<int64_t>(val));
+									 },
+									 [this](const mpz_class &val) -> size_t {
+										 ASSERT(val.fits_slong_p());
+										 return get_position_from_slice(val.get_si());
+									 },
+								 },
 			end->value().value);
 		std::string_view substring{ m_value.c_str() + start_, end_ - start_ };
 		result = substring.ends_with(suffix->value());
@@ -644,9 +741,7 @@ PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
 		if (value.is_ok()) { new_string.append(m_value); }
 	};
 
-	if (value.is_err() && value.unwrap_err()->type() != stop_iteration()->type()) {
-		return value;
-	}
+	if (value.is_err() && value.unwrap_err()->type() != stop_iteration()->type()) { return value; }
 	return PyString::create(new_string);
 }
 

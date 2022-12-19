@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include <gmpxx.h>
+
 #include "forward.hpp"
 #include "lexer/Lexer.hpp"
 #include "utilities.hpp"
@@ -176,12 +178,13 @@ class Constant : public ASTNode
 	void print_this_node(const std::string &indent) const override;
 
   public:
-	explicit Constant(double value, SourceLocation source_location);
-	explicit Constant(int64_t value, SourceLocation source_location);
-	explicit Constant(bool value, SourceLocation source_location);
-	explicit Constant(std::string value, SourceLocation source_location);
-	explicit Constant(const char *value, SourceLocation source_location);
-	explicit Constant(const py::Value &, SourceLocation source_location);
+	Constant(double value, SourceLocation source_location);
+	Constant(int64_t value, SourceLocation source_location);
+	Constant(mpz_class value, SourceLocation source_location);
+	Constant(bool value, SourceLocation source_location);
+	Constant(std::string value, SourceLocation source_location);
+	Constant(const char *value, SourceLocation source_location);
+	Constant(const py::Value &, SourceLocation source_location);
 
 	const py::Value *value() const { return m_value.get(); }
 

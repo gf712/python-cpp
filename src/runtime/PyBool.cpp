@@ -22,14 +22,13 @@ PyBool::PyBool(bool value) : PyInteger(BuiltinTypes::the().bool_(), value) {}
 
 std::string PyBool::to_string() const
 {
-	ASSERT(std::holds_alternative<int64_t>(m_value.value));
-	return std::get<int64_t>(m_value.value) ? "True" : "False";
+	return value() ? "True" : "False";
 }
 
 bool PyBool::value() const
 {
-	ASSERT(std::holds_alternative<int64_t>(m_value.value));
-	return std::get<int64_t>(m_value.value);
+	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
+	return static_cast<bool>(std::get<BigIntType>(m_value.value));
 }
 
 PyResult<PyObject *> PyBool::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -52,8 +51,8 @@ PyResult<PyObject *> PyBool::__repr__() const { return PyString::create(to_strin
 
 PyResult<bool> PyBool::__bool__() const
 {
-	ASSERT(std::holds_alternative<int64_t>(m_value.value));
-	return Ok(static_cast<bool>(std::get<int64_t>(m_value.value)));
+	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
+	return Ok(value());
 }
 
 PyResult<PyBool *> PyBool::create(bool value)

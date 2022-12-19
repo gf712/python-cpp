@@ -39,7 +39,7 @@ template<typename T> void check_value(const PyObject *obj, T expected_value)
 		ASSERT_EQ(obj->type(), integer());
 		auto pynum = as<PyInteger>(obj);
 		ASSERT_TRUE(pynum);
-		ASSERT_EQ(std::get<int64_t>(pynum->value().value), expected_value);
+		ASSERT_EQ(std::get<BigIntType>(pynum->value().value), expected_value);
 	} else if constexpr (std::is_same_v<T, const char *> || std::is_same_v<T, std::string>) {
 		ASSERT_EQ(obj->type(), str());
 		auto pystring = as<PyString>(obj);
@@ -129,7 +129,7 @@ TEST_F(RunPythonProgram, SimpleAssignment)
 	constexpr std::string_view program = "a = 2\n";
 	run(program);
 	auto &vm = VirtualMachine::the();
-	ASSERT_EQ(std::get<int64_t>(std::get<Number>(vm.reg(1)).value), 2);
+	ASSERT_EQ(std::get<BigIntType>(std::get<Number>(vm.reg(1)).value), 2);
 
 	assert_interpreter_object_value("a", 2);
 }
@@ -139,9 +139,9 @@ TEST_F(RunPythonProgram, SimplePowerAssignment)
 	constexpr std::string_view program = "a = 2 ** 10\n";
 	run(program);
 	auto &vm = VirtualMachine::the();
-	ASSERT_EQ(std::get<int64_t>(std::get<Number>(vm.reg(1)).value), 2);
-	ASSERT_EQ(std::get<int64_t>(std::get<Number>(vm.reg(2)).value), 10);
-	ASSERT_EQ(std::get<int64_t>(std::get<Number>(vm.reg(3)).value), std::pow(2, 10));
+	ASSERT_EQ(std::get<BigIntType>(std::get<Number>(vm.reg(1)).value), 2);
+	ASSERT_EQ(std::get<BigIntType>(std::get<Number>(vm.reg(2)).value), 10);
+	ASSERT_EQ(std::get<BigIntType>(std::get<Number>(vm.reg(3)).value), std::pow(2, 10));
 
 	assert_interpreter_object_value("a", static_cast<int64_t>(std::pow(2, 10)));
 }

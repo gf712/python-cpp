@@ -31,6 +31,9 @@ FetchContent_Declare(
 	GIT_TAG v3.9.13)
 FetchContent_MakeAvailable(cpython)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+find_package(GMP REQUIRED)
+
 find_package(ICU REQUIRED COMPONENTS uc)
 # if (NOT ${ICU_FOUND})
 # 	ExternalProject_Add(icu

@@ -1,5 +1,8 @@
 #include "Parser.hpp"
 #include "runtime/Value.hpp"
+
+#include <gmpxx.h>
+
 #include <sstream>
 
 using namespace py;
@@ -2054,9 +2057,9 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 	} else if (value.find_first_of("eE") != std::string::npos) {
 		// scientific notation
 		// FIXME: seems innefficient, since we know that it is in scientific notation?
-		std::istringstream os(value);
+		std::istringstream is(value);
 		double float_value;
-		os >> float_value;
+		is >> float_value;
 		return std::make_shared<Constant>(float_value, source_location);
 	} else if (value.find('.') != std::string::npos) {
 		// float
@@ -2064,8 +2067,12 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 		return std::make_shared<Constant>(float_value, source_location);
 	} else {
 		// int
-		int64_t int_value = std::stoll(value);
-		return std::make_shared<Constant>(int_value, source_location);
+		mpz_class big_int{value};
+		if (big_int.fits_slong_p()) {
+			return std::make_shared<Constant>(big_int.get_si(), source_location);
+		} else {
+			return std::make_shared<Constant>(big_int, source_location);
+		}
 	}
 }
 

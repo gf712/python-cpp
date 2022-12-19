@@ -28,7 +28,10 @@ PyResult<PyList *> create_sys_paths(Interpreter &interpreter)
 	const auto &entry_script = interpreter.entry_script();
 	auto entry_parent = PyString::create(std::filesystem::path(entry_script).parent_path());
 	if (entry_parent.is_err()) return Err(entry_parent.unwrap_err());
-	auto path_list = PyList::create({ entry_parent.unwrap() });
+	auto path_list = PyList::create({
+		entry_parent.unwrap(),
+		PyString::create("/home/hobengil/Python/build/_deps/cpython-src/Lib").unwrap(),
+	});
 
 	return path_list;
 }

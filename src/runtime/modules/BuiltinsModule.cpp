@@ -485,9 +485,10 @@ PyResult<PyObject *> hex(const PyTuple *args, const PyDict *, Interpreter &)
 	if (obj_.is_err()) return obj_;
 	auto *obj = obj_.unwrap();
 	if (auto pynumber = PyNumber::as_number(obj)) {
-		if (std::holds_alternative<int64_t>(pynumber->value().value)) {
-			return PyObject::from(
-				String{ fmt::format("{0:#x}", std::get<int64_t>(pynumber->value().value)) });
+		if (std::holds_alternative<BigIntType>(pynumber->value().value)) {
+			std::ostringstream os;
+			os << std::hex << std::ios::showbase << std::get<BigIntType>(pynumber->value().value);
+			return PyString::create(os.str());
 		} else {
 			// FIXME: when float is separated from integer fix this
 			return Err(type_error(

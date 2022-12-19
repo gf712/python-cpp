@@ -55,17 +55,20 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 
 
 PyRange::PyRange(PyInteger *stop)
-	: PyBaseObject(BuiltinTypes::the().range()), m_stop(std::get<int64_t>(stop->value().value))
+	: PyBaseObject(BuiltinTypes::the().range()), m_stop(std::get<BigIntType>(stop->value().value))
 {}
 
 PyRange::PyRange(PyInteger *start, PyInteger *stop)
-	: PyBaseObject(BuiltinTypes::the().range()), m_start(std::get<int64_t>(start->value().value)),
-	  m_stop(std::get<int64_t>(stop->value().value))
+	: PyBaseObject(BuiltinTypes::the().range()),
+	  m_start(std::get<BigIntType>(start->value().value)),
+	  m_stop(std::get<BigIntType>(stop->value().value))
 {}
 
 PyRange::PyRange(PyInteger *start, PyInteger *stop, PyInteger *step)
-	: PyBaseObject(BuiltinTypes::the().range()), m_start(std::get<int64_t>(start->value().value)),
-	  m_stop(std::get<int64_t>(stop->value().value)), m_step(std::get<int64_t>(step->value().value))
+	: PyBaseObject(BuiltinTypes::the().range()),
+	  m_start(std::get<BigIntType>(start->value().value)),
+	  m_stop(std::get<BigIntType>(stop->value().value)),
+	  m_step(std::get<BigIntType>(step->value().value))
 {}
 
 std::string PyRange::to_string() const

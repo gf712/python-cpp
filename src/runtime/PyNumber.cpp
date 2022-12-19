@@ -11,14 +11,7 @@
 
 using namespace py;
 
-std::string PyNumber::to_string() const
-{
-	return std::visit(overloaded{
-						  [](const double &value) { return fmt::format("{:f}", value); },
-						  [](const int64_t &value) { return fmt::format("{}", value); },
-					  },
-		m_value.value);
-}
+std::string PyNumber::to_string() const { return m_value.to_string(); }
 
 PyResult<PyObject *> PyNumber::__repr__() const { return PyString::create(to_string()); }
 
@@ -35,7 +28,13 @@ const PyNumber *PyNumber::as_number(const PyObject *obj)
 PyResult<PyObject *> PyNumber::__abs__() const
 {
 	return PyNumber::create(
-		std::visit([](const auto &val) { return Number{ std::abs(val) }; }, m_value.value));
+		std::visit(overloaded{ [](const auto &val) { return Number{ std::abs(val) }; },
+					   [](const mpz_class &val) {
+						   mpz_class result{};
+						   mpz_abs(result.get_mpz_t(), val.get_mpz_t());
+						   return Number{ result };
+					   } },
+			m_value.value));
 }
 
 PyResult<PyObject *> PyNumber::__neg__() const
@@ -55,7 +54,7 @@ PyResult<PyObject *> PyNumber::__invert__() const
 	if (std::holds_alternative<double>(m_value.value)) {
 		return Err(type_error("bad operand type for unary ~: 'float'"));
 	}
-	return PyNumber::create(Number{ ~std::get<int64_t>(m_value.value) });
+	return PyNumber::create(Number{ ~std::get<BigIntType>(m_value.value) });
 }
 
 PyResult<PyObject *> PyNumber::__add__(const PyObject *obj) const
@@ -175,7 +174,7 @@ PyResult<bool> PyNumber::__bool__() const
 	if (std::holds_alternative<double>(m_value.value)) {
 		return Ok(std::fpclassify(std::get<double>(m_value.value)) != FP_ZERO);
 	} else {
-		return Ok(std::get<int64_t>(m_value.value) != int64_t{ 0 });
+		return Ok(static_cast<bool>(std::get<BigIntType>(m_value.value)));
 	}
 }
 
@@ -184,6 +183,6 @@ PyResult<PyNumber *> PyNumber::create(const Number &number)
 	if (std::holds_alternative<double>(number.value)) {
 		return PyFloat::create(std::get<double>(number.value));
 	} else {
-		return PyInteger::create(std::get<int64_t>(number.value));
+		return PyInteger::create(std::get<mpz_class>(number.value));
 	}
 }

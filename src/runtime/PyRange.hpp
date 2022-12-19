@@ -8,9 +8,9 @@ class PyRange : public PyBaseObject
 {
 	friend class ::Heap;
 
-	int64_t m_start{ 0 };
-	int64_t m_stop;
-	int64_t m_step{ 1 };
+	const BigIntType m_start{ 0 };
+	const BigIntType m_stop;
+	const BigIntType m_step{ 1 };
 
   public:
 	std::string to_string() const override;
@@ -19,9 +19,9 @@ class PyRange : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 
-	int64_t start() const { return m_start; }
-	int64_t stop() const { return m_stop; }
-	int64_t step() const { return m_step; }
+	const BigIntType& start() const { return m_start; }
+	const BigIntType& stop() const { return m_stop; }
+	const BigIntType& step() const { return m_step; }
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
@@ -38,7 +38,7 @@ class PyRangeIterator : public PyBaseObject
 	friend class ::Heap;
 
 	const PyRange &m_pyrange;
-	int64_t m_current_index;
+	BigIntType m_current_index;
 
   public:
 	PyRangeIterator(const PyRange &);

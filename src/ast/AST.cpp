@@ -753,6 +753,11 @@ Constant::Constant(int64_t value, SourceLocation source_location)
 	  m_value(std::make_unique<py::Value>(py::Number{ value }))
 {}
 
+Constant::Constant(mpz_class value, SourceLocation source_location)
+	: ASTNode(ASTNodeType::Constant, source_location),
+	  m_value(std::make_unique<py::Value>(py::Number{ value }))
+{}
+
 Constant::Constant(bool value, SourceLocation source_location)
 	: ASTNode(ASTNodeType::Constant, source_location),
 	  m_value(std::make_unique<py::Value>(py::NameConstant{ value }))

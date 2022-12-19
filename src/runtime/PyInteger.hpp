@@ -8,13 +8,15 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 {
 	friend class ::Heap;
 
-	PyInteger(int64_t);
+	PyInteger(BigIntType);
 
   protected:
-	PyInteger(TypePrototype &, int64_t);
+	PyInteger(TypePrototype &, BigIntType);
 
   public:
 	static PyResult<PyInteger *> create(int64_t);
+
+	static PyResult<PyInteger *> create(BigIntType);
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
