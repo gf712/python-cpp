@@ -21,6 +21,10 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 		if (args->size() == 1) {
 			if (auto arg1 = PyObject::from(args->elements()[0]); arg1.is_ok()) {
 				auto stop = as<PyInteger>(arg1.unwrap());
+				if (!stop) {
+					return Err(type_error("'{}' object cannot be interpreted as an integer",
+						arg1.unwrap()->type()->name()));
+				}
 				return VirtualMachine::the().heap().allocate<PyRange>(stop);
 			} else {
 				return Err(arg1.unwrap_err());
@@ -29,20 +33,40 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 			auto start_ = PyObject::from(args->elements()[0]);
 			if (start_.is_err()) return Err(start_.unwrap_err());
 			auto *start = as<PyInteger>(start_.unwrap());
+			if (!start) {
+				return Err(type_error("'{}' object cannot be interpreted as an integer",
+					start_.unwrap()->type()->name()));
+			}
 			auto stop_ = PyObject::from(args->elements()[1]);
 			if (stop_.is_err()) return Err(stop_.unwrap_err());
 			auto *stop = as<PyInteger>(stop_.unwrap());
+			if (!stop) {
+				return Err(type_error("'{}' object cannot be interpreted as an integer",
+					stop_.unwrap()->type()->name()));
+			}
 			return VirtualMachine::the().heap().allocate<PyRange>(start, stop);
 		} else if (args->size() == 3) {
 			auto start_ = PyObject::from(args->elements()[0]);
 			if (start_.is_err()) return Err(start_.unwrap_err());
 			auto *start = as<PyInteger>(start_.unwrap());
+			if (!start) {
+				return Err(type_error("'{}' object cannot be interpreted as an integer",
+					start_.unwrap()->type()->name()));
+			}
 			auto stop_ = PyObject::from(args->elements()[1]);
 			if (stop_.is_err()) return Err(stop_.unwrap_err());
 			auto *stop = as<PyInteger>(stop_.unwrap());
+			if (!stop) {
+				return Err(type_error("'{}' object cannot be interpreted as an integer",
+					stop_.unwrap()->type()->name()));
+			}
 			auto step_ = PyObject::from(args->elements()[2]);
 			if (step_.is_err()) return Err(step_.unwrap_err());
 			auto *step = as<PyInteger>(step_.unwrap());
+			if (!step) {
+				return Err(type_error("'{}' object cannot be interpreted as an integer",
+					step_.unwrap()->type()->name()));
+			}
 			return VirtualMachine::the().heap().allocate<PyRange>(start, stop, step);
 		}
 		ASSERT_NOT_REACHED();
