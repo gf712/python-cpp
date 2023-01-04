@@ -16,7 +16,7 @@ PyResult<Value> JumpForward::execute(VirtualMachine &vm, Interpreter &) const
 }
 
 
-void JumpForward::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void JumpForward::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }

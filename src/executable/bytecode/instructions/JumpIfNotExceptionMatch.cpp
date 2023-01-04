@@ -30,7 +30,7 @@ PyResult<Value> JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter
 	return Ok(Value{ py_none() });
 }
 
-void JumpIfNotExceptionMatch::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void JumpIfNotExceptionMatch::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }

@@ -2781,7 +2781,7 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 	for (const auto &function : functions.functions) {
 		size_t instruction_idx{ 0 };
 		for (const auto &block : function.blocks) {
-			for (const auto &ins : block) { ins->relocate(*this, instruction_idx++); }
+			for (const auto &ins : block) { ins->relocate(instruction_idx++); }
 		}
 	}
 }

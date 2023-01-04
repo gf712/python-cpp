@@ -14,7 +14,7 @@ PyResult<Value> SetupWith::execute(VirtualMachine &vm, Interpreter &) const
 	return Ok(Value{ py_none() });
 }
 
-void SetupWith::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void SetupWith::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }

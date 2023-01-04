@@ -18,7 +18,7 @@ class DictUpdate final : public Instruction
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 
-	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+	void relocate(size_t) final {}
 
 	std::vector<uint8_t> serialize() const final;
 

@@ -72,8 +72,9 @@ PyResult<Value> unary_not(const Value &val)
 {
 	return std::visit(
 		overloaded{ [](const Number &val) -> PyResult<Value> {
-					   return Ok(
-						   std::visit([](const auto &v) { return NameConstant{ !static_cast<bool>(v) }; }, val.value));
+					   return Ok(std::visit(
+						   [](const auto &v) { return NameConstant{ !static_cast<bool>(v) }; },
+						   val.value));
 				   },
 			[](const String &s) -> PyResult<Value> { return Ok(NameConstant{ !s.s.empty() }); },
 			[](const Bytes &) -> PyResult<Value> { TODO(); },

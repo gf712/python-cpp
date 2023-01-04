@@ -24,7 +24,7 @@ PyResult<Value> JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter
 	return Err(test_result.unwrap_err());
 }
 
-void JumpIfTrue::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void JumpIfTrue::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }

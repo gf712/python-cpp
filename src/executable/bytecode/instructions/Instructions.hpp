@@ -12,7 +12,7 @@ class Instruction : NonCopyable
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
 	virtual py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const = 0;
-	virtual void relocate(codegen::BytecodeGenerator &, size_t) = 0;
+	virtual void relocate(size_t) = 0;
 	virtual std::vector<uint8_t> serialize() const = 0;
 	virtual uint8_t id() const = 0;
 };

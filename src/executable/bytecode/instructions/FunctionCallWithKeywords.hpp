@@ -14,8 +14,8 @@ class FunctionCallWithKeywords final : public Instruction
 		std::vector<Register> &&args,
 		std::vector<Register> &&kwargs,
 		std::vector<Register> &&keywords)
-		: m_function_name(function_name), m_args(std::move(args)),
-		  m_kwargs(std::move(kwargs)), m_keywords(std::move(keywords))
+		: m_function_name(function_name), m_args(std::move(args)), m_kwargs(std::move(kwargs)),
+		  m_keywords(std::move(keywords))
 	{}
 	std::string to_string() const final
 	{
@@ -36,7 +36,7 @@ class FunctionCallWithKeywords final : public Instruction
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+	void relocate(size_t) final {}
 
 	std::vector<uint8_t> serialize() const final;
 

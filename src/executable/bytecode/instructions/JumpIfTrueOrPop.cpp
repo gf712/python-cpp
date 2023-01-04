@@ -42,7 +42,7 @@ PyResult<Value> JumpIfTrueOrPop::execute(VirtualMachine &vm, Interpreter &) cons
 	}
 }
 
-void JumpIfTrueOrPop::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void JumpIfTrueOrPop::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }

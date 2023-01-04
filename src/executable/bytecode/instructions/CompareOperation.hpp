@@ -38,7 +38,7 @@ class CompareOperation final : public Instruction
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(codegen::BytecodeGenerator &, size_t) final {}
+	void relocate(size_t) final {}
 
 	std::vector<uint8_t> serialize() const final;
 

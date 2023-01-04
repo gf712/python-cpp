@@ -36,7 +36,7 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &) const
 	}
 }
 
-void ForIter::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void ForIter::relocate(size_t instruction_idx)
 {
 	m_offset = m_exit_label->position() - instruction_idx - 1;
 }

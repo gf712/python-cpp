@@ -16,7 +16,7 @@ PyResult<Value> Jump::execute(VirtualMachine &vm, Interpreter &) const
 }
 
 
-void Jump::relocate(codegen::BytecodeGenerator &, size_t instruction_idx)
+void Jump::relocate(size_t instruction_idx)
 {
 	m_offset = m_label->position() - instruction_idx - 1;
 }
