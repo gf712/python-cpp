@@ -1,6 +1,7 @@
 #include "ImportFrom.hpp"
 
 #include "interpreter/Interpreter.hpp"
+#include "runtime/ImportError.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyModule.hpp"
 #include "vm/VM.hpp"
@@ -14,12 +15,18 @@ PyResult<Value> ImportFrom::execute(VirtualMachine &vm, Interpreter &interpreter
 
 	ASSERT(as<PyModule>(PyObject::from(from).unwrap()));
 
-	auto obj_ = PyObject::from(from).unwrap()->get_attribute(PyString::create(name).unwrap());
+	auto module = as<PyModule>(PyObject::from(from).unwrap());
+	auto obj_ = module->get_attribute(PyString::create(name).unwrap());
 
-	return obj_.and_then([&vm, this](PyObject *obj) {
-		vm.reg(m_destination) = obj;
-		return Ok(obj);
-	});
+	return obj_
+		.and_then([&vm, this](PyObject *obj) {
+			vm.reg(m_destination) = obj;
+			return Ok(obj);
+		})
+		.or_else([&name, &module](auto) -> PyResult<PyObject *> {
+			return Err(
+				import_error("cannot import name {} from {}", name, module->name()->value()));
+		});
 }
 
 std::vector<uint8_t> ImportFrom::serialize() const
