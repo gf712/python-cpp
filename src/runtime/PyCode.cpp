@@ -243,12 +243,14 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 
 	{
 		auto default_iter = defaults.rbegin();
-		for (size_t i = m_arg_count - 1; i > (m_arg_count - defaults.size() - 1); --i) {
-			auto &arg = VirtualMachine::the().stack_local(i);
+		int64_t i = m_arg_count - 1;
+		while (default_iter != defaults.rend()) {
+			ASSERT(i >= 0);
+			auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
 			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-				VirtualMachine::the().stack_local(i) = *default_iter;
+				VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *default_iter;
 			}
-			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), i);
+			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), static_cast<size_t>(i));
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
 				auto cell = PyCell::create(*default_iter);
@@ -256,17 +258,19 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 				function_frame->freevars()[free_var_idx] = cell.unwrap();
 			}
 			default_iter = std::next(default_iter);
+			i--;
 		}
 	}
 	{
 		auto kw_default_iter = kw_defaults.rbegin();
-		const size_t start = m_kwonly_arg_count + m_arg_count - 1;
-		for (size_t i = start; i > start - kw_defaults.size(); --i) {
-			auto &arg = VirtualMachine::the().stack_local(i);
+		int64_t i = m_kwonly_arg_count + m_arg_count - 1;
+		while (kw_default_iter != kw_defaults.rend()) {
+			ASSERT(i >= 0);
+			auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
 			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-				VirtualMachine::the().stack_local(i) = *kw_default_iter;
+				VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *kw_default_iter;
 			}
-			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), i);
+			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), static_cast<size_t>(i));
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
 				auto cell = PyCell::create(*kw_default_iter);
@@ -274,6 +278,7 @@ PyResult<PyObject *> PyCode::eval(PyDict *globals,
 				function_frame->freevars()[free_var_idx] = cell.unwrap();
 			}
 			kw_default_iter = std::next(kw_default_iter);
+			i--;
 		}
 	}
 
