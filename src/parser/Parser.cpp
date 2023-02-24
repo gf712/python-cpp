@@ -548,7 +548,8 @@ template<size_t TypeIdx, typename... PatternTypes> struct OrPatternV2_
 		using PatternMatcher = PatternMatchV2<Pattern>;
 		static_assert(
 			std::tuple_size_v<typename std::invoke_result_t<decltype(PatternMatcher::match),
-				Parser &>::value_type> == 1);
+				Parser &>::value_type>
+			== 1);
 		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
 			if (auto result = PatternMatcher::match(p)) {
 				return std::get<0>(*result);
@@ -749,13 +750,15 @@ template<typename lhs, typename rhs> struct AndLiteralV2 : PatternV2<AndLiteralV
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token)
+		requires(!is_tuple_v<PatternType>)
 	{
 		return PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token)
+		requires(is_tuple_v<PatternTypes>)
 	{
 		return std::apply(
 			[&](auto... r) { return (... && decltype(r)::matches(token)); }, PatternTypes{});
@@ -780,13 +783,15 @@ template<typename lhs, typename rhs> struct AndNotLiteralV2 : PatternV2<AndNotLi
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token)
+		requires(!is_tuple_v<PatternType>)
 	{
 		return !PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token)
+		requires(is_tuple_v<PatternTypes>)
 	{
 		return !std::apply(
 			[&](auto... r) { return (... || decltype(r)::matches(token)); }, PatternTypes{});
@@ -2067,7 +2072,7 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 		return std::make_shared<Constant>(float_value, source_location);
 	} else {
 		// int
-		mpz_class big_int{value};
+		mpz_class big_int{ value };
 		if (big_int.fits_slong_p()) {
 			return std::make_shared<Constant>(big_int.get_si(), source_location);
 		} else {
@@ -5915,8 +5920,43 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			ZeroOrOnePatternV2<StarEtcPattern>>;
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("param_with_default+ [star_etc]");
-			(void)result;
-			TODO_NO_FAIL();
+			auto [params_with_default, star_etc] = *result;
+
+			std::vector<std::shared_ptr<Argument>> posonlyargs;
+			std::vector<std::shared_ptr<Argument>> args;
+			std::shared_ptr<Argument> vararg;
+			std::vector<std::shared_ptr<Argument>> kwonlyargs;
+			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
+			std::shared_ptr<Argument> kwarg;
+			std::vector<std::shared_ptr<ASTNode>> defaults;
+			SourceLocation source_location{
+				params_with_default.front().first->source_location().start,
+				p.lexer().peek_token(p.token_position() - 1)->end(),
+			};
+
+			for (const auto &[param, default_] : params_with_default) {
+				args.push_back(param);
+				defaults.push_back(default_);
+			}
+
+			if (star_etc.has_value()) {
+				auto [vararg_, kwonlyargs_, kwarg_] = *star_etc;
+				vararg = vararg_.value_or(nullptr);
+				for (const auto &[param, default_] : kwonlyargs_) {
+					kwonlyargs.push_back(param);
+					kw_defaults.push_back(default_.value_or(nullptr));
+				}
+				kwarg = kwarg_.value_or(nullptr);
+			}
+
+			return std::make_shared<Arguments>(posonlyargs,
+				args,
+				vararg,
+				kwonlyargs,
+				kw_defaults,
+				kwarg,
+				defaults,
+				source_location);
 		}
 
 		auto start =
