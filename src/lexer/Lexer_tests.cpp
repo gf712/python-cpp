@@ -735,3 +735,20 @@ TEST(Lexer, TripleDoubleQuoteStringWithQuotes)
 
 	assert_generates_tokens(program, expected_tokens);
 }
+
+TEST(Lexer, BreakupLine)
+{
+	constexpr std::string_view program =
+		"a = \\\n"
+		"    1\n";
+
+	std::vector<Token::TokenType> expected_tokens{
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::NUMBER,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::ENDMARKER
+	};
+
+	assert_generates_tokens(program, expected_tokens);
+}

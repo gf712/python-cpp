@@ -58,6 +58,7 @@ bool Lexer::read_more_tokens_loop()
 	if (try_read_comment()) { return true; }
 	if (try_read_indent()) { return true; }
 	if (try_read_newline()) { return true; }
+	try_read_backslash();
 	try_read_space();
 	if (try_read_string()) { return true; }
 	if (try_read_name()) { return true; }
@@ -774,6 +775,19 @@ bool Lexer::try_read_operation()
 	push_token(*type, original_position, m_position);
 
 	return true;
+}
+
+void Lexer::try_read_backslash() {
+	try_read_space();
+	if (advance_if('\\')) {
+		if (advance_if('\n')) {
+			increment_row_position();
+		} else {
+			// ERROR!
+			// TODO: Emit an error token
+			TODO();
+		}
+	}
 }
 
 bool Lexer::try_read_space()

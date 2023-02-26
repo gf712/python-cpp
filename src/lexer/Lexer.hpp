@@ -248,6 +248,8 @@ class Lexer
 
 	std::optional<size_t> comment_start() const;
 
+	void try_read_backslash();
+
 	bool try_read_comment();
 
 	bool try_empty_line();
