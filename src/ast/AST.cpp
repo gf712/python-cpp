@@ -306,6 +306,13 @@ void NodeVisitor::visit(ListComp *node)
 	for (auto &generator : node->generators()) { dispatch(generator.get()); }
 }
 
+void NodeVisitor::visit(DictComp *node)
+{
+	dispatch(node->key().get());
+	dispatch(node->value().get());
+	for (auto &generator : node->generators()) { dispatch(generator.get()); }
+}
+
 void NodeVisitor::visit(GeneratorExp *node)
 {
 	dispatch(node->elt().get());
@@ -721,6 +728,15 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
 std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<ListComp> node)
 {
 	transform_single_node(node->elt());
+	TODO();
+	// transform_multiple_nodes(node->generators());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<DictComp> node)
+{
+	transform_single_node(node->key());
+	transform_single_node(node->value());
 	TODO();
 	// transform_multiple_nodes(node->generators());
 	return { node };
@@ -1597,6 +1613,18 @@ void ListComp::print_this_node(const std::string &indent) const
 	std::string new_indent = indent + std::string(6, ' ');
 	spdlog::debug("{}  - elt: ", indent);
 	m_elt->print_node(new_indent);
+	spdlog::debug("{}  - generators: ", indent);
+	for (const auto &generator : m_generators) { generator->print_node(new_indent); }
+}
+
+void DictComp::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}DictComp", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	spdlog::debug("{}  - key: ", indent);
+	m_key->print_node(new_indent);
+	spdlog::debug("{}  - value: ", indent);
+	m_value->print_node(new_indent);
 	spdlog::debug("{}  - generators: ", indent);
 	for (const auto &generator : m_generators) { generator->print_node(new_indent); }
 }

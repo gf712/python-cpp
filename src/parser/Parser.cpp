@@ -2000,7 +2000,24 @@ struct DictCompPattern : PatternV2<DictCompPattern>
 {
 	using ResultType = typename traits<DictCompPattern>::result_type;
 
-	static std::optional<ResultType> matches_impl(Parser &) { return {}; }
+	// dictcomp: '{' kvpair for_if_clauses '}'
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LBRACE>,
+			KVPairPattern,
+			ForIfClausesPattern,
+			SingleTokenPatternV2<Token::TokenType::RBRACE>>;
+		if (auto result = pattern1::match(p)) {
+			auto [l, kvpair, generators, r] = *result;
+			SourceLocation sc{
+				.start = l.start(),
+				.end = r.end(),
+			};
+			auto [key, value] = kvpair;
+			return std::make_shared<DictComp>(key, value, std::move(generators), sc);
+		}
+		return {};
+	}
 };
 
 template<> struct traits<struct SetCompPattern>

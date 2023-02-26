@@ -855,6 +855,27 @@ void compare_list_comprehension(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
+void compare_dict_comprehension(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::DictComp);
+
+	const auto result_key = as<DictComp>(result)->key();
+	const auto expected_key = as<DictComp>(expected)->key();
+	dispatch(result_key, expected_key);
+
+	const auto result_value = as<DictComp>(result)->value();
+	const auto expected_value = as<DictComp>(expected)->value();
+	dispatch(result_value, expected_value);
+
+	const auto result_generators = as<DictComp>(result)->generators();
+	const auto expected_generators = as<DictComp>(expected)->generators();
+	ASSERT_EQ(result_generators.size(), expected_generators.size());
+	for (size_t i = 0; i < result_generators.size(); ++i) {
+		dispatch(result_generators[i], expected_generators[i]);
+	}
+}
+
 void compare_set_comprehension(const std::shared_ptr<ASTNode> &result,
 	const std::shared_ptr<ASTNode> &expected)
 {
@@ -1071,6 +1092,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::ListComp: {
 		compare_list_comprehension(result, expected);
+		break;
+	}
+	case ASTNodeType::DictComp: {
+		compare_dict_comprehension(result, expected);
 		break;
 	}
 	case ASTNodeType::SetComp: {
@@ -3137,8 +3162,7 @@ TEST(Parser, FunctionDefinitionWithOnlyDefaultArguments)
 
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{},
+		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
 			std::vector{
 				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
 			},
@@ -3312,6 +3336,33 @@ TEST(Parser, ListComprehensionIf)
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, DictComprehension)
+{
+	constexpr std::string_view program = "{k: v for k, v in container}\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(
+		std::make_shared<DictComp>(std::make_shared<Name>("k", ContextType::LOAD, SourceLocation{}),
+			std::make_shared<Name>("v", ContextType::LOAD, SourceLocation{}),
+			std::vector<std::shared_ptr<Comprehension>>{
+				std::make_shared<Comprehension>(
+					std::make_shared<Tuple>(
+						std::vector<std::shared_ptr<ASTNode>>{
+							std::make_shared<Name>("k", ContextType::STORE, SourceLocation{}),
+							std::make_shared<Name>("v", ContextType::STORE, SourceLocation{}),
+						},
+						ContextType::STORE,
+						SourceLocation{}),
+					std::make_shared<Name>("container", ContextType::LOAD, SourceLocation{}),
+					std::vector<std::shared_ptr<ASTNode>>{},
+					false,
+					SourceLocation{}),
+			},
+			SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
 
 TEST(Parser, GeneratorExpr)
 {

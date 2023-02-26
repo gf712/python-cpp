@@ -43,6 +43,7 @@ namespace ast {
 	__AST_NODE_TYPE(Constant)                \
 	__AST_NODE_TYPE(Delete)                  \
 	__AST_NODE_TYPE(Dict)                    \
+	__AST_NODE_TYPE(DictComp)                \
 	__AST_NODE_TYPE(ExceptHandler)           \
 	__AST_NODE_TYPE(Expression)              \
 	__AST_NODE_TYPE(For)                     \
@@ -1550,6 +1551,32 @@ class ListComp : public ASTNode
 	{}
 
 	const std::shared_ptr<ASTNode> elt() const { return m_elt; }
+	const std::vector<std::shared_ptr<Comprehension>> &generators() const { return m_generators; }
+	std::vector<std::shared_ptr<Comprehension>> &generators() { return m_generators; }
+
+	Value *codegen(CodeGenerator *) const override;
+
+  private:
+	void print_this_node(const std::string &indent) const override;
+};
+
+class DictComp : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_key;
+	std::shared_ptr<ASTNode> m_value;
+	std::vector<std::shared_ptr<Comprehension>> m_generators;
+
+  public:
+	DictComp(std::shared_ptr<ASTNode> key,
+		std::shared_ptr<ASTNode> value,
+		std::vector<std::shared_ptr<Comprehension>> &&generators,
+		SourceLocation source_location)
+		: ASTNode(ASTNodeType::DictComp, source_location), m_key(std::move(key)),
+		  m_value(std::move(value)), m_generators(std::move(generators))
+	{}
+
+	const std::shared_ptr<ASTNode> key() const { return m_key; }
+	const std::shared_ptr<ASTNode> value() const { return m_value; }
 	const std::vector<std::shared_ptr<Comprehension>> &generators() const { return m_generators; }
 	std::vector<std::shared_ptr<Comprehension>> &generators() { return m_generators; }
 

@@ -2536,6 +2536,8 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	return create_return_value();
 }
 
+Value *BytecodeGenerator::visit(const DictComp *) { TODO(); }
+
 Value *BytecodeGenerator::visit(const GeneratorExp *node)
 {
 	// FIXME: this should be a generator, ie. produce values lazily

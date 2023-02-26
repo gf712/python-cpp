@@ -742,6 +742,46 @@ Value *VariablesResolver::visit(const ListComp *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const DictComp *node)
+{
+	auto caller = m_current_scope;
+
+	store("<dictcomp>", node->source_location());
+	for (const auto &generator : node->generators()) { generator->iter()->codegen(this); }
+
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		m_current_scope->get().namespace_, "<dictcomp>", node->source_location());
+
+	auto ns = m_current_scope->get().namespace_ + "." + "<dictcomp>";
+
+	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::CLOSURE,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<dictcomp>"] = Visibility::LOCAL;
+	} else {
+		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
+			.namespace_ = std::move(ns),
+			.type = Scope::Type::FUNCTION,
+			.parent = &caller->get() });
+		m_current_scope = std::ref(*m_visibility.at(function_name));
+		caller->get().visibility["<dictcomp>"] = Visibility::NAME;
+	}
+
+	caller->get().children.push_back(*m_current_scope);
+
+	for (const auto &generator : node->generators()) {
+		m_to_visit.emplace_back(*m_current_scope, generator);
+	}
+	m_to_visit.emplace_back(*m_current_scope, node->key());
+	m_to_visit.emplace_back(*m_current_scope, node->value());
+
+	m_current_scope = caller;
+
+	return nullptr;
+}
 
 Value *VariablesResolver::visit(const GeneratorExp *node)
 {
