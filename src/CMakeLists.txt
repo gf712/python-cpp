@@ -17,6 +17,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/CompareOperation.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/ClearTopCleanup.cpp
+    executable/bytecode/instructions/DictAdd.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/DictUpdate.cpp
     executable/bytecode/instructions/DeleteName.cpp

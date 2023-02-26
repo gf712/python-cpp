@@ -12,6 +12,7 @@
 #include "executable/bytecode/instructions/CompareOperation.hpp"
 #include "executable/bytecode/instructions/DeleteName.hpp"
 #include "executable/bytecode/instructions/DeleteSubscript.hpp"
+#include "executable/bytecode/instructions/DictAdd.hpp"
 #include "executable/bytecode/instructions/DictMerge.hpp"
 #include "executable/bytecode/instructions/DictUpdate.hpp"
 #include "executable/bytecode/instructions/ForIter.hpp"
@@ -2536,7 +2537,104 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	return create_return_value();
 }
 
-Value *BytecodeGenerator::visit(const DictComp *) { TODO(); }
+Value *BytecodeGenerator::visit(const DictComp *node)
+{
+	const std::string &function_name = Mangler::default_mangler().function_mangle(
+		mangle_namespace(m_stack), "<dictcomp>", node->source_location());
+	auto *f = create_function(function_name);
+	create_nested_scope("<dictcomp>", function_name);
+
+	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
+	for (const auto &capture : m_variable_visibility.at(function_name)->captures) {
+		auto *value = create_free_value(capture);
+		captures.emplace_back(capture, value);
+		m_stack.top().locals.emplace(capture, value);
+	}
+
+	auto old_function_id = m_function_id;
+	m_function_id = f->function_info().function_id;
+
+	auto *block = allocate_block(m_function_id);
+	auto *old_block = m_current_block;
+	set_insert_point(block);
+	auto [start_labels, end_labels, dict] =
+		visit_comprehension(node->generators(), [this]() { return build_dict({}, {}); });
+	auto *key = generate(node->key().get(), m_function_id);
+	ASSERT(key);
+	auto *value = generate(node->value().get(), m_function_id);
+	ASSERT(value);
+	emit<DictAdd>(dict->get_register(), key->get_register(), value->get_register());
+	ASSERT(start_labels.size() == end_labels.size());
+	while (!start_labels.empty()) {
+		auto start_label = start_labels.back();
+		auto end_label = end_labels.back();
+		emit<Jump>(start_label);
+		bind(*end_label);
+		start_labels.pop_back();
+		end_labels.pop_back();
+	}
+	emit<ReturnValue>(dict->get_register());
+
+	m_stack.pop();
+	exit_function(f->function_info().function_id);
+	m_function_id = old_function_id;
+	set_insert_point(old_block);
+
+	auto captures_tuple = [&]() -> std::optional<Register> {
+		if (!captures.empty()) {
+			std::vector<Register> capture_regs;
+			capture_regs.reserve(captures.size());
+			for (const auto &[name, el] : captures) {
+				ASSERT(m_stack.top().locals.contains(name));
+				const auto &value = m_stack.top().locals.at(name);
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				emit<LoadClosure>(el->get_free_var_index(),
+					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
+				capture_regs.push_back(el->get_free_var_index());
+			}
+			auto *tuple_value = build_tuple(capture_regs);
+			return tuple_value->get_register();
+		} else {
+			return {};
+		}
+	}();
+
+	std::vector<std::string> varnames{
+		"comprehension_iterator",
+	};
+	const auto &name_visibility_it = m_variable_visibility.find(function_name);
+	ASSERT(name_visibility_it != m_variable_visibility.end())
+	const auto &name_visibility = name_visibility_it->second->visibility;
+	for (const auto &[varname, v] : name_visibility) {
+		if (v == VariablesResolver::Visibility::FREE) {
+			f->function_info().function.metadata.freevars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::CELL) {
+			f->function_info().function.metadata.cellvars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::LOCAL) {
+			f->function_info().function.metadata.varnames.push_back(varname);
+		} else {
+			// TODO: add to co_names
+			// A tuple containing names used by the bytecode:
+			//  * global variables,
+			//  * functions
+			//  * classes
+			//	* attributes loaded from objects
+		}
+	}
+	f->function_info().function.metadata.nlocals = varnames.size();
+	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.arg_count = 1;
+	f->function_info().function.metadata.kwonly_arg_count = 0;
+	f->function_info().function.metadata.cell2arg = {};
+	f->function_info().function.metadata.flags = CodeFlags::create();
+	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
+	auto *generator = node->generators()[0].get();
+	auto *iterable = generate(generator->iter().get(), m_function_id);
+	auto iterator = create_value();
+	emit<GetIter>(iterator->get_register(), iterable->get_register());
+	emit_call(f->get_register(), { iterator->get_register() });
+	return create_return_value();
+}
 
 Value *BytecodeGenerator::visit(const GeneratorExp *node)
 {

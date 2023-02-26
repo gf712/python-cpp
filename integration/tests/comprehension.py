@@ -33,3 +33,11 @@ def comprehension_nested():
     assert f[4] == 5
 
 comprehension_nested()
+
+def dict_comprehension():
+    d = {x: x for x in range(2)}
+    assert len(d) == 2
+    assert d[0] == 0
+    assert d[1] == 1
+
+dict_comprehension()
