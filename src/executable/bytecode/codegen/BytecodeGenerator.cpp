@@ -1137,6 +1137,8 @@ Value *BytecodeGenerator::visit(const Yield *node)
 	return src;
 }
 
+Value *BytecodeGenerator::visit(const YieldFrom *) { TODO(); }
+
 Value *BytecodeGenerator::visit(const Assign *node)
 {
 	auto *src = generate(node->value().get(), m_function_id);

@@ -77,7 +77,8 @@ namespace ast {
 	__AST_NODE_TYPE(While)                   \
 	__AST_NODE_TYPE(With)                    \
 	__AST_NODE_TYPE(WithItem)                \
-	__AST_NODE_TYPE(Yield)
+	__AST_NODE_TYPE(Yield)                   \
+	__AST_NODE_TYPE(YieldFrom)
 
 class Value
 {
@@ -532,6 +533,22 @@ class Yield : public ASTNode
   public:
 	Yield(std::shared_ptr<ASTNode> value, SourceLocation source_location)
 		: ASTNode(ASTNodeType::Yield, source_location), m_value(std::move(value))
+	{}
+
+	std::shared_ptr<ASTNode> value() const { return m_value; }
+
+	void print_this_node(const std::string &indent) const override;
+
+	Value *codegen(CodeGenerator *) const override;
+};
+
+class YieldFrom : public ASTNode
+{
+	std::shared_ptr<ASTNode> m_value;
+
+  public:
+	YieldFrom(std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::YieldFrom, source_location), m_value(std::move(value))
 	{}
 
 	std::shared_ptr<ASTNode> value() const { return m_value; }

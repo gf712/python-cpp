@@ -244,6 +244,15 @@ void compare_yield(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	dispatch(result_value, expected_value);
 }
 
+void compare_yieldfrom(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+{
+	ASSERT_EQ(result->node_type(), ASTNodeType::YieldFrom);
+
+	const auto result_value = as<YieldFrom>(result)->value();
+	const auto expected_value = as<YieldFrom>(expected)->value();
+	dispatch(result_value, expected_value);
+}
+
 void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::If);
@@ -972,6 +981,10 @@ void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTN
 	}
 	case ASTNodeType::Yield: {
 		compare_yield(result, expected);
+		break;
+	}
+	case ASTNodeType::YieldFrom: {
+		compare_yieldfrom(result, expected);
 		break;
 	}
 	case ASTNodeType::If: {
@@ -3542,6 +3555,29 @@ TEST(Parser, YieldMutipleValues)
 
 	assert_generates_ast(program, expected_ast);
 }
+
+TEST(Parser, YieldFrom)
+{
+	constexpr std::string_view program =
+		"def foo():\n"
+		"   yield from bar\n";
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("foo",// function_name
+		std::make_shared<Arguments>(
+			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<YieldFrom>(
+				std::make_shared<Name>("bar", ContextType::LOAD, SourceLocation{}),
+				SourceLocation{}),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		"",// type_comment
+		SourceLocation{}));
+
+	assert_generates_ast(program, expected_ast);
+}
+
 
 TEST(Parser, Coroutine)
 {

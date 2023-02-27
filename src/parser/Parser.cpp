@@ -1782,7 +1782,7 @@ template<> struct traits<struct GroupPattern>
 
 template<> struct traits<struct YieldExpressionPattern>
 {
-	using result_type = std::shared_ptr<Yield>;
+	using result_type = std::shared_ptr<ASTNode>;
 };
 
 struct GroupPattern : PatternV2<GroupPattern>
@@ -4309,10 +4309,8 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'yield' 'from' expression");
 			auto [yield_token, from_token, expression] = *result;
-			(void)yield_token;
-			(void)from_token;
-			(void)expression;
-			TODO_NO_FAIL();
+			return std::make_shared<YieldFrom>(expression,
+				SourceLocation{ yield_token.start(), expression->source_location().end });
 		}
 
 		// 'yield' [star_expressions]
@@ -5176,7 +5174,7 @@ struct DeleteStatementPattern : PatternV2<DeleteStatementPattern>
 
 template<> struct traits<struct YieldStatementPattern>
 {
-	using result_type = std::shared_ptr<Yield>;
+	using result_type = std::shared_ptr<ASTNode>;
 };
 
 struct YieldStatementPattern : PatternV2<YieldStatementPattern>
