@@ -24,8 +24,8 @@ template<typename T> struct klass
 	{}
 
 	template<typename... BaseType>
-	requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> &&...)
-		klass(PyModule *module, std::string_view name, BaseType &&...bases)
+		requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> && ...)
+	klass(PyModule *module, std::string_view name, BaseType &&...bases)
 		: type(TypePrototype::create<T>(name)), m_bases(std::vector<Value>{ bases... }),
 		  m_module(module)
 	{}
@@ -33,8 +33,8 @@ template<typename T> struct klass
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
 
 	template<typename... BaseType>
-	requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> &&...)
-		klass(std::string_view name, BaseType &&...bases)
+		requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> && ...)
+	klass(std::string_view name, BaseType &&...bases)
 		: type(TypePrototype::create<T>(name)), m_bases(std::vector<Value>{ bases... })
 	{}
 
@@ -78,10 +78,8 @@ template<typename T> struct klass
 	}
 
 	template<typename ClassMemberType>
-	klass &attr(std::string_view name, ClassMemberType &&member) requires requires(PyObject *self)
-	{
-		static_cast<T *>(self)->*member;
-	}
+	klass &attr(std::string_view name, ClassMemberType &&member)
+		requires requires(PyObject *self) { static_cast<T *>(self)->*member; }
 	{
 		type->add_member(MemberDefinition{
 			.name = std::string(name),
@@ -132,11 +130,8 @@ template<typename T> struct klass
 	}
 
 	template<typename ClassMemberType>
-	klass &attribute_readonly(std::string_view name, ClassMemberType &&member) requires
-		requires(PyObject *self)
-	{
-		static_cast<T *>(self)->*member;
-	}
+	klass &attribute_readonly(std::string_view name, ClassMemberType &&member)
+		requires requires(PyObject *self) { static_cast<T *>(self)->*member; }
 	{
 		type->add_member(MemberDefinition{
 			.name = std::string(name),
@@ -172,22 +167,23 @@ template<typename T> struct klass
 
 
 	template<typename FuncType>
-	klass &def(std::string_view name, FuncType &&F) requires requires(PyObject *self)
-	{
-		(static_cast<T *>(self)->*F)();
-	}
+	klass &def(std::string_view name, FuncType &&F)
+		requires requires(PyObject *self) { (static_cast<T *>(self)->*F)(); }
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
-			.method =
-				[F](PyObject *self, PyTuple *args, PyDict *kwargs) {
-					// TODO: this should raise an exception
-					//       TypeError: {}() takes no arguments ({} given)
-					//       TypeError: {}() takes no keyword arguments
-					ASSERT(!args || args->size() == 0)
-					ASSERT(!kwargs || kwargs->map().empty())
-					return (static_cast<T *>(self)->*F)();
-				},
+			.method = [F, name](
+						  PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				const size_t arg_count = (args ? args->size() : 0) + (kwargs ? kwargs->size() : 0);
+				if (arg_count) {
+					return Err(
+						type_error("{}() takes no arguments ({} given)", name, args->size()));
+				}
+				if (kwargs && kwargs->size() > 0) {
+					return Err(type_error("{}() takes no keyword arguments)", name));
+				}
+				return (static_cast<T *>(self)->*F)();
+			},
 			.flags = MethodFlags::create(MethodFlags::Flag::NOARGS),
 			.doc = "",
 		});
@@ -195,11 +191,8 @@ template<typename T> struct klass
 	}
 
 	template<typename FuncType>
-	klass &def(std::string_view name, FuncType &&F) requires
-		requires(PyObject *self, PyObject *arg0)
-	{
-		(static_cast<T *>(self)->*F)(arg0);
-	}
+	klass &def(std::string_view name, FuncType &&F)
+		requires requires(PyObject *self, PyObject *arg0) { (static_cast<T *>(self)->*F)(arg0); }
 	{
 		std::string name_str{ name };
 		type->add_method(MethodDefinition{
@@ -221,11 +214,10 @@ template<typename T> struct klass
 	}
 
 	template<typename FuncType>
-	klass &def(std::string_view name, FuncType &&F) requires
-		requires(PyObject *self, PyTuple *args, PyDict *kwargs)
-	{
-		(static_cast<T *>(self)->*F)(args, kwargs);
-	}
+	klass &def(std::string_view name, FuncType &&F)
+		requires requires(PyObject *self, PyTuple *args, PyDict *kwargs) {
+					 (static_cast<T *>(self)->*F)(args, kwargs);
+				 }
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
@@ -239,11 +231,10 @@ template<typename T> struct klass
 	}
 
 	template<typename FuncType>
-	klass &def(std::string_view name, FuncType &&F) requires
-		requires(PyObject *self, PyTuple *args, PyDict *kwargs)
-	{
-		F(static_cast<T *>(self), args, kwargs);
-	}
+	klass &def(std::string_view name, FuncType &&F)
+		requires requires(PyObject *self, PyTuple *args, PyDict *kwargs) {
+					 F(static_cast<T *>(self), args, kwargs);
+				 }
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
@@ -257,11 +248,8 @@ template<typename T> struct klass
 	}
 
 	template<typename FuncType>
-	klass &classmethod(std::string_view name, FuncType &&F) requires
-		requires(PyType *type, PyTuple *args, PyDict *kwargs)
-	{
-		F(type, args, kwargs);
-	}
+	klass &classmethod(std::string_view name, FuncType &&F)
+		requires requires(PyType *type, PyTuple *args, PyDict *kwargs) { F(type, args, kwargs); }
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
@@ -275,11 +263,8 @@ template<typename T> struct klass
 	}
 
 	template<typename FuncType>
-	klass &staticmethod(std::string_view name, FuncType &&F) requires
-		requires(PyTuple *args, PyDict *kwargs)
-	{
-		F(args, kwargs);
-	}
+	klass &staticmethod(std::string_view name, FuncType &&F)
+		requires requires(PyTuple *args, PyDict *kwargs) { F(args, kwargs); }
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
