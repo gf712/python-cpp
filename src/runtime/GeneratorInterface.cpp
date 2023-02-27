@@ -46,15 +46,21 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__iter__() cons
 	return Ok(static_cast<T *>(const_cast<GeneratorInterface<T> *>(this)));
 }
 
-template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__next__() { return send(); }
+template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__next__()
+{
+	return send(py_none());
+}
 
-template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send()
+template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send(PyObject *value)
 {
 	if (m_is_running) { return Err(value_error("generator already executing")); }
 	if (m_frame == nullptr) {
 		// exhausted generator, or raised an exception
 		return Err(stop_iteration(py_none()));
 	}
+
+	// send the value to the coroutine
+	m_last_sent_value = value;
 
 	m_is_running = true;
 
@@ -67,6 +73,7 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send()
 
 	m_is_running = false;
 	m_frame->m_f_back = nullptr;
+	m_last_sent_value = nullptr;
 
 	if (m_invalid_return && result.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
 		spdlog::debug("generator returned value {}", result.unwrap_err()->args()->to_string());
@@ -119,6 +126,8 @@ template<typename T> void GeneratorInterface<T>::visit_graph(Visitor &visitor)
 			}
 		}
 	}
+
+	if (m_last_sent_value) { visitor.visit(*m_last_sent_value); }
 }
 
 template class GeneratorInterface<PyAsyncGenerator>;

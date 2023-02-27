@@ -63,6 +63,7 @@
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 #include "executable/bytecode/instructions/WithExceptStart.hpp"
+#include "executable/bytecode/instructions/YieldLoad.hpp"
 #include "executable/bytecode/instructions/YieldValue.hpp"
 
 #include "ast/optimizers/ConstantFolding.hpp"
@@ -1134,7 +1135,9 @@ Value *BytecodeGenerator::visit(const Yield *node)
 {
 	auto *src = generate(node->value().get(), m_function_id);
 	emit<YieldValue>(src->get_register());
-	return src;
+	auto bidirectional_value = create_value();
+	emit<YieldLoad>(bidirectional_value->get_register());
+	return bidirectional_value;
 }
 
 Value *BytecodeGenerator::visit(const YieldFrom *) { TODO(); }

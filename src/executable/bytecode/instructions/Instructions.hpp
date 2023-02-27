@@ -81,5 +81,6 @@ static constexpr uint8_t INPLACE_OP = 63;
 static constexpr uint8_t YIELD_VALUE = 64;
 static constexpr uint8_t DICT_UPDATE = 65;
 static constexpr uint8_t DICT_ADD = 66;
+static constexpr uint8_t YIELD_LOAD = 67;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

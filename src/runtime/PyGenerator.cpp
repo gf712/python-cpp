@@ -54,6 +54,7 @@ namespace {
 	{
 		return std::move(klass<PyGenerator>(PyGenerator::GeneratorTypeName)
 							 .def("close", &PyGenerator::close)
+							 .def("send", &PyGenerator::send)
 							 .type);
 	}
 }// namespace
