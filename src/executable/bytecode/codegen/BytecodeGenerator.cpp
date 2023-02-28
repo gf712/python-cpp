@@ -20,6 +20,7 @@
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GetIter.hpp"
+#include "executable/bytecode/instructions/GetYieldFromIter.hpp"
 #include "executable/bytecode/instructions/ImportFrom.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
 #include "executable/bytecode/instructions/InplaceOp.hpp"
@@ -63,6 +64,7 @@
 #include "executable/bytecode/instructions/Unary.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 #include "executable/bytecode/instructions/WithExceptStart.hpp"
+#include "executable/bytecode/instructions/YieldFrom.hpp"
 #include "executable/bytecode/instructions/YieldLoad.hpp"
 #include "executable/bytecode/instructions/YieldValue.hpp"
 
@@ -1134,13 +1136,26 @@ Value *BytecodeGenerator::visit(const Return *node)
 Value *BytecodeGenerator::visit(const Yield *node)
 {
 	auto *src = generate(node->value().get(), m_function_id);
+	ASSERT(src);
 	emit<YieldValue>(src->get_register());
-	auto bidirectional_value = create_value();
+	auto *bidirectional_value = create_value();
 	emit<YieldLoad>(bidirectional_value->get_register());
 	return bidirectional_value;
 }
 
-Value *BytecodeGenerator::visit(const YieldFrom *) { TODO(); }
+Value *BytecodeGenerator::visit(const ast::YieldFrom *node)
+{
+	auto *src = generate(node->value().get(), m_function_id);
+	ASSERT(src);
+	auto *iterator = create_value();
+	emit<GetYieldFromIter>(iterator->get_register(), src->get_register());
+	auto *none_static = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+	auto *none = create_value();
+	emit<LoadConst>(none->get_register(), none_static->get_index());
+	auto *result = create_value();
+	emit<::YieldFrom>(result->get_register(), iterator->get_register(), none->get_register());
+	return result;
+}
 
 Value *BytecodeGenerator::visit(const Assign *node)
 {

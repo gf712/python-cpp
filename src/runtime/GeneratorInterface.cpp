@@ -75,13 +75,13 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send(PyObject *
 	m_frame->m_f_back = nullptr;
 	m_last_sent_value = nullptr;
 
-	if (m_invalid_return && result.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
-		spdlog::debug("generator returned value {}", result.unwrap_err()->args()->to_string());
-	} else if (result.is_ok()) {
-		spdlog::debug("generator result {}", result.unwrap()->to_string());
-	} else if (result.is_err()
+	if (m_invalid_return && result.is_ok()) {
+		spdlog::debug("generator returned value {}", result.unwrap()->to_string());
+	} else if (!m_invalid_return && result.is_err()
 			   && result.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
 		result = Err(runtime_error("generator raised StopIteration"));
+	} else if (result.is_ok()) {
+		spdlog::debug("generator yielded {}", result.unwrap()->to_string());
 	}
 
 	if (result.is_err()) { m_frame = nullptr; }

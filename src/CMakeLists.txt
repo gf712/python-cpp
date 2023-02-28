@@ -27,6 +27,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
     executable/bytecode/instructions/GetIter.cpp
+    executable/bytecode/instructions/GetYieldFromIter.cpp
     executable/bytecode/instructions/InplaceOp.cpp
     executable/bytecode/instructions/Instructions.cpp
     executable/bytecode/instructions/ImportFrom.cpp
@@ -70,6 +71,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp
     executable/bytecode/instructions/WithExceptStart.cpp
+    executable/bytecode/instructions/YieldFrom.cpp
     executable/bytecode/instructions/YieldLoad.cpp
     executable/bytecode/instructions/YieldValue.cpp
     executable/Mangler.cpp)

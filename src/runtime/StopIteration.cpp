@@ -3,9 +3,25 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
+namespace py {
 
-static PyType *s_stop_iteration = nullptr;
+namespace {
+	static PyType *s_stop_iteration = nullptr;
+}
+
+template<> StopIteration *as(PyObject *obj)
+{
+	ASSERT(s_stop_iteration);
+	if (obj->type() == s_stop_iteration) { return static_cast<StopIteration *>(obj); }
+	return nullptr;
+}
+
+template<> const StopIteration *as(const PyObject *obj)
+{
+	ASSERT(s_stop_iteration);
+	if (obj->type() == s_stop_iteration) { return static_cast<const StopIteration *>(obj); }
+	return nullptr;
+}
 
 StopIteration::StopIteration(PyTuple *args) : Exception(s_stop_iteration->underlying_type(), args)
 {}
@@ -33,3 +49,4 @@ PyType *StopIteration::register_type(PyModule *module)
 	}
 	return s_stop_iteration;
 }
+}// namespace py
