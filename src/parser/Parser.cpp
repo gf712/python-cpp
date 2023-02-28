@@ -5765,6 +5765,49 @@ struct StarEtcPattern : PatternV2<StarEtcPattern>
 	}
 };
 
+template<> struct traits<struct SlashWithDefaultPattern>
+{
+	using result_type = std::pair<std::vector<typename traits<ParamNoDefaultPattern>::result_type>,
+		std::vector<typename traits<ParamWithDefaultPattern>::result_type>>;
+};
+
+struct SlashWithDefaultPattern : PatternV2<SlashWithDefaultPattern>
+{
+	using ResultType = typename traits<SlashWithDefaultPattern>::result_type;
+
+	// slash_with_default:
+	//     | param_no_default* param_with_default+ '/' ','
+	//     | param_no_default* param_with_default+ '/' &')'
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<ZeroOrMorePatternV2<ParamNoDefaultPattern>,
+			OneOrMorePatternV2<ParamWithDefaultPattern>,
+			SingleTokenPatternV2<Token::TokenType::SLASH>,
+			SingleTokenPatternV2<Token::TokenType::COMMA>>;
+		// param_no_default* param_with_default+ '/' ','
+		if (auto result = pattern1::match(p)) {
+			DEBUG_LOG("param_no_default* param_with_default+ '/' ','");
+			auto [params_no_default, param_with_default, s, _] = *result;
+			(void)s;
+			return { { params_no_default, param_with_default } };
+		}
+
+		using pattern2 = PatternMatchV2<ZeroOrMorePatternV2<ParamNoDefaultPattern>,
+			OneOrMorePatternV2<ParamWithDefaultPattern>,
+			SingleTokenPatternV2<Token::TokenType::SLASH>,
+			LookAheadV2<SingleTokenPatternV2<Token::TokenType::RPAREN>>>;
+		// param_no_default* param_with_default+ '/' &')'
+		if (auto result = pattern2::match(p)) {
+			DEBUG_LOG("param_no_default* param_with_default+ '/' &')'");
+			auto [params_no_default, param_with_default, s, _] = *result;
+			(void)s;
+			return { { params_no_default, param_with_default } };
+		}
+
+		return {};
+	}
+};
+
 template<> struct traits<struct SlashNoDefaultPattern>
 {
 	using result_type = std::vector<std::shared_ptr<Argument>>;
@@ -5792,7 +5835,7 @@ struct SlashNoDefaultPattern : PatternV2<SlashNoDefaultPattern>
 
 		using pattern2 = PatternMatchV2<OneOrMorePatternV2<ParamNoDefaultPattern>,
 			SingleTokenPatternV2<Token::TokenType::SLASH>,
-			LookAheadV2<SingleTokenPatternV2<Token::TokenType::COMMA>>>;
+			LookAheadV2<SingleTokenPatternV2<Token::TokenType::RPAREN>>>;
 		// param_no_default+ '/' &')'
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("param_no_default+ '/' &')'");
@@ -5873,16 +5916,63 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 				source_location);
 		}
 
-		// // slash_with_default param_with_default* [star_etc]
-		// using pattern2 = PatternMatchV2<SlashWithDefaultPattern,
-		// 	ZeroOrMorePatternV2<ParamWithDefaultPattern>,
-		// 	ZeroOrOnePatternV2<StarEtcPattern>>;
-		// if (auto result = pattern2::match(p)) {
-		// 	DEBUG_LOG("slash_with_default param_with_default* [star_etc]");
-		// 	(void)result;
-		// 	TODO();
-		// 	return {};
-		// }
+		// slash_with_default param_with_default* [star_etc]
+		using pattern2 = PatternMatchV2<SlashWithDefaultPattern,
+			ZeroOrMorePatternV2<ParamWithDefaultPattern>,
+			ZeroOrOnePatternV2<StarEtcPattern>>;
+		if (auto result = pattern2::match(p)) {
+			DEBUG_LOG("slash_with_default param_with_default* [star_etc]");
+			auto [posonly_params, params_with_default, star_etc] = *result;
+			const auto &[posonly_params_without_default, posonly_params_with_default] =
+				posonly_params;
+
+			std::vector<std::shared_ptr<Argument>> posonlyargs;
+			std::vector<std::shared_ptr<Argument>> args;
+			std::shared_ptr<Argument> vararg;
+			std::vector<std::shared_ptr<Argument>> kwonlyargs;
+			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
+			std::shared_ptr<Argument> kwarg;
+			std::vector<std::shared_ptr<ASTNode>> defaults;
+			SourceLocation source_location{
+				posonly_params_without_default.empty()
+					? posonly_params_with_default.front().first->source_location().start
+					: posonly_params_without_default.front()->source_location().start,
+				p.lexer().peek_token(p.token_position() - 1)->end(),// too lazy to figure this out
+			};
+
+			for (const auto &param : posonly_params_without_default) {
+				posonlyargs.push_back(param);
+			}
+
+			for (const auto &[param, default_value] : posonly_params_with_default) {
+				posonlyargs.push_back(param);
+				defaults.push_back(default_value);
+			}
+
+			for (const auto &[param, default_value] : params_with_default) {
+				args.push_back(param);
+				defaults.push_back(default_value);
+			}
+
+			if (star_etc.has_value()) {
+				auto [vararg_, kwonlyargs_, kwarg_] = *star_etc;
+				vararg = vararg_.value_or(nullptr);
+				for (const auto &[param, default_] : kwonlyargs_) {
+					kwonlyargs.push_back(param);
+					kw_defaults.push_back(default_.value_or(nullptr));
+				}
+				kwarg = kwarg_.value_or(nullptr);
+			}
+
+			return std::make_shared<Arguments>(posonlyargs,
+				args,
+				vararg,
+				kwonlyargs,
+				kw_defaults,
+				kwarg,
+				defaults,
+				source_location);
+		}
 
 		// param_no_default+ param_with_default* [star_etc]
 		using pattern3 = PatternMatchV2<OneOrMorePatternV2<ParamNoDefaultPattern>,

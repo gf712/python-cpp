@@ -244,7 +244,8 @@ void compare_yield(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	dispatch(result_value, expected_value);
 }
 
-void compare_yieldfrom(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_yieldfrom(const std::shared_ptr<ASTNode> &result,
+	const std::shared_ptr<ASTNode> &expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::YieldFrom);
 
@@ -3156,6 +3157,42 @@ TEST(Parser, FunctionDefinitionWithPositionalArgsWithoutDefault)
 			std::vector<std::shared_ptr<ASTNode>>{},
 			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
 			std::vector<std::shared_ptr<ASTNode>>{},
+			SourceLocation{}),// args
+		std::vector<std::shared_ptr<ASTNode>>{
+			std::make_shared<Pass>(SourceLocation{}),
+		},// body
+		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		nullptr,// returns
+		"",// type_comment
+		SourceLocation{}));
+	assert_generates_ast(program, expected_ast);
+}
+
+TEST(Parser, FunctionDefinitionWithPositionalArgWithDefault)
+{
+	constexpr std::string_view program =
+		"def f(a, b=(), /, c=1, **kwargs):\n"
+		"  pass\n";
+
+	auto expected_ast = create_test_module();
+	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
+		std::make_shared<Arguments>(
+			std::vector{
+				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+			},
+			std::vector{
+				std::make_shared<Argument>("c", nullptr, "", SourceLocation{}),
+			},
+			nullptr,
+			std::vector<std::shared_ptr<Argument>>{},
+			std::vector<std::shared_ptr<ASTNode>>{},
+			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<std::shared_ptr<ASTNode>>{
+				std::make_shared<Tuple>(
+					std::vector<std::shared_ptr<ASTNode>>{}, ContextType::LOAD, SourceLocation{}),
+				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			},
 			SourceLocation{}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Pass>(SourceLocation{}),

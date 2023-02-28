@@ -1884,7 +1884,6 @@ Value *BytecodeGenerator::visit(const ast::ImportFrom *node)
 {
 	std::vector<Register> names;
 	for (const auto &n : node->names()) {
-		if (!n.asname.empty()) { TODO(); }
 		auto name = load_const(py::String{ n.name }, m_function_id);
 		auto name_value = create_value();
 		emit<LoadConst>(name_value->get_register(), name->get_index());
@@ -1910,7 +1909,11 @@ Value *BytecodeGenerator::visit(const ast::ImportFrom *node)
 		auto *name = load_name(n.name, m_function_id);
 		emit<::ImportFrom>(
 			imported_object->get_register(), name->get_index(), module_value->get_register());
-		store_name(n.name, imported_object);
+		if (n.asname.empty()) {
+			store_name(n.name, imported_object);
+		} else {
+			store_name(n.asname, imported_object);
+		}
 	}
 
 	return nullptr;
