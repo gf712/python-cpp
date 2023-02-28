@@ -4449,19 +4449,23 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 					target, BinaryOpType::MINUS, expression, source_location);
 			} break;
 			case Token::TokenType::STAREQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::MULTIPLY, expression, source_location);
 			} break;
 			case Token::TokenType::ATEQUAL: {
 				TODO_NO_FAIL();
 			} break;
 			case Token::TokenType::SLASHEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::SLASH, expression, source_location);
 			} break;
 			case Token::TokenType::PERCENTEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::MODULO, expression, source_location);
 			} break;
 			case Token::TokenType::AMPEREQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::AND, expression, source_location);
 			} break;
 			case Token::TokenType::VBAREQUAL: {
 				return std::make_shared<AugAssign>(
