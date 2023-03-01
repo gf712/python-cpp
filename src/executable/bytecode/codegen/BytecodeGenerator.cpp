@@ -1171,16 +1171,25 @@ Value *BytecodeGenerator::visit(const Assign *node)
 				src->get_register(),
 				load_name(ast_attr->attr(), m_function_id)->get_index());
 		} else if (auto ast_tuple = as<Tuple>(target)) {
-			std::vector<BytecodeValue *> dst_values;
-			std::vector<Register> dst_registers;
+			std::vector<BytecodeValue *> unpacked_values;
+			std::vector<Register> unpacked_registers;
 			for (size_t i = 0; i < ast_tuple->elements().size(); ++i) {
-				dst_values.push_back(create_value());
-				dst_registers.push_back(dst_values.back()->get_register());
+				auto &unpacked_value = unpacked_values.emplace_back(create_value());
+				unpacked_registers.push_back(unpacked_value->get_register());
 			}
-			emit<UnpackSequence>(dst_registers, src->get_register());
-			for (size_t idx = 0; const auto &dst_value : dst_values) {
+			emit<UnpackSequence>(unpacked_registers, src->get_register());
+			for (size_t idx = 0; const auto &unpacked_value : unpacked_values) {
 				const auto &el = ast_tuple->elements()[idx++];
-				store_name(as<Name>(el)->ids()[0], dst_value);
+				if (auto name = as<Name>(el)) {
+					store_name(name->ids()[0], unpacked_value);
+				} else if (auto attr = as<Attribute>(el)) {
+					auto *dst_obj = generate(attr->value().get(), m_function_id);
+					emit<StoreAttr>(dst_obj->get_register(),
+						unpacked_value->get_register(),
+						load_name(attr->attr(), m_function_id)->get_index());
+				} else {
+					TODO();
+				}
 			}
 		} else if (auto ast_subscript = as<Subscript>(target)) {
 			auto *obj = generate(ast_subscript->value().get(), m_function_id);
