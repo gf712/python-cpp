@@ -152,6 +152,9 @@ struct SequenceTypePrototype
 {
 	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __concat__;
+	std::optional<std::variant<GetItemSlotFunctionType, PyObject *>> __getitem__;
+	std::optional<std::variant<SetItemSlotFunctionType, PyObject *>> __setitem__;
+	std::optional<std::variant<DelItemSlotFunctionType, PyObject *>> __delitem__;
 	std::optional<std::variant<ContainsSlotFunctionType, PyObject *>> __contains__;
 };
 
@@ -317,6 +320,9 @@ class PySequenceWrapper
 	PySequenceWrapper(PyObject *object) : m_object(object) {}
 	PyResult<size_t> len();
 	PyResult<PyObject *> concat(PyObject *other);
+	PyResult<PyObject *> getitem(PyObject *);// sq_item
+	PyResult<std::monostate> setitem(PyObject *, PyObject *);// sq_ass_item
+	PyResult<std::monostate> delitem(PyObject *);// sq_ass_item
 	PyResult<bool> contains(PyObject *);
 };
 

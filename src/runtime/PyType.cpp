@@ -48,8 +48,8 @@ namespace {
 	template<typename SlotFunctionType,
 		typename ResultType = typename SlotFunctionType::result_type,
 		typename... Args>
-	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-		Args &&...args_) requires std::is_same_v<typename ResultType::OkType, PyObject *>
+	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
+		requires std::is_same_v<typename ResultType::OkType, PyObject *>
 	{
 		if (std::holds_alternative<SlotFunctionType>(slot)) {
 			return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -73,7 +73,8 @@ namespace {
 		typename... Args>
 	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 		std::string_view conversion_error_message,
-		Args &&...args_) requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
+		Args &&...args_)
+		requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
 	{
 		if (std::holds_alternative<SlotFunctionType>(slot)) {
 			return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -670,19 +671,33 @@ static std::array slotdefs = {
 	// 	"__imatmul__($self, value, /)\n--\n\nReturn value@=self." },
 
 	// mapping
-	// Slot{ "__len__", &MappingTypePrototype::__len__, "__len__($self, /)\n--\n\nReturn len(self)."
-	// }, Slot{ "__getitem__", 	&MappingTypePrototype::__getitem__,
-	// 	"__getitem__($self, key, /)\n--\n\nReturn self[key]." },
-	// Slot{ "__setitem__",
-	// 	&MappingTypePrototype::__setitem__,
-	// 	"__setitem__($self, key, value, /)\n--\n\nSet self[key] to value." },
-	// Slot{ "__delitem__",
-	// 	&MappingTypePrototype::__delitem__,
-	// 	"__delitem__($self, key, /)\n--\n\nDelete self[key]." },
+	Slot{ "__len__", &MappingTypePrototype::__len__, "__len__($self, /)\n--\n\nReturn len(self)." },
+	Slot{ "__getitem__",
+		&MappingTypePrototype::__getitem__,
+		"__getitem__($self, key, /)\n--\n\nReturn self[key]." },
+	Slot{ "__setitem__",
+		&MappingTypePrototype::__setitem__,
+		"__setitem__($self, key, value, /)\n--\n\nSet self[key] to value." },
+	Slot{ "__delitem__",
+		&MappingTypePrototype::__delitem__,
+		"__delitem__($self, key, /)\n--\n\nDelete self[key]." },
 
-	// Slot{ "__len__",
-	// 	&SequenceTypePrototype::__len__,
-	// 	"__len__($self, /)\n--\n\nReturn len(self)." },
+	Slot{ "__len__",
+		&SequenceTypePrototype::__len__,
+		"__len__($self, /)\n--\n\nReturn len(self)." },
+	Slot{ "__getitem__",
+		&SequenceTypePrototype::__getitem__,
+		"__getitem__($self, key, /)\n--\n\nReturn self[key]." },
+	Slot{ "__setitem__",
+		&SequenceTypePrototype::__setitem__,
+		"__setitem__($self, key, value, /)\n--\n\nSet self[key] to value." },
+	Slot{ "__delitem__",
+		&SequenceTypePrototype::__delitem__,
+		"__delitem__($self, key, /)\n--\n\nDelete self[key]." },
+	Slot{ "__contains__",
+		&SequenceTypePrototype::__contains__,
+		"__contains__($self, key, /)\n--\n\nReturn key in self." },
+
 	// Slot{ "__add__",
 	// 	&SequenceTypePrototype::__concat__,
 	// 	"__add__($self, value, /)\n--\n\nReturn self+value." },
@@ -691,15 +706,6 @@ static std::array slotdefs = {
 	//        "__mul__($self, value, /)\n--\n\nReturn self*value."),
 	// SQSLOT("__rmul__", sq_repeat, NULL, wrap_indexargfunc,
 	//        "__rmul__($self, value, /)\n--\n\nReturn value*self."),
-	// SQSLOT("__getitem__", sq_item, slot_sq_item, wrap_sq_item,
-	//        "__getitem__($self, key, /)\n--\n\nReturn self[key]."),
-	// SQSLOT("__setitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_setitem,
-	//        "__setitem__($self, key, value, /)\n--\n\nSet self[key] to value."),
-	// SQSLOT("__delitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_delitem,
-	//        "__delitem__($self, key, /)\n--\n\nDelete self[key]."),
-	// Slot{ "__contains__",
-	// 	&SequenceTypePrototype::__contains__,
-	// 	"__contains__($self, key, /)\n--\n\nReturn key in self." },
 	// SQSLOT("__iadd__", sq_inplace_concat, NULL,
 	//        wrap_binaryfunc,
 	//        "__iadd__($self, value, /)\n--\n\nImplement self+=value."),
@@ -1009,6 +1015,9 @@ PyResult<std::monostate> PyType::inherit_slots(PyType *base)
 	// add_numeric_slot(&TypePrototype::__imatmul__);
 	add_sequence_slot(&SequenceTypePrototype::__len__);
 	add_sequence_slot(&SequenceTypePrototype::__concat__);
+	add_sequence_slot(&SequenceTypePrototype::__getitem__);
+	add_sequence_slot(&SequenceTypePrototype::__setitem__);
+	add_sequence_slot(&SequenceTypePrototype::__delitem__);
 	add_sequence_slot(&SequenceTypePrototype::__contains__);
 
 	add_mapping_slot(&MappingTypePrototype::__len__);
@@ -1585,6 +1594,9 @@ void PyType::visit_graph(Visitor &visitor)
 
 	VISIT_SEQUENCE_SLOT(__len__)
 	VISIT_SEQUENCE_SLOT(__concat__)
+	VISIT_SEQUENCE_SLOT(__setitem__)
+	VISIT_SEQUENCE_SLOT(__getitem__)
+	VISIT_SEQUENCE_SLOT(__delitem__)
 	VISIT_SEQUENCE_SLOT(__contains__)
 #undef VISIT_SLOT
 

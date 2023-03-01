@@ -93,8 +93,8 @@ namespace {
 template<typename SlotFunctionType,
 	typename ResultType = typename SlotFunctionType::result_type,
 	typename... Args>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-	Args &&...args_) requires std::is_same_v<typename ResultType::OkType, PyObject *>
+ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
+	requires std::is_same_v<typename ResultType::OkType, PyObject *>
 {
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -118,7 +118,8 @@ template<typename SlotFunctionType,
 	typename... Args>
 ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 	std::string_view conversion_error_message,
-	Args &&...args_) requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
+	Args &&...args_)
+	requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
 {
 	if (std::holds_alternative<SlotFunctionType>(slot)) {
 		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
@@ -239,6 +240,46 @@ PyResult<bool> PySequenceWrapper::contains(PyObject *value)
 	}
 
 	return Err(type_error("object of type '{}' has no contains()", m_object->type()->name()));
+}
+
+
+PyResult<PyObject *> PySequenceWrapper::getitem(PyObject *name)
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__getitem__.has_value()) {
+		return call_slot(
+			*m_object->type_prototype().sequence_type_protocol->__getitem__, m_object, name);
+	}
+
+	return Err(
+		type_error("object of type '{}' does not support indexing", m_object->type()->name()));
+}
+
+PyResult<std::monostate> PySequenceWrapper::setitem(PyObject *name, PyObject *value)
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__setitem__.has_value()) {
+		return call_slot(*m_object->type_prototype().sequence_type_protocol->__setitem__,
+			"",
+			m_object,
+			name,
+			value);
+	}
+
+	return Err(type_error(
+		"object of type '{}' does not support item assignment", m_object->type()->name()));
+}
+
+PyResult<std::monostate> PySequenceWrapper::delitem(PyObject *name)
+{
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__delitem__.has_value()) {
+		return call_slot(
+			*m_object->type_prototype().sequence_type_protocol->__delitem__, "", m_object, name);
+	}
+
+	return Err(
+		type_error("object of type '{}' does not support item deletion", m_object->type()->name()));
 }
 
 PyResult<PyObject *> PySequenceWrapper::concat(PyObject *value)

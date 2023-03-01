@@ -37,20 +37,20 @@ class Slot
 		static constexpr size_t value = sizeof...(Args);
 	};
 
-	template<Slot::Flags flags_, typename R, typename... Args>
-	constexpr void initialize(
-		std::optional<std::variant<std::function<R(Args...)>, PyObject *>> TypePrototype::*slot);
+	template<Slot::Flags flags_, typename TypePrototypeWrapper, typename R, typename... Args>
+	constexpr void initialize(std::optional<std::variant<std::function<R(Args...)>, PyObject *>>
+			TypePrototypeWrapper::*slot);
 
   public:
-	template<typename FnType>
+	template<typename FnType, typename TypePrototypeWrapper>
 	constexpr Slot(std::string_view name_,
-		std::optional<std::variant<std::function<FnType>, PyObject *>> TypePrototype::*slot)
+		std::optional<std::variant<std::function<FnType>, PyObject *>> TypePrototypeWrapper::*slot)
 		: Slot(name_, slot, std::nullopt)
 	{}
 
-	template<typename FnType>
+	template<typename FnType, typename TypePrototypeWrapper>
 	constexpr Slot(std::string_view name_,
-		std::optional<std::variant<std::function<FnType>, PyObject *>> TypePrototype::*slot,
+		std::optional<std::variant<std::function<FnType>, PyObject *>> TypePrototypeWrapper::*slot,
 		std::optional<std::string_view> doc_)
 		: name(name_), doc(doc_), flags(Flags::None)
 	{
@@ -102,7 +102,7 @@ class PySlotWrapper : public PyBaseObject
 	PyString *slot_name() { return m_name; }
 	const FunctionType &slot() { return m_slot; }
 	std::reference_wrapper<Slot> base() const { return m_base; }
-	PyType* base_type() const { return m_type; }
+	PyType *base_type() const { return m_type; }
 
 	std::string to_string() const override;
 
@@ -116,44 +116,66 @@ class PySlotWrapper : public PyBaseObject
 	PyType *type() const override;
 };
 
-template<Slot::Flags flags_, typename R, typename... Args>
+template<Slot::Flags flags_, typename TypePrototypeWrapper, typename R, typename... Args>
 constexpr void Slot::initialize(
-	std::optional<std::variant<std::function<R(Args...)>, PyObject *>> TypePrototype::*slot)
+	std::optional<std::variant<std::function<R(Args...)>, PyObject *>> TypePrototypeWrapper::*slot)
 {
 	using FnType = std::function<R(Args...)>;
 	using FnPointerType = typename std::add_pointer_t<R(Args...)>;
 
-	has_member = [slot](TypePrototype &t) -> bool { return (t.*slot).has_value(); };
-	reset_member = [slot](TypePrototype &t) { t.*slot = std::nullopt; };
-	get_member = [slot](TypePrototype &t) -> std::optional<std::variant<void *, PyObject *>> {
-		if ((t.*slot).has_value()) {
-			if (std::holds_alternative<FnType>(*(t.*slot))) {
-				ASSERT(std::get<FnType>(*(t.*slot)));
-				auto fn_ptr = std::get<FnType>(*(t.*slot)).template target<FnPointerType>();
+	auto get_slot = [](TypePrototype &t) -> TypePrototypeWrapper & {
+		if constexpr (std::is_same_v<TypePrototypeWrapper, TypePrototype>) {
+			return t;
+		} else if constexpr (std::is_same_v<TypePrototypeWrapper, MappingTypePrototype>) {
+			if (!t.mapping_type_protocol.has_value()) {
+				t.mapping_type_protocol = MappingTypePrototype{};
+			}
+			return *t.mapping_type_protocol;
+		} else if constexpr (std::is_same_v<TypePrototypeWrapper, SequenceTypePrototype>) {
+			if (!t.sequence_type_protocol.has_value()) {
+				t.sequence_type_protocol = SequenceTypePrototype{};
+			}
+			return *t.sequence_type_protocol;
+		}
+	};
+
+	has_member = [slot, get_slot](
+					 TypePrototype &t) -> bool { return (get_slot(t).*slot).has_value(); };
+	reset_member = [slot, get_slot](TypePrototype &t) { get_slot(t).*slot = std::nullopt; };
+	get_member = [slot, get_slot](
+					 TypePrototype &t) -> std::optional<std::variant<void *, PyObject *>> {
+		auto &slot_value = get_slot(t).*slot;
+		if (slot_value.has_value()) {
+			if (std::holds_alternative<FnType>(*slot_value)) {
+				ASSERT(std::get<FnType>(*slot_value));
+				auto fn_ptr = std::get<FnType>(*slot_value).template target<FnPointerType>();
 				ASSERT(fn_ptr);
 				return reinterpret_cast<void *>(*fn_ptr);
 			} else {
-				ASSERT(std::get<PyObject *>(*(t.*slot)));
-				return std::get<PyObject *>(*(t.*slot));
+				ASSERT(std::get<PyObject *>(*slot_value));
+				return std::get<PyObject *>(*slot_value);
 			}
 		} else {
 			return std::nullopt;
 		}
 	};
-	set_member = [slot](TypePrototype &t, std::variant<void *, PyObject *> fn) {
+	set_member = [slot, get_slot](TypePrototype &t, std::variant<void *, PyObject *> fn) {
+		auto &slot_value = get_slot(t).*slot;
 		if (std::holds_alternative<void *>(fn)) {
 			ASSERT(std::get<void *>(fn));
-			t.*slot = reinterpret_cast<FnPointerType>(std::get<void *>(fn));
+			slot_value = reinterpret_cast<FnPointerType>(std::get<void *>(fn));
 		} else {
 			ASSERT(std::get<PyObject *>(fn));
-			t.*slot = std::get<PyObject *>(fn);
+			slot_value = std::get<PyObject *>(fn);
 		}
 	};
-	update_member = [slot](TypePrototype &t, PyObject *obj) { (t.*slot) = obj; };
-	create_slot_wrapper = [this, slot, name_ = name](PyType *type) -> PyResult<PySlotWrapper *> {
+	update_member = [slot, get_slot](TypePrototype &t, PyObject *obj) { get_slot(t).*slot = obj; };
+	create_slot_wrapper = [this, slot, get_slot, name_ = name](
+							  PyType *type) -> PyResult<PySlotWrapper *> {
 		auto &t = type->underlying_type();
-		ASSERT((t.*slot).has_value());
-		auto &fn_ = *(t.*slot);
+		auto &slot_value = get_slot(t).*slot;
+		ASSERT(slot_value.has_value());
+		auto &fn_ = *slot_value;
 		auto name = PyString::create(std::string{ name_ });
 		if (name.is_err()) { return Err(name.unwrap_err()); };
 		if (std::holds_alternative<PyObject *>(fn_)) {
