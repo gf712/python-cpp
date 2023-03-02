@@ -90,6 +90,16 @@ size_t ValueHash::operator()(const Value &value) const
 
 namespace {
 
+template<typename T> auto to_object(T &&value)
+{
+	if constexpr (std::is_base_of_v<PyObject,
+					  typename std::remove_pointer_t<typename std::remove_cvref_t<T>>>) {
+		return value;
+	} else {
+		return PyObject::from(value).unwrap();
+	}
+}
+
 template<typename SlotFunctionType,
 	typename ResultType = typename SlotFunctionType::result_type,
 	typename... Args>
@@ -103,8 +113,8 @@ ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Arg
 		//		  PyObject constness (right?). But for the internal calls handled above
 		//		  which are resolved in the C++ runtime, we want to enforce constness
 		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(
-			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
+		auto args = PyTuple::create(const_cast<PyObject *>(
+			static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
 		if (args.is_err()) { return Err(args.unwrap_err()); }
 		PyDict *kwargs = nullptr;
 		return std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
@@ -130,8 +140,8 @@ ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 		//		  PyObject constness (right?). But for the internal calls handled above
 		//		  which are resolved in the C++ runtime, we want to enforce constness
 		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(
-			const_cast<PyObject *>(static_cast<const PyObject *>(std::forward<Args>(args_)))...);
+		auto args = PyTuple::create(const_cast<PyObject *>(
+			static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
 		if (args.is_err()) { return Err(args.unwrap_err()); }
 		PyDict *kwargs = nullptr;
 		if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
@@ -243,26 +253,26 @@ PyResult<bool> PySequenceWrapper::contains(PyObject *value)
 }
 
 
-PyResult<PyObject *> PySequenceWrapper::getitem(PyObject *name)
+PyResult<PyObject *> PySequenceWrapper::getitem(int64_t index)
 {
 	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
 	if (m_object->type_prototype().sequence_type_protocol->__getitem__.has_value()) {
 		return call_slot(
-			*m_object->type_prototype().sequence_type_protocol->__getitem__, m_object, name);
+			*m_object->type_prototype().sequence_type_protocol->__getitem__, m_object, index);
 	}
 
 	return Err(
 		type_error("object of type '{}' does not support indexing", m_object->type()->name()));
 }
 
-PyResult<std::monostate> PySequenceWrapper::setitem(PyObject *name, PyObject *value)
+PyResult<std::monostate> PySequenceWrapper::setitem(int64_t index, PyObject *value)
 {
 	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
 	if (m_object->type_prototype().sequence_type_protocol->__setitem__.has_value()) {
 		return call_slot(*m_object->type_prototype().sequence_type_protocol->__setitem__,
 			"",
 			m_object,
-			name,
+			index,
 			value);
 	}
 
@@ -270,12 +280,12 @@ PyResult<std::monostate> PySequenceWrapper::setitem(PyObject *name, PyObject *va
 		"object of type '{}' does not support item assignment", m_object->type()->name()));
 }
 
-PyResult<std::monostate> PySequenceWrapper::delitem(PyObject *name)
+PyResult<std::monostate> PySequenceWrapper::delitem(int64_t index)
 {
 	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
 	if (m_object->type_prototype().sequence_type_protocol->__delitem__.has_value()) {
 		return call_slot(
-			*m_object->type_prototype().sequence_type_protocol->__delitem__, "", m_object, name);
+			*m_object->type_prototype().sequence_type_protocol->__delitem__, "", m_object, index);
 	}
 
 	return Err(
@@ -304,6 +314,11 @@ template<> PyResult<PyObject *> PyObject::from(PyObject *const &value)
 template<> PyResult<PyObject *> PyObject::from(const Number &value)
 {
 	return PyNumber::create(value);
+}
+
+template<> PyResult<PyObject *> PyObject::from(const int64_t &value)
+{
+	return PyNumber::create(Number{ value });
 }
 
 template<> PyResult<PyObject *> PyObject::from(const String &value)

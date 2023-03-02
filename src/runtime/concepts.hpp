@@ -133,7 +133,7 @@ namespace concepts {
 
 	// sequence methods
 	template<typename T>
-	concept HasContains = requires(T *obj, T *value)
+	concept HasContains = requires(T *obj, PyObject *value)
 	{
 		obj->__contains__(value);
 	};

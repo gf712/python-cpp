@@ -5,6 +5,7 @@
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
+#include "TypeError.hpp"
 
 namespace py {
 
@@ -35,6 +36,8 @@ class Slot
 	template<typename R, typename... Args> struct arity<std::function<R(Args...)>>
 	{
 		static constexpr size_t value = sizeof...(Args);
+		template<size_t Idx>
+		using arg_type = typename std::tuple_element_t<Idx, std::tuple<Args...>>;
 	};
 
 	template<Slot::Flags flags_, typename TypePrototypeWrapper, typename R, typename... Args>
@@ -221,6 +224,33 @@ constexpr void Slot::initialize(
 						();
 					}
 				};
+				auto get_parameter = [&args]<typename T, size_t Idx>() -> PyResult<T> {
+					using ArgType = typename std::remove_cv_t<std::remove_pointer_t<T>>;
+					if constexpr (std::is_same_v<ArgType, PyObject>) {
+						return PyObject::from(args->elements()[Idx]);
+					} else if constexpr (std::is_same_v<ArgType, int64_t>) {
+						const auto &el = args->elements()[Idx];
+						if (std::holds_alternative<PyObject *>(el)) {
+							auto obj = std::get<PyObject *>(el);
+							if (auto int_obj = as<PyInteger>(obj)) { return Ok(int_obj->as_i64()); }
+							return Err(type_error(
+								"expected integer type, but got {}", obj->type()->name()));
+						} else if (std::holds_alternative<Number>(el)) {
+							if (std::holds_alternative<double>(std::get<Number>(el).value)) {
+								return Err(type_error("expected integer type, but got float"));
+							}
+							return Ok(std::get<BigIntType>(std::get<Number>(el).value).get_si());
+						} else {
+							TODO();
+						}
+					} else {
+						[]<bool flag = false>()
+						{
+							static_assert(flag, "unsupported native parameter type");
+						}
+						();
+					}
+				};
 				if constexpr (flags_ == Flags::Keywords) {
 					return wrap_result(native_fn(self, args, kwargs));
 				} else if constexpr (flags_ == Flags::New) {
@@ -233,13 +263,19 @@ constexpr void Slot::initialize(
 						return wrap_result(native_fn(self));
 					} else if constexpr (arity<FnType>::value == 2) {
 						ASSERT(args->elements().size() >= 1);
-						return wrap_result(
-							native_fn(self, PyObject::from(args->elements()[0]).unwrap()));
+						using arg_type0 = typename arity<FnType>::template arg_type<1>;
+						auto arg0 = get_parameter.template operator()<arg_type0, 0>();
+						if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
+						return wrap_result(native_fn(self, arg0.unwrap()));
 					} else if constexpr (arity<FnType>::value == 3) {
 						ASSERT(args->elements().size() >= 2);
-						return wrap_result(native_fn(self,
-							PyObject::from(args->elements()[0]).unwrap(),
-							PyObject::from(args->elements()[1]).unwrap()));
+						using arg_type0 = typename arity<FnType>::template arg_type<1>;
+						using arg_type1 = typename arity<FnType>::template arg_type<2>;
+						auto arg0 = get_parameter.template operator()<arg_type0, 0>();
+						auto arg1 = get_parameter.template operator()<arg_type1, 1>();
+						if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
+						if (arg1.is_err()) { return Err(arg1.unwrap_err()); }
+						return wrap_result(native_fn(self, arg0.unwrap(), arg1.unwrap()));
 					} else {
 						[]<bool flag = false>() { static_assert(flag, "unsupported arity"); }
 						();

@@ -105,6 +105,12 @@ using SetItemSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
 using DelItemSlotFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
 
+using GetItemSequenceSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, int64_t)>;
+using SetItemSequenceSlotFunctionType =
+	std::function<PyResult<std::monostate>(PyObject *, int64_t, PyObject *)>;
+using DelItemSequenceSlotFunctionType =
+	std::function<PyResult<std::monostate>(PyObject *, int64_t)>;
+
 using LenSlotFunctionType = std::function<PyResult<size_t>(const PyObject *)>;
 using BoolSlotFunctionType = std::function<PyResult<bool>(const PyObject *)>;
 using ContainsSlotFunctionType = std::function<PyResult<bool>(PyObject *, PyObject *)>;
@@ -152,9 +158,9 @@ struct SequenceTypePrototype
 {
 	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __concat__;
-	std::optional<std::variant<GetItemSlotFunctionType, PyObject *>> __getitem__;
-	std::optional<std::variant<SetItemSlotFunctionType, PyObject *>> __setitem__;
-	std::optional<std::variant<DelItemSlotFunctionType, PyObject *>> __delitem__;
+	std::optional<std::variant<GetItemSequenceSlotFunctionType, PyObject *>> __getitem__;
+	std::optional<std::variant<SetItemSequenceSlotFunctionType, PyObject *>> __setitem__;
+	std::optional<std::variant<DelItemSequenceSlotFunctionType, PyObject *>> __delitem__;
 	std::optional<std::variant<ContainsSlotFunctionType, PyObject *>> __contains__;
 };
 
@@ -320,9 +326,9 @@ class PySequenceWrapper
 	PySequenceWrapper(PyObject *object) : m_object(object) {}
 	PyResult<size_t> len();
 	PyResult<PyObject *> concat(PyObject *other);
-	PyResult<PyObject *> getitem(PyObject *);// sq_item
-	PyResult<std::monostate> setitem(PyObject *, PyObject *);// sq_ass_item
-	PyResult<std::monostate> delitem(PyObject *);// sq_ass_item
+	PyResult<PyObject *> getitem(int64_t);// sq_item
+	PyResult<std::monostate> setitem(int64_t, PyObject *);// sq_ass_item
+	PyResult<std::monostate> delitem(int64_t);// sq_ass_item
 	PyResult<bool> contains(PyObject *);
 };
 
@@ -432,6 +438,7 @@ class PyObject : public Cell
 // avoid explicit specialization after instantiations
 template<> PyResult<PyObject *> PyObject::from(PyObject *const &value);
 template<> PyResult<PyObject *> PyObject::from(const Number &value);
+template<> PyResult<PyObject *> PyObject::from(const int64_t &value);
 template<> PyResult<PyObject *> PyObject::from(const String &value);
 template<> PyResult<PyObject *> PyObject::from(const Bytes &value);
 template<> PyResult<PyObject *> PyObject::from(const Ellipsis &value);
