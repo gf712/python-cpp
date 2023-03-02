@@ -159,18 +159,38 @@ PyResult<PyObject *> PyList::__iter__() const
 	return Ok(it);
 }
 
+PyResult<PyObject *> PyList::__getitem__(int64_t index)
+{
+	if (index >= 0) {
+		if (static_cast<size_t>(index) >= m_elements.size()) {
+			return Err(index_error("list index out of range"));
+		}
+		return PyObject::from(m_elements[index]);
+	} else {
+		// TODO: write wrap around logic
+		TODO();
+	}
+}
+
+PyResult<std::monostate> PyList::__setitem__(int64_t index, PyObject *value)
+{
+	if (index >= 0) {
+		if (static_cast<size_t>(index) >= m_elements.size()) {
+			return Err(index_error("list index out of range"));
+		}
+		m_elements[index] = value;
+		return Ok(std::monostate{});
+	} else {
+		// TODO: write wrap around logic
+		TODO();
+	}
+}
+
 PyResult<PyObject *> PyList::__getitem__(PyObject *index)
 {
 	if (auto index_int = as<PyInteger>(index)) {
 		const auto i = index_int->as_i64();
-		if (i >= 0) {
-			if (static_cast<size_t>(i) >= m_elements.size()) {
-				return Err(index_error("list index out of range"));
-			}
-			return PyObject::from(m_elements[i]);
-		} else {
-			TODO();
-		}
+		return __getitem__(i);
 	} else if (auto slice = as<PySlice>(index)) {
 		auto indices_ = slice->unpack();
 		if (indices_.is_err()) return Err(indices_.unwrap_err());

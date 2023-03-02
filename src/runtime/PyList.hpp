@@ -20,6 +20,10 @@ class PyList : public PyBaseObject
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __getitem__(PyObject *index);
 	PyResult<size_t> __len__() const;
+
+	PyResult<PyObject *> __getitem__(int64_t index);
+	PyResult<std::monostate> __setitem__(int64_t index, PyObject *value);
+
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
 	const std::vector<Value> &elements() const { return m_elements; }

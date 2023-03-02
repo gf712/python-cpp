@@ -179,7 +179,7 @@ ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
 
 PyResult<size_t> PyMappingWrapper::len()
 {
-	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	ASSERT(m_object->type_prototype().mapping_type_protocol.has_value());
 	if (m_object->type_prototype().mapping_type_protocol->__len__.has_value()) {
 		return call_slot(*m_object->type_prototype().mapping_type_protocol->__len__,
 			"object cannot be interpreted as an integer",
@@ -191,7 +191,7 @@ PyResult<size_t> PyMappingWrapper::len()
 
 PyResult<PyObject *> PyMappingWrapper::getitem(PyObject *name)
 {
-	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	ASSERT(m_object->type_prototype().mapping_type_protocol.has_value());
 	if (m_object->type_prototype().mapping_type_protocol->__getitem__.has_value()) {
 		return call_slot(
 			*m_object->type_prototype().mapping_type_protocol->__getitem__, m_object, name);
@@ -202,7 +202,7 @@ PyResult<PyObject *> PyMappingWrapper::getitem(PyObject *name)
 
 PyResult<std::monostate> PyMappingWrapper::setitem(PyObject *name, PyObject *value)
 {
-	if (!m_object->type_prototype().mapping_type_protocol.has_value()) { TODO(); }
+	ASSERT(m_object->type_prototype().mapping_type_protocol.has_value());
 	if (m_object->type_prototype().mapping_type_protocol->__setitem__.has_value()) {
 		return call_slot(*m_object->type_prototype().mapping_type_protocol->__setitem__,
 			"",
@@ -869,8 +869,13 @@ PyResult<PyObject *> PyObject::getitem(PyObject *key)
 {
 	if (as_mapping().is_ok() && type_prototype().mapping_type_protocol->__getitem__.has_value()) {
 		return call_slot(*type_prototype().mapping_type_protocol->__getitem__, this, key);
-	} else if (as_sequence().is_ok()) {
-		// FIXME: add check to see if __getitem__ in sequence protocol is implemented
+	} else if (as_sequence().is_ok()
+			   && type_prototype().sequence_type_protocol->__getitem__.has_value()) {
+		if (!as<PyInteger>(key)) {
+			return Err(type_error("sequence index must be integer, not '{}'", key->type()->name()));
+		}
+		const auto index = as<PyInteger>(key)->as_i64();
+		return call_slot(*type_prototype().sequence_type_protocol->__getitem__, this, index);
 	}
 	// TODO: could getitem be virtual and we override the logic below in PyType?
 	if (as<PyType>(this)) {
@@ -881,6 +886,40 @@ PyResult<PyObject *> PyObject::getitem(PyObject *key)
 		}
 	}
 	return Err(type_error("'{}' object is not subscriptable", type()->name()));
+}
+
+PyResult<std::monostate> PyObject::setitem(PyObject *key, PyObject *value)
+{
+	if (as_mapping().is_ok() && type_prototype().mapping_type_protocol->__setitem__.has_value()) {
+		return call_slot(
+			*type_prototype().mapping_type_protocol->__setitem__, "", this, key, value);
+	} else if (as_sequence().is_ok()
+			   && type_prototype().sequence_type_protocol->__setitem__.has_value()) {
+		if (!as<PyInteger>(key)) {
+			return Err(type_error("sequence index must be integer, not '{}'", key->type()->name()));
+		}
+		const auto index = as<PyInteger>(key)->as_i64();
+		return call_slot(
+			*type_prototype().sequence_type_protocol->__setitem__, "", this, index, value);
+	}
+
+	return Err(type_error("'{}' object does not support item assignment", type()->name()));
+}
+
+PyResult<std::monostate> PyObject::delitem(PyObject *key)
+{
+	if (as_mapping().is_ok() && type_prototype().mapping_type_protocol->__delitem__.has_value()) {
+		return call_slot(*type_prototype().mapping_type_protocol->__delitem__, "", this, key);
+	} else if (as_sequence().is_ok()
+			   && type_prototype().sequence_type_protocol->__delitem__.has_value()) {
+		if (!as<PyInteger>(key)) {
+			return Err(type_error("sequence index must be integer, not '{}'", key->type()->name()));
+		}
+		const auto index = as<PyInteger>(key)->as_i64();
+		return call_slot(*type_prototype().sequence_type_protocol->__delitem__, "", this, index);
+	}
+
+	return Err(type_error("'{}' object does not support item deletion", type()->name()));
 }
 
 

@@ -18,12 +18,9 @@ PyResult<Value> StoreSubscript::execute(VirtualMachine &vm, Interpreter &) const
 	auto value = PyObject::from(value_value);
 	if (value.is_err()) return value;
 
-	return object.unwrap()
-		->as_mapping()
-		.and_then([&subscript, &value](PyMappingWrapper mapping) {
-			return mapping.setitem(subscript.unwrap(), value.unwrap());
-		})
-		.and_then([](auto) { return Ok(py_none()); });
+	return object.unwrap()->setitem(subscript.unwrap(), value.unwrap()).and_then([](auto) {
+		return Ok(py_none());
+	});
 }
 
 std::vector<uint8_t> StoreSubscript::serialize() const

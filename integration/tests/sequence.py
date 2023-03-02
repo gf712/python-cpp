@@ -5,8 +5,8 @@ class A:
         return len(self.a)
     def __getitem__(self, key) -> int:
         return self.a[key]
-    # def __setitem__(self, key, value):
-    #     self.a[key] = value
+    def __setitem__(self, key, value):
+        self.a[key] = value
     def __contains__(self, key) -> bool:
         return key in self.a
 
@@ -21,6 +21,14 @@ def getitem_test():
     assert a[0] == 1
 
 getitem_test()
+
+def setitem_test():
+    a = A()
+    assert a[1] != 10
+    a[1] = 10
+    assert a[1] == 10
+
+setitem_test()
 
 def contains_test():
     a = A()

@@ -407,7 +407,9 @@ class PyObject : public Cell
 	virtual PyResult<PyObject *> new_(PyTuple *args, PyDict *kwargs) const;
 	PyResult<int32_t> init(PyTuple *args, PyDict *kwargs);
 
-	PyResult<PyObject *> getitem(PyObject *);
+	PyResult<PyObject *> getitem(PyObject *key);
+	PyResult<std::monostate> setitem(PyObject *key, PyObject *value);
+	PyResult<std::monostate> delitem(PyObject *key);
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
@@ -594,6 +596,50 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 			type_prototype->sequence_type_protocol->__contains__ =
 				+[](PyObject *self, PyObject *value) -> PyResult<bool> {
 				return static_cast<Type *>(self)->__contains__(value);
+			};
+		}
+	}
+	if constexpr (HasSequenceGetItem<Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol = SequenceTypePrototype{
+				.__getitem__ = +[](PyObject *self, int64_t index) -> PyResult<PyObject *> {
+					return static_cast<Type *>(self)->__getitem__(index);
+				}
+			};
+		} else {
+			type_prototype->sequence_type_protocol->__getitem__ =
+				+[](PyObject *self, int64_t index) -> PyResult<PyObject *> {
+				return static_cast<Type *>(self)->__getitem__(index);
+			};
+		}
+	}
+	if constexpr (HasSequenceSetItem<Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol =
+				SequenceTypePrototype{ .__setitem__ =
+										   +[](PyObject *self,
+												int64_t index,
+												PyObject *value) -> PyResult<std::monostate> {
+					return static_cast<Type *>(self)->__setitem__(index, value);
+				} };
+		} else {
+			type_prototype->sequence_type_protocol->__setitem__ =
+				+[](PyObject *self, int64_t index, PyObject *value) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__setitem__(index, value);
+			};
+		}
+	}
+	if constexpr (HasSequenceDelItem<Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol = SequenceTypePrototype{
+				.__delitem__ = +[](PyObject *self, int64_t index) -> PyResult<std::monostate> {
+					return static_cast<Type *>(self)->__delitem__(index);
+				}
+			};
+		} else {
+			type_prototype->sequence_type_protocol->__delitem__ =
+				+[](PyObject *self, int64_t index) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__delitem__(index);
 			};
 		}
 	}

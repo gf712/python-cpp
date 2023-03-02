@@ -115,6 +115,7 @@ namespace concepts {
 	{
 		obj->__len__();
 	};
+
 	template<typename T>
 	concept HasGetItem = requires(T *obj, PyObject *name)
 	{
@@ -138,6 +139,21 @@ namespace concepts {
 		obj->__contains__(value);
 	};
 
+	template<typename T>
+	concept HasSequenceGetItem = requires(T *obj, int64_t index)
+	{
+		obj->__getitem__(index);
+	};
+	template<typename T>
+	concept HasSequenceSetItem = requires(T *obj, int64_t index, PyObject *value)
+	{
+		obj->__setitem__(index, value);
+	};
+	template<typename T>
+	concept HasSequenceDelItem = requires(T *obj, int64_t index)
+	{
+		obj->__delitem__(index);
+	};
 
 	template<typename T>
 	concept HasLt = requires(const T *obj, const PyObject *other)
