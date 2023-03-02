@@ -4775,8 +4775,7 @@ struct ImportFromTargetsPattern : PatternV2<ImportFromTargetsPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("'*'");
 			auto [star_token] = *result;
-			(void)star_token;
-			TODO_NO_FAIL();
+			return { { { star_token, std::nullopt } } };
 		}
 
 		return {};

@@ -32,6 +32,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/Instructions.cpp
     executable/bytecode/instructions/ImportFrom.cpp
     executable/bytecode/instructions/ImportName.cpp
+    executable/bytecode/instructions/ImportStar.cpp
     executable/bytecode/instructions/Jump.cpp
     executable/bytecode/instructions/JumpForward.cpp
     executable/bytecode/instructions/JumpIfFalse.cpp

@@ -23,6 +23,7 @@
 #include "executable/bytecode/instructions/GetYieldFromIter.hpp"
 #include "executable/bytecode/instructions/ImportFrom.hpp"
 #include "executable/bytecode/instructions/ImportName.hpp"
+#include "executable/bytecode/instructions/ImportStar.hpp"
 #include "executable/bytecode/instructions/InplaceOp.hpp"
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "executable/bytecode/instructions/Jump.hpp"
@@ -1914,14 +1915,18 @@ Value *BytecodeGenerator::visit(const ast::ImportFrom *node)
 		level_value->get_register());
 
 	for (const auto &n : node->names()) {
-		auto *imported_object = create_value();
-		auto *name = load_name(n.name, m_function_id);
-		emit<::ImportFrom>(
-			imported_object->get_register(), name->get_index(), module_value->get_register());
-		if (n.asname.empty()) {
-			store_name(n.name, imported_object);
+		if (n.name == "*") {
+			emit<ImportStar>(module_value->get_register());
 		} else {
-			store_name(n.asname, imported_object);
+			auto *imported_object = create_value();
+			auto *name = load_name(n.name, m_function_id);
+			emit<::ImportFrom>(
+				imported_object->get_register(), name->get_index(), module_value->get_register());
+			if (n.asname.empty()) {
+				store_name(n.name, imported_object);
+			} else {
+				store_name(n.asname, imported_object);
+			}
 		}
 	}
 
