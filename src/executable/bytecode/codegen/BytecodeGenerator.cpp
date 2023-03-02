@@ -1188,6 +1188,13 @@ Value *BytecodeGenerator::visit(const Assign *node)
 					emit<StoreAttr>(dst_obj->get_register(),
 						unpacked_value->get_register(),
 						load_name(attr->attr(), m_function_id)->get_index());
+				} else if (auto subscript = as<Subscript>(el)) {
+					auto *dst_obj = generate(subscript->value().get(), m_function_id);
+					const auto &slice = subscript->slice();
+					const auto *index = build_slice(slice);
+					emit<StoreSubscript>(dst_obj->get_register(),
+						index->get_register(),
+						unpacked_value->get_register());
 				} else {
 					TODO();
 				}
