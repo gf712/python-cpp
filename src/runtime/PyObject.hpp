@@ -129,6 +129,8 @@ using SubtractSlotFunctionType =
 using MultiplySlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using ExpSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
+using FloorDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
+using TrueDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using LeftShiftSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType =
@@ -236,6 +238,8 @@ struct TypePrototype
 	std::optional<std::variant<SubtractSlotFunctionType, PyObject *>> __sub__;
 	std::optional<std::variant<MultiplySlotFunctionType, PyObject *>> __mul__;
 	std::optional<std::variant<ExpSlotFunctionType, PyObject *>> __exp__;
+	std::optional<std::variant<TrueDivSlotFunctionType, PyObject *>> __truediv__;
+	std::optional<std::variant<FloorDivSlotFunctionType, PyObject *>> __floordiv__;
 	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
 	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
 	std::optional<std::variant<AndSlotFunctionType, PyObject *>> __and__;
@@ -373,6 +377,8 @@ class PyObject : public Cell
 	PyResult<PyObject *> subtract(const PyObject *other) const;
 	PyResult<PyObject *> multiply(const PyObject *other) const;
 	PyResult<PyObject *> exp(const PyObject *other) const;
+	PyResult<PyObject *> floordiv(PyObject *);
+	PyResult<PyObject *> truediv(PyObject *);
 	PyResult<PyObject *> lshift(const PyObject *other) const;
 	PyResult<PyObject *> modulo(const PyObject *other) const;
 	PyResult<PyObject *> and_(PyObject *other);
@@ -681,6 +687,17 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		type_prototype->__exp__ =
 			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__exp__(other);
+		};
+	}
+	if constexpr (HasTrueDiv<Type>) {
+		type_prototype->__truediv__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__truediv__(other);
+		};
+	}
+	if constexpr (HasFloorDiv<Type>) {
+		type_prototype->__floordiv__ =
+			+[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__floordiv__(other);
 		};
 	}
 	if constexpr (HasLshift<Type>) {

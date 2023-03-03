@@ -101,6 +101,28 @@ PyResult<PyObject *> PyNumber::__mul__(const PyObject *obj) const
 	}
 }
 
+PyResult<PyObject *> PyNumber::__truediv__(const PyObject *obj) const
+{
+	if (auto rhs = as_number(obj)) {
+		return PyNumber::create(m_value / rhs->value());
+	} else {
+		return Err(type_error("unsupported operand type(s) for /: \'{}\' and \'{}\'",
+			type()->name(),
+			obj->type()->name()));
+	}
+}
+
+PyResult<PyObject *> PyNumber::__floordiv__(const PyObject *obj) const
+{
+	if (auto rhs = as_number(obj)) {
+		return PyNumber::create(m_value.floordiv(rhs->value()));
+	} else {
+		return Err(type_error("unsupported operand type(s) for //: \'{}\' and \'{}\'",
+			type()->name(),
+			obj->type()->name()));
+	}
+}
+
 PyResult<PyObject *> PyNumber::__eq__(const PyObject *obj) const
 {
 	if (auto *pynum = as_number(obj)) {

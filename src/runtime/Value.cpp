@@ -516,12 +516,10 @@ PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &)
 				   },
 			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) { return py_lhs; }
 				const auto py_rhs = PyObject::from(rhs_value);
-				(void)py_lhs;
-				(void)py_rhs;
-				// if (auto result = py_lhs->true_divide(py_rhs)) { return result; }
-				TODO();
-				return Ok(nullptr);
+				if (py_rhs.is_err()) { return py_rhs; }
+				return py_lhs.unwrap()->truediv(py_rhs.unwrap());
 			} },
 		lhs,
 		rhs);
@@ -535,12 +533,10 @@ PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &)
 				   },
 			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) { return py_lhs; }
 				const auto py_rhs = PyObject::from(rhs_value);
-				(void)py_lhs;
-				(void)py_rhs;
-				// if (auto result = py_lhs->floordiv(py_rhs)) { return result; }
-				TODO();
-				return Ok(nullptr);
+				if (py_rhs.is_err()) { return py_rhs; }
+				return py_lhs.unwrap()->floordiv(py_rhs.unwrap());
 			} },
 		lhs,
 		rhs);

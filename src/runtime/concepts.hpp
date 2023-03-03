@@ -256,6 +256,18 @@ namespace concepts {
 	};
 
 	template<typename T>
+	concept HasFloorDiv = requires(T *obj, PyObject *other)
+	{
+		obj->__floordiv__(other);
+	};
+
+	template<typename T>
+	concept HasTrueDiv = requires(T *obj, PyObject *other)
+	{
+		obj->__truediv__(other);
+	};
+
+	template<typename T>
 	concept HasLshift = requires(const T *obj, const PyObject *other)
 	{
 		obj->__lshift__(other);

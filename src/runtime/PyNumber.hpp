@@ -21,6 +21,8 @@ class PyNumber : public PyBaseObject
 	PyResult<PyObject *> __sub__(const PyObject *obj) const;
 	PyResult<PyObject *> __mod__(const PyObject *obj) const;
 	PyResult<PyObject *> __mul__(const PyObject *obj) const;
+	PyResult<PyObject *> __truediv__(const PyObject *obj) const;
+	PyResult<PyObject *> __floordiv__(const PyObject *obj) const;
 
 	PyResult<PyObject *> __abs__() const;
 	PyResult<PyObject *> __neg__() const;

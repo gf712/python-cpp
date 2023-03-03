@@ -657,6 +657,26 @@ PyResult<PyObject *> PyObject::exp(const PyObject *other) const
 		other->type_prototype().__name__));
 }
 
+PyResult<PyObject *> PyObject::truediv(PyObject *other)
+{
+	if (type_prototype().__truediv__.has_value()) {
+		return call_slot(*type_prototype().__truediv__, this, other);
+	}
+	return Err(type_error("unsupported operand type(s) for //: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<PyObject *> PyObject::floordiv(PyObject *other)
+{
+	if (type_prototype().__floordiv__.has_value()) {
+		return call_slot(*type_prototype().__floordiv__, this, other);
+	}
+	return Err(type_error("unsupported operand type(s) for //: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
 PyResult<PyObject *> PyObject::lshift(const PyObject *other) const
 {
 	if (type_prototype().__lshift__.has_value()) {
