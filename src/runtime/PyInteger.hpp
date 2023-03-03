@@ -25,6 +25,9 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 	PyResult<PyObject *> __and__(PyObject *obj);
 	PyResult<PyObject *> __or__(PyObject *obj);
 
+	PyResult<PyObject *> __lshift__(const PyObject *other) const;
+	PyResult<PyObject *> __rshift__(const PyObject *other) const;
+
 	PyResult<PyObject *> to_bytes(PyTuple *args, PyDict *kwargs) const;
 
 	static PyResult<PyObject *> from_bytes(PyType *type, PyTuple *args, PyDict *kwargs);

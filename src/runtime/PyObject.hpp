@@ -133,6 +133,8 @@ using FloorDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, 
 using TrueDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using LeftShiftSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
+using RightShiftSlotFunctionType =
+	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using AndSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
@@ -241,6 +243,7 @@ struct TypePrototype
 	std::optional<std::variant<TrueDivSlotFunctionType, PyObject *>> __truediv__;
 	std::optional<std::variant<FloorDivSlotFunctionType, PyObject *>> __floordiv__;
 	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
+	std::optional<std::variant<RightShiftSlotFunctionType, PyObject *>> __rshift__;
 	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
 	std::optional<std::variant<AndSlotFunctionType, PyObject *>> __and__;
 	std::optional<std::variant<OrSlotFunctionType, PyObject *>> __or__;
@@ -380,6 +383,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> floordiv(PyObject *);
 	PyResult<PyObject *> truediv(PyObject *);
 	PyResult<PyObject *> lshift(const PyObject *other) const;
+	PyResult<PyObject *> rshift(const PyObject *other) const;
 	PyResult<PyObject *> modulo(const PyObject *other) const;
 	PyResult<PyObject *> and_(PyObject *other);
 	PyResult<PyObject *> or_(PyObject *other);
@@ -704,6 +708,12 @@ template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std
 		type_prototype->__lshift__ =
 			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__lshift__(other);
+		};
+	}
+	if constexpr (HasRshift<Type>) {
+		type_prototype->__rshift__ =
+			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__rshift__(other);
 		};
 	}
 	if constexpr (HasModulo<Type>) {

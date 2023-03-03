@@ -110,6 +110,26 @@ PyResult<PyObject *> PyInteger::__or__(PyObject *obj)
 	return PyInteger::create((as_i64() | as<PyInteger>(obj)->as_i64()));
 }
 
+PyResult<PyObject *> PyInteger::__lshift__(const PyObject *obj) const
+{
+	if (obj->type() != integer()) {
+		return Err(
+			type_error("unsupported operand type(s) for <<: 'int' and '{}'", obj->type()->name()));
+	}
+
+	return PyNumber::create(m_value << as<PyInteger>(obj)->value());
+}
+
+PyResult<PyObject *> PyInteger::__rshift__(const PyObject *obj) const
+{
+	if (obj->type() != integer()) {
+		return Err(
+			type_error("unsupported operand type(s) for >>: 'int' and '{}'", obj->type()->name()));
+	}
+
+	return PyNumber::create(m_value >> as<PyInteger>(obj)->value());
+}
+
 PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
 {
 	// FIXME: fix signature to to_bytes(length, byteorder, *, signed=False)

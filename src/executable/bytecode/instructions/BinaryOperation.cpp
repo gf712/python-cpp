@@ -36,7 +36,7 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 			return lshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::RIGHTSHIFT: {
-			TODO();
+			return rshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::AND: {
 			return and_(lhs, rhs, interpreter);

@@ -687,6 +687,16 @@ PyResult<PyObject *> PyObject::lshift(const PyObject *other) const
 		other->type_prototype().__name__));
 }
 
+PyResult<PyObject *> PyObject::rshift(const PyObject *other) const
+{
+	if (type_prototype().__rshift__.has_value()) {
+		return call_slot(*type_prototype().__rshift__, this, other);
+	}
+	return Err(type_error("unsupported operand type(s) for >>: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
 PyResult<PyObject *> PyObject::modulo(const PyObject *other) const
 {
 	if (type_prototype().__mod__.has_value()) {

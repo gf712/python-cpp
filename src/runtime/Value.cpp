@@ -198,6 +198,30 @@ Number Number::operator<<(const Number &rhs) const
 		rhs.value);
 }
 
+Number Number::operator>>(const Number &rhs) const
+{
+	return std::visit(overloaded{
+						  [](const BigIntType &lhs_value, const BigIntType &rhs_value) -> Number {
+							  ASSERT(rhs_value.fits_ulong_p());
+							  return Number{ lhs_value >> rhs_value.get_ui() };
+						  },
+						  [](const BigIntType &, const double &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+						  [](const double &, const BigIntType &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+						  [](const double &, const double &) -> Number {
+							  // should raise error
+							  TODO();
+						  },
+					  },
+		value,
+		rhs.value);
+}
+
 bool Number::operator<=(const Number &rhs) const
 {
 	return std::visit(
@@ -486,6 +510,23 @@ PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &)
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (py_rhs.is_err()) return py_rhs;
 				return py_lhs.unwrap()->lshift(py_rhs.unwrap());
+			} },
+		lhs,
+		rhs);
+}
+
+PyResult<Value> rshift(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value >> rhs_value);
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->rshift(py_rhs.unwrap());
 			} },
 		lhs,
 		rhs);

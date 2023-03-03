@@ -274,6 +274,12 @@ namespace concepts {
 	};
 
 	template<typename T>
+	concept HasRshift = requires(const T *obj, const PyObject *other)
+	{
+		obj->__rshift__(other);
+	};
+
+	template<typename T>
 	concept HasModulo = requires(const T *obj, const PyObject *other)
 	{
 		obj->__mod__(other);

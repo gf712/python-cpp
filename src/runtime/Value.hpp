@@ -53,6 +53,7 @@ struct Number
 	Number operator/(const Number &rhs) const;
 
 	Number operator<<(const Number &rhs) const;
+	Number operator>>(const Number &rhs) const;
 
 	bool operator==(const Number &rhs) const;
 	bool operator<=(const Number &rhs) const;
@@ -292,6 +293,7 @@ PyResult<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpre
 PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> rshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
