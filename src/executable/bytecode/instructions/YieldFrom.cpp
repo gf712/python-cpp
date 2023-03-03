@@ -10,7 +10,6 @@
 #include "runtime/StopIteration.hpp"
 #include "vm/VM.hpp"
 
-
 using namespace py;
 
 PyResult<Value> YieldFrom::execute(VirtualMachine &vm, Interpreter &interpreter) const

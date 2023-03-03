@@ -4,8 +4,6 @@
 
 namespace py {
 
-class PyTupleIterator;
-
 class PyTuple
 	: public PyBaseObject
 	, PySequence
@@ -78,6 +76,8 @@ class PyTupleIterator : public PyBaseObject
 	using pointer = value_type *;
 	using reference = value_type &;
 	using iterator_category = std::forward_iterator_tag;
+
+	static PyResult<PyTupleIterator *> create(const PyTuple &pytuple);
 
 	std::string to_string() const override;
 

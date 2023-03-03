@@ -125,13 +125,7 @@ std::string PyTuple::to_string() const
 
 PyResult<PyObject *> PyTuple::__repr__() const { return PyString::create(to_string()); }
 
-PyResult<PyObject *> PyTuple::__iter__() const
-{
-	auto &heap = VirtualMachine::the().heap();
-	auto *obj = heap.allocate<PyTupleIterator>(*this);
-	if (!obj) return Err(memory_error(sizeof(PyTupleIterator)));
-	return Ok(obj);
-}
+PyResult<PyObject *> PyTuple::__iter__() const { return PyTupleIterator::create(*this); }
 
 PyResult<size_t> PyTuple::__len__() const { return Ok(m_elements.size()); }
 
@@ -223,9 +217,7 @@ void PyTuple::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &el : m_elements) {
 		if (std::holds_alternative<PyObject *>(el)) {
-			if (std::get<PyObject *>(el) != this) {
-				visitor.visit(*std::get<PyObject *>(el));
-			}
+			if (std::get<PyObject *>(el) != this) { visitor.visit(*std::get<PyObject *>(el)); }
 		}
 	}
 }
@@ -259,6 +251,14 @@ PyTupleIterator::PyTupleIterator(const PyTuple &pytuple)
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
 {
 	m_current_index = position;
+}
+
+PyResult<PyTupleIterator *> PyTupleIterator::create(const PyTuple &pytuple)
+{
+	auto &heap = VirtualMachine::the().heap();
+	auto *obj = heap.allocate<PyTupleIterator>(pytuple);
+	if (!obj) return Err(memory_error(sizeof(PyTupleIterator)));
+	return Ok(obj);
 }
 
 std::string PyTupleIterator::to_string() const

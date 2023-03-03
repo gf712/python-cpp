@@ -135,7 +135,7 @@ class IOBase : public PyBaseObject
 		return Ok(const_cast<IOBase *>(this));
 	}
 
-	PyResult<PyObject *> __next__() const
+	PyResult<PyObject *> __next__()
 	{
 		return get_method(PyString::create("readline").unwrap()).and_then([](PyObject *readline) {
 			return readline->call(PyTuple::create().unwrap(), PyDict::create().unwrap())

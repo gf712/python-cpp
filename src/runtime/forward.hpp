@@ -26,6 +26,7 @@ class PySlotWrapper;
 class PyString;
 class PyTraceback;
 class PyTuple;
+class PyTupleIterator;
 class PyType;
 struct TypePrototype;
 

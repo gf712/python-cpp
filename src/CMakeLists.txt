@@ -102,6 +102,8 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/BuiltinsModule.cpp
     runtime/modules/ImpModule.cpp
     runtime/modules/IOModule.cpp
+    runtime/modules/itertools/module.cpp
+    runtime/modules/itertools/Chain.cpp
     runtime/modules/MarshalModule.cpp
     runtime/modules/PosixModule.cpp
     runtime/modules/SysModule.cpp
