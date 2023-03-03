@@ -250,6 +250,12 @@ size_t PyInteger::as_size_t() const
 	return std::get<BigIntType>(m_value.value).get_ui();
 }
 
+BigIntType PyInteger::as_big_int() const
+{
+	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
+	return std::get<BigIntType>(m_value.value);
+}
+
 PyType *PyInteger::type() const { return integer(); }
 
 namespace {

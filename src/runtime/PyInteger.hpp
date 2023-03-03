@@ -37,6 +37,7 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 
 	int64_t as_i64() const;
 	size_t as_size_t() const;
+	BigIntType as_big_int() const;
 };
 
 }// namespace py
