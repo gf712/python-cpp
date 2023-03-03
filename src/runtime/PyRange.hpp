@@ -19,14 +19,17 @@ class PyRange : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 
-	const BigIntType& start() const { return m_start; }
-	const BigIntType& stop() const { return m_stop; }
-	const BigIntType& step() const { return m_step; }
+	const BigIntType &start() const { return m_start; }
+	const BigIntType &stop() const { return m_stop; }
+	const BigIntType &step() const { return m_step; }
+
+	PyResult<PyObject *> __reversed__() const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *type() const override;
 
   private:
+	PyRange(BigIntType start, BigIntType stop, BigIntType step);
 	PyRange(PyInteger *stop);
 	PyRange(PyInteger *start, PyInteger *stop);
 	PyRange(PyInteger *start, PyInteger *stop, PyInteger *step);
@@ -47,6 +50,7 @@ class PyRangeIterator : public PyBaseObject
 
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __next__();
+	PyResult<PyObject *> __iter__() const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 

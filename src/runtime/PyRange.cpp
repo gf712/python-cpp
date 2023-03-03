@@ -77,6 +77,9 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 	return Ok(std::get<PyRange *>(obj));
 }
 
+PyRange::PyRange(BigIntType start, BigIntType stop, BigIntType step)
+	: PyBaseObject(BuiltinTypes::the().range()), m_start(start), m_stop(stop), m_step(step)
+{}
 
 PyRange::PyRange(PyInteger *stop)
 	: PyBaseObject(BuiltinTypes::the().range()), m_stop(std::get<BigIntType>(stop->value().value))
@@ -114,13 +117,31 @@ PyResult<PyObject *> PyRange::__iter__() const
 	return Ok(obj);
 }
 
+PyResult<PyObject *> PyRange::__reversed__() const
+{
+	// reversed(range(start, stop, step)) -> range(start+(n-1)*step, start-step, -step)
+	// where n is the number of integers in the range.
+	const BigIntType n = (m_stop - m_start) / m_step;
+	BigIntType start = m_start + (n - 1) * m_step;
+	BigIntType stop = m_start - m_step;
+	BigIntType step = -m_step;
+
+	auto *range = VirtualMachine::the().heap().allocate<PyRange>(start, stop, step);
+	if (!range) { return Err(memory_error(sizeof(PyRange))); }
+
+	return range->__iter__();
+}
+
 PyType *PyRange::type() const { return range(); }
 
 namespace {
 
 std::once_flag range_flag;
 
-std::unique_ptr<TypePrototype> register_range() { return std::move(klass<PyRange>("range").type); }
+std::unique_ptr<TypePrototype> register_range()
+{
+	return std::move(klass<PyRange>("range").def("__reversed__", &PyRange::__reversed__).type);
+}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyRange::type_factory()
@@ -147,12 +168,24 @@ PyResult<PyObject *> PyRangeIterator::__repr__() const { return PyString::create
 
 PyResult<PyObject *> PyRangeIterator::__next__()
 {
-	if (m_current_index < m_pyrange.stop()) {
+	auto within_range = [this](const BigIntType &current) {
+		if (m_pyrange.step() < 0) {
+			return current > m_pyrange.stop();
+		} else {
+			return current < m_pyrange.stop();
+		}
+	};
+	if (within_range(m_current_index)) {
 		auto result = PyNumber::from(Number{ m_current_index });
 		m_current_index += m_pyrange.step();
 		return result;
 	}
 	return Err(stop_iteration());
+}
+
+PyResult<PyObject *> PyRangeIterator::__iter__() const
+{
+	return Ok(const_cast<PyRangeIterator *>(this));
 }
 
 PyType *PyRangeIterator::type() const { return range_iterator(); }
