@@ -1,6 +1,7 @@
 #include "../Modules.hpp"
 #include "Chain.hpp"
 #include "Repeat.hpp"
+#include "StarMap.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyType.hpp"
 
@@ -20,6 +21,8 @@ PyModule *itertools_module()
 	module->add_symbol(PyString::create("chain").unwrap(), itertools::Chain::register_type(module));
 	module->add_symbol(
 		PyString::create("repeat").unwrap(), itertools::Repeat::register_type(module));
+	module->add_symbol(
+		PyString::create("starmap").unwrap(), itertools::StarMap::register_type(module));
 
 	return module;
 }
