@@ -64,6 +64,8 @@ struct Number
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const Ellipsis &) const { return false; }
 	bool operator==(const NameConstant &) const;
+
+	Number floordiv(const Number&) const;
 };
 
 struct String
@@ -288,6 +290,7 @@ PyResult<Value> multiply(const Value &lhs, const Value &rhs, Interpreter &interp
 PyResult<Value> exp(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> modulo(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);

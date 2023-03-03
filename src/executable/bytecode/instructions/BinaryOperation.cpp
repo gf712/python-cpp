@@ -30,7 +30,7 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 			return true_divide(lhs, rhs, interpreter);
 		} break;
 		case Operation::FLOORDIV: {
-			TODO();
+			return floordiv(lhs, rhs, interpreter);
 		} break;
 		case Operation::LEFTSHIFT: {
 			return lshift(lhs, rhs, interpreter);

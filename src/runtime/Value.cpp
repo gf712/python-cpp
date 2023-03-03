@@ -22,27 +22,27 @@ std::string Number::to_string() const
 
 Number Number::exp(const Number &rhs) const
 {
-	return std::visit(overloaded{
-						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
-							  if(rhs_value.fits_ulong_p()) {
-							  	mpz_class result{};
-								mpz_pow_ui(
-									result.get_mpz_t(), lhs_value.get_mpz_t(), rhs_value.get_ui());
-							  	return Number{ std::move(result) };
-							  } else {
-								return Number{ std::pow(lhs_value.get_d(), rhs_value.get_d()) };
-							  }
-						  },
-						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ std::pow(lhs_value.get_d(), rhs_value) };
-						  },
-						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
-							  return Number{ std::pow(lhs_value, rhs_value.get_d()) };
-						  },
-						  [](const double &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ std::pow(lhs_value, rhs_value) };
-						  },
-					  },
+	return std::visit(
+		overloaded{
+			[](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
+				if (rhs_value.fits_ulong_p()) {
+					mpz_class result{};
+					mpz_pow_ui(result.get_mpz_t(), lhs_value.get_mpz_t(), rhs_value.get_ui());
+					return Number{ std::move(result) };
+				} else {
+					return Number{ std::pow(lhs_value.get_d(), rhs_value.get_d()) };
+				}
+			},
+			[](const mpz_class &lhs_value, const double &rhs_value) -> Number {
+				return Number{ std::pow(lhs_value.get_d(), rhs_value) };
+			},
+			[](const double &lhs_value, const mpz_class &rhs_value) -> Number {
+				return Number{ std::pow(lhs_value, rhs_value.get_d()) };
+			},
+			[](const double &lhs_value, const double &rhs_value) -> Number {
+				return Number{ std::pow(lhs_value, rhs_value) };
+			},
+		},
 		value,
 		rhs.value);
 }
@@ -111,7 +111,7 @@ Number Number::operator/(const Number &other) const
 {
 	return std::visit(overloaded{
 						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
-							  return Number{ lhs_value / rhs_value };
+							  return Number{ lhs_value.get_d() / rhs_value.get_d() };
 						  },
 						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
 							  return Number{ lhs_value.get_d() / rhs_value };
@@ -229,6 +229,26 @@ bool Number::operator>=(const Number &rhs) const
 		rhs.value);
 }
 
+Number Number::floordiv(const Number &other) const
+{
+	return std::visit(
+		overloaded{
+			[](const double &lhs, const BigIntType &rhs) -> Number {
+				return Number{ BigIntType{ BigIntType{ lhs } / rhs }.get_d() };
+			},
+			[](const BigIntType &lhs, const double &rhs) -> Number {
+				return Number{ BigIntType{ lhs / BigIntType{ rhs } }.get_d() };
+			},
+			[](const BigIntType &lhs, const BigIntType &rhs) -> Number {
+				return Number{ BigIntType{ lhs / rhs } };
+			},
+			[](const double &lhs, const double &rhs) -> Number {
+				return Number{ BigIntType{ BigIntType{ lhs } / BigIntType{ rhs } }.get_d() };
+			},
+		},
+		value,
+		other.value);
+}
 
 bool String::operator==(const PyObject *other) const
 {
@@ -500,6 +520,25 @@ PyResult<Value> true_divide(const Value &lhs, const Value &rhs, Interpreter &)
 				(void)py_lhs;
 				(void)py_rhs;
 				// if (auto result = py_lhs->true_divide(py_rhs)) { return result; }
+				TODO();
+				return Ok(nullptr);
+			} },
+		lhs,
+		rhs);
+}
+
+PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{ [](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+					   return Ok(lhs_value.floordiv(rhs_value));
+				   },
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				const auto py_rhs = PyObject::from(rhs_value);
+				(void)py_lhs;
+				(void)py_rhs;
+				// if (auto result = py_lhs->floordiv(py_rhs)) { return result; }
 				TODO();
 				return Ok(nullptr);
 			} },

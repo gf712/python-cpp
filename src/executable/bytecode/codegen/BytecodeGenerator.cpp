@@ -596,8 +596,12 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 			rhs->get_register(),
 			BinaryOperation::Operation::SLASH);
 	} break;
-	case BinaryOpType::FLOORDIV:
-		TODO();
+	case BinaryOpType::FLOORDIV: {
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::FLOORDIV);
+	} break;
 	case BinaryOpType::LEFTSHIFT: {
 		emit<BinaryOperation>(dst->get_register(),
 			lhs->get_register(),
