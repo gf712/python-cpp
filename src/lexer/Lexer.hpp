@@ -287,10 +287,10 @@ class Lexer
 	std::optional<size_t> float_number(size_t) const;
 	std::optional<size_t> imag_number(size_t) const;
 
-	std::optional<size_t> single_quote_string(size_t) const;
-	std::optional<size_t> double_quote_string(size_t) const;
-	std::optional<size_t> single_triple_quote_string(size_t) const;
-	std::optional<size_t> double_triple_quote_string(size_t) const;
+	bool single_quote_string(size_t);
+	bool double_quote_string(size_t);
+	bool single_triple_quote_string(size_t);
+	bool double_triple_quote_string(size_t);
 
 	template<typename FunctorType>
 	std::optional<size_t> parse_digits(size_t n, FunctorType &&f) const;

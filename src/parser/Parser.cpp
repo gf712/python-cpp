@@ -1529,11 +1529,34 @@ struct StringPattern : PatternV2<StringPattern>
 				end_token = token;
 			}
 			if (is_bytes) {
-				return std::make_shared<Constant>(std::get<Bytes>(collection),
-					SourceLocation{ start_token.start(), end_token.end() });
+				const auto &bytes = std::get<Bytes>(collection);
+				Bytes transformed;
+				transformed.b.reserve(bytes.b.size());
+				for (size_t i = 0; i < bytes.b.size();) {
+					if (i < (bytes.b.size() - 1) && static_cast<char>(bytes.b[i]) == '\\'
+						&& static_cast<char>(bytes.b[i + 1]) == '\n') {
+						i += 2;
+					} else {
+						transformed.b.push_back(bytes.b[i++]);
+					}
+				}
+				transformed.b.shrink_to_fit();
+				return std::make_shared<Constant>(
+					transformed, SourceLocation{ start_token.start(), end_token.end() });
 			} else {
-				return std::make_shared<Constant>(std::get<std::string>(collection),
-					SourceLocation{ start_token.start(), end_token.end() });
+				const auto &str = std::get<std::string>(collection);
+				std::string transformed;
+				transformed.reserve(str.size());
+				for (size_t i = 0; i < str.size();) {
+					if (i < (str.size() - 1) && str[i] == '\\' && str[i + 1] == '\n') {
+						i += 2;
+					} else {
+						transformed.push_back(str[i++]);
+					}
+				}
+				transformed.shrink_to_fit();
+				return std::make_shared<Constant>(
+					transformed, SourceLocation{ start_token.start(), end_token.end() });
 			}
 		}
 		return {};
