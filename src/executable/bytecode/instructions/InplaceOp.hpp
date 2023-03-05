@@ -19,6 +19,7 @@ class InplaceOp : public Instruction
 		AND = 9,
 		OR = 10,
 		XOR = 11,
+		MATMUL = 12,
 	};
 
 	Register m_lhs;

@@ -602,6 +602,12 @@ Value *BytecodeGenerator::visit(const BinaryExpr *node)
 			rhs->get_register(),
 			BinaryOperation::Operation::FLOORDIV);
 	} break;
+	case BinaryOpType::MATMUL: {
+		emit<BinaryOperation>(dst->get_register(),
+			lhs->get_register(),
+			rhs->get_register(),
+			BinaryOperation::Operation::MATMUL);
+	} break;
 	case BinaryOpType::LEFTSHIFT: {
 		emit<BinaryOperation>(dst->get_register(),
 			lhs->get_register(),
@@ -1835,6 +1841,9 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 	}
 	case BinaryOpType::FLOORDIV: {
 		emit<InplaceOp>(lhs->get_register(), rhs->get_register(), InplaceOp::Operation::FLOORDIV);
+	}
+	case BinaryOpType::MATMUL: {
+		emit<InplaceOp>(lhs->get_register(), rhs->get_register(), InplaceOp::Operation::MATMUL);
 	}
 	case BinaryOpType::LEFTSHIFT: {
 		emit<InplaceOp>(lhs->get_register(), rhs->get_register(), InplaceOp::Operation::LEFTSHIFT);

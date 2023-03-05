@@ -2897,15 +2897,12 @@ struct TermPattern : PatternV2<TermPattern>
 		using pattern5 =
 			PatternMatchV2<TermPattern, SingleTokenPatternV2<Token::TokenType::AT>, FactorPattern>;
 		if (auto result = pattern5::match(p)) {
-			DEBUG_LOG("term '//' factor");
+			DEBUG_LOG("term '@' factor");
 			auto [lhs, _, rhs] = *result;
-			(void)lhs;
-			(void)rhs;
-			TODO_NO_FAIL();
-			// return std::make_shared<BinaryExpr>(BinaryOpType::,
-			// 	lhs,
-			// 	rhs,
-			// 	SourceLocation{ lhs->source_location().start, rhs->source_location().end });
+			return std::make_shared<BinaryExpr>(BinaryOpType::MATMUL,
+				lhs,
+				rhs,
+				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
 		}
 
 		// factor
@@ -4476,7 +4473,8 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 					target, BinaryOpType::MULTIPLY, expression, source_location);
 			} break;
 			case Token::TokenType::ATEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::MATMUL, expression, source_location);
 			} break;
 			case Token::TokenType::SLASHEQUAL: {
 				return std::make_shared<AugAssign>(

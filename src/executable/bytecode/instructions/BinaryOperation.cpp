@@ -32,6 +32,9 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 		case Operation::FLOORDIV: {
 			return floordiv(lhs, rhs, interpreter);
 		} break;
+		case Operation::MATMUL: {
+			TODO();
+		} break;
 		case Operation::LEFTSHIFT: {
 			return lshift(lhs, rhs, interpreter);
 		} break;

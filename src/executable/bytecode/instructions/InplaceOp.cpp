@@ -31,6 +31,9 @@ PyResult<Value> InplaceOp::execute(VirtualMachine &vm, Interpreter &interpreter)
 		case Operation::FLOORDIV: {
 			TODO();
 		} break;
+		case Operation::MATMUL: {
+			TODO();
+		} break;
 		case Operation::LEFTSHIFT: {
 			return lshift(lhs, rhs, interpreter);
 		} break;

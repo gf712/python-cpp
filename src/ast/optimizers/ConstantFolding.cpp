@@ -42,6 +42,9 @@ namespace optimizer {
 			case BinaryOpType::FLOORDIV: {
 				TODO();
 			} break;
+			case BinaryOpType::MATMUL: {
+				TODO();
+			} break;
 			case BinaryOpType::LEFTSHIFT: {
 				TODO();
 			} break;
