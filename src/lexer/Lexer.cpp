@@ -798,6 +798,7 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_two_characters() 
 	if (peek(0) == '+' && peek(1) == '=') return Token::TokenType::PLUSEQUAL;
 	if (peek(0) == '-' && peek(1) == '=') return Token::TokenType::MINEQUAL;
 	if (peek(0) == '*' && peek(1) == '=') return Token::TokenType::STAREQUAL;
+	if (peek(0) == '/' && peek(1) == '=') return Token::TokenType::SLASHEQUAL;
 	if (peek(0) == '%' && peek(1) == '=') return Token::TokenType::PERCENTEQUAL;
 	if (peek(0) == '&' && peek(1) == '=') return Token::TokenType::AMPEREQUAL;
 	if (peek(0) == '|' && peek(1) == '=') return Token::TokenType::VBAREQUAL;
