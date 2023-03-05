@@ -495,10 +495,14 @@ Value *VariablesResolver::visit(const Keyword *node)
 	if (node->arg().has_value()) {
 		load(*node->arg(), node->source_location());
 	} else {
-		auto name = as<Name>(node->value());
-		ASSERT(name);
-		ASSERT(name->ids().size() == 1);
-		load(name->ids()[0], node->source_location());
+		if (auto name = as<Name>(node->value())) {
+			ASSERT(name->ids().size() == 1);
+			load(name->ids()[0], node->source_location());
+		} else if (auto attr = as<Attribute>(node->value())) {
+			attr->value()->codegen(this);
+		} else {
+			TODO();
+		}
 	}
 	// m_current_scope->get().visibility[*node->arg()] = Visibility::LOCAL;
 	if (node->value()) { node->value()->codegen(this); }
