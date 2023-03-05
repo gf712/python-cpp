@@ -4493,19 +4493,24 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 					target, BinaryOpType::OR, expression, source_location);
 			} break;
 			case Token::TokenType::CIRCUMFLEXEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::XOR, expression, source_location);
 			} break;
 			case Token::TokenType::LEFTSHIFTEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::LEFTSHIFT, expression, source_location);
 			} break;
 			case Token::TokenType::RIGHTSHIFTEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::RIGHTSHIFT, expression, source_location);
 			} break;
 			case Token::TokenType::DOUBLESTAREQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::EXP, expression, source_location);
 			} break;
 			case Token::TokenType::DOUBLESLASHEQUAL: {
-				TODO_NO_FAIL();
+				return std::make_shared<AugAssign>(
+					target, BinaryOpType::FLOORDIV, expression, source_location);
 			} break;
 			default:
 				ASSERT(false && "!ICE!: unhandled token in unary operation parsing");
