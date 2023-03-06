@@ -980,7 +980,7 @@ std::string PyStringIterator::to_string() const
 void PyStringIterator::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	const_cast<PyString &>(m_pystring).visit_graph(visitor);
+	visitor.visit(const_cast<PyString &>(m_pystring));
 }
 
 PyResult<PyObject *> PyStringIterator::__repr__() const { return PyString::create(to_string()); }
