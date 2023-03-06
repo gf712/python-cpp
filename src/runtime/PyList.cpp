@@ -201,7 +201,8 @@ PyResult<PyObject *> PyList::__getitem__(PyObject *index)
 
 		if (slice_length == 0) { return PyList::create(); }
 		if (start == 0 && end == static_cast<int64_t>(m_elements.size()) && step == 1) {
-			return Ok(this);
+			// shallow copy of the list since we need all elements
+			return PyList::create(m_elements);
 		}
 
 		auto new_list = PyList::create();
