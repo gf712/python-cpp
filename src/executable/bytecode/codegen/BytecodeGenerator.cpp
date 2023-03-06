@@ -1979,7 +1979,13 @@ BytecodeValue *BytecodeGenerator::build_slice(const ast::Subscript::SliceType &s
 		auto *lower = slice.lower ? generate(slice.lower.get(), m_function_id) : nullptr;
 		auto *upper = slice.upper ? generate(slice.upper.get(), m_function_id) : nullptr;
 		auto *step = slice.step ? generate(slice.step.get(), m_function_id) : nullptr;
-		if (!upper && !step) {
+		if (!lower && !upper && !step) {
+			auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+			auto *none_value = create_value();
+			emit<LoadConst>(none_value->get_register(), none->get_index());
+			emit<BuildSlice>(
+				index->get_register(), none_value->get_register(), none_value->get_register());
+		} else if (!upper && !step) {
 			auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
 			auto *none_value = create_value();
 			emit<LoadConst>(none_value->get_register(), none->get_index());
