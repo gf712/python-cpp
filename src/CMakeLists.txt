@@ -104,6 +104,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/IOModule.cpp
     runtime/modules/itertools/module.cpp
     runtime/modules/itertools/Chain.cpp
+    runtime/modules/itertools/ISlice.cpp
     runtime/modules/itertools/Repeat.cpp
     runtime/modules/itertools/StarMap.cpp
     runtime/modules/MarshalModule.cpp

@@ -1,6 +1,5 @@
 #include "Chain.hpp"
 #include "runtime/MemoryError.hpp"
-#include "runtime/PyArgParser.hpp"
 #include "runtime/StopIteration.hpp"
 #include "runtime/types/api.hpp"
 

@@ -1,5 +1,6 @@
 #include "../Modules.hpp"
 #include "Chain.hpp"
+#include "ISlice.hpp"
 #include "Repeat.hpp"
 #include "StarMap.hpp"
 #include "runtime/PyDict.hpp"
@@ -19,6 +20,8 @@ PyModule *itertools_module()
 
 	auto *module = PyModule::create(symbols, name, doc).unwrap();
 	module->add_symbol(PyString::create("chain").unwrap(), itertools::Chain::register_type(module));
+	module->add_symbol(
+		PyString::create("islice").unwrap(), itertools::ISlice::register_type(module));
 	module->add_symbol(
 		PyString::create("repeat").unwrap(), itertools::Repeat::register_type(module));
 	module->add_symbol(
