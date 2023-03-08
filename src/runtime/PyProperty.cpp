@@ -30,6 +30,8 @@ PyResult<PyObject *> PyProperty::__new__(const PyType *type, PyTuple *args, PyDi
 	return PyProperty::create(fget.unwrap(), py_none(), py_none(), py_none());
 }
 
+PyProperty::PyProperty(PyType* type): PyBaseObject(type) {}
+
 PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
 	: PyBaseObject(BuiltinTypes::the().property()), m_getter(fget), m_setter(fset), m_deleter(fdel),
 	  m_property_name(name)
@@ -150,7 +152,7 @@ void PyProperty::visit_graph(Visitor &visitor)
 	if (m_property_name) { visitor.visit(*m_property_name); }
 }
 
-PyType *PyProperty::type() const { return property(); }
+PyType *PyProperty::static_type() const { return property(); }
 
 namespace {
 

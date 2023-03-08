@@ -23,6 +23,8 @@ template<> const StopIteration *as(const PyObject *obj)
 	return nullptr;
 }
 
+StopIteration::StopIteration(PyType *type) : Exception(type) {}
+
 StopIteration::StopIteration(PyTuple *args) : Exception(s_stop_iteration->underlying_type(), args)
 {}
 
@@ -33,7 +35,7 @@ PyResult<PyObject *> StopIteration::__new__(const PyType *type, PyTuple *args, P
 	return Ok(StopIteration::create(args));
 }
 
-PyType *StopIteration::type() const
+PyType *StopIteration::static_type() const
 {
 	ASSERT(s_stop_iteration)
 	return s_stop_iteration;

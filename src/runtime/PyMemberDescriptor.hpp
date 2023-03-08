@@ -14,6 +14,8 @@ class PyMemberDescriptor : public PyBaseObject
 
 	friend class ::Heap;
 
+	PyMemberDescriptor(PyType *);
+
 	PyMemberDescriptor(PyString *name,
 		PyType *underlying_type,
 		std::function<PyObject *(PyObject *)> member,
@@ -36,7 +38,7 @@ class PyMemberDescriptor : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

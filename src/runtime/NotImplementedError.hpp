@@ -11,9 +11,11 @@ class NotImplementedError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *not_implemented_error(const std::string &message, Args &&... args);
+	friend BaseException *not_implemented_error(const std::string &message, Args &&...args);
 
   private:
+	NotImplementedError(PyType *);
+
 	NotImplementedError(PyTuple *args);
 
 	static NotImplementedError *create(PyTuple *args)
@@ -27,12 +29,12 @@ class NotImplementedError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
 template<typename... Args>
-inline BaseException *not_implemented_error(const std::string &message, Args &&... args)
+inline BaseException *not_implemented_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())

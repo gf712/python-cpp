@@ -14,6 +14,8 @@ class TypeError : public Exception
 	friend BaseException *type_error(const std::string &message, Args &&...args);
 
   private:
+	TypeError(PyType *type);
+
 	TypeError(PyTuple *args);
 
 	static TypeError *create(PyTuple *args)
@@ -27,7 +29,7 @@ class TypeError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<typename... Args>

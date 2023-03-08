@@ -11,6 +11,8 @@
 
 using namespace py;
 
+PyRange::PyRange(PyType *type) : PyBaseObject(type) {}
+
 PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
@@ -132,7 +134,7 @@ PyResult<PyObject *> PyRange::__reversed__() const
 	return range->__iter__();
 }
 
-PyType *PyRange::type() const { return range(); }
+PyType *PyRange::static_type() const { return range(); }
 
 namespace {
 
@@ -188,7 +190,7 @@ PyResult<PyObject *> PyRangeIterator::__iter__() const
 	return Ok(const_cast<PyRangeIterator *>(this));
 }
 
-PyType *PyRangeIterator::type() const { return range_iterator(); }
+PyType *PyRangeIterator::static_type() const { return range_iterator(); }
 
 void PyRangeIterator::visit_graph(Visitor &visitor)
 {

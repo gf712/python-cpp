@@ -1,7 +1,6 @@
 #pragma once
 
 #include "GarbageCollector.hpp"
-#include "runtime/PyObject.hpp"
 #include "utilities.hpp"
 
 #include <bitset>
@@ -190,7 +189,9 @@ class Slab
 	std::unique_ptr<Block> &block_1024() { return block1024; }
 	std::unique_ptr<Block> &block_2048() { return block2048; }
 
-	template<typename T> uint8_t *allocate() requires std::is_base_of_v<Cell, T>
+	template<typename T>
+	uint8_t *allocate()
+		requires std::is_base_of_v<Cell, T>
 	{
 		spdlog::trace("Allocating Cell object memory for object of size {}", sizeof(T));
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 16) { return block16->allocate(); }
@@ -330,8 +331,6 @@ class Heap
 		uint8_t *obj_ptr = allocate_gc(ptr);
 		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
 
-		if constexpr (std::is_base_of_v<py::PyObject, T>)
-			log_allocation(static_cast<py::PyObject *>(obj));
 		return obj;
 	}
 
@@ -366,7 +365,6 @@ class Heap
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;
-	void log_allocation(py::PyObject *obj) const;
 
 	Heap();
 };

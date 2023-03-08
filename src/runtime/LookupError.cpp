@@ -9,6 +9,8 @@ namespace {
 	static PyType *s_lookup_error = nullptr;
 }
 
+LookupError::LookupError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+
 LookupError::LookupError(PyType *type, PyTuple *args) : Exception(type->underlying_type(), args) {}
 
 LookupError::LookupError(PyTuple *args) : Exception(s_lookup_error->underlying_type(), args) {}
@@ -24,13 +26,13 @@ PyResult<PyObject *> LookupError::__new__(const PyType *type, PyTuple *args, PyD
 	}
 }
 
-PyType *LookupError::static_type()
+PyType *LookupError::class_type()
 {
 	ASSERT(s_lookup_error)
 	return s_lookup_error;
 }
 
-PyType *LookupError::type() const
+PyType *LookupError::static_type() const
 {
 	ASSERT(s_lookup_error)
 	return s_lookup_error;

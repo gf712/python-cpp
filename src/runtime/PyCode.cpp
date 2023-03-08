@@ -30,6 +30,12 @@ template<> const PyCode *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyCode::PyCode(PyType *type)
+	: PyBaseObject(type), m_function(nullptr), m_register_count(0), m_arg_count(0),
+	  m_first_line_number(0), m_flags(CodeFlags::create()), m_positional_only_arg_count(0),
+	  m_kwonly_arg_count(0), m_nlocals(0), m_stack_size(0)
+{}
+
 PyCode::PyCode(std::unique_ptr<Function> &&function,
 	std::vector<size_t> &&cell2arg,
 	size_t arg_count,
@@ -131,7 +137,7 @@ size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 
 CodeFlags PyCode::flags() const { return m_flags; }
 
-PyType *PyCode::type() const { return code(); }
+PyType *PyCode::static_type() const { return code(); }
 
 const PyTuple *PyCode::consts() const { return m_consts; }
 

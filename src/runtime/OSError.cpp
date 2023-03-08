@@ -15,7 +15,6 @@ template<> OSError *as(PyObject *obj)
 	return nullptr;
 }
 
-
 template<> const OSError *as(const PyObject *obj)
 {
 	ASSERT(s_os_error)
@@ -26,6 +25,8 @@ template<> const OSError *as(const PyObject *obj)
 OSError::OSError(PyType *type, PyTuple *args) : Exception(type->underlying_type(), args) {}
 
 OSError::OSError(PyTuple *args) : OSError(s_os_error, args) {}
+
+OSError::OSError(PyType *t) : OSError(t, nullptr) {}
 
 PyResult<OSError *> OSError::create(PyTuple *args)
 {
@@ -42,13 +43,13 @@ PyResult<PyObject *> OSError::__new__(const PyType *type, PyTuple *args, PyDict 
 	return OSError::create(args);
 }
 
-PyType *OSError::type() const
+PyType *OSError::static_type() const
 {
 	ASSERT(s_os_error);
 	return s_os_error;
 }
 
-PyType *OSError::static_type()
+PyType *OSError::class_type()
 {
 	ASSERT(s_os_error);
 	return s_os_error;

@@ -9,6 +9,7 @@ namespace itertools {
 		PyObject *m_object{ nullptr };
 		std::optional<BigIntType> m_times_remaining;
 
+		Repeat(PyType *type);
 		Repeat(PyObject *object);
 		Repeat(PyObject *object, BigIntType times);
 		static PyResult<PyObject *> create(PyObject *object);

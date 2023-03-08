@@ -4,6 +4,8 @@
 #include "types/builtin.hpp"
 
 namespace py {
+PyMappingProxy::PyMappingProxy(PyType *type) : PyBaseObject(type) {}
+
 PyMappingProxy::PyMappingProxy(PyObject *mapping)
 	: PyBaseObject(BuiltinTypes::the().mappingproxy()), m_mapping(mapping)
 {}
@@ -48,7 +50,7 @@ PyResult<PyObject *> PyMappingProxy::__getitem__(PyObject *index)
 		});
 }
 
-PyType *PyMappingProxy::type() const { return mappingproxy(); }
+PyType *PyMappingProxy::static_type() const { return mappingproxy(); }
 
 void PyMappingProxy::visit_graph(Visitor &visitor)
 {

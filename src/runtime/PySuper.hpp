@@ -12,6 +12,8 @@ class PySuper : public PyBaseObject
 	PyObject *m_object{ nullptr };
 	PyType *m_object_type{ nullptr };
 
+	PySuper(PyType *);
+
 	PySuper();
 	PySuper(PyType *type, PyObject *object, PyType *object_type);
 
@@ -27,7 +29,7 @@ class PySuper : public PyBaseObject
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	static PyResult<PyType *> check(PyType *type, PyObject *object);

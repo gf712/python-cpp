@@ -14,6 +14,8 @@ class PySlice : public PyBaseObject
 	PyObject *m_step{ nullptr };
 
   private:
+	PySlice(PyType *);
+
 	PySlice();
 	PySlice(PyObject *stop);
 	PySlice(PyObject *start, PyObject *stop, PyObject *end);
@@ -43,7 +45,7 @@ class PySlice : public PyBaseObject
 		adjust_indices(int64_t start, int64_t stop, int64_t step, int64_t length);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 	std::string to_string() const override;
 };
 

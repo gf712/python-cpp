@@ -10,6 +10,8 @@
 
 using namespace py;
 
+PySlotWrapper::PySlotWrapper(PyType *type) : PyBaseObject(type) {}
+
 std::string PySlotWrapper::to_string() const
 {
 	return fmt::format("<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_type->name());
@@ -84,7 +86,7 @@ PyResult<PySlotWrapper *>
 	return Ok(obj);
 }
 
-PyType *PySlotWrapper::type() const { return slot_wrapper(); }
+PyType *PySlotWrapper::static_type() const { return slot_wrapper(); }
 
 namespace {
 

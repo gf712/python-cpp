@@ -18,12 +18,11 @@ template<> const PyBool *as(const PyObject *node)
 	return nullptr;
 }
 
+PyBool::PyBool(PyType *type) : PyInteger(type) {}
+
 PyBool::PyBool(bool value) : PyInteger(BuiltinTypes::the().bool_(), value) {}
 
-std::string PyBool::to_string() const
-{
-	return value() ? "True" : "False";
-}
+std::string PyBool::to_string() const { return value() ? "True" : "False"; }
 
 bool PyBool::value() const
 {
@@ -63,7 +62,7 @@ PyResult<PyBool *> PyBool::create(bool value)
 	return Ok(result);
 }
 
-PyType *PyBool::type() const { return py::bool_(); }
+PyType *PyBool::static_type() const { return py::bool_(); }
 
 PyObject *py_true()
 {

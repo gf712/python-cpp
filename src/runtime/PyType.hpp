@@ -20,9 +20,11 @@ class PyType : public PyBaseObject
 	std::vector<PyObject *> __slots__;
 	PyString *__module__{ nullptr };
 	mutable PyTuple *__mro__{ nullptr };
-	std::variant<std::reference_wrapper<TypePrototype>, PyType *> m_metaclass;
+	std::variant<std::monostate, std::reference_wrapper<TypePrototype>, PyType *> m_metaclass;
 
   private:
+	PyType(PyType *);
+
 	PyType(TypePrototype &type_prototype);
 	PyType(std::unique_ptr<TypePrototype> &&type_prototype);
 
@@ -66,7 +68,7 @@ class PyType : public PyBaseObject
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	PyResult<PyList *> mro();
 
@@ -77,6 +79,8 @@ class PyType : public PyBaseObject
 	PyResult<PyObject *> lookup(PyObject *name) const;
 
 	PyDict *dict() { return m_attributes; }
+
+	static PyResult<PyObject *> heap_object_allocation(PyType *);
 
   protected:
 	PyResult<PyTuple *> mro_internal() const;

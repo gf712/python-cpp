@@ -14,6 +14,8 @@ class PyTuple
 	const std::vector<Value> m_elements;
 
   protected:
+	PyTuple(PyType *);
+
 	PyTuple();
 	PyTuple(std::vector<Value> &&elements);
 	PyTuple(const std::vector<PyObject *> &elements);
@@ -50,7 +52,7 @@ class PyTuple
 	PyResult<PyObject *> operator[](size_t idx) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<> PyTuple *as(PyObject *obj);
@@ -90,7 +92,7 @@ class PyTupleIterator : public PyBaseObject
 	PyTupleIterator &operator--();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

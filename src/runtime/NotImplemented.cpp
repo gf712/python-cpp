@@ -5,7 +5,13 @@
 
 namespace py {
 
-PyType *NotImplemented::type() const { ASSERT_NOT_REACHED(); }
+NotImplemented::NotImplemented(PyType *type) : PyBaseObject(type) {}
+
+NotImplemented::NotImplemented() : PyBaseObject(BuiltinTypes::the().not_implemented()) {}
+
+PyType *NotImplemented::static_type() const { return not_implemented(); }
+
+std::string NotImplemented::to_string() const { return "NotImplemented"; }
 
 namespace {
 	std::once_flag not_implemented_flag;

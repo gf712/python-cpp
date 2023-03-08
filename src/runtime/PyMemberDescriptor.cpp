@@ -22,6 +22,8 @@ template<> const PyMemberDescriptor *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyMemberDescriptor::PyMemberDescriptor(PyType *type) : PyBaseObject(type) {}
+
 PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 	PyType *underlying_type,
 	std::function<PyObject *(PyObject *)> member,
@@ -86,7 +88,7 @@ PyResult<std::monostate> PyMemberDescriptor::__set__(PyObject *obj, PyObject *va
 }
 
 
-PyType *PyMemberDescriptor::type() const { return member_descriptor(); }
+PyType *PyMemberDescriptor::static_type() const { return member_descriptor(); }
 
 namespace {
 

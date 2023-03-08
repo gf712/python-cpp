@@ -12,6 +12,8 @@ class PyString : public PyBaseObject
 	friend class ::Heap;
 	std::string m_value;
 
+	PyString(PyType *);
+
   public:
 	static PyResult<PyString *> create(const std::string &value);
 	static PyResult<PyString *> create(PyString *self, PyTuple *args, PyDict *kwargs)
@@ -67,7 +69,7 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> format(PyTuple *args, PyDict *kwargs) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyString(std::string s);
@@ -93,7 +95,7 @@ class PyStringIterator : public PyBaseObject
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

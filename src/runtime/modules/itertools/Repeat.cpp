@@ -10,6 +10,8 @@ namespace {
 	static PyType *s_itertools_repeat = nullptr;
 }
 namespace itertools {
+	Repeat::Repeat(PyType *type) : PyBaseObject(type) {}
+
 	Repeat::Repeat(PyObject *object, BigIntType times)
 		: PyBaseObject(s_itertools_repeat), m_object(object), m_times_remaining(std::move(times))
 	{}

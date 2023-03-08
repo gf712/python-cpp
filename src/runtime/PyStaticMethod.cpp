@@ -10,6 +10,8 @@
 
 using namespace py;
 
+PyStaticMethod::PyStaticMethod(PyType *type) : PyBaseObject(type) {}
+
 PyResult<PyObject *> PyStaticMethod::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(!kwargs || kwargs->map().empty())
@@ -52,7 +54,7 @@ PyResult<PyObject *> PyStaticMethod::__get__(PyObject * /*instance*/, PyObject *
 	return Ok(m_static_method);
 }
 
-PyType *PyStaticMethod::type() const { return ::static_method(); }
+PyType *PyStaticMethod::static_type() const { return ::static_method(); }
 
 namespace {
 

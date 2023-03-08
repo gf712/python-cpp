@@ -15,6 +15,8 @@ class PyFrozenSet : public PyBaseObject
   private:
 	SetType m_elements;
 
+	PyFrozenSet(PyType *);
+
   public:
 	static PyResult<PyFrozenSet *> create(SetType elements);
 	static PyResult<PyFrozenSet *> create();
@@ -37,7 +39,7 @@ class PyFrozenSet : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyFrozenSet();

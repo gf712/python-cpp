@@ -9,7 +9,7 @@
 namespace py {
 class PyFunction : public PyBaseObject
 {
-	// friend std::unique_ptr<TypePrototype> register_type();
+	friend class ::Heap;
 
 	PyString *m_name = nullptr;
 	PyString *m_doc = nullptr;
@@ -20,6 +20,8 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> m_kwonly_defaults;
 	PyTuple *m_closure{ nullptr };
 	PyString *m_module = nullptr;
+
+	PyFunction(PyType *);
 
   public:
 	PyFunction(std::string,
@@ -49,7 +51,7 @@ class PyFunction : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
@@ -69,6 +71,8 @@ class PyNativeFunction : public PyBaseObject
 	FunctionType m_function;
 	PyObject *m_self{ nullptr };
 	std::vector<PyObject *> m_captures;
+
+	PyNativeFunction(PyType *);
 
 	PyNativeFunction(std::string &&name, FunctionType &&function);
 
@@ -141,7 +145,7 @@ class PyNativeFunction : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

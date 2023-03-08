@@ -11,6 +11,8 @@ class PyEnumerate : public PyBaseObject
 	PyObject *m_iterator{ nullptr };
 
   private:
+	PyEnumerate(PyType *);
+
 	PyEnumerate(int64_t current_index, PyObject *iterator);
 
   public:
@@ -23,6 +25,6 @@ class PyEnumerate : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 }// namespace py

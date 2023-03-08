@@ -21,6 +21,8 @@ class ModuleNotFoundError : public ImportError
   private:
 	ModuleNotFoundError(PyTuple *msg, PyObject *name, PyObject *path);
 
+	ModuleNotFoundError(PyType *type);
+
 	static ModuleNotFoundError *create(PyTuple *args, PyObject *name, PyObject *path)
 	{
 		auto &heap = VirtualMachine::the().heap();
@@ -33,7 +35,7 @@ class ModuleNotFoundError : public ImportError
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<typename... Args>

@@ -91,10 +91,12 @@ class PySlotWrapper : public PyBaseObject
 
 	PyString *m_name{ nullptr };
 	PyType *m_type{ nullptr };
-	std::reference_wrapper<Slot> m_base;
+	std::optional<std::reference_wrapper<Slot>> m_base;
 	FunctionType m_slot;
 
 	friend class ::Heap;
+
+	PySlotWrapper(PyType *type);
 
 	PySlotWrapper(PyString *name, PyType *underlying_type, Slot &base, FunctionType &&function);
 
@@ -103,8 +105,13 @@ class PySlotWrapper : public PyBaseObject
 		create(PyString *name, PyType *underlying_type, Slot &base, FunctionType &&function);
 
 	PyString *slot_name() { return m_name; }
-	const FunctionType &slot() { return m_slot; }
-	std::reference_wrapper<Slot> base() const { return m_base; }
+	FunctionType slot() { return m_slot; }
+	const FunctionType &slot() const { return m_slot; }
+	std::reference_wrapper<Slot> base() const
+	{
+		ASSERT(m_base);
+		return m_base->get();
+	}
 	PyType *base_type() const { return m_type; }
 
 	std::string to_string() const override;
@@ -116,7 +123,7 @@ class PySlotWrapper : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<Slot::Flags flags_, typename TypePrototypeWrapper, typename R, typename... Args>

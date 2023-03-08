@@ -11,6 +11,8 @@ class PyNone : public PyBaseObject
 
 	bool m_value;
 
+	PyNone(PyType *);
+
   public:
 	std::string to_string() const override;
 
@@ -23,7 +25,7 @@ class PyNone : public PyBaseObject
 	void visit_graph(Visitor &) override {}
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	static PyNone *create();

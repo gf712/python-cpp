@@ -24,6 +24,8 @@ class Lock : public PyBaseObject
 	std::timed_mutex m_mutex;
 	bool m_locked{ false };
 
+	Lock(PyType* type): PyBaseObject(type) {}
+
 	Lock() : PyBaseObject(s_lock->underlying_type()) {}
 
   public:
@@ -122,7 +124,7 @@ class Lock : public PyBaseObject
 
 	PyResult<PyObject *> __exit__(PyTuple *, PyDict *) { return release_lock(); }
 
-	PyType *type() const override
+	PyType *static_type() const override
 	{
 		ASSERT(s_lock)
 		return s_lock;

@@ -6,6 +6,7 @@
 #include "forward.hpp"
 #include "memory/GarbageCollector.hpp"
 #include "runtime/forward.hpp"
+#include "vm/VM.hpp"
 
 #include <functional>
 #include <memory>
@@ -221,6 +222,7 @@ struct TypePrototype
 	PyType *__base__{ nullptr };
 	PyTuple *__bases__{ nullptr };
 
+	std::function<PyResult<PyObject *>(PyType *)> __alloc__;
 	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
 	std::optional<std::variant<InitSlotFunctionType, PyObject *>> __init__;
 	PyType *__class__{ nullptr };
@@ -348,6 +350,7 @@ class PyObject : public Cell
 	friend class ::Heap;
 	friend PyMappingWrapper;
 	friend PySequenceWrapper;
+	friend class PyType;
 
   protected:
 	std::variant<std::reference_wrapper<const TypePrototype>, PyType *> m_type;
@@ -360,7 +363,8 @@ class PyObject : public Cell
 
 	virtual ~PyObject() = default;
 
-	virtual PyType *type() const;
+	virtual PyType *static_type() const;
+	PyType *type() const;
 
 	template<typename T> static PyResult<PyObject *> from(const T &value);
 
@@ -457,12 +461,19 @@ template<> PyResult<PyObject *> PyObject::from(const Ellipsis &value);
 template<> PyResult<PyObject *> PyObject::from(const NameConstant &value);
 template<> PyResult<PyObject *> PyObject::from(const Value &value);
 
+BaseException *memory_error(size_t failed_allocation_size);
+
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
 {
 	using namespace concepts;
 
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
+	type_prototype->__alloc__ = [](PyType *t) -> PyResult<PyObject *> {
+		auto *obj = VirtualMachine::the().heap().allocate<Type>(t);
+		if (!obj) { return Err(memory_error(sizeof(Type))); }
+		return Ok(obj);
+	};
 	if constexpr (HasRepr<Type>) {
 		type_prototype->__repr__ = +[](const PyObject *self) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__repr__();

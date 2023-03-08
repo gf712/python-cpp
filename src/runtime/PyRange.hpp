@@ -12,6 +12,8 @@ class PyRange : public PyBaseObject
 	const BigIntType m_stop;
 	const BigIntType m_step{ 1 };
 
+	PyRange(PyType *);
+
   public:
 	std::string to_string() const override;
 
@@ -26,7 +28,7 @@ class PyRange : public PyBaseObject
 	PyResult<PyObject *> __reversed__() const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyRange(BigIntType start, BigIntType stop, BigIntType step);
@@ -56,7 +58,7 @@ class PyRangeIterator : public PyBaseObject
 
 	void visit_graph(Visitor &) override;
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

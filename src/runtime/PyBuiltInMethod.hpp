@@ -6,10 +6,12 @@ namespace py {
 
 class PyBuiltInMethod : public PyBaseObject
 {
-	MethodDefinition &m_ml;
+	friend class ::Heap;
+
+	std::optional<std::reference_wrapper<MethodDefinition>> m_ml;
 	PyObject *m_self;
 
-	friend class ::Heap;
+	PyBuiltInMethod(PyType *);
 
 	PyBuiltInMethod(MethodDefinition &method_definition, PyObject *self);
 
@@ -24,7 +26,7 @@ class PyBuiltInMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

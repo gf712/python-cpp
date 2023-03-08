@@ -28,6 +28,7 @@ class PyDict : public PyBaseObject
 	PyDict(MapType &&map);
 	PyDict(const MapType &map);
 	PyDict();
+	PyDict(PyType *);
 
   public:
 	static PyResult<PyDict *> create();
@@ -66,7 +67,7 @@ class PyDict : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 class PyDictItems : public PyBaseObject
@@ -75,7 +76,9 @@ class PyDictItems : public PyBaseObject
 	friend PyDict;
 	friend PyDictItemsIterator;
 
-	const PyDict &m_pydict;
+	const std::optional<std::reference_wrapper<const PyDict>> m_pydict;
+
+	PyDictItems(PyType *);
 
   public:
 	static PyResult<PyDictItems *> create(const PyDict &pydict);
@@ -91,7 +94,7 @@ class PyDictItems : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
@@ -101,7 +104,9 @@ class PyDictKeys : public PyBaseObject
 	friend PyDict;
 	friend PyDictKeyIterator;
 
-	const PyDict &m_pydict;
+	const std::optional<std::reference_wrapper<const PyDict>> m_pydict;
+
+	PyDictKeys(PyType *);
 
 	PyDictKeys(const PyDict &pydict);
 
@@ -117,7 +122,7 @@ class PyDictKeys : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
@@ -127,7 +132,9 @@ class PyDictValues : public PyBaseObject
 	friend PyDict;
 	friend PyDictValueIterator;
 
-	const PyDict &m_pydict;
+	const std::optional<std::reference_wrapper<const PyDict>> m_pydict;
+
+	PyDictValues(PyType *);
 
 	PyDictValues(const PyDict &pydict);
 
@@ -143,7 +150,7 @@ class PyDictValues : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 class PyDictItemsIterator : public PyBaseObject
@@ -151,8 +158,10 @@ class PyDictItemsIterator : public PyBaseObject
 	friend class ::Heap;
 	friend PyDictItems;
 
-	const PyDictItems &m_pydictitems;
+	const std::optional<std::reference_wrapper<const PyDictItems>> m_pydictitems;
 	PyDict::MapType::const_iterator m_current_iterator;
+
+	PyDictItemsIterator(PyType *);
 
 	PyDictItemsIterator(const PyDictItems &pydict_items);
 	PyDictItemsIterator(const PyDictItems &pydict_items, size_t position);
@@ -179,7 +188,7 @@ class PyDictItemsIterator : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
@@ -189,8 +198,10 @@ class PyDictKeyIterator : public PyBaseObject
 	friend PyDictItems;
 	friend PyDictKeys;
 
-	const PyDictKeys &m_pydictkeys;
+	const std::optional<std::reference_wrapper<const PyDictKeys>> m_pydictkeys;
 	PyDict::MapType::const_iterator m_current_iterator;
+
+	PyDictKeyIterator(PyType *);
 
 	PyDictKeyIterator(const PyDictKeys &pydict_keys);
 	PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position);
@@ -217,7 +228,7 @@ class PyDictKeyIterator : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 class PyDictValueIterator : public PyBaseObject
@@ -226,8 +237,10 @@ class PyDictValueIterator : public PyBaseObject
 	friend PyDictItems;
 	friend PyDictValues;
 
-	const PyDictValues &m_pydictvalues;
+	const std::optional<std::reference_wrapper<const PyDictValues>> m_pydictvalues;
 	PyDict::MapType::const_iterator m_current_iterator;
+
+	PyDictValueIterator(PyType *);
 
 	PyDictValueIterator(const PyDictValues &pydict_values);
 	PyDictValueIterator(const PyDictValues &pydict_values, size_t position);
@@ -255,7 +268,7 @@ class PyDictValueIterator : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

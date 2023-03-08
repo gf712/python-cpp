@@ -16,6 +16,8 @@ class PyProperty : public PyBaseObject
 
 	friend class ::Heap;
 
+	PyProperty(PyType *);
+
 	PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *);
 
   public:
@@ -36,7 +38,7 @@ class PyProperty : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

@@ -1,4 +1,5 @@
 #include "BinarySubscript.hpp"
+#include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
 #include "vm/VM.hpp"
 

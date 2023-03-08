@@ -6,6 +6,9 @@
 #include "types/builtin.hpp"
 
 namespace py {
+
+PyZip::PyZip(PyType *type) : PyBaseObject(type) {}
+
 PyZip::PyZip(std::vector<PyObject *> &&iterators)
 	: PyBaseObject(BuiltinTypes::the().zip()), m_iterators(std::move(iterators))
 {}
@@ -41,7 +44,7 @@ PyResult<PyObject *> PyZip::__next__()
 	if (m_iterators.empty()) {
 		return Err(stop_iteration());
 	} else {
-        // use a list here because it is mutable
+		// use a list here because it is mutable
 		auto els = PyList::create();
 		if (els.is_err()) { return els; }
 		for (auto *it : m_iterators) {
@@ -51,11 +54,12 @@ PyResult<PyObject *> PyZip::__next__()
 				return value;
 			}
 		}
-		return PyTuple::create(els.unwrap()->elements());;
+		return PyTuple::create(els.unwrap()->elements());
+		;
 	}
 }
 
-PyType *PyZip::type() const { return zip(); }
+PyType *PyZip::static_type() const { return zip(); }
 
 void PyZip::visit_graph(Visitor &visitor)
 {

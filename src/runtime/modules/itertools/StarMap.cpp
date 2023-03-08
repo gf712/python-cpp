@@ -9,6 +9,9 @@ namespace {
 	static PyType *s_itertools_starmap = nullptr;
 }
 namespace itertools {
+
+	StarMap::StarMap(PyType *type) : PyBaseObject(type) {}
+
 	StarMap::StarMap(PyObject *function, PyObject *iterator)
 		: PyBaseObject(s_itertools_starmap), m_function(function), m_iterator(iterator)
 	{}

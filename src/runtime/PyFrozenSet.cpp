@@ -22,6 +22,8 @@ template<> const PyFrozenSet *as(const PyObject *obj)
 
 PyFrozenSet::PyFrozenSet() : PyBaseObject(BuiltinTypes::the().frozenset()) {}
 
+PyFrozenSet::PyFrozenSet(PyType *type) : PyBaseObject(type) {}
+
 PyFrozenSet::PyFrozenSet(SetType elements) : PyFrozenSet() { m_elements = std::move(elements); }
 
 PyResult<PyFrozenSet *> PyFrozenSet::create(SetType elements)
@@ -169,7 +171,7 @@ void PyFrozenSet::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyFrozenSet::type() const { return frozenset(); }
+PyType *PyFrozenSet::static_type() const { return frozenset(); }
 
 namespace {
 

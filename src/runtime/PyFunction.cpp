@@ -19,6 +19,8 @@
 
 namespace py {
 
+PyFunction::PyFunction(PyType *type) : PyBaseObject(type) {}
+
 PyFunction::PyFunction(std::string name,
 	std::vector<Value> defaults,
 	std::vector<Value> kwonly_defaults,
@@ -61,7 +63,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_closure) visitor.visit(*m_closure);
 }
 
-PyType *PyFunction::type() const { return function(); }
+PyType *PyFunction::static_type() const { return function(); }
 
 PyResult<PyObject *> PyFunction::__repr__() const
 {
@@ -122,6 +124,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 	};
 }
 
+PyNativeFunction::PyNativeFunction(PyType *type) : PyBaseObject(type) {}
 
 PyNativeFunction::PyNativeFunction(std::string &&name, FunctionType &&function)
 	: PyBaseObject(BuiltinTypes::the().native_function()), m_name(std::move(name)),
@@ -159,7 +162,7 @@ void PyNativeFunction::visit_graph(Visitor &visitor)
 	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
-PyType *PyNativeFunction::type() const { return native_function(); }
+PyType *PyNativeFunction::static_type() const { return native_function(); }
 
 namespace {
 	std::once_flag native_function_flag;

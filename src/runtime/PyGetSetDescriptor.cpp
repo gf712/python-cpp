@@ -23,6 +23,8 @@ template<> const PyGetSetDescriptor *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyGetSetDescriptor::PyGetSetDescriptor(PyType *type) : PyBaseObject(type) {}
+
 PyGetSetDescriptor::PyGetSetDescriptor(PyString *name,
 	PyType *underlying_type,
 	PropertyDefinition &getset)
@@ -67,7 +69,10 @@ PyResult<PyObject *> PyGetSetDescriptor::__get__(PyObject *instance, PyObject * 
 				instance->type()->underlying_type().__name__));
 	}
 
-	if (m_getset.member_getter.has_value()) { return m_getset.member_getter->operator()(instance); }
+	ASSERT(m_getset.has_value());
+	if (m_getset->get().member_getter.has_value()) {
+		return m_getset->get().member_getter->operator()(instance);
+	}
 
 	return Err(attribute_error("attribute '{}' of '{}' objects is not readable",
 		m_name->value(),
@@ -83,8 +88,9 @@ PyResult<std::monostate> PyGetSetDescriptor::__set__(PyObject *obj, PyObject *va
 			obj->type()->underlying_type().__name__));
 	}
 
-	if (m_getset.member_setter.has_value()) {
-		return m_getset.member_setter->operator()(obj, value);
+	ASSERT(m_getset.has_value());
+	if (m_getset->get().member_setter.has_value()) {
+		return m_getset->get().member_setter->operator()(obj, value);
 	}
 
 	return Err(attribute_error("attribute '{}' of '{}' objects is not writable",
@@ -93,7 +99,7 @@ PyResult<std::monostate> PyGetSetDescriptor::__set__(PyObject *obj, PyObject *va
 }
 
 
-PyType *PyGetSetDescriptor::type() const { return getset_descriptor(); }
+PyType *PyGetSetDescriptor::static_type() const { return getset_descriptor(); }
 
 namespace {
 

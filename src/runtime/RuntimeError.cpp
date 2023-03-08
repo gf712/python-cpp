@@ -24,6 +24,8 @@ template<> const RuntimeError *as(const PyObject *obj)
 	return nullptr;
 }
 
+RuntimeError::RuntimeError(PyType *type) : Exception(type) {}
+
 RuntimeError::RuntimeError(PyTuple *args) : Exception(s_runtime_error->underlying_type(), args) {}
 
 PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
@@ -34,7 +36,7 @@ PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
 	return Ok(obj);
 }
 
-PyType *RuntimeError::type() const
+PyType *RuntimeError::static_type() const
 {
 	ASSERT(s_runtime_error)
 	return s_runtime_error;

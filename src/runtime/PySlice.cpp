@@ -25,6 +25,10 @@ template<> const PySlice *as(const PyObject *obj)
 	return nullptr;
 }
 
+PySlice::PySlice(PyType *type)
+	: PyBaseObject(type), m_start(py_none()), m_stop(py_none()), m_step(py_none())
+{}
+
 PySlice::PySlice() : PySlice(py_none(), py_none(), py_none()) {}
 
 PySlice::PySlice(PyObject *stop) : PySlice(py_none(), stop, py_none()) {}
@@ -319,7 +323,7 @@ std::function<std::unique_ptr<TypePrototype>()> PySlice::type_factory()
 	};
 }
 
-PyType *PySlice::type() const { return slice(); }
+PyType *PySlice::static_type() const { return slice(); }
 
 void PySlice::visit_graph(Visitor &visitor)
 {

@@ -15,6 +15,8 @@ class LookupError : public Exception
 	friend BaseException *lookup_error(const std::string &message, Args &&...args);
 
   protected:
+	LookupError(PyType *);
+
 	LookupError(PyType *, PyTuple *msg);
 
   private:
@@ -31,8 +33,8 @@ class LookupError : public Exception
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
-	PyType *type() const override;
-	static PyType *static_type();
+	PyType *static_type() const override;
+	static PyType *class_type();
 };
 
 template<typename... Args>

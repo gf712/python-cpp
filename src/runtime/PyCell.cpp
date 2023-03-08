@@ -18,12 +18,14 @@ template<> const PyCell *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyCell::PyCell(PyType *type) : PyBaseObject(type) {}
+
 PyCell::PyCell(const Value &content) : PyBaseObject(BuiltinTypes::the().cell()), m_content(content)
 {}
 
 PyResult<PyCell *> PyCell::create()
 {
-	auto *obj = VirtualMachine::the().heap().allocate<PyCell>(nullptr);
+	auto *obj = VirtualMachine::the().heap().allocate<PyCell>(Value{ nullptr });
 	if (!obj) { return Err(memory_error(sizeof(PyCell))); }
 	return Ok(obj);
 }
@@ -63,7 +65,7 @@ void PyCell::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyCell::type() const { return cell(); }
+PyType *PyCell::static_type() const { return cell(); }
 
 const Value &PyCell::content() const { return m_content; }
 

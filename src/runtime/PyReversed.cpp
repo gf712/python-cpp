@@ -3,6 +3,8 @@
 #include "types/builtin.hpp"
 
 namespace py {
+PyReversed::PyReversed(PyType *type) : PyBaseObject(type) {}
+
 PyReversed::PyReversed(PyObject *sequence)
 	: PyBaseObject(BuiltinTypes::the().reversed()), m_sequence(sequence)
 {}
@@ -34,7 +36,7 @@ PyResult<PyObject *> PyReversed::__new__(const PyType *type, PyTuple *args, PyDi
 PyResult<PyObject *> PyReversed::__iter__() const { TODO(); }
 PyResult<PyObject *> PyReversed::__next__() { TODO(); }
 
-PyType *PyReversed::type() const { return reversed(); }
+PyType *PyReversed::static_type() const { return reversed(); }
 
 void PyReversed::visit_graph(Visitor &visitor)
 {

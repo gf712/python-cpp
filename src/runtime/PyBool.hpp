@@ -10,6 +10,8 @@ class PyBool : public PyInteger
 	friend PyObject *py_true();
 	friend PyObject *py_false();
 
+	PyBool(PyType *);
+
   public:
 	std::string to_string() const override;
 
@@ -22,7 +24,7 @@ class PyBool : public PyInteger
 	PyResult<bool> __bool__() const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	static PyResult<PyBool *> create(bool);

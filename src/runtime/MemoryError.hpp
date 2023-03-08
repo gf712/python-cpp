@@ -13,6 +13,8 @@ class MemoryError : public Exception
 	friend BaseException *memory_error(size_t failed_allocation_size);
 
   private:
+	MemoryError(PyType *type);
+
 	MemoryError(PyTuple *args);
 
 	static PyResult<MemoryError *> create(PyTuple *args)
@@ -32,7 +34,7 @@ class MemoryError : public Exception
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	static PyType *this_type();
 

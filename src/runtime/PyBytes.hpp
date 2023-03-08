@@ -10,6 +10,8 @@ class PyBytes : public PyBaseObject
 
 	Bytes m_value;
 
+	PyBytes(PyType *);
+
   public:
 	static PyResult<PyBytes *> create(const Bytes &number);
 	static PyResult<PyBytes *> create();
@@ -27,7 +29,7 @@ class PyBytes : public PyBaseObject
 	const Bytes &value() const { return m_value; }
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyBytes();
@@ -41,6 +43,8 @@ class PyBytesIterator : public PyBaseObject
 	PyBytes *m_bytes{ nullptr };
 	size_t m_index{ 0 };
 
+	PyBytesIterator(PyType *);
+
   public:
 	static PyResult<PyBytesIterator *> create(PyBytes *bytes);
 	std::string to_string() const override;
@@ -49,7 +53,7 @@ class PyBytesIterator : public PyBaseObject
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	void visit_graph(Visitor &) override;
 

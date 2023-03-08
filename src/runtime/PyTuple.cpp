@@ -48,6 +48,8 @@ namespace {
 	}
 }// namespace
 
+PyTuple::PyTuple(PyType *type) : PyBaseObject(type) {}
+
 PyTuple::PyTuple(std::vector<Value> &&elements)
 	: PyBaseObject(BuiltinTypes::the().tuple()), m_elements(std::move(elements))
 {
@@ -222,7 +224,7 @@ void PyTuple::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyTuple::type() const { return tuple(); }
+PyType *PyTuple::static_type() const { return tuple(); }
 
 namespace {
 
@@ -306,7 +308,7 @@ void PyTupleIterator::visit_graph(Visitor &visitor)
 }
 
 
-PyType *PyTupleIterator::type() const { return tuple_iterator(); }
+PyType *PyTupleIterator::static_type() const { return tuple_iterator(); }
 
 namespace {
 

@@ -11,6 +11,8 @@ class PyWeakRef : public PyBaseObject
 	PyObject *m_callback{ nullptr };
 
   protected:
+	PyWeakRef(PyType *);
+
 	PyWeakRef(PyObject *object, PyObject *callback);
 
 	void visit_graph(Visitor &) override;

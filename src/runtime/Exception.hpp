@@ -10,9 +10,11 @@ class Exception : public BaseException
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend PyObject *exception(const std::string &message, Args &&... args);
+	friend PyObject *exception(const std::string &message, Args &&...args);
 
   protected:
+	Exception(PyType *);
+
 	Exception(const TypePrototype &type, PyTuple *args);
 
 	static PyType *s_exception_type;
@@ -29,13 +31,13 @@ class Exception : public BaseException
   public:
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
-	static PyType *static_type();
+	static PyType *class_type();
 };
 
 
-template<typename... Args> inline PyObject *exception(const std::string &message, Args &&... args)
+template<typename... Args> inline PyObject *exception(const std::string &message, Args &&...args)
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));

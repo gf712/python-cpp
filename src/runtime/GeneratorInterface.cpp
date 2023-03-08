@@ -15,6 +15,8 @@
 
 namespace py {
 
+template<typename T> GeneratorInterface<T>::GeneratorInterface(PyType *type) : PyBaseObject(type) {}
+
 template<typename T>
 GeneratorInterface<T>::GeneratorInterface(TypePrototype &type,
 	PyFrame *frame,

@@ -19,6 +19,8 @@ template<> const PyGenerator *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyGenerator::PyGenerator(PyType *type) : GeneratorInterface(type) {}
+
 PyGenerator::PyGenerator(PyFrame *frame,
 	std::unique_ptr<StackFrame> &&stack_frame,
 	bool is_running,
@@ -68,7 +70,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyGenerator::type_factory()
 	};
 }
 
-PyType *PyGenerator::type() const { return generator(); }
+PyType *PyGenerator::static_type() const { return generator(); }
 
 void PyGenerator::visit_graph(Visitor &visitor)
 {

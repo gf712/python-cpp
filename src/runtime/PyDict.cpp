@@ -33,6 +33,8 @@ PyDict::PyDict(const MapType &map) : PyBaseObject(BuiltinTypes::the().dict()), m
 
 PyDict::PyDict() : PyBaseObject(BuiltinTypes::the().dict()) {}
 
+PyDict::PyDict(PyType *type) : PyBaseObject(type) {}
+
 PyResult<PyDict *> PyDict::create()
 {
 	auto *result = VirtualMachine::the().heap().allocate<PyDict>();
@@ -215,10 +217,12 @@ void PyDict::visit_graph(Visitor &visitor)
 	PyObject::visit_graph(visitor);
 	for (auto &[key, value] : m_map) {
 		if (std::holds_alternative<PyObject *>(value)) {
-			if (std::get<PyObject *>(value) && std::get<PyObject *>(value) != this) visitor.visit(*std::get<PyObject *>(value));
+			if (std::get<PyObject *>(value) && std::get<PyObject *>(value) != this)
+				visitor.visit(*std::get<PyObject *>(value));
 		}
 		if (std::holds_alternative<PyObject *>(key)) {
-			if (std::get<PyObject *>(key) && std::get<PyObject *>(key) != this) visitor.visit(*std::get<PyObject *>(key));
+			if (std::get<PyObject *>(key) && std::get<PyObject *>(key) != this)
+				visitor.visit(*std::get<PyObject *>(key));
 		}
 	}
 }
@@ -227,7 +231,14 @@ PyResult<PyDictKeys *> PyDict::keys() const { return PyDictKeys::create(*this); 
 
 PyResult<PyDictValues *> PyDict::values() const { return PyDictValues::create(*this); }
 
-PyType *PyDict::type() const { return dict(); }
+PyType *PyDict::static_type() const
+{
+	if (std::holds_alternative<std::reference_wrapper<const TypePrototype>>(m_type)) {
+		return dict();
+	} else {
+		return std::get<PyType *>(m_type);
+	}
+}
 
 PyResult<PyObject *> PyDict::get(PyObject *key, PyObject *default_value) const
 {
@@ -392,6 +403,8 @@ PyResult<PyDictItems *> PyDictItems::create(const PyDict &pydict)
 	return Ok(result);
 }
 
+PyDictItems::PyDictItems(PyType *type) : PyBaseObject(type) {}
+
 PyDictItems::PyDictItems(const PyDict &pydict)
 	: PyBaseObject(BuiltinTypes::the().dict_items()), m_pydict(pydict)
 {}
@@ -403,7 +416,9 @@ PyDictItemsIterator PyDictItems::begin() const { return PyDictItemsIterator(*thi
 
 PyDictItemsIterator PyDictItems::end() const
 {
-	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	ASSERT(m_pydict);
+
+	auto end_position = std::distance(m_pydict->get().map().begin(), m_pydict->get().map().end());
 	return PyDictItemsIterator(*this, end_position);
 }
 
@@ -427,10 +442,10 @@ std::string PyDictItems::to_string() const
 void PyDictItems::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+	visitor.visit(const_cast<PyDict &>(m_pydict->get()));
 }
 
-PyType *PyDictItems::type() const { return dict_items(); }
+PyType *PyDictItems::static_type() const { return dict_items(); }
 
 namespace {
 
@@ -460,6 +475,8 @@ PyResult<PyDictKeys *> PyDictKeys::create(const PyDict &pydict)
 	return Ok(result);
 }
 
+PyDictKeys::PyDictKeys(PyType *type) : PyBaseObject(type) {}
+
 PyDictKeys::PyDictKeys(const PyDict &pydict)
 	: PyBaseObject(BuiltinTypes::the().dict_keys()), m_pydict(pydict)
 {}
@@ -470,7 +487,8 @@ PyDictKeyIterator PyDictKeys::begin() const { return PyDictKeyIterator(*this); }
 
 PyDictKeyIterator PyDictKeys::end() const
 {
-	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	ASSERT(m_pydict);
+	auto end_position = std::distance(m_pydict->get().map().begin(), m_pydict->get().map().end());
 	return PyDictKeyIterator(*this, end_position);
 }
 
@@ -494,10 +512,10 @@ std::string PyDictKeys::to_string() const
 void PyDictKeys::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+	visitor.visit(const_cast<PyDict &>(m_pydict->get()));
 }
 
-PyType *PyDictKeys::type() const { return dict_keys(); }
+PyType *PyDictKeys::static_type() const { return dict_keys(); }
 
 namespace {
 
@@ -525,6 +543,8 @@ PyResult<PyDictValues *> PyDictValues::create(const PyDict &pydict)
 	return Ok(result);
 }
 
+PyDictValues::PyDictValues(PyType *type) : PyBaseObject(type) {}
+
 PyDictValues::PyDictValues(const PyDict &pydict)
 	: PyBaseObject(BuiltinTypes::the().dict_values()), m_pydict(pydict)
 {}
@@ -535,7 +555,8 @@ PyDictValueIterator PyDictValues::begin() const { return PyDictValueIterator(*th
 
 PyDictValueIterator PyDictValues::end() const
 {
-	auto end_position = std::distance(m_pydict.map().begin(), m_pydict.map().end());
+	ASSERT(m_pydict);
+	auto end_position = std::distance(m_pydict->get().map().begin(), m_pydict->get().map().end());
 	return PyDictValueIterator(*this, end_position);
 }
 
@@ -559,10 +580,10 @@ std::string PyDictValues::to_string() const
 void PyDictValues::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*const_cast<PyDict *>(&m_pydict));
+	visitor.visit(const_cast<PyDict &>(m_pydict->get()));
 }
 
-PyType *PyDictValues::type() const { return dict_values(); }
+PyType *PyDictValues::static_type() const { return dict_values(); }
 
 namespace {
 
@@ -586,9 +607,11 @@ std::function<std::unique_ptr<TypePrototype>()> PyDictValues::type_factory()
 
 // iterators
 
+PyDictItemsIterator::PyDictItemsIterator(PyType *type) : PyBaseObject(type) {}
+
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items)
 	: PyBaseObject(BuiltinTypes::the().dict_items_iterator()), m_pydictitems(pydict_items),
-	  m_current_iterator(m_pydictitems.m_pydict.map().begin())
+	  m_current_iterator(m_pydictitems->get().m_pydict->get().map().begin())
 {}
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items, size_t position)
@@ -617,7 +640,7 @@ PyResult<PyDictItemsIterator *> PyDictItemsIterator::create(const PyDictItems &p
 void PyDictItemsIterator::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	if (m_current_iterator != m_pydictitems.m_pydict.map().end()) {
+	if (m_current_iterator != m_pydictitems->get().m_pydict->get().map().end()) {
 		if (std::holds_alternative<PyObject *>(m_current_iterator->first)) {
 			visitor.visit(*std::get<PyObject *>(m_current_iterator->first));
 		}
@@ -625,7 +648,7 @@ void PyDictItemsIterator::visit_graph(Visitor &visitor)
 			visitor.visit(*std::get<PyObject *>(m_current_iterator->second));
 		}
 	}
-	visitor.visit(*const_cast<PyDictItems *>(&m_pydictitems));
+	visitor.visit(const_cast<PyDictItems &>(m_pydictitems->get()));
 }
 
 std::string PyDictItemsIterator::to_string() const
@@ -637,7 +660,7 @@ PyResult<PyObject *> PyDictItemsIterator::__repr__() const { return PyString::cr
 
 PyResult<PyObject *> PyDictItemsIterator::__next__()
 {
-	if (m_current_iterator != m_pydictitems.m_pydict.map().end()) {
+	if (m_current_iterator != m_pydictitems->get().m_pydict->get().map().end()) {
 		const auto &[key, value] = *m_current_iterator;
 		m_current_iterator++;
 		return PyTuple::create(key, value);
@@ -647,7 +670,9 @@ PyResult<PyObject *> PyDictItemsIterator::__next__()
 
 bool PyDictItemsIterator::operator==(const PyDictItemsIterator &other) const
 {
-	return &m_pydictitems == &other.m_pydictitems && m_current_iterator == other.m_current_iterator;
+	return m_pydictitems.has_value() && other.m_pydictitems.has_value()
+		   && &m_pydictitems->get() == &other.m_pydictitems->get()
+		   && m_current_iterator == other.m_current_iterator;
 }
 
 PyDictItemsIterator &PyDictItemsIterator::operator++()
@@ -662,7 +687,7 @@ PyTuple *PyDictItemsIterator::operator*() const
 	return VirtualMachine::the().heap().allocate<PyTuple>(std::vector{ key, value });
 }
 
-PyType *PyDictItemsIterator::type() const { return dict_items_iterator(); }
+PyType *PyDictItemsIterator::static_type() const { return dict_items_iterator(); }
 
 namespace {
 
@@ -683,10 +708,11 @@ std::function<std::unique_ptr<TypePrototype>()> PyDictItemsIterator::type_factor
 	};
 }
 
+PyDictKeyIterator::PyDictKeyIterator(PyType *type) : PyBaseObject(type) {}
 
 PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys)
 	: PyBaseObject(BuiltinTypes::the().dict_key_iterator()), m_pydictkeys(pydict_keys),
-	  m_current_iterator(m_pydictkeys.m_pydict.map().begin())
+	  m_current_iterator(m_pydictkeys->get().m_pydict->get().map().begin())
 {}
 
 PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position)
@@ -714,12 +740,12 @@ PyResult<PyDictKeyIterator *> PyDictKeyIterator::create(const PyDictKeys &pydict
 void PyDictKeyIterator::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	if (m_current_iterator != m_pydictkeys.m_pydict.map().end()) {
+	if (m_current_iterator != m_pydictkeys->get().m_pydict->get().map().end()) {
 		if (std::holds_alternative<PyObject *>(m_current_iterator->first)) {
 			visitor.visit(*std::get<PyObject *>(m_current_iterator->first));
 		}
 	}
-	visitor.visit(*const_cast<PyDictKeys *>(&m_pydictkeys));
+	visitor.visit(const_cast<PyDictKeys &>(m_pydictkeys->get()));
 }
 
 std::string PyDictKeyIterator::to_string() const
@@ -731,7 +757,7 @@ PyResult<PyObject *> PyDictKeyIterator::__repr__() const { return PyString::crea
 
 PyResult<PyObject *> PyDictKeyIterator::__next__()
 {
-	if (m_current_iterator != m_pydictkeys.m_pydict.map().end()) {
+	if (m_current_iterator != m_pydictkeys->get().m_pydict->get().map().end()) {
 		const auto &key = m_current_iterator->first;
 		m_current_iterator++;
 		return PyObject::from(key);
@@ -741,7 +767,9 @@ PyResult<PyObject *> PyDictKeyIterator::__next__()
 
 bool PyDictKeyIterator::operator==(const PyDictKeyIterator &other) const
 {
-	return &m_pydictkeys == &other.m_pydictkeys && m_current_iterator == other.m_current_iterator;
+	return m_pydictkeys.has_value() && other.m_pydictkeys.has_value()
+		   && &m_pydictkeys->get() == &other.m_pydictkeys->get()
+		   && m_current_iterator == other.m_current_iterator;
 }
 
 PyDictKeyIterator &PyDictKeyIterator::operator++()
@@ -756,7 +784,7 @@ PyObject *PyDictKeyIterator::operator*() const
 	return PyObject::from(key).unwrap();
 }
 
-PyType *PyDictKeyIterator::type() const { return dict_key_iterator(); }
+PyType *PyDictKeyIterator::static_type() const { return dict_key_iterator(); }
 
 namespace {
 
@@ -777,9 +805,11 @@ std::function<std::unique_ptr<TypePrototype>()> PyDictKeyIterator::type_factory(
 	};
 }
 
+PyDictValueIterator::PyDictValueIterator(PyType *type) : PyBaseObject(type) {}
+
 PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values)
 	: PyBaseObject(BuiltinTypes::the().dict_value_iterator()), m_pydictvalues(pydict_values),
-	  m_current_iterator(m_pydictvalues.m_pydict.map().begin())
+	  m_current_iterator(m_pydictvalues->get().m_pydict->get().map().begin())
 {}
 
 PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values, size_t position)
@@ -811,7 +841,7 @@ void PyDictValueIterator::visit_graph(Visitor &visitor)
 		visitor.visit(*std::get<PyObject *>(m_current_iterator->second));
 	}
 
-	visitor.visit(*const_cast<PyDictValues *>(&m_pydictvalues));
+	visitor.visit(const_cast<PyDictValues &>(m_pydictvalues->get()));
 }
 
 std::string PyDictValueIterator::to_string() const
@@ -823,7 +853,7 @@ PyResult<PyObject *> PyDictValueIterator::__repr__() const { return PyString::cr
 
 PyResult<PyObject *> PyDictValueIterator::__next__()
 {
-	if (m_current_iterator != m_pydictvalues.m_pydict.map().end()) {
+	if (m_current_iterator != m_pydictvalues->get().m_pydict->get().map().end()) {
 		const auto &value = m_current_iterator->second;
 		m_current_iterator++;
 		return PyObject::from(value);
@@ -833,7 +863,8 @@ PyResult<PyObject *> PyDictValueIterator::__next__()
 
 bool PyDictValueIterator::operator==(const PyDictValueIterator &other) const
 {
-	return &m_pydictvalues == &other.m_pydictvalues
+	return m_pydictvalues.has_value() && other.m_pydictvalues.has_value()
+		   && &m_pydictvalues->get() == &other.m_pydictvalues->get()
 		   && m_current_iterator == other.m_current_iterator;
 }
 
@@ -849,7 +880,7 @@ PyObject *PyDictValueIterator::operator*() const
 	return PyObject::from(value).unwrap();
 }
 
-PyType *PyDictValueIterator::type() const { return dict_value_iterator(); }
+PyType *PyDictValueIterator::static_type() const { return dict_value_iterator(); }
 
 namespace {
 

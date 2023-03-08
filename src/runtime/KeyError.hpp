@@ -14,6 +14,8 @@ class KeyError : public Exception
 	friend BaseException *key_error(const std::string &message, Args &&... args);
 
   private:
+	KeyError(PyType *type);
+
 	KeyError(PyTuple *args);
 
   public:
@@ -22,7 +24,7 @@ class KeyError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<typename... Args>

@@ -21,6 +21,8 @@ class PyModule : public PyBaseObject
 
 	std::shared_ptr<Program> m_program;
 
+	PyModule(PyType *);
+
   public:
 	PyModule(PyDict *symbol_table, PyString *module_name, PyObject *doc);
 
@@ -43,7 +45,7 @@ class PyModule : public PyBaseObject
 	PyString *name() const { return m_module_name; }
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	void set_program(std::shared_ptr<Program> program);
 

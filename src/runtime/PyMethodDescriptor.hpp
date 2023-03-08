@@ -10,10 +10,12 @@ class PyMethodDescriptor : public PyBaseObject
 {
 	PyString *m_name{ nullptr };
 	PyType *m_underlying_type{ nullptr };
-	MethodDefinition &m_method;
+	std::optional<std::reference_wrapper<MethodDefinition>> m_method;
 	std::vector<PyObject *> m_captures;
 
 	friend class ::Heap;
+
+	PyMethodDescriptor(PyType *);
 
 	PyMethodDescriptor(PyString *name,
 		PyType *underlying_type,
@@ -36,7 +38,11 @@ class PyMethodDescriptor : public PyBaseObject
 
 	PyString *name() { return m_name; }
 
-	const MethodDefinition &method_descriptor() const { return m_method; }
+	const MethodDefinition &method_descriptor() const
+	{
+		ASSERT(m_method);
+		return m_method->get();
+	}
 
 	std::string to_string() const override;
 
@@ -47,7 +53,7 @@ class PyMethodDescriptor : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

@@ -11,6 +11,8 @@ class PyStaticMethod : public PyBaseObject
 
 	friend class ::Heap;
 
+	PyStaticMethod(PyType *);
+
 	PyStaticMethod(PyType *underlying_type, PyObject *function);
 
   public:
@@ -26,7 +28,7 @@ class PyStaticMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

@@ -12,9 +12,11 @@ class AssertionError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *assertion_error(const std::string &message, Args &&... args);
+	friend BaseException *assertion_error(const std::string &message, Args &&...args);
 
   private:
+	AssertionError(PyType *t);
+
 	AssertionError(PyTuple *args);
 
 	static PyResult<AssertionError *> create(PyTuple *args)
@@ -30,7 +32,7 @@ class AssertionError : public Exception
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	static PyType *this_type();
 
@@ -38,7 +40,7 @@ class AssertionError : public Exception
 };
 
 template<typename... Args>
-inline BaseException *assertion_error(const std::string &message, Args &&... args)
+inline BaseException *assertion_error(const std::string &message, Args &&...args)
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));

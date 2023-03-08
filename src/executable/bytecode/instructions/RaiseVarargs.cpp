@@ -29,7 +29,7 @@ PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 				return obj;
 			}
 		}
-		if (!exception_obj->type()->issubclass(BaseException::static_type())) {
+		if (!exception_obj->type()->issubclass(BaseException::class_type())) {
 			return Err(type_error("exceptions must derive from BaseException"));
 		}
 		return Err(static_cast<BaseException *>(exception_obj));

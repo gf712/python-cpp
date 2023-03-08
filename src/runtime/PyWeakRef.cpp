@@ -12,6 +12,8 @@ namespace {
 	static PyType *s_weak_ref = nullptr;
 }
 
+PyWeakRef::PyWeakRef(PyType *type) : PyBaseObject(type) {}
+
 PyWeakRef::PyWeakRef(PyObject *object, PyObject *callback)
 	: PyBaseObject(s_weak_ref), m_object(object), m_callback(callback)
 {}

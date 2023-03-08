@@ -19,6 +19,8 @@ template<> const PyCoroutine *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyCoroutine::PyCoroutine(PyType *type) : GeneratorInterface(type) {}
+
 PyCoroutine::PyCoroutine(PyFrame *frame,
 	std::unique_ptr<StackFrame> &&stack_frame,
 	bool is_running,
@@ -67,7 +69,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyCoroutine::type_factory()
 	};
 }
 
-PyType *PyCoroutine::type() const { return coroutine(); }
+PyType *PyCoroutine::static_type() const { return coroutine(); }
 
 void PyCoroutine::visit_graph(Visitor &visitor)
 {

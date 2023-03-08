@@ -22,6 +22,8 @@ template<> const KeyError *as(const PyObject *obj)
 	return nullptr;
 }
 
+KeyError::KeyError(PyType *type) : Exception(type) {}
+
 KeyError::KeyError(PyTuple *args) : Exception(s_key_error->underlying_type(), args) {}
 
 PyResult<KeyError *> KeyError::create(PyTuple *args)
@@ -39,7 +41,7 @@ PyResult<PyObject *> KeyError::__new__(const PyType *type, PyTuple *args, PyDict
 	return KeyError::create(args);
 }
 
-PyType *KeyError::type() const
+PyType *KeyError::static_type() const
 {
 	ASSERT(s_key_error)
 	return s_key_error;

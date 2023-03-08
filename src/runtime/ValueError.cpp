@@ -15,13 +15,14 @@ template<> ValueError *as(PyObject *obj)
 	return nullptr;
 }
 
-
 template<> const ValueError *as(const PyObject *obj)
 {
 	ASSERT(s_value_error)
 	if (obj->type() == s_value_error) { return static_cast<const ValueError *>(obj); }
 	return nullptr;
 }
+
+ValueError::ValueError(PyType *type) : Exception(type) {}
 
 ValueError::ValueError(PyTuple *args) : Exception(s_value_error->underlying_type(), args) {}
 
@@ -40,13 +41,13 @@ PyResult<PyObject *> ValueError::__new__(const PyType *type, PyTuple *args, PyDi
 	return ValueError::create(args);
 }
 
-PyType *ValueError::type() const
+PyType *ValueError::static_type() const
 {
 	ASSERT(s_value_error)
 	return s_value_error;
 }
 
-PyType *ValueError::static_type()
+PyType *ValueError::class_type()
 {
 	ASSERT(s_value_error)
 	return s_value_error;

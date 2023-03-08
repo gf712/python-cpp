@@ -12,6 +12,8 @@ namespace itertools {
 		BigIntType m_step{ 1 };
 		std::optional<BigIntType> m_counter;
 
+		ISlice(PyType *);
+
 		ISlice(PyObject *iterator,
 			BigIntType start,
 			std::optional<BigIntType> stop,

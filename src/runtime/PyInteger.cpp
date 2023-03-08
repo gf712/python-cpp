@@ -23,6 +23,7 @@ template<> const PyInteger *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyInteger::PyInteger(PyType *type) : Interface(type) {}
 
 PyInteger::PyInteger(BigIntType value)
 	: Interface(Number{ std::move(value) }, BuiltinTypes::the().integer())
@@ -256,7 +257,7 @@ BigIntType PyInteger::as_big_int() const
 	return std::get<BigIntType>(m_value.value);
 }
 
-PyType *PyInteger::type() const { return integer(); }
+PyType *PyInteger::static_type() const { return integer(); }
 
 namespace {
 

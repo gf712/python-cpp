@@ -38,6 +38,8 @@ namespace {
 		long m_st_ctime_nsec;
 
 	  private:
+		PyStatResult(PyType *type) : PyBaseObject(type->underlying_type()) {}
+
 		PyStatResult(std::unique_ptr<struct stat> &&stat_)
 			: PyBaseObject(s_stat_result->underlying_type())
 		{
@@ -94,7 +96,7 @@ namespace {
 
 		PyResult<PyObject *> __repr__() const { return PyString::create(to_string()); }
 
-		PyType *type() const final
+		PyType *static_type() const final
 		{
 			ASSERT(s_stat_result)
 			return s_stat_result;

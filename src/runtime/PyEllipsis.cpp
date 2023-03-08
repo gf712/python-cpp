@@ -7,6 +7,8 @@
 
 using namespace py;
 
+PyEllipsis::PyEllipsis(PyType *type) : PyBaseObject(type) {}
+
 PyEllipsis::PyEllipsis() : PyBaseObject(BuiltinTypes::the().ellipsis()) {}
 
 PyResult<PyEllipsis *> PyEllipsis::create()
@@ -21,7 +23,7 @@ PyResult<PyObject *> PyEllipsis::__add__(const PyObject *) const { TODO(); }
 
 PyResult<PyObject *> PyEllipsis::__repr__() const { return PyString::create("Ellipsis"); }
 
-PyType *PyEllipsis::type() const { return ellipsis(); }
+PyType *PyEllipsis::static_type() const { return ellipsis(); }
 
 PyObject *py::py_ellipsis()
 {

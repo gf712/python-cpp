@@ -350,7 +350,7 @@ template<> PyResult<PyObject *> PyObject::from(const Value &value)
 
 PyObject::PyObject(const TypePrototype &type) : Cell(), m_type(type) {}
 
-PyObject::PyObject(PyType *type) : Cell(), m_type(type) {}
+PyObject::PyObject(PyType *type) : Cell(), m_type(type) { ASSERT(type); }
 
 const TypePrototype &PyObject::type_prototype() const
 {
@@ -968,7 +968,7 @@ PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
 	auto *name = as<PyString>(attribute);
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::static_type()) {
+	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::class_type()) {
 		return descriptor_;
 	}
 
@@ -1038,7 +1038,7 @@ std::tuple<PyResult<PyObject *>, LookupAttrResult> PyObject::lookup_attribute(Py
 	}();
 
 	if (std::get<0>(result).is_err()
-		&& (std::get<0>(result).unwrap_err()->type() == AttributeError::static_type())) {
+		&& (std::get<0>(result).unwrap_err()->type() == AttributeError::class_type())) {
 		return { Ok(py_none()), LookupAttrResult::NOT_FOUND };
 	} else if (std::get<0>(result).is_err()) {
 		return { std::get<0>(result), LookupAttrResult::NOT_FOUND };
@@ -1061,7 +1061,7 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 	}
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::static_type()) {
+	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::class_type()) {
 		return descriptor_;
 	}
 
@@ -1164,10 +1164,7 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 			}
 		}
 	}
-	// FIXME: if custom allocators are ever added, should call the type's allocator here
-	auto *obj = VirtualMachine::the().heap().allocate<CustomPyObject>(type);
-	if (!obj) { return Err(memory_error(sizeof(CustomPyObject))); }
-	return Ok(obj);
+	return type->underlying_type().__alloc__(const_cast<PyType *>(type));
 }
 
 PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
@@ -1211,6 +1208,16 @@ std::string PyObject::to_string() const
 }
 
 PyType *PyObject::type() const
+{
+	if (std::holds_alternative<std::reference_wrapper<const py::TypePrototype>>(m_type)) {
+		return static_type();
+	} else {
+		ASSERT(std::holds_alternative<PyType *>(m_type));
+		return std::get<PyType *>(m_type);
+	}
+}
+
+PyType *PyObject::static_type() const
 {
 	ASSERT(
 		std::holds_alternative<PyType *>(m_type) && "Static types should overload PyObject::type!");

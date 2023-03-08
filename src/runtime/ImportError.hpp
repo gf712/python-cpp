@@ -14,6 +14,8 @@ class ImportError : public Exception
 	friend BaseException *import_error(const std::string &message, Args &&...args);
 
   protected:
+	ImportError(PyType *);
+
 	ImportError(PyType *, PyTuple *args);
 
   private:
@@ -30,9 +32,9 @@ class ImportError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	static PyType* static_type();
+	static PyType *class_type();
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 

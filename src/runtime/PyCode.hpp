@@ -48,6 +48,8 @@ class PyCode : public PyBaseObject
 
 	std::shared_ptr<Program> m_program;
 
+	PyCode(PyType *);
+
 	PyCode(std::unique_ptr<Function> &&function,
 		std::vector<size_t> &&cell2arg,
 		size_t arg_count,
@@ -111,7 +113,7 @@ class PyCode : public PyBaseObject
 	const std::shared_ptr<Program> &program() const { return m_program; }
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
 	void visit_graph(Visitor &) override;
 

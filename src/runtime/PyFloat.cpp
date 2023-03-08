@@ -18,6 +18,8 @@ template<> const PyFloat *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyFloat::PyFloat(PyType *type) : PyNumber(type) {}
+
 PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
 
 PyResult<PyObject *> PyFloat::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -54,7 +56,7 @@ PyResult<PyFloat *> PyFloat::create(double value)
 	return Ok(obj);
 }
 
-PyType *PyFloat::type() const { return float_(); }
+PyType *PyFloat::static_type() const { return float_(); }
 
 double PyFloat::as_f64() const
 {

@@ -11,6 +11,8 @@ class PyGenericAlias : public PyBaseObject
 	PyTuple *m_args{ nullptr };
 	PyObject *m_parameters{ nullptr };
 
+	PyGenericAlias(PyType *type);
+
 	PyGenericAlias(PyObject *origin, PyTuple *args, PyObject *parameters);
 
   public:
@@ -23,7 +25,7 @@ class PyGenericAlias : public PyBaseObject
 	std::string to_string() const override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 	void visit_graph(Visitor &visitor) override;
 };
 }// namespace py

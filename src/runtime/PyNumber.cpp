@@ -11,6 +11,8 @@
 
 using namespace py;
 
+PyNumber::PyNumber(PyType *type) : PyBaseObject(type) {}
+
 std::string PyNumber::to_string() const { return m_value.to_string(); }
 
 PyResult<PyObject *> PyNumber::__repr__() const { return PyString::create(to_string()); }

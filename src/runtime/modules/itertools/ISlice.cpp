@@ -12,6 +12,8 @@ namespace {
 }
 
 namespace itertools {
+	ISlice::ISlice(PyType *type) : PyBaseObject(type) {}
+
 	ISlice::ISlice(PyObject *iterator,
 		BigIntType start,
 		std::optional<BigIntType> stop,

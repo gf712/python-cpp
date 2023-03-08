@@ -188,6 +188,10 @@ std::vector<PyObject *> mro_(PyType *type)
 	return mro_types;
 }
 
+PyType::PyType(PyType *type)
+	: PyBaseObject(type), m_underlying_type(type->underlying_type()),
+	  m_metaclass(BuiltinTypes::the().type())
+{}
 
 PyType::PyType(TypePrototype &type_prototype)
 	: PyBaseObject(BuiltinTypes::the().type()), m_underlying_type(type_prototype),
@@ -211,7 +215,7 @@ PyResult<PyType *> PyType::create(PyType *type)
 	return Ok(new_type);
 }
 
-PyType *PyType::type() const
+PyType *PyType::static_type() const
 {
 	if (&underlying_type() == &BuiltinTypes::the().type()) {
 		return const_cast<PyType *>(this);// :(
@@ -313,7 +317,7 @@ PyResult<PyObject *> PyType::__getattribute__(PyObject *attribute) const
 	}
 
 	auto meta_attr_ = type()->lookup(name);
-	if (meta_attr_.is_err() && meta_attr_.unwrap_err()->type() != AttributeError::static_type()) {
+	if (meta_attr_.is_err() && meta_attr_.unwrap_err()->type() != AttributeError::class_type()) {
 		return meta_attr_;
 	}
 	if (meta_attr_.is_ok()) {
@@ -359,6 +363,32 @@ PyResult<PyObject *> PyType::lookup(PyObject *name) const
 	return Err(attribute_error("INTERNAL EXCEPTION: type object '{}' does not have attribute '{}'",
 		to_string(),
 		name->to_string()));
+}
+
+PyResult<PyObject *> PyType::heap_object_allocation(PyType *type)
+{
+	return type->mro()
+		.and_then([type](PyList *mro) -> PyResult<PyObject *> {
+			for (const auto &el : mro->elements()) {
+				ASSERT(std::holds_alternative<PyObject *>(el));
+				ASSERT(as<PyType>(std::get<PyObject *>(el)));
+				auto *t = as<PyType>(std::get<PyObject *>(el));
+				if (!t->underlying_type().is_heaptype) {
+					return t->underlying_type().__alloc__(type);
+				}
+			}
+			return object()->underlying_type().__alloc__(type);
+		})
+		.and_then([](PyObject *obj) -> PyResult<PyObject *> {
+			if (!obj->attributes()) {
+				if (auto dict = PyDict::create(); dict.is_ok()) {
+					obj->m_attributes = dict.unwrap();
+				} else {
+					return dict;
+				}
+			}
+			return Ok(obj);
+		});
 }
 
 void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns)
@@ -482,6 +512,7 @@ void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, P
 		}
 	}
 
+	underlying_type().__alloc__ = &PyType::heap_object_allocation;
 	auto result = ready();
 	ASSERT(result.is_ok());
 
@@ -1245,17 +1276,36 @@ namespace {
 		ASSERT(descr);
 		if (auto slot_wrapper = as<PySlotWrapper>(descr)) {
 			auto slotdef = resolve_slotdups(type, slot.name);
-			ASSERT(slotdef.has_value());
-			ASSERT(&slotdef->get() == &slot);
-			if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type());
-				!s.has_value()) {
-				// if we don't have a specific slot we get the wrapper from descriptor we found in
-				// the MRO
+			if (!slotdef.has_value()) {
+				generic = PyNativeFunction::create(
+					std::string{ slot.name },
+					[slot_wrapper](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						std::vector<Value> new_args_vector;
+						new_args_vector.reserve(args->size() - 1);
+						auto self_ = PyObject::from(args->elements()[0]);
+						if (self_.is_err()) return self_;
+						auto *self = self_.unwrap();
+						for (size_t i = 1; i < args->size(); ++i) {
+							new_args_vector.push_back(args->elements()[i]);
+						}
+						auto args_ = PyTuple::create(new_args_vector);
+						if (args_.is_err()) return args_;
+						args = args_.unwrap();
+						return slot_wrapper->slot()(self, args, kwargs);
+					},
+					slot_wrapper)
+							  .unwrap();
+				use_generic = true;
+			} else if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type());
+					   !s.has_value()) {
+				// if we don't have a specific slot we get the wrapper from descriptor we found
+				// in the MRO
 				generic = slot_wrapper->base().get().get_member(
 					slot_wrapper->base_type()->underlying_type());
 				use_generic = true;
 			} else {
 				specific = *s;
+				use_generic = false;
 			}
 		} else if (auto fn = as<PyNativeFunction>(descr);
 				   fn && (fn->method_pointer().has_value() && *fn->method_pointer() == &new_wrapper)

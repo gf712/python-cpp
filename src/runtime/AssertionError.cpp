@@ -7,6 +7,8 @@ using namespace py;
 
 static PyType *s_assertion_error = nullptr;
 
+AssertionError::AssertionError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+
 AssertionError::AssertionError(PyTuple *args)
 	: Exception(s_assertion_error->underlying_type(), args)
 {}
@@ -22,7 +24,7 @@ PyResult<PyObject *> AssertionError::__new__(const PyType *type, PyTuple *args, 
 	}
 }
 
-PyType *AssertionError::type() const
+PyType *AssertionError::static_type() const
 {
 	ASSERT(s_assertion_error)
 	return s_assertion_error;

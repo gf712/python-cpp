@@ -26,7 +26,6 @@ template<> PyString *as(PyObject *obj)
 	return nullptr;
 }
 
-
 template<> const PyString *as(const PyObject *obj)
 {
 	if (obj->type() == str()) { return static_cast<const PyString *>(obj); }
@@ -83,6 +82,8 @@ namespace utf8 {
 	}
 
 }// namespace utf8
+
+PyString::PyString(PyType *type) : PyBaseObject(type) {}
 
 PyResult<PyString *> PyString::create(const std::string &value)
 {
@@ -871,7 +872,7 @@ std::optional<int32_t> PyString::codepoint() const
 	}
 }
 
-PyType *PyString::type() const { return py::str(); }
+PyType *PyString::static_type() const { return py::str(); }
 
 PyResult<PyObject *> PyString::__iter__() const
 {
@@ -996,7 +997,7 @@ PyResult<PyObject *> PyStringIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyStringIterator::type() const { return list_iterator(); }
+PyType *PyStringIterator::static_type() const { return list_iterator(); }
 
 namespace {
 

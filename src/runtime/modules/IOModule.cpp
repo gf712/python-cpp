@@ -46,7 +46,7 @@ Exception *unsupported_operation(PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(s_unsupported_operation_type);
 	auto *obj = s_unsupported_operation_type->call(args, kwargs).unwrap();
-	ASSERT(obj->type()->issubclass(Exception::static_type()));
+	ASSERT(obj->type()->issubclass(Exception::class_type()));
 	return static_cast<Exception *>(obj);
 }
 
@@ -339,7 +339,7 @@ class IOBase : public PyBaseObject
 
 	PyObject *dict() const { return m_attributes; }
 
-	PyType *type() const override { return s_io_base; }
+	PyType *static_type() const override { return s_io_base; }
 
 	PyResult<PyObject *> __enter__(PyTuple *, PyDict *)
 	{
@@ -511,7 +511,7 @@ class RawIOBase : public PyBaseObject
 		return IOBase::create(type);
 	}
 
-	PyType *type() const override { return s_io_raw_iobase; }
+	PyType *static_type() const override { return s_io_raw_iobase; }
 
 	PyResult<PyObject *> read(int64_t n)
 	{
@@ -683,7 +683,7 @@ class BufferedIOBase : public IOBase
 		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
 	}
 
-	PyType *type() const override { return s_io_buffered_io_base; }
+	PyType *static_type() const override { return s_io_buffered_io_base; }
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -1207,9 +1207,9 @@ class BufferedReader
 		return s_io_buffered_reader;
 	}
 
-	PyType *type() const override { return s_io_buffered_reader; }
+	PyType *static_type() const override { return s_io_buffered_reader; }
 
-	static PyType *static_type() { return s_io_buffered_reader; }
+	static PyType *class_type() { return s_io_buffered_reader; }
 
 	void visit_graph(Visitor &visitor) override
 	{
@@ -1322,9 +1322,9 @@ class BufferedWriter
 		return s_io_buffered_writer;
 	}
 
-	PyType *type() const override { return s_io_buffered_writer; }
+	PyType *static_type() const override { return s_io_buffered_writer; }
 
-	static PyType *static_type() { return s_io_buffered_writer; }
+	static PyType *class_type() { return s_io_buffered_writer; }
 
 	void visit_graph(Visitor &visitor) override
 	{
@@ -1335,13 +1335,13 @@ class BufferedWriter
 
 template<> BufferedReader *as(PyObject *obj)
 {
-	if (obj->type() == BufferedReader::static_type()) { return static_cast<BufferedReader *>(obj); }
+	if (obj->type() == BufferedReader::class_type()) { return static_cast<BufferedReader *>(obj); }
 	return nullptr;
 }
 
 template<> const BufferedReader *as(const PyObject *obj)
 {
-	if (obj->type() == BufferedReader::static_type()) {
+	if (obj->type() == BufferedReader::class_type()) {
 		return static_cast<const BufferedReader *>(obj);
 	}
 	return nullptr;
@@ -1349,13 +1349,13 @@ template<> const BufferedReader *as(const PyObject *obj)
 
 template<> BufferedWriter *as(PyObject *obj)
 {
-	if (obj->type() == BufferedWriter::static_type()) { return static_cast<BufferedWriter *>(obj); }
+	if (obj->type() == BufferedWriter::class_type()) { return static_cast<BufferedWriter *>(obj); }
 	return nullptr;
 }
 
 template<> const BufferedWriter *as(const PyObject *obj)
 {
-	if (obj->type() == BufferedWriter::static_type()) {
+	if (obj->type() == BufferedWriter::class_type()) {
 		return static_cast<const BufferedWriter *>(obj);
 	}
 	return nullptr;
@@ -1421,13 +1421,13 @@ class BufferedRWPair : public BufferedIOBase
 			return Err(writable.unwrap_err());
 		}
 
-		auto reader_ = BufferedReader::static_type()->call(
+		auto reader_ = BufferedReader::class_type()->call(
 			PyTuple::create(reader, buffer_size).unwrap(), nullptr);
 		if (reader_.is_err()) return Err(reader_.unwrap_err());
 		m_reader = as<BufferedReader>(reader_.unwrap());
 		ASSERT(m_reader);
 
-		auto writer_ = BufferedWriter::static_type()->call(
+		auto writer_ = BufferedWriter::class_type()->call(
 			PyTuple::create(writer, buffer_size).unwrap(), nullptr);
 		if (writer_.is_err()) return Err(writer_.unwrap_err());
 		m_writer = as<BufferedWriter>(writer_.unwrap());
@@ -1532,7 +1532,7 @@ class BufferedRWPair : public BufferedIOBase
 		return s_io_buffered_rwpair;
 	}
 
-	PyType *type() const override { return s_io_buffered_rwpair; }
+	PyType *static_type() const override { return s_io_buffered_rwpair; }
 
 	void visit_graph(Visitor &visitor) override
 	{
@@ -1671,9 +1671,9 @@ class BufferedRandom
 		return s_io_buffered_random;
 	}
 
-	PyType *type() const override { return s_io_buffered_random; }
+	PyType *static_type() const override { return s_io_buffered_random; }
 
-	static PyType *static_type() { return s_io_buffered_random; }
+	static PyType *class_type() { return s_io_buffered_random; }
 
 	void visit_graph(Visitor &visitor) override
 	{
@@ -1768,7 +1768,7 @@ class BytesIO : public BufferedIOBase
 
 	PyResult<PyObject *> read1(int64_t n) { return read(n); }
 
-	PyType *type() const override { return s_io_bytesio; }
+	PyType *static_type() const override { return s_io_bytesio; }
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -1969,7 +1969,7 @@ class FileIO : public RawIOBase
 
 	PyResult<PyObject *> __repr__() const { return PyString::create(to_string()); }
 
-	PyType *type() const override { return s_io_fileio; }
+	PyType *static_type() const override { return s_io_fileio; }
 
 	PyResult<PyObject *> readall()
 	{
@@ -2237,7 +2237,7 @@ class TextIOBase : public IOBase
 		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
 	}
 
-	PyType *type() const override { return s_io_textiobase; }
+	PyType *static_type() const override { return s_io_textiobase; }
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -2403,7 +2403,7 @@ class StringIO : public TextIOBase
 		return init(as<PyString>(initial_value), as<PyString>(newline));
 	}
 
-	PyType *type() const override { return s_io_stringio; }
+	PyType *static_type() const override { return s_io_stringio; }
 
 	PyResult<PyObject *> readable() const
 	{
@@ -2801,7 +2801,7 @@ class TextIOWrapper : public TextIOBase
 			write_through == py_true());
 	}
 
-	PyType *type() const override { return s_io_textiowrapper; }
+	PyType *static_type() const override { return s_io_textiowrapper; }
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -2873,6 +2873,8 @@ class BlockingIOError : public OSError
 	friend class ::Heap;
 
   private:
+	BlockingIOError(PyType *t) : OSError(t) {}
+
 	BlockingIOError(PyTuple *args) : OSError(s_blocking_io_error, args) {}
 
 	static BlockingIOError *create(PyTuple *args)
@@ -2895,7 +2897,7 @@ class BlockingIOError : public OSError
 	{
 		if (!s_blocking_io_error) {
 			s_blocking_io_error =
-				klass<BlockingIOError>(module, "BlockingIOError", OSError::static_type())
+				klass<BlockingIOError>(module, "BlockingIOError", OSError::class_type())
 					.finalize();
 		} else {
 			module->add_symbol(PyString::create("BlockingIOError").unwrap(), s_blocking_io_error);
@@ -2903,7 +2905,7 @@ class BlockingIOError : public OSError
 		return s_blocking_io_error;
 	}
 
-	PyType *type() const override
+	PyType *static_type() const override
 	{
 		ASSERT(s_blocking_io_error);
 		return s_blocking_io_error;
@@ -2964,7 +2966,7 @@ PyModule *io_module()
 	// >> type("UnsupportedOperation", (_io.OSError, ValueError), {})
 	auto unsupported_operation_type = type()->call(
 		PyTuple::create(PyString::create("UnsupportedOperation").unwrap(),
-			PyTuple::create(OSError::static_type(), ValueError::static_type()).unwrap(),
+			PyTuple::create(OSError::class_type(), ValueError::class_type()).unwrap(),
 			PyDict::create().unwrap())
 			.unwrap(),
 		PyDict::create().unwrap());

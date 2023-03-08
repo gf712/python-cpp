@@ -21,6 +21,8 @@ template<> const PyNamespace *as(const PyObject *obj)
 }
 
 
+PyNamespace::PyNamespace(PyType *type) : PyBaseObject(type) {}
+
 PyNamespace::PyNamespace(PyDict *dict)
 	: PyBaseObject(BuiltinTypes::the().namespace_()), m_dict(dict)
 {
@@ -107,7 +109,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyNamespace::type_factory()
 	};
 }
 
-PyType *PyNamespace::type() const { return namespace_(); }
+PyType *PyNamespace::static_type() const { return namespace_(); }
 
 std::string PyNamespace::to_string() const
 {

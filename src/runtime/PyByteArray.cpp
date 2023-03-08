@@ -8,6 +8,8 @@
 #include "vm/VM.hpp"
 
 namespace py {
+PyByteArray::PyByteArray(PyType *type) : PyBaseObject(type) {}
+
 PyByteArray::PyByteArray(const Bytes &value)
 	: PyBaseObject(BuiltinTypes::the().bytearray()), m_value(value)
 {}
@@ -123,7 +125,9 @@ std::function<std::unique_ptr<TypePrototype>()> PyByteArray::type_factory()
 	};
 }
 
-PyType *PyByteArray::type() const { return bytearray(); }
+PyType *PyByteArray::static_type() const { return bytearray(); }
+
+PyByteArrayIterator::PyByteArrayIterator(PyType *type) : PyBaseObject(type) {}
 
 PyByteArrayIterator::PyByteArrayIterator(PyByteArray *bytes, size_t index)
 	: PyBaseObject(BuiltinTypes::the().bytearray_iterator()), m_bytes(bytes), m_index(index)
@@ -170,7 +174,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyByteArrayIterator::type_factor
 	};
 }
 
-PyType *PyByteArrayIterator::type() const { return bytearray_iterator(); }
+PyType *PyByteArrayIterator::static_type() const { return bytearray_iterator(); }
 
 void PyByteArrayIterator::visit_graph(Visitor &visitor)
 {

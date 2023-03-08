@@ -7,9 +7,11 @@ using namespace py;
 
 static PyType *s_name_error = nullptr;
 
+NameError::NameError(PyType *type) : Exception(type) {}
+
 NameError::NameError(PyTuple *args) : Exception(s_name_error->underlying_type(), args) {}
 
-PyType *NameError::type() const
+PyType *NameError::static_type() const
 {
 	ASSERT(s_name_error)
 	return s_name_error;

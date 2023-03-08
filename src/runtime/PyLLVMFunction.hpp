@@ -19,11 +19,13 @@ class PyLLVMFunction : public PyBaseObject
 	FunctionType m_function;
 	std::vector<PyObject *> m_captures;
 
+	PyLLVMFunction(PyType *);
+
 	PyLLVMFunction(std::string &&name, FunctionType &&function);
 
 	// TODO: fix tracking of lambda captures
 	template<typename... Args>
-	PyLLVMFunction(std::string &&name, FunctionType &&function, Args &&... args)
+	PyLLVMFunction(std::string &&name, FunctionType &&function, Args &&...args)
 		: PyLLVMFunction(std::move(name), std::move(function))
 	{
 		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
@@ -32,7 +34,7 @@ class PyLLVMFunction : public PyBaseObject
   public:
 	template<typename... Args>
 	static PyResult<PyLLVMFunction *>
-		create(std::string name, FunctionType &&function, Args &&... args)
+		create(std::string name, FunctionType &&function, Args &&...args)
 	{
 		auto *result = VirtualMachine::the().heap().allocate<PyLLVMFunction>(
 			std::move(name), std::move(function), std::forward<Args>(args)...);
@@ -55,6 +57,6 @@ class PyLLVMFunction : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 }// namespace py

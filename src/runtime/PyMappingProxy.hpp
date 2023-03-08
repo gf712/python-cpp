@@ -10,6 +10,8 @@ class PyMappingProxy : public PyBaseObject
 	PyObject *m_mapping{ nullptr };
 
   private:
+	PyMappingProxy(PyType *);
+
 	PyMappingProxy(PyObject *mapping);
 
   public:
@@ -23,6 +25,6 @@ class PyMappingProxy : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 }// namespace py

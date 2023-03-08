@@ -7,6 +7,8 @@
 
 using namespace py;
 
+PyBoundMethod::PyBoundMethod(PyType *type) : PyBaseObject(type) {}
+
 PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
 	: PyBaseObject(BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
 {}
@@ -49,7 +51,7 @@ PyResult<PyObject *> PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
 	return m_method->call(args_.unwrap(), kwargs);
 }
 
-PyType *PyBoundMethod::type() const { return bound_method(); }
+PyType *PyBoundMethod::static_type() const { return bound_method(); }
 
 namespace {
 

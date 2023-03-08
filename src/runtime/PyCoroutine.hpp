@@ -7,6 +7,8 @@ class PyCoroutine : public GeneratorInterface<PyCoroutine>
 {
 	friend ::Heap;
 
+	PyCoroutine(PyType *);
+
 	PyCoroutine(PyFrame *m_frame,
 		std::unique_ptr<StackFrame> &&,
 		bool is_running,
@@ -22,7 +24,7 @@ class PyCoroutine : public GeneratorInterface<PyCoroutine>
 		create(PyFrame *frame, std::unique_ptr<StackFrame> &&, PyString *name, PyString *qualname);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 	void visit_graph(Visitor &visitor) override;
 };
 }// namespace py

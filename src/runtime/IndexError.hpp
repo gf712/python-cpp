@@ -16,6 +16,8 @@ class IndexError : public LookupError
 	friend BaseException *index_error(const std::string &message, Args &&...args);
 
   private:
+	IndexError(PyType *type);
+
 	IndexError(PyTuple *msg);
 
 	static IndexError *create(PyTuple *args)
@@ -29,8 +31,8 @@ class IndexError : public LookupError
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
-	PyType *type() const override;
-	static PyType *static_type();
+	PyType *static_type() const override;
+	static PyType *class_type();
 };
 
 template<typename... Args>

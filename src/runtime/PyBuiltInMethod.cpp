@@ -19,6 +19,8 @@ template<> const PyBuiltInMethod *as(const PyObject *node)
 	return nullptr;
 }
 
+PyBuiltInMethod::PyBuiltInMethod(PyType *type) : PyBaseObject(type) {}
+
 PyBuiltInMethod::PyBuiltInMethod(MethodDefinition &method_definition, PyObject *self)
 	: PyBaseObject(BuiltinTypes::the().builtin_method()), m_ml(method_definition), m_self(self)
 {}
@@ -31,8 +33,10 @@ void PyBuiltInMethod::visit_graph(Visitor &visitor)
 
 std::string PyBuiltInMethod::to_string() const
 {
+	ASSERT(m_ml);
+
 	return fmt::format("<built-in method '{}' of '{}' object at {}>",
-		m_ml.name,
+		m_ml->get().name,
 		m_self->type()->name(),
 		static_cast<const void *>(this));
 }
@@ -41,10 +45,12 @@ PyResult<PyObject *> PyBuiltInMethod::__repr__() const { return PyString::create
 
 PyResult<PyObject *> PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
 {
-	if (m_ml.flags.flags() == MethodFlags::create().flags()) {
-		return m_ml.method(m_self, args, kwargs);
-	} else if (m_ml.flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
-		return m_ml.method(m_self->type(), args, kwargs);
+	ASSERT(m_ml);
+
+	if (m_ml->get().flags.flags() == MethodFlags::create().flags()) {
+		return m_ml->get().method(m_self, args, kwargs);
+	} else if (m_ml->get().flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
+		return m_ml->get().method(m_self->type(), args, kwargs);
 	} else {
 		TODO();
 	}
@@ -58,7 +64,7 @@ PyResult<PyBuiltInMethod *> PyBuiltInMethod::create(MethodDefinition &method_def
 	return Ok(obj);
 }
 
-PyType *PyBuiltInMethod::type() const { return py::builtin_method(); }
+PyType *PyBuiltInMethod::static_type() const { return py::builtin_method(); }
 
 namespace {
 

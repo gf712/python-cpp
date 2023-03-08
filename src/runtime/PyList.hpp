@@ -10,6 +10,8 @@ class PyList : public PyBaseObject
 
 	std::vector<Value> m_elements;
 
+	PyList(PyType *);
+
   public:
 	static PyResult<PyList *> create(std::vector<Value> elements);
 	static PyResult<PyList *> create();
@@ -41,7 +43,7 @@ class PyList : public PyBaseObject
 	void sort();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyList();
@@ -67,7 +69,7 @@ class PyListIterator : public PyBaseObject
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 class PyListReverseIterator : public PyBaseObject
@@ -78,6 +80,8 @@ class PyListReverseIterator : public PyBaseObject
 	size_t m_current_index{ 0 };
 
   private:
+	PyListReverseIterator(PyType *);
+
 	PyListReverseIterator(PyList &pylist, size_t start_index);
 
   public:
@@ -89,7 +93,7 @@ class PyListReverseIterator : public PyBaseObject
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

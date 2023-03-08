@@ -10,12 +10,14 @@ class PyReversed : public PyBaseObject
 	PyObject *m_sequence{ nullptr };
 
   private:
+	PyReversed(PyType *type);
+
 	PyReversed(PyObject *sequence);
 
   public:
-    // can return an object that is not PyReversed, if the sequence implements __reversed__
+	// can return an object that is not PyReversed, if the sequence implements __reversed__
 	static PyResult<PyObject *> create(PyObject *sequence);
-    static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __next__();
@@ -23,6 +25,6 @@ class PyReversed : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 }// namespace py

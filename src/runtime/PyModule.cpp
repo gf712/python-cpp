@@ -18,6 +18,8 @@
 
 using namespace py;
 
+PyModule::PyModule(PyType *type) : PyBaseObject(type) {}
+
 PyModule::PyModule(PyDict *symbol_table, PyString *module_name, PyObject *doc)
 	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(module_name), m_doc(doc)
 {
@@ -105,7 +107,7 @@ bool is_initializing(PyObject *spec)
 PyResult<PyObject *> PyModule::__getattribute__(PyObject *attribute) const
 {
 	auto attr = PyObject::__getattribute__(attribute);
-	if (attr.is_ok() || attr.unwrap_err()->type() != AttributeError::static_type()) { return attr; }
+	if (attr.is_ok() || attr.unwrap_err()->type() != AttributeError::class_type()) { return attr; }
 
 	String getattr_str{ "__getattr__" };
 	String name_str{ "__name__" };
@@ -167,7 +169,7 @@ PyResult<PyModule *> PyModule::create(PyDict *symbol_table, PyString *module_nam
 	return Ok(result);
 }
 
-PyType *PyModule::type() const { return module(); }
+PyType *PyModule::static_type() const { return module(); }
 
 void PyModule::set_program(std::shared_ptr<Program> program) { m_program = std::move(program); }
 

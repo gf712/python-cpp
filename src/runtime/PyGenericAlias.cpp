@@ -21,6 +21,8 @@ template<> const PyGenericAlias *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyGenericAlias::PyGenericAlias(PyType *type) : PyBaseObject(type) {}
+
 PyGenericAlias::PyGenericAlias(PyObject *origin, PyTuple *args, PyObject *parameters)
 	: PyBaseObject(BuiltinTypes::the().generic_alias()), m_origin(origin), m_args(args),
 	  m_parameters(parameters)
@@ -88,7 +90,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyGenericAlias::type_factory()
 	};
 }
 
-PyType *PyGenericAlias::type() const { return generic_alias(); }
+PyType *PyGenericAlias::static_type() const { return generic_alias(); }
 
 void PyGenericAlias::visit_graph(Visitor &visitor)
 {

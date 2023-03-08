@@ -7,17 +7,19 @@ using namespace py;
 
 PyType *Exception::s_exception_type = nullptr;
 
+Exception::Exception(PyType *t) : BaseException(t->underlying_type(), nullptr) {}
+
 Exception::Exception(PyTuple *args) : BaseException(s_exception_type->underlying_type(), args) {}
 
 Exception::Exception(const TypePrototype &type, PyTuple *args) : BaseException(type, args) {}
 
-PyType *Exception::type() const
+PyType *Exception::static_type() const
 {
 	ASSERT(s_exception_type)
 	return s_exception_type;
 }
 
-PyType *Exception::static_type()
+PyType *Exception::class_type()
 {
 	ASSERT(s_exception_type)
 	return s_exception_type;

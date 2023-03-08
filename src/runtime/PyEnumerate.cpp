@@ -4,6 +4,8 @@
 #include "types/builtin.hpp"
 
 namespace py {
+PyEnumerate::PyEnumerate(PyType *type) : PyBaseObject(type) {}
+
 PyEnumerate::PyEnumerate(int64_t current_index, PyObject *iterator)
 	: PyBaseObject(BuiltinTypes::the().enumerate()), m_current_index(current_index),
 	  m_iterator(iterator)
@@ -46,7 +48,7 @@ PyResult<PyObject *> PyEnumerate::__next__()
 	return PyTuple::create(Number{ m_current_index++ }, value.unwrap());
 }
 
-PyType *PyEnumerate::type() const { return enumerate(); }
+PyType *PyEnumerate::static_type() const { return enumerate(); }
 
 void PyEnumerate::visit_graph(Visitor &visitor)
 {

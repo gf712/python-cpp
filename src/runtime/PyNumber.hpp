@@ -13,6 +13,8 @@ class PyNumber : public PyBaseObject
   protected:
 	Number m_value;
 
+	PyNumber(PyType *);
+
   public:
 	static PyResult<PyNumber *> create(const Number &number);
 	std::string to_string() const override;

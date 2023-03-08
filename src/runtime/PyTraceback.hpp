@@ -19,6 +19,8 @@ class PyTraceback : public PyBaseObject
   private:
 	friend class ::Heap;
 
+	PyTraceback(PyType *);
+
 	PyTraceback(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next);
 
   public:
@@ -32,7 +34,7 @@ class PyTraceback : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

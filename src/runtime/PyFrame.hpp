@@ -1,9 +1,9 @@
 #pragma once
 
 #include "forward.hpp"
-#include "vm/VM.hpp"
-
+#include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
+#include "vm/VM.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -25,7 +25,9 @@ class PyFrame : public PyBaseObject
 	};
 
   private:
-	PyFrame(const std::vector<std::string> &);
+	PyFrame(PyType *);
+
+	PyFrame(const std::vector<std::string>);
 
   protected:
 	// next outer frame object (this frame’s caller)
@@ -42,7 +44,7 @@ class PyFrame : public PyBaseObject
 	PyObject *m_generator{ nullptr };
 
 	size_t m_register_count;
-	const std::vector<std::string> &m_names;
+	const std::vector<std::string> m_names;
 	const PyTuple *m_consts;
 	std::vector<PyCell *> m_freevars;
 	BaseException *m_exception_to_catch{ nullptr };
@@ -56,7 +58,7 @@ class PyFrame : public PyBaseObject
 		PyDict *globals,
 		PyDict *locals,
 		const PyTuple *consts,
-		const std::vector<std::string> &names,
+		const std::vector<std::string> names,
 		PyObject *generator);
 
 	void put_local(const std::string &name, const Value &);
@@ -96,7 +98,7 @@ class PyFrame : public PyBaseObject
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PyFrame();

@@ -44,6 +44,8 @@ PyResult<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
 
 PyClassMethod::PyClassMethod() : PyBaseObject(BuiltinTypes::the().classmethod()) {}
 
+PyClassMethod::PyClassMethod(PyType *type) : PyBaseObject(type) {}
+
 std::string PyClassMethod::to_string() const
 {
 	return fmt::format("<classmethod object at {}>", static_cast<const void *>(this));
@@ -78,7 +80,7 @@ void PyClassMethod::visit_graph(Visitor &visitor)
 	if (m_callable) visitor.visit(*m_callable);
 }
 
-PyType *PyClassMethod::type() const { return classmethod(); }
+PyType *PyClassMethod::static_type() const { return classmethod(); }
 
 namespace {
 

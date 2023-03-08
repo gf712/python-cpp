@@ -30,6 +30,8 @@ template<> const BaseException *py::as(const PyObject *obj)
 	return nullptr;
 }
 
+BaseException::BaseException(PyType *type) : PyBaseObject(type->underlying_type()) {}
+
 BaseException::BaseException(PyTuple *args)
 	: PyBaseObject(s_base_exception_type->underlying_type()), m_args(args)
 {}
@@ -64,13 +66,13 @@ PyResult<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
 	return Ok(0);
 }
 
-PyType *BaseException::type() const
+PyType *BaseException::static_type() const
 {
 	ASSERT(s_base_exception_type)
 	return s_base_exception_type;
 }
 
-PyType *BaseException::static_type()
+PyType *BaseException::class_type()
 {
 	ASSERT(s_base_exception_type)
 	return s_base_exception_type;

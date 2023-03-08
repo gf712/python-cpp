@@ -21,6 +21,8 @@ template<> const PyMethodDescriptor *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyMethodDescriptor::PyMethodDescriptor(PyType *type) : PyBaseObject(type) {}
+
 PyMethodDescriptor::PyMethodDescriptor(PyString *name,
 	PyType *underlying_type,
 	MethodDefinition &method_definition,
@@ -71,7 +73,8 @@ PyResult<PyObject *> PyMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 	if (args_.is_err()) return args_;
 	args = args_.unwrap();
 
-	return m_method.method(self, args, kwargs);
+	ASSERT(m_method);
+	return m_method->get().method(self, args, kwargs);
 }
 
 PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * /*owner*/) const
@@ -106,7 +109,7 @@ PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * 
 }
 
 
-PyType *PyMethodDescriptor::type() const { return method_wrapper(); }
+PyType *PyMethodDescriptor::static_type() const { return method_wrapper(); }
 
 namespace {
 

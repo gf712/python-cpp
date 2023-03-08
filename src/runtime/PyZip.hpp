@@ -10,6 +10,8 @@ class PyZip : public PyBaseObject
 	std::vector<PyObject *> m_iterators;
 
   private:
+	PyZip(PyType *type);
+
 	PyZip(std::vector<PyObject *> &&iterators);
 
   public:
@@ -22,6 +24,6 @@ class PyZip : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 }// namespace py

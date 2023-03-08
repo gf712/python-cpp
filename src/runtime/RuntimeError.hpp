@@ -11,9 +11,11 @@ class RuntimeError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *runtime_error(const std::string &message, Args &&... args);
+	friend BaseException *runtime_error(const std::string &message, Args &&...args);
 
   private:
+	RuntimeError(PyType *);
+
 	RuntimeError(PyTuple *args);
 
 	static PyResult<RuntimeError *> create(PyTuple *args);
@@ -21,11 +23,11 @@ class RuntimeError : public Exception
   public:
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 template<typename... Args>
-inline BaseException *runtime_error(const std::string &message, Args &&... args)
+inline BaseException *runtime_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())

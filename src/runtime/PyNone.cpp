@@ -8,6 +8,8 @@ using namespace py;
 
 PyNone::PyNone() : PyBaseObject(BuiltinTypes::the().none()) {}
 
+PyNone::PyNone(PyType *type) : PyBaseObject(type) {}
+
 std::string PyNone::to_string() const { return "None"; }
 
 PyResult<PyObject *> PyNone::__repr__() const { return PyString::create(to_string()); }
@@ -22,7 +24,7 @@ PyNone *PyNone::create()
 	return heap.allocate_static<PyNone>().get();
 }
 
-PyType *PyNone::type() const { return none(); }
+PyType *PyNone::static_type() const { return none(); }
 
 namespace {
 

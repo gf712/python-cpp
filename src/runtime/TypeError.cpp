@@ -7,6 +7,8 @@ using namespace py;
 
 static PyType *s_type_error = nullptr;
 
+TypeError::TypeError(PyType *type) : Exception(type) {}
+
 TypeError::TypeError(PyTuple *args) : Exception(s_type_error->underlying_type(), args) {}
 
 PyResult<PyObject *> TypeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -16,7 +18,7 @@ PyResult<PyObject *> TypeError::__new__(const PyType *type, PyTuple *args, PyDic
 	return Ok(TypeError::create(args));
 }
 
-PyType *TypeError::type() const
+PyType *TypeError::static_type() const
 {
 	ASSERT(s_type_error)
 	return s_type_error;

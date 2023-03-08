@@ -11,9 +11,11 @@ class NameError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *name_error(const std::string &message, Args &&... args);
+	friend BaseException *name_error(const std::string &message, Args &&...args);
 
   private:
+	NameError(PyType *type);
+
 	NameError(PyTuple *args);
 
 	static NameError *create(PyTuple *args)
@@ -25,12 +27,12 @@ class NameError : public Exception
   public:
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 
 template<typename... Args>
-inline BaseException *name_error(const std::string &message, Args &&... args)
+inline BaseException *name_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())

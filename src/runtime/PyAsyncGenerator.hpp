@@ -7,6 +7,8 @@ class PyAsyncGenerator : public GeneratorInterface<PyAsyncGenerator>
 {
 	friend ::Heap;
 
+	PyAsyncGenerator(PyType *);
+
 	PyAsyncGenerator(PyFrame *m_frame,
 		std::unique_ptr<StackFrame> &&,
 		bool is_running,
@@ -22,7 +24,7 @@ class PyAsyncGenerator : public GeneratorInterface<PyAsyncGenerator>
 		create(PyFrame *frame, std::unique_ptr<StackFrame> &&, PyString *name, PyString *qualname);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 	void visit_graph(Visitor &visitor) override;
 };
 }// namespace py

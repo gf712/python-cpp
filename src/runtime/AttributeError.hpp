@@ -10,9 +10,11 @@ class AttributeError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *attribute_error(const std::string &message, Args &&... args);
+	friend BaseException *attribute_error(const std::string &message, Args &&...args);
 
   private:
+	AttributeError(PyType *type);
+
 	AttributeError(PyTuple *args);
 
 	static AttributeError *create(PyTuple *args)
@@ -24,14 +26,14 @@ class AttributeError : public Exception
   public:
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
-	static PyType *static_type();
+	static PyType *class_type();
 };
 
 
 template<typename... Args>
-inline BaseException *attribute_error(const std::string &message, Args &&... args)
+inline BaseException *attribute_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())

@@ -12,6 +12,8 @@ class PyBoundMethod : public PyBaseObject
 
 	PyBoundMethod(PyObject *self, PyFunction *method);
 
+	PyBoundMethod(PyType *);
+
   public:
 	static PyResult<PyBoundMethod *> create(PyObject *self, PyFunction *method);
 
@@ -26,7 +28,7 @@ class PyBoundMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

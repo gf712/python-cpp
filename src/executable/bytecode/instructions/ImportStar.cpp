@@ -30,7 +30,7 @@ PyResult<Value> ImportStar::execute(VirtualMachine &vm, Interpreter &interpreter
 		for (int64_t i = 0;; ++i) {
 			auto el = all_sequence.getitem(i);
 			if (el.is_err()) {
-				if (el.unwrap_err()->type()->issubclass(IndexError::static_type())) { break; }
+				if (el.unwrap_err()->type()->issubclass(IndexError::class_type())) { break; }
 				return Err(el.unwrap_err());
 			}
 			auto name = as<PyString>(el.unwrap());

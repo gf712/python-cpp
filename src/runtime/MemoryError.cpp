@@ -23,6 +23,8 @@ template<> const MemoryError *as(const PyObject *obj)
 	return nullptr;
 }
 
+MemoryError::MemoryError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+
 MemoryError::MemoryError(PyTuple *args) : Exception(s_memory_error->underlying_type(), args) {}
 
 PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -36,7 +38,7 @@ PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyD
 	}
 }
 
-PyType *MemoryError::type() const
+PyType *MemoryError::static_type() const
 {
 	ASSERT(s_memory_error)
 	return s_memory_error;

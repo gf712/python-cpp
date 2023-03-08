@@ -18,6 +18,8 @@ template<typename GeneratorType> class GeneratorInterface : public PyBaseObject
 	bool m_invalid_return{ false };
 
   protected:
+	GeneratorInterface(PyType *type);
+
 	GeneratorInterface(TypePrototype &type,
 		PyFrame *frame,
 		std::unique_ptr<StackFrame> &&,

@@ -7,6 +7,8 @@ using namespace py;
 
 static PyType *s_import_error = nullptr;
 
+ImportError::ImportError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+
 ImportError::ImportError(PyType *type, PyTuple *args) : Exception(type->underlying_type(), args) {}
 
 ImportError::ImportError(PyTuple *args) : Exception(s_import_error->underlying_type(), args) {}
@@ -22,13 +24,13 @@ PyResult<PyObject *> ImportError::__new__(const PyType *type, PyTuple *args, PyD
 	}
 }
 
-PyType *ImportError::static_type()
+PyType *ImportError::class_type()
 {
 	ASSERT(s_import_error)
 	return s_import_error;
 }
 
-PyType *ImportError::type() const
+PyType *ImportError::static_type() const
 {
 	ASSERT(s_import_error)
 	return s_import_error;

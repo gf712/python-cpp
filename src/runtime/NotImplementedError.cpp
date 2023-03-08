@@ -7,6 +7,8 @@ using namespace py;
 
 static PyType *s_not_implemented_error = nullptr;
 
+NotImplementedError::NotImplementedError(PyType *type) : Exception(type) {}
+
 NotImplementedError::NotImplementedError(PyTuple *args)
 	: Exception(s_not_implemented_error->underlying_type(), args)
 {}
@@ -22,7 +24,7 @@ PyResult<PyObject *> NotImplementedError::__new__(const PyType *type, PyTuple *a
 	}
 }
 
-PyType *NotImplementedError::type() const
+PyType *NotImplementedError::static_type() const
 {
 	ASSERT(s_not_implemented_error)
 	return s_not_implemented_error;

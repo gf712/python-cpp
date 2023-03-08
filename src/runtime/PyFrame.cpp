@@ -26,8 +26,10 @@ template<> const PyFrame *as(const PyObject *obj)
 	return nullptr;
 }
 
-PyFrame::PyFrame(const std::vector<std::string> &names)
-	: PyBaseObject(BuiltinTypes::the().frame()), m_names(names)
+PyFrame::PyFrame(PyType *type) : PyBaseObject(type) {}
+
+PyFrame::PyFrame(const std::vector<std::string> names)
+	: PyBaseObject(BuiltinTypes::the().frame()), m_names(std::move(names))
 {}
 
 PyFrame *PyFrame::create(PyFrame *parent,
@@ -37,10 +39,10 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	PyDict *globals,
 	PyDict *locals,
 	const PyTuple *consts,
-	const std::vector<std::string> &names,
+	const std::vector<std::string> names,
 	PyObject *generator)
 {
-	auto *new_frame = VirtualMachine::the().heap().allocate<PyFrame>(names);
+	auto *new_frame = VirtualMachine::the().heap().allocate<PyFrame>(std::move(names));
 	new_frame->m_f_back = parent;
 	new_frame->m_register_count = register_count;
 	new_frame->m_globals = globals;
@@ -196,6 +198,6 @@ std::function<std::unique_ptr<TypePrototype>()> PyFrame::type_factory()
 	};
 }
 
-PyType *PyFrame::type() const { return frame(); }
+PyType *PyFrame::static_type() const { return frame(); }
 
 }// namespace py

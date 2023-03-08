@@ -34,6 +34,8 @@ template<> const PyList *py::as(const PyObject *obj)
 
 PyList::PyList() : PyBaseObject(BuiltinTypes::the().list()) {}
 
+PyList::PyList(PyType *type) : PyBaseObject(type) {}
+
 PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(elements); }
 
 PyResult<PyList *> PyList::create(std::vector<Value> elements)
@@ -274,7 +276,7 @@ void PyList::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyList::type() const { return list(); }
+PyType *PyList::static_type() const { return list(); }
 
 namespace {
 
@@ -356,7 +358,7 @@ PyResult<PyObject *> PyListIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyListIterator::type() const { return list_iterator(); }
+PyType *PyListIterator::static_type() const { return list_iterator(); }
 
 namespace {
 
@@ -376,6 +378,8 @@ std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
 		return std::move(type);
 	};
 }
+
+PyListReverseIterator::PyListReverseIterator(PyType *type) : PyBaseObject(type) {}
 
 PyListReverseIterator::PyListReverseIterator(PyList &pylist, size_t start_index)
 	: PyBaseObject(BuiltinTypes::the().list_reverseiterator()), m_pylist(pylist),
@@ -412,7 +416,7 @@ PyResult<PyObject *> PyListReverseIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyListReverseIterator::type() const { return list_reverseiterator(); }
+PyType *PyListReverseIterator::static_type() const { return list_reverseiterator(); }
 
 namespace {
 

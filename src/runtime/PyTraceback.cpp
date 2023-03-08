@@ -7,6 +7,8 @@
 
 namespace py {
 
+PyTraceback::PyTraceback(PyType *type) : PyBaseObject(type) {}
+
 std::string PyTraceback::to_string() const
 {
 	return fmt::format("<traceback object at {}>", static_cast<const void *>(this));
@@ -35,7 +37,7 @@ PyResult<PyTraceback *>
 	return Ok(obj);
 }
 
-PyType *PyTraceback::type() const { return traceback(); }
+PyType *PyTraceback::static_type() const { return traceback(); }
 
 namespace {
 

@@ -17,6 +17,7 @@ class OSError : public Exception
 	OSError(PyTuple *args);
 
   protected:
+	OSError(PyType *);
 	OSError(PyType *, PyTuple *args);
 
   public:
@@ -25,9 +26,9 @@ class OSError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
-	static PyType *static_type();
+	static PyType *class_type();
 };
 
 template<typename... Args>

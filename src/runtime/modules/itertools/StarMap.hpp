@@ -9,6 +9,7 @@ namespace itertools {
 		PyObject *m_function{ nullptr };
 		PyObject *m_iterator{ nullptr };
 
+		StarMap(PyType *);
 		StarMap(PyObject *function, PyObject *iterator);
 		static PyResult<PyObject *> create(PyObject *function, PyObject *iterable);
 

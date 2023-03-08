@@ -8,9 +8,11 @@ class PyGetSetDescriptor : public PyBaseObject
 {
 	PyString *m_name;
 	PyType *m_underlying_type;
-	PropertyDefinition &m_getset;
+	std::optional<std::reference_wrapper<PropertyDefinition>> m_getset;
 
 	friend class ::Heap;
+
+	PyGetSetDescriptor(PyType *);
 
 	PyGetSetDescriptor(PyString *name, PyType *underlying_type, PropertyDefinition &getset);
 
@@ -29,7 +31,7 @@ class PyGetSetDescriptor : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

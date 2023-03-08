@@ -9,6 +9,8 @@ namespace {
 	static PyType *s_index_error = nullptr;
 }
 
+IndexError::IndexError(PyType *type) : LookupError(type, nullptr) {}
+
 IndexError::IndexError(PyTuple *args) : LookupError(s_index_error, args) {}
 
 PyResult<PyObject *> IndexError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -22,13 +24,13 @@ PyResult<PyObject *> IndexError::__new__(const PyType *type, PyTuple *args, PyDi
 	}
 }
 
-PyType *IndexError::static_type()
+PyType *IndexError::class_type()
 {
 	ASSERT(s_index_error)
 	return s_index_error;
 }
 
-PyType *IndexError::type() const
+PyType *IndexError::static_type() const
 {
 	ASSERT(s_index_error)
 	return s_index_error;
@@ -38,7 +40,7 @@ PyType *IndexError::register_type(PyModule *module)
 {
 	if (!s_index_error) {
 		s_index_error =
-			klass<IndexError>(module, "IndexError", LookupError::static_type()).finalize();
+			klass<IndexError>(module, "IndexError", LookupError::class_type()).finalize();
 	} else {
 		module->add_symbol(PyString::create("IndexError").unwrap(), s_index_error);
 	}

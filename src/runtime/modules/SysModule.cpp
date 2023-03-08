@@ -98,6 +98,8 @@ class Flags : public PyBaseObject
 	uint8_t m_utf8_mode;
 
   private:
+	Flags(PyType *type) : PyBaseObject(type) {}
+
 	Flags(uint8_t debug,
 		uint8_t inspect,
 		uint8_t interactive,
@@ -182,7 +184,7 @@ class Flags : public PyBaseObject
 
 	PyResult<PyObject *> __repr__() const { return PyString::create(to_string()); }
 
-	PyType *type() const final
+	PyType *static_type() const final
 	{
 		ASSERT(s_sys_flags)
 		return s_sys_flags;
@@ -219,13 +221,15 @@ class Version : public PyBaseObject
 	friend class ::Heap;
 
   public:
-	uint8_t m_major;
-	uint8_t m_minor;
-	uint8_t m_micro;
+	uint8_t m_major{ 0 };
+	uint8_t m_minor{ 0 };
+	uint8_t m_micro{ 0 };
 	std::string m_release_level;
-	uint8_t m_serial;
+	uint8_t m_serial{ 0 };
 
   private:
+	Version(PyType *t) : PyBaseObject(t) {}
+
 	Version(uint8_t major, uint8_t minor, uint8_t micro, std::string release_level, uint8_t serial)
 		: PyBaseObject(s_sys_version->underlying_type()), m_major(major), m_minor(minor),
 		  m_micro(micro), m_release_level(release_level), m_serial(serial)
@@ -257,7 +261,7 @@ class Version : public PyBaseObject
 
 	PyResult<PyObject *> __repr__() const { return PyString::create(to_string()); }
 
-	PyType *type() const final
+	PyType *static_type() const final
 	{
 		ASSERT(s_sys_version)
 		return s_sys_version;

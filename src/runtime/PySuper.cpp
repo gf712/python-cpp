@@ -14,6 +14,8 @@
 
 namespace py {
 
+PySuper::PySuper(PyType *type) : PyBaseObject(type) {}
+
 PySuper::PySuper() : PySuper(nullptr, nullptr, nullptr) {}
 
 PySuper::PySuper(PyType *type, PyObject *object, PyType *object_type)
@@ -244,6 +246,6 @@ std::function<std::unique_ptr<TypePrototype>()> PySuper::type_factory()
 	};
 }
 
-PyType *PySuper::type() const { return super(); }
+PyType *PySuper::static_type() const { return super(); }
 
 }// namespace py

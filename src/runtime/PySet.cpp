@@ -33,6 +33,8 @@ template<> const PySet *as(const PyObject *obj)
 
 PySet::PySet() : PyBaseObject(BuiltinTypes::the().set()) {}
 
+PySet::PySet(PyType *type) : PyBaseObject(type) {}
+
 PySet::PySet(SetType elements) : PySet() { m_elements = std::move(elements); }
 
 PyResult<PySet *> PySet::create(SetType elements)
@@ -160,7 +162,7 @@ void PySet::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PySet::type() const { return set(); }
+PyType *PySet::static_type() const { return set(); }
 
 namespace {
 
@@ -185,6 +187,7 @@ std::function<std::unique_ptr<TypePrototype>()> PySet::type_factory()
 	};
 }
 
+PySetIterator::PySetIterator(PyType *type) : PyBaseObject(type) {}
 
 PySetIterator::PySetIterator(const PySet &pyset)
 	: PyBaseObject(BuiltinTypes::the().set_iterator()), m_pyset(pyset)
@@ -205,8 +208,10 @@ void PySetIterator::visit_graph(Visitor &visitor)
 	// TODO: should visit_graph be const and the bit flags mutable?
 	std::visit(
 		[&visitor]<typename T>(const T &el) {
-			const_cast<typename std::remove_cv_t<typename T::type> &>(el.get()).visit_graph(
-				visitor);
+			if constexpr (!std::is_same_v<T, std::monostate>) {
+				const_cast<typename std::remove_cv_t<typename T::type> &>(el.get()).visit_graph(
+					visitor);
+			}
 		},
 		m_pyset);
 }
@@ -216,18 +221,22 @@ PyResult<PyObject *> PySetIterator::__repr__() const { return PyString::create(t
 PyResult<PyObject *> PySetIterator::__next__()
 {
 	return std::visit(
-		[&](const auto &set_ref) -> PyResult<PyObject *> {
-			const auto &set = set_ref.get();
-			if (m_current_index < set.elements().size()) {
-				return std::visit([](const auto &element) { return PyObject::from(element); },
-					*std::next(set.elements().begin(), m_current_index++));
+		[&]<typename T>(const T &set_ref) -> PyResult<PyObject *> {
+			if constexpr (!std::is_same_v<T, std::monostate>) {
+				const auto &set = set_ref.get();
+				if (m_current_index < set.elements().size()) {
+					return std::visit([](const auto &element) { return PyObject::from(element); },
+						*std::next(set.elements().begin(), m_current_index++));
+				}
+				return Err(stop_iteration());
+			} else {
+				TODO();
 			}
-			return Err(stop_iteration());
 		},
 		m_pyset);
 }
 
-PyType *PySetIterator::type() const { return set_iterator(); }
+PyType *PySetIterator::static_type() const { return set_iterator(); }
 
 namespace {
 

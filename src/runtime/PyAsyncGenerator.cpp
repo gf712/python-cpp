@@ -19,6 +19,8 @@ template<> const PyAsyncGenerator *as(const PyObject *obj)
 	return nullptr;
 }
 
+PyAsyncGenerator::PyAsyncGenerator(PyType *type) : GeneratorInterface(type) {}
+
 PyAsyncGenerator::PyAsyncGenerator(PyFrame *frame,
 	std::unique_ptr<StackFrame> &&stack_frame,
 	bool is_running,
@@ -67,7 +69,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyAsyncGenerator::type_factory()
 	};
 }
 
-PyType *PyAsyncGenerator::type() const { return async_generator(); }
+PyType *PyAsyncGenerator::static_type() const { return async_generator(); }
 
 void PyAsyncGenerator::visit_graph(Visitor &visitor)
 {

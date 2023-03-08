@@ -9,6 +9,8 @@ namespace {
 	static PyType *s_module_not_found_error = nullptr;
 }
 
+ModuleNotFoundError::ModuleNotFoundError(PyType *type) : ImportError(type, nullptr) {}
+
 ModuleNotFoundError::ModuleNotFoundError(PyTuple *args, PyObject *name, PyObject *path)
 	: ImportError(s_module_not_found_error, args), m_name(name), m_path(path)
 {}
@@ -40,7 +42,7 @@ PyResult<PyObject *> ModuleNotFoundError::__new__(const PyType *type, PyTuple *a
 
 PyResult<int32_t> ModuleNotFoundError::__init__(PyTuple *, PyDict *) { return Ok(0); }
 
-PyType *ModuleNotFoundError::type() const
+PyType *ModuleNotFoundError::static_type() const
 {
 	ASSERT(s_module_not_found_error)
 	return s_module_not_found_error;
@@ -50,7 +52,7 @@ PyType *ModuleNotFoundError::register_type(PyModule *module)
 {
 	if (!s_module_not_found_error) {
 		s_module_not_found_error =
-			klass<ModuleNotFoundError>(module, "ModuleNotFoundError", ImportError::static_type())
+			klass<ModuleNotFoundError>(module, "ModuleNotFoundError", ImportError::class_type())
 				.finalize();
 	} else {
 		module->add_symbol(

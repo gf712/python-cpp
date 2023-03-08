@@ -11,9 +11,11 @@ class ValueError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *value_error(const std::string &message, Args &&... args);
+	friend BaseException *value_error(const std::string &message, Args &&...args);
 
   private:
+	ValueError(PyType *type);
+
 	ValueError(PyTuple *args);
 
   public:
@@ -22,13 +24,13 @@ class ValueError : public Exception
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
+	PyType *static_type() const override;
 
-	static PyType *static_type();
+	static PyType *class_type();
 };
 
 template<typename... Args>
-inline BaseException *value_error(const std::string &message, Args &&... args)
+inline BaseException *value_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok())

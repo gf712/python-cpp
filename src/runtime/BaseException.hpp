@@ -16,6 +16,8 @@ class BaseException : public PyBaseObject
 	PyTuple *m_args{ nullptr };
 	PyTraceback *m_traceback{ nullptr };
 
+	BaseException(PyType *type);
+
 	BaseException(const TypePrototype &type, PyTuple *args);
 
 	static PyType *s_base_exception_type;
@@ -42,8 +44,8 @@ class BaseException : public PyBaseObject
 
 	static PyType *register_type(PyModule *);
 
-	PyType *type() const override;
-	static PyType *static_type();
+	PyType *static_type() const override;
+	static PyType *class_type();
 
 	void visit_graph(Visitor &) override;
 };

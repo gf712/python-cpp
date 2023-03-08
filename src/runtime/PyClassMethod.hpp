@@ -10,6 +10,7 @@ class PyClassMethod : public PyBaseObject
 
 	PyObject *m_callable;
 
+	PyClassMethod(PyType *);
 	PyClassMethod();
 
   public:
@@ -25,7 +26,7 @@ class PyClassMethod : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py

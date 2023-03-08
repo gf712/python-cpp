@@ -11,6 +11,8 @@ class PyCell : public PyBaseObject
 	Value m_content;
 
   protected:
+	PyCell(PyType *);
+
 	PyCell(const Value &);
 
   public:
@@ -21,9 +23,9 @@ class PyCell : public PyBaseObject
 	void visit_graph(Visitor &visitor) override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
-	void set_cell(const Value&);
+	void set_cell(const Value &);
 
 	const Value &content() const;
 

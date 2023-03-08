@@ -12,6 +12,8 @@ class PyNamespace : public PyBaseObject
 	PyDict *m_dict{ nullptr };
 
   private:
+	PyNamespace(PyType *);
+
 	PyNamespace(PyDict *);
 
   protected:
@@ -29,7 +31,7 @@ class PyNamespace : public PyBaseObject
 	PyResult<PyObject *> __lt__(const PyObject *obj) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 	std::string to_string() const override;
 };
 

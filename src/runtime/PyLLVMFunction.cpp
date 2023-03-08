@@ -5,6 +5,8 @@
 
 namespace py {
 
+PyLLVMFunction::PyLLVMFunction(PyType *type) : PyBaseObject(type) {}
+
 PyLLVMFunction::PyLLVMFunction(std::string &&name, FunctionType &&function)
 	: PyBaseObject(BuiltinTypes::the().llvm_function()), m_name(std::move(name)),
 	  m_function(std::move(function))
@@ -28,7 +30,7 @@ void PyLLVMFunction::visit_graph(Visitor &visitor)
 	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
-PyType *PyLLVMFunction::type() const { return llvm_function(); }
+PyType *PyLLVMFunction::static_type() const { return llvm_function(); }
 
 namespace {
 	std::once_flag llvm_function_flag;

@@ -15,6 +15,8 @@ class PySet : public PyBaseObject
   private:
 	SetType m_elements;
 
+	PySet(PyType *);
+
   public:
 	static PyResult<PySet *> create(SetType elements);
 	static PyResult<PySet *> create();
@@ -41,7 +43,7 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> remove(PyObject *element);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 
   private:
 	PySet();
@@ -53,10 +55,13 @@ class PySetIterator : public PyBaseObject
 {
 	friend class ::Heap;
 
-	const std::variant<std::reference_wrapper<const PySet>,
+	const std::variant<std::monostate,
+		std::reference_wrapper<const PySet>,
 		std::reference_wrapper<const PyFrozenSet>>
 		m_pyset;
 	size_t m_current_index{ 0 };
+
+	PySetIterator(PyType *);
 
   public:
 	PySetIterator(const PySet &pyset);
@@ -70,7 +75,7 @@ class PySetIterator : public PyBaseObject
 	PyResult<PyObject *> __next__();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
-	PyType *type() const override;
+	PyType *static_type() const override;
 };
 
 }// namespace py
