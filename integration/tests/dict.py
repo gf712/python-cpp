@@ -36,3 +36,12 @@ def dict_from_map():
     assert len(a) == 4
 
 dict_from_map()
+
+def dict_setdefault():
+    a = {"a": 1}
+    assert a.setdefault("a", 10) == 1
+    assert a.setdefault("b", 10) == 10
+    assert a["a"] == 1
+    assert a["b"] == 10
+
+dict_setdefault()

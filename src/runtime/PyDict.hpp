@@ -56,6 +56,7 @@ class PyDict : public PyBaseObject
 	PyResult<PyObject *> update(PyDict *other);
 	PyResult<PyDictKeys *> keys() const;
 	PyResult<PyDictValues *> values() const;
+	PyResult<PyObject *> setdefault(PyTuple *args, PyDict *kwargs);
 
 	static PyResult<PyObject *> fromkeys(PyObject *iterable, PyObject *value);
 

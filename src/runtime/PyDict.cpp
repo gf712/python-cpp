@@ -275,6 +275,26 @@ PyResult<PyObject *> PyDict::update(PyDict *other)
 	return Ok(py_none());
 }
 
+PyResult<PyObject *> PyDict::setdefault(PyTuple *args, PyDict *kwargs)
+{
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"dict.setdefault",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 2>{},
+		py_none() /* default */);
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+
+	auto [key, default_] = result.unwrap();
+
+	if (const auto it = m_map.find(key); it != m_map.end()) { return PyObject::from(it->second); }
+
+	insert(key, default_);
+
+	return Ok(default_);
+}
+
+
 PyResult<PyObject *> PyDict::fromkeys(PyObject *iterable, PyObject *value)
 {
 	auto iterator = iterable->iter();
@@ -357,6 +377,7 @@ namespace {
 					})
 				.def("keys", &PyDict::keys)
 				.def("values", &PyDict::values)
+				.def("setdefault", &PyDict::setdefault)
 				.classmethod(
 					"fromkeys",
 					+[](PyType *cls, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
