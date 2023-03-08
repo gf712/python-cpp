@@ -1,4 +1,5 @@
 #include "PyString.hpp"
+#include "IndexError.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
@@ -886,19 +887,7 @@ PyResult<PyObject *> PyString::__getitem__(PyObject *index)
 {
 	if (auto index_int = as<PyInteger>(index)) {
 		const auto i = index_int->as_i64();
-		if (i >= 0) {
-			const auto &els = codepoints();
-			if (static_cast<size_t>(i) >= els.size()) {
-				// FIXME: should be IndexError
-				return Err(value_error("list index out of range"));
-			}
-			icu::UnicodeString uni_str(els[i]);
-			std::string str;
-			uni_str.toUTF8String(str);
-			return PyString::create(str);
-		} else {
-			TODO();
-		}
+		return (*this)[i];
 	} else if (auto slice = as<PySlice>(index)) {
 		const auto codepoints = this->codepoints();
 		auto indices_ = slice->unpack();
@@ -929,6 +918,23 @@ PyResult<PyObject *> PyString::__getitem__(PyObject *index)
 	}
 }
 
+PyResult<PyObject *> PyString::operator[](int64_t index) const
+{
+	const int64_t str_size = size();
+	if (index < 0) {
+		if (std::abs(index) > str_size) { return Err(index_error("string index out of range")); }
+		index += str_size;
+	}
+
+	ASSERT(index >= 0);
+
+	if (index >= str_size) { return Err(index_error("string index out of range")); }
+
+	icu::UnicodeString uni_str(codepoints()[index]);
+	std::string str;
+	uni_str.toUTF8String(str);
+	return PyString::create(str);
+}
 
 namespace {
 

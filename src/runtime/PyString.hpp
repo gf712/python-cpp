@@ -71,6 +71,8 @@ class PyString : public PyBaseObject
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
 
+	PyResult<PyObject*> operator[](int64_t) const;
+
   private:
 	PyString(std::string s);
 
