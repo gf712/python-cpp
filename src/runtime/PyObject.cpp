@@ -968,14 +968,12 @@ PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
 	auto *name = as<PyString>(attribute);
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::class_type()) {
-		return descriptor_;
-	}
+	if (descriptor_.has_value() && descriptor_->is_err()) { return *descriptor_; }
 
 	bool descriptor_has_get = false;
 
-	if (descriptor_.is_ok()) {
-		auto *descriptor = descriptor_.unwrap();
+	if (descriptor_.has_value() && descriptor_->is_ok()) {
+		auto *descriptor = descriptor_->unwrap();
 		const auto &descriptor_get = descriptor->type()->underlying_type().__get__;
 		if (descriptor_get.has_value()) { descriptor_has_get = true; }
 		if (descriptor_get.has_value() && descriptor_is_data(descriptor->type())) {
@@ -990,11 +988,11 @@ PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
 		// AttributeError
 	}
 
-	if (descriptor_has_get) {
-		return descriptor_.unwrap()->get(const_cast<PyObject *>(this), type());
+	if (descriptor_.has_value() && descriptor_has_get) {
+		return descriptor_->unwrap()->get(const_cast<PyObject *>(this), type());
 	}
 
-	if (descriptor_.is_ok()) { return descriptor_; }
+	if (descriptor_.has_value() && descriptor_->is_ok()) { return *descriptor_; }
 
 	return Err(attribute_error(
 		"'{}' object has no attribute '{}'", type_prototype().__name__, name->to_string()));
@@ -1061,14 +1059,12 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 	}
 
 	auto descriptor_ = type()->lookup(name);
-	if (descriptor_.is_err() && descriptor_.unwrap_err()->type() != AttributeError::class_type()) {
-		return descriptor_;
-	}
+	if (descriptor_.has_value() && descriptor_->is_err()) { return *descriptor_; }
 
 	bool method_found = false;
 
-	if (descriptor_.is_ok()) {
-		auto *descriptor = descriptor_.unwrap();
+	if (descriptor_.has_value() && descriptor_->is_ok()) {
+		auto *descriptor = descriptor_->unwrap();
 		if (is_method_descriptor(descriptor->type())) {
 			method_found = true;
 		} else {
@@ -1083,8 +1079,8 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 		if (auto it = dict.find(name); it != dict.end()) { return PyObject::from(it->second); }
 	}
 
-	if (method_found) {
-		auto result = descriptor_.unwrap()->get(const_cast<PyObject *>(this), type());
+	if (descriptor_.has_value() && method_found) {
+		auto result = descriptor_->unwrap()->get(const_cast<PyObject *>(this), type());
 		ASSERT(result.is_ok())
 		return result;
 	}
@@ -1102,8 +1098,8 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 
 	auto descriptor_ = type()->lookup(attribute);
 
-	if (descriptor_.is_ok()) {
-		auto *descriptor = descriptor_.unwrap();
+	if (descriptor_.has_value() && descriptor_->is_ok()) {
+		auto *descriptor = descriptor_->unwrap();
 		const auto &descriptor_set = descriptor->type()->underlying_type().__set__;
 		if (descriptor_set.has_value()) {
 			return call_slot(*descriptor_set, "", descriptor, this, value);
@@ -1111,7 +1107,7 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 	}
 
 	if (!m_attributes) {
-		if (descriptor_.is_ok()) {
+		if (descriptor_.has_value() && descriptor_->is_ok()) {
 			return Err(attribute_error(
 				"'{}' object attribute '{}' is read-only", type()->name(), attribute->to_string()));
 		} else {

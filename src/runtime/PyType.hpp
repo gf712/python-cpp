@@ -76,7 +76,7 @@ class PyType : public PyBaseObject
 
 	bool issubtype(const TypePrototype &other) const;
 
-	PyResult<PyObject *> lookup(PyObject *name) const;
+	std::optional<PyResult<PyObject *>> lookup(PyObject *name) const;
 
 	PyDict *dict() { return m_attributes; }
 

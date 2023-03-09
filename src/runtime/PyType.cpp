@@ -317,11 +317,9 @@ PyResult<PyObject *> PyType::__getattribute__(PyObject *attribute) const
 	}
 
 	auto meta_attr_ = type()->lookup(name);
-	if (meta_attr_.is_err() && meta_attr_.unwrap_err()->type() != AttributeError::class_type()) {
-		return meta_attr_;
-	}
-	if (meta_attr_.is_ok()) {
-		auto *meta_attr = meta_attr_.unwrap();
+	if (meta_attr_.has_value() && meta_attr_->is_err()) { return *meta_attr_; }
+	if (meta_attr_.has_value() && meta_attr_->is_ok()) {
+		auto *meta_attr = meta_attr_->unwrap();
 		const auto &meta_get = meta_attr->type()->underlying_type().__get__;
 		if (meta_get.has_value() && descriptor_is_data(meta_attr)) {
 			return call_slot(*meta_get, meta_attr, const_cast<PyType *>(this), type());
@@ -329,26 +327,32 @@ PyResult<PyObject *> PyType::__getattribute__(PyObject *attribute) const
 	}
 
 	auto attr_ = lookup(name);
-	if (attr_.is_err()) {
-		return Err(type_error(
-			"type object '{}' has no attribute '{}'", underlying_type().__name__, name->value()));
-	}
-	auto *attr = attr_.unwrap();
-	if (attr) {
-		const auto &local_get = attr->type()->underlying_type().__get__;
-		if (local_get.has_value()) {
-			return call_slot(*local_get, attr, nullptr, const_cast<PyType *>(this));
+	if (attr_.has_value()) {
+		if (attr_->is_err()) { return *attr_; }
+		auto *attr = attr_->unwrap();
+		if (attr) {
+			const auto &local_get = attr->type()->underlying_type().__get__;
+			if (local_get.has_value()) {
+				return call_slot(*local_get, attr, nullptr, const_cast<PyType *>(this));
+			}
+			return Ok(attr);
 		}
-		return Ok(attr);
 	}
 
-	if (meta_attr_.is_ok()) { return meta_attr_; }
+	if (meta_attr_.has_value() && meta_attr_->is_ok()) {
+		auto *meta_attr = meta_attr_->unwrap();
+		const auto &meta_get = meta_attr->type()->underlying_type().__get__;
+		if (meta_get.has_value()) {
+			return call_slot(*meta_get, meta_attr, const_cast<PyType *>(this), type());
+		}
+		return Ok(meta_attr);
+	}
 
 	return Err(attribute_error(
 		"type object '{}' has no attribute '{}'", underlying_type().__name__, name->value()));
 }
 
-PyResult<PyObject *> PyType::lookup(PyObject *name) const
+std::optional<PyResult<PyObject *>> PyType::lookup(PyObject *name) const
 {
 	auto mro = mro_internal();
 	if (mro.is_err()) { return mro; }
@@ -360,9 +364,7 @@ PyResult<PyObject *> PyType::lookup(PyObject *name) const
 		const auto &dict = t->underlying_type().__dict__->map();
 		if (auto it = dict.find(name); it != dict.end()) { return PyObject::from(it->second); }
 	}
-	return Err(attribute_error("INTERNAL EXCEPTION: type object '{}' does not have attribute '{}'",
-		to_string(),
-		name->to_string()));
+	return std::nullopt;
 }
 
 PyResult<PyObject *> PyType::heap_object_allocation(PyType *type)
