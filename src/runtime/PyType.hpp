@@ -95,13 +95,13 @@ class PyType : public PyBaseObject
 	void inherit_special(PyType *base);
 	void fixup_slots();
 
-	void initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns);
+	void initialize(const std::string &name, PyType *base, PyTuple *bases, PyObject *ns);
 
 	static PyResult<PyType *> build_type(const PyType *metatype,
 		PyString *type_name,
 		PyType *base,
 		PyTuple *bases,
-		PyDict *ns);
+		PyObject *ns);
 
 	using BasePair = std::tuple<PyType *, PyTuple *>;
 	static PyResult<std::variant<BasePair, PyObject *>>

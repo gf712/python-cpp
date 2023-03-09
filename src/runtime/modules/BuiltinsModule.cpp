@@ -202,6 +202,13 @@ PyResult<PyObject *>
 
 	if (callable.is_err()) { TODO(); }
 
+	const std::string class_name_str =
+		Mangler::default_mangler().class_demangle(mangled_class_name_as_string);
+
+	auto class_name_ = PyString::create(class_name_str);
+	if (class_name_.is_err()) { return Err(class_name_.unwrap_err()); }
+	auto *class_name = class_name_.unwrap();
+
 	std::vector<Value> bases_vector;
 	if (args->size() > 2) {
 		bases_vector.reserve(args->size() - 2);
@@ -212,13 +219,36 @@ PyResult<PyObject *>
 		}
 	}
 
-	auto ns_ = PyDict::create();
-	if (ns_.is_err()) { return Err(ns_.unwrap_err()); }
-	auto *ns = ns_.unwrap();
-
 	auto bases_ = PyTuple::create(bases_vector);
 	if (bases_.is_err()) { return Err(bases_.unwrap_err()); }
 	auto *bases = bases_.unwrap();
+
+	auto ns_ = [metaclass, class_name, bases, kwargs]() -> PyResult<PyObject *> {
+		if (metaclass == type()) {
+			return PyDict::create();
+		} else {
+			auto prepare = PyString::create("__prepare__");
+			if (prepare.is_err()) { return prepare; }
+			auto prepare_kwargs = kwargs->map();
+			prepare_kwargs.erase(String{ "metaclass" });
+			auto new_kwargs_ = PyDict::create(prepare_kwargs);
+			if (new_kwargs_.is_err()) { return new_kwargs_; }
+			auto *new_kwargs = new_kwargs_.unwrap();
+			auto result = metaclass->lookup_attribute(prepare.unwrap());
+			if (std::get<0>(result).is_ok() && std::get<1>(result) == LookupAttrResult::FOUND) {
+				return std::get<0>(result).and_then(
+					[class_name, bases, new_kwargs](PyObject *prepare) {
+						auto args = PyTuple::create(class_name, bases);
+						return prepare->call(args.unwrap(), new_kwargs);
+					});
+			} else {
+				return PyDict::create();
+			}
+		}
+	}();
+
+	if (ns_.is_err()) { return Err(ns_.unwrap_err()); }
+	auto *ns = ns_.unwrap();
 
 	// this calls a function that defines a call
 	// For example:
@@ -253,13 +283,7 @@ PyResult<PyObject *>
 	auto classcell = callable.unwrap()->call_with_frame(ns, empty_args, empty_kwargs);
 	if (classcell.is_err()) { return classcell; }
 
-	const std::string class_name_str =
-		Mangler::default_mangler().class_demangle(mangled_class_name_as_string);
-
-	auto class_name = PyString::create(class_name_str);
-	if (class_name.is_err()) { return Err(class_name.unwrap_err()); }
-
-	auto call_args = PyTuple::create(class_name.unwrap(), bases, ns);
+	auto call_args = PyTuple::create(class_name, bases, ns);
 	if (call_args.is_err()) { return Err(call_args.unwrap_err()); }
 
 	auto cls = metaclass->call(call_args.unwrap(), nullptr);

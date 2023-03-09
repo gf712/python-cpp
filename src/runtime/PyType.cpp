@@ -17,6 +17,7 @@
 #include "PySlotWrapper.hpp"
 #include "PyStaticMethod.hpp"
 #include "PyString.hpp"
+#include "StopIteration.hpp"
 #include "TypeError.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -254,6 +255,10 @@ namespace {
 			klass<PyType>("type")
 				.def("mro", &PyType::mro)
 				.attr("__mro__", &PyType::__mro__)
+				.classmethod("__prepare__",
+					[](PyType *, PyTuple *, PyDict *) -> PyResult<PyObject *> {
+						return PyDict::create();
+					})
 				.property(
 					"__name__",
 					[](PyType *self) { return PyString::create(self->name()); },
@@ -300,11 +305,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyType::type_factory()
 namespace {
 	bool descriptor_is_data(const PyObject *obj)
 	{
-		// FIXME: temporary hack to get object.__new__ working, but requires __set__ to be
-		// implemented
-		//        should be:
-		//        obj->type()->underlying_type().__set__.has_value()
-		return !as<PyStaticMethod>(obj) && !as<PySlotWrapper>(obj);
+		return obj->type()->underlying_type().__set__.has_value();
 	}
 }// namespace
 
@@ -393,9 +394,34 @@ PyResult<PyObject *> PyType::heap_object_allocation(PyType *type)
 		});
 }
 
-void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, PyDict *ns)
+void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, PyObject *ns)
 {
-	auto dict = PyDict::create(ns->map()).unwrap();
+	auto dict_ = [ns]() -> PyResult<PyDict *> {
+		if (as<PyDict>(ns)) {
+			return PyDict::create(as<PyDict>(ns)->map());
+		} else {
+			auto dict_ = PyDict::create();
+			if (dict_.is_err()) { return dict_; }
+			auto *dict = dict_.unwrap();
+			auto ns_iter_ = ns->iter();
+			if (ns_iter_.is_err()) { return Err(ns_iter_.unwrap_err()); }
+			auto *ns_iter = ns_iter_.unwrap();
+			auto key = ns_iter->next();
+			while (key.is_ok()) {
+				auto value = ns->getitem(key.unwrap());
+				if (value.is_err()) { return Err(value.unwrap_err()); }
+				dict->insert(key.unwrap(), value.unwrap());
+				key = ns_iter->next();
+			}
+			if (key.unwrap_err()->type() != StopIteration::class_type()) {
+				return Err(key.unwrap_err());
+			}
+			return Ok(dict);
+		}
+	}();
+	if (dict_.is_err()) { TODO(); }
+
+	auto dict = dict_.unwrap();
 	bool may_add_dict = base->attributes() == nullptr;
 	if (auto it = dict->map().find(String{ "__slots__" }); it != dict->map().end()) {
 		// has slots
@@ -430,8 +456,8 @@ void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, P
 	underlying_type().__bases__ = bases;
 	underlying_type().__base__ = base;
 
-	underlying_type().__dict__ = ns;
-	m_attributes = ns;
+	underlying_type().__dict__ = dict;
+	m_attributes = dict;
 
 	if (!m_attributes->map().contains(String{ "__module__" })) {
 		auto *globals = VirtualMachine::the().interpreter().execution_frame()->globals();
@@ -1362,8 +1388,7 @@ PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict 
 	ASSERT(name);
 	auto *bases = as<PyTuple>(PyObject::from(args->elements()[1]).unwrap());
 	ASSERT(bases);
-	auto *ns = as<PyDict>(PyObject::from(args->elements()[2]).unwrap());
-	ASSERT(ns);
+	auto *ns = PyObject::from(args->elements()[2]).unwrap();
 
 	auto bases_result = compute_bases(type_, bases, args, kwargs);
 	if (bases_result.is_err()) { return Err(bases_result.unwrap_err()); }
@@ -1445,15 +1470,24 @@ PyResult<PyType *> PyType::build_type(const PyType *metatype,
 	PyString *type_name,
 	PyType *base,
 	PyTuple *bases,
-	PyDict *ns)
+	PyObject *ns)
 {
 	ASSERT(!bases->elements().empty());
 
-	for (const auto &[key, value] : ns->map()) {
-		const auto key_str = PyObject::from(key);
-		if (key_str.is_err()) return Err(key_str.unwrap_err());
-		if (!key_str.unwrap()) { return Err(type_error("")); }
+	auto ns_iter_ = ns->iter();
+	if (ns_iter_.is_err()) { return Err(ns_iter_.unwrap_err()); }
+	auto *ns_iter = ns_iter_.unwrap();
+
+	auto key = ns_iter->next();
+	while (key.is_ok()) {
+		if (!as<PyString>(key.unwrap())) {
+			return Err(type_error("namespace key is of type '{}', but 'str' is required",
+				key.unwrap()->type()->name()));
+		}
+		key = ns_iter->next();
 	}
+
+	if (key.unwrap_err()->type() != StopIteration::class_type()) { return Err(key.unwrap_err()); }
 
 	return PyType::create(const_cast<PyType *>(metatype)).and_then([&](PyType *type) {
 		type->underlying_type().is_heaptype = true;
