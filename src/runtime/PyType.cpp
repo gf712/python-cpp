@@ -433,8 +433,12 @@ void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, P
 
 	if (!m_attributes->map().contains(String{ "__module__" })) {
 		auto *globals = VirtualMachine::the().interpreter().execution_frame()->globals();
-		if (auto it = globals->map().find(String{ "__name__" }); it != globals->map().end()) {
-			m_attributes->insert(String{ "__module__" }, it->second);
+		if (auto *g = as<PyDict>(globals)) {
+			if (auto it = g->map().find(String{ "__name__" }); it != g->map().end()) {
+				m_attributes->insert(String{ "__module__" }, it->second);
+			}
+		} else {
+			TODO();
 		}
 	}
 

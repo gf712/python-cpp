@@ -530,7 +530,8 @@ PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &inter
 	if (dir_list_.is_err()) return Err(dir_list_.unwrap_err());
 	auto *dir_list = dir_list_.unwrap();
 	if (args->size() == 0) {
-		for (const auto &[k, _] : interpreter.execution_frame()->locals()->map()) {
+		ASSERT(as<PyDict>(interpreter.execution_frame()->locals()));
+		for (const auto &[k, _] : as<PyDict>(interpreter.execution_frame()->locals())->map()) {
 			auto obj_ = PyObject::from(k);
 			if (obj_.is_err()) return obj_;
 			dir_list->elements().push_back(obj_.unwrap());

@@ -161,8 +161,8 @@ PyObject *PyCode::make_function(const std::string &function_name,
 	return f;
 }
 
-PyResult<PyObject *> PyCode::eval(PyDict *globals,
-	PyDict *locals,
+PyResult<PyObject *> PyCode::eval(PyObject *globals,
+	PyObject *locals,
 	PyTuple *args,
 	PyDict *kwargs,
 	const std::vector<Value> &defaults,

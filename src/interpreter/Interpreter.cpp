@@ -2,6 +2,7 @@
 
 #include "runtime/BaseException.hpp"
 #include "runtime/Import.hpp"
+#include "runtime/KeyError.hpp"
 #include "runtime/NameError.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
@@ -332,27 +333,57 @@ PyResult<Value> Interpreter::get_object(const std::string &name)
 	ASSERT(execution_frame()->globals())
 	ASSERT(execution_frame()->builtins())
 
-	const auto &locals = execution_frame()->locals()->map();
-	const auto &globals = execution_frame()->globals()->map();
+	auto *locals = execution_frame()->locals();
+	auto *globals = execution_frame()->globals();
 	const auto &builtins = execution_frame()->builtins()->symbol_table()->map();
 
 	return [&]() -> PyResult<Value> {
 		const auto &name_value = String{ name };
+		PyString *pystr_name = nullptr;
 
-		if (const auto &it = locals.find(name_value); it != locals.end()) {
-			return Ok(std::move(it->second));
-		} else if (const auto &it = globals.find(name_value); it != globals.end()) {
-			return Ok(std::move(it->second));
-		} else {
-			auto pystr_name = PyString::create(name);
-			if (pystr_name.is_err()) { return Err(pystr_name.unwrap_err()); }
-			if (const auto &it = builtins.find(pystr_name.unwrap()); it != builtins.end()) {
+		if (auto *locals_ = as<PyDict>(locals)) {
+			if (const auto &it = locals_->map().find(name_value); it != locals_->map().end()) {
 				return Ok(std::move(it->second));
-			} else {
-				return Err(name_error("name '{:s}' is not defined", name));
+			}
+		} else {
+			if (!pystr_name) {
+				auto name_ = PyString::create(name);
+				if (name_.is_err()) { return name_; }
+				pystr_name = name_.unwrap();
+			}
+			if (auto r = locals->as_mapping().unwrap().getitem(pystr_name); r.is_ok()) {
+				return r;
+			} else if (r.unwrap_err()->type() != KeyError::class_type()) {
+				return r;
 			}
 		}
-		return Ok(Value{ py_none() });
+
+		if (auto *globals_ = as<PyDict>(globals)) {
+			if (const auto &it = globals_->map().find(name_value); it != globals_->map().end()) {
+				return Ok(std::move(it->second));
+			}
+		} else {
+			if (!pystr_name) {
+				auto name_ = PyString::create(name);
+				if (name_.is_err()) { return name_; }
+				pystr_name = name_.unwrap();
+			}
+			if (auto r = globals->as_mapping().unwrap().getitem(pystr_name); r.is_ok()) {
+				return r;
+			} else if (r.unwrap_err()->type() != KeyError::class_type()) {
+				return r;
+			}
+		}
+
+		if (!pystr_name) {
+			auto name_ = PyString::create(name);
+			if (name_.is_err()) { return name_; }
+			pystr_name = name_.unwrap();
+		}
+		if (const auto &it = builtins.find(pystr_name); it != builtins.end()) {
+			return Ok(std::move(it->second));
+		}
+		return Err(name_error("name '{:s}' is not defined", name));
 	}();
 }
 

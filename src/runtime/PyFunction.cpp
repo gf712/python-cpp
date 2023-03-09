@@ -26,7 +26,7 @@ PyFunction::PyFunction(std::string name,
 	std::vector<Value> kwonly_defaults,
 	PyCode *code,
 	PyTuple *closure,
-	PyDict *globals)
+	PyObject *globals)
 	: PyBaseObject(BuiltinTypes::the().function()), m_code(code), m_globals(globals),
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
 	  m_closure(closure)
@@ -78,10 +78,10 @@ PyResult<PyObject *> PyFunction::__get__(PyObject *instance, PyObject * /*owner*
 }
 
 PyResult<PyObject *>
-	PyFunction::call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const
+	PyFunction::call_with_frame(PyObject *ns, PyTuple *args, PyDict *kwargs) const
 {
 	return m_code->eval(m_globals,
-		locals,
+		ns,
 		args,
 		kwargs,
 		m_defaults,

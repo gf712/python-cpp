@@ -14,7 +14,7 @@ class PyFunction : public PyBaseObject
 	PyString *m_name = nullptr;
 	PyString *m_doc = nullptr;
 	PyCode *m_code = nullptr;
-	PyDict *m_globals = nullptr;
+	PyObject *m_globals = nullptr;
 	PyDict *m_dict = nullptr;
 	const std::vector<Value> m_defaults;
 	const std::vector<Value> m_kwonly_defaults;
@@ -29,7 +29,7 @@ class PyFunction : public PyBaseObject
 		std::vector<Value> kwonly_defaults,
 		PyCode *code,
 		PyTuple *closure,
-		PyDict *globals);
+		PyObject *globals);
 
 	const PyCode *code() const { return m_code; }
 	PyCode *code() { return m_code; }
@@ -38,12 +38,12 @@ class PyFunction : public PyBaseObject
 	const std::vector<Value> &defaults() const { return m_defaults; }
 	const std::vector<Value> &kwonly_defaults() const { return m_kwonly_defaults; }
 
-	PyResult<PyObject *> call_with_frame(PyDict *locals, PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> call_with_frame(PyObject *ns, PyTuple *args, PyDict *kwargs) const;
 
 	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs);
 	PyString *function_name() const { return m_name; }
 
-	PyDict *globals() const { return m_globals; }
+	PyObject *globals() const { return m_globals; }
 
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __get__(PyObject *instance, PyObject *owner) const;

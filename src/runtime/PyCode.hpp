@@ -119,8 +119,8 @@ class PyCode : public PyBaseObject
 
 	std::vector<uint8_t> serialize() const;
 
-	PyResult<PyObject *> eval(PyDict *globals,
-		PyDict *locals,
+	PyResult<PyObject *> eval(PyObject *globals,
+		PyObject *locals,
 		PyTuple *args,
 		PyDict *kwargs,
 		const std::vector<Value> &defaults,

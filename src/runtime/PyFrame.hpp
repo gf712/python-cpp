@@ -35,9 +35,9 @@ class PyFrame : public PyBaseObject
 	// builtins namespace seen by this frame
 	PyModule *m_builtins{ nullptr };
 	// global namespace seen by this frame
-	PyDict *m_globals{ nullptr };
+	PyObject *m_globals{ nullptr };
 	// local namespace seen by this frame
-	PyDict *m_locals{ nullptr };
+	PyObject *m_locals{ nullptr };
 	// code segment
 	PyCode *m_f_code{ nullptr };
 	// generator object
@@ -55,8 +55,8 @@ class PyFrame : public PyBaseObject
 		size_t register_count,
 		size_t freevar_count,
 		PyCode *code,
-		PyDict *globals,
-		PyDict *locals,
+		PyObject *globals,
+		PyObject *locals,
 		const PyTuple *consts,
 		const std::vector<std::string> names,
 		PyObject *generator);
@@ -81,8 +81,8 @@ class PyFrame : public PyBaseObject
 
 	PyFrame *exit();
 
-	PyDict *globals() const;
-	PyDict *locals() const;
+	PyObject *globals() const;
+	PyObject *locals() const;
 	PyModule *builtins() const;
 	PyCode *code() const { return m_f_code; }
 	PyObject *generator() const { return m_generator; }

@@ -57,8 +57,9 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 	// 	spdlog::debug(
 	// 		"Key: {}, Value: {}", PyObject::from(k)->to_string(), PyObject::from(v)->to_string());
 	// }
-	auto obj_ =
-		PyObject::from(vm.interpreter().execution_frame()->locals()->map().at(String{ name }));
+	auto locals = vm.interpreter().execution_frame()->locals();
+	ASSERT(as<PyDict>(locals));
+	auto obj_ = PyObject::from(as<PyDict>(locals)->map().at(String{ name }));
 	ASSERT_TRUE(obj_.is_ok());
 	auto *obj = obj_.unwrap();
 	ASSERT_TRUE(obj);

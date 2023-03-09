@@ -1,5 +1,6 @@
 #include "PyFrame.hpp"
 #include "BaseException.hpp"
+#include "KeyError.hpp"
 #include "PyCell.hpp"
 #include "PyCode.hpp"
 #include "PyDict.hpp"
@@ -36,12 +37,22 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	size_t register_count,
 	size_t free_vars_count,
 	PyCode *code,
-	PyDict *globals,
-	PyDict *locals,
+	PyObject *globals,
+	PyObject *locals,
 	const PyTuple *consts,
 	const std::vector<std::string> names,
 	PyObject *generator)
 {
+	// TODO: handle wrong type here or somewhere else
+	if (globals->as_mapping().is_err()) { TODO(); }
+	if (locals->as_mapping().is_err()) { TODO(); }
+	if (!globals->type()->underlying_type().mapping_type_protocol->__getitem__.has_value()) {
+		TODO();
+	}
+	if (!locals->type()->underlying_type().mapping_type_protocol->__getitem__.has_value()) {
+		TODO();
+	}
+
 	auto *new_frame = VirtualMachine::the().heap().allocate<PyFrame>(std::move(names));
 	new_frame->m_f_back = parent;
 	new_frame->m_register_count = register_count;
@@ -55,12 +66,23 @@ PyFrame *PyFrame::create(PyFrame *parent,
 		new_frame->m_builtins = new_frame->m_f_back->m_builtins;
 		new_frame->m_exception_stack = new_frame->m_f_back->m_exception_stack;
 	} else {
-		const auto builtins = (*new_frame->m_locals)[String{ "__builtins__" }];
-		ASSERT(builtins.has_value());
-		ASSERT(std::holds_alternative<PyObject *>(*builtins));
-		ASSERT(as<PyModule>(std::get<PyObject *>(*builtins)));
+		auto builtins = [new_frame]() -> PyResult<PyObject *> {
+			if (auto *locals = as<PyDict>(new_frame->m_locals)) {
+				if (auto value = (*locals)[String{ "__builtins__" }]; value.has_value()) {
+					return PyObject::from(*value);
+				} else {
+					return Err(key_error("__builtins__"));
+				}
+			} else {
+				return new_frame->m_locals->as_mapping().and_then([](PyMappingWrapper mapping) {
+					return mapping.getitem(PyString::create("__builtins__").unwrap());
+				});
+			}
+		}();
+		ASSERT(builtins.is_ok());
+		ASSERT(as<PyModule>(builtins.unwrap()));
 		// TODO: could this just return the builtin singleton?
-		new_frame->m_builtins = as<PyModule>(std::get<PyObject *>(*builtins));
+		new_frame->m_builtins = as<PyModule>(builtins.unwrap());
 		new_frame->m_exception_stack = std::make_shared<std::vector<ExceptionStackItem>>();
 	}
 
@@ -105,16 +127,28 @@ bool PyFrame::catch_exception(PyObject *exception) const
 
 void PyFrame::put_local(const std::string &name, const Value &value)
 {
-	m_locals->insert(String{ name }, value);
+	if (auto *locals = as<PyDict>(m_locals)) {
+		locals->insert(String{ name }, value);
+	} else {
+		m_locals->as_mapping().unwrap().setitem(
+			PyString::create(name).unwrap(), PyObject::from(value).unwrap());
+	}
 }
 
 void PyFrame::put_global(const std::string &name, const Value &value)
 {
-	m_globals->insert(String{ name }, value);
+	if (auto *globals = as<PyDict>(m_globals)) {
+		globals->insert(String{ name }, value);
+	} else {
+		m_globals->as_mapping().unwrap().setitem(
+			PyString::create(name).unwrap(), PyObject::from(value).unwrap());
+	}
 }
 
-PyDict *PyFrame::locals() const { return m_locals; }
-PyDict *PyFrame::globals() const { return m_globals; }
+PyObject *PyFrame::locals() const { return m_locals; }
+
+PyObject *PyFrame::globals() const { return m_globals; }
+
 PyModule *PyFrame::builtins() const { return m_builtins; }
 
 const std::vector<py::PyCell *> &PyFrame::freevars() const { return m_freevars; }
