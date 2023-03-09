@@ -1003,7 +1003,7 @@ PyResult<PyObject *> PyStringIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyStringIterator::static_type() const { return list_iterator(); }
+PyType *PyStringIterator::static_type() const { return str_iterator(); }
 
 namespace {
 
