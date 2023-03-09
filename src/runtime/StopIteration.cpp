@@ -41,6 +41,12 @@ PyType *StopIteration::static_type() const
 	return s_stop_iteration;
 }
 
+PyType *StopIteration::class_type()
+{
+	ASSERT(s_stop_iteration)
+	return s_stop_iteration;
+}
+
 PyType *StopIteration::register_type(PyModule *module)
 {
 	if (!s_stop_iteration) {

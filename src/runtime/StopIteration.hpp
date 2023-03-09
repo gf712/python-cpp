@@ -13,7 +13,7 @@ class StopIteration : public Exception
 	template<typename... Args> friend BaseException *stop_iteration(Args &&...args);
 
   private:
-	StopIteration(PyType* type);
+	StopIteration(PyType *type);
 
 	StopIteration(PyTuple *args);
 
@@ -29,6 +29,8 @@ class StopIteration : public Exception
 	static PyType *register_type(PyModule *);
 
 	PyType *static_type() const override;
+
+	static PyType *class_type();
 };
 
 template<typename... Args> inline BaseException *stop_iteration(Args &&...args)

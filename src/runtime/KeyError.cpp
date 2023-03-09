@@ -47,6 +47,12 @@ PyType *KeyError::static_type() const
 	return s_key_error;
 }
 
+PyType *KeyError::class_type()
+{
+	ASSERT(s_key_error)
+	return s_key_error;
+}
+
 PyType *KeyError::register_type(PyModule *module)
 {
 	if (!s_key_error) {

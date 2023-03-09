@@ -25,6 +25,7 @@ class KeyError : public Exception
 	static PyType *register_type(PyModule *);
 
 	PyType *static_type() const override;
+	static PyType *class_type();
 };
 
 template<typename... Args>
