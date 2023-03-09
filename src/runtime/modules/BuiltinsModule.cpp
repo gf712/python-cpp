@@ -689,15 +689,16 @@ PyResult<PyObject *> issubclass(const PyTuple *args, const PyDict *kwargs, Inter
 	if (classinfo_.is_err()) return classinfo_;
 	auto *classinfo = classinfo_.unwrap();
 
+	auto *class_as_type = as<PyType>(class_);
+	if (!class_as_type) { return Err(type_error("issubclass() arg 1 must be a class")); }
+
 	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
 		(void)class_info_tuple;
 		TODO();
 	} else if (auto *class_info_type = as<PyType>(classinfo)) {
-		auto *class_as_type = as<PyType>(class_);
-		if (!class_as_type) { return Err(type_error("issubclass() arg 1 must be a class")); }
 		return Ok(class_as_type->issubclass(class_info_type) ? py_true() : py_false());
 	} else {
-		TODO();
+		return Err(type_error("issubclass() arg 2 must be a class or tuple of classes"));
 	}
 }
 
