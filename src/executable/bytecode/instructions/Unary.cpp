@@ -1,5 +1,6 @@
 #include "Unary.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/TypeError.hpp"
 #include "vm/VM.hpp"
 
@@ -68,35 +69,14 @@ PyResult<Value> unary_negative(const Value &val)
 		val);
 }
 
-PyResult<Value> unary_not(const Value &val)
+PyResult<Value> unary_not(const Value &val, Interpreter &interpreter)
 {
-	return std::visit(
-		overloaded{ [](const Number &val) -> PyResult<Value> {
-					   return Ok(std::visit(
-						   [](const auto &v) { return NameConstant{ !static_cast<bool>(v) }; },
-						   val.value));
-				   },
-			[](const String &s) -> PyResult<Value> { return Ok(NameConstant{ !s.s.empty() }); },
-			[](const Bytes &) -> PyResult<Value> { TODO(); },
-			[](const Ellipsis &) -> PyResult<Value> { return Ok(NameConstant{ false }); },
-			[](const NameConstant &c) -> PyResult<Value> {
-				if (std::holds_alternative<NoneType>(c.value)) { return Ok(NameConstant{ true }); }
-				if (std::get<bool>(c.value)) { return Ok(NameConstant{ false }); }
-				return Ok(NameConstant{ true });
-			},
-			[](PyObject *obj) -> PyResult<Value> {
-				if (auto r = obj->bool_(); r.is_ok()) {
-					return Ok(NameConstant{ !r.unwrap() });
-				} else {
-					return Err(r.unwrap_err());
-				}
-			} },
-		val);
+	return truthy(val, interpreter).and_then([](bool v) { return Ok(v ? py_false() : py_true()); });
 }
 
 }// namespace
 
-PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &val = vm.reg(m_source);
 	auto result = [&]() -> PyResult<Value> {
@@ -111,7 +91,7 @@ PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &) const
 			TODO();
 		} break;
 		case Operation::NOT: {
-			return unary_not(val);
+			return unary_not(val, interpreter);
 		} break;
 		}
 	}();

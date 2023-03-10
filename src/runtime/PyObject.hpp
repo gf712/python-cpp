@@ -412,7 +412,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> lt(const PyObject *other) const;
 	PyResult<PyObject *> ne(const PyObject *other) const;
 
-	PyResult<bool> bool_() const;
+	virtual PyResult<bool> true_();
 	PyResult<PyObject *> iter() const;
 	PyResult<PyObject *> next();
 
@@ -433,7 +433,6 @@ class PyObject : public Cell
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 	PyResult<PyObject *> __repr__() const;
 	PyResult<int64_t> __hash__() const;
-	PyResult<bool> __bool__() const;
 	PyResult<PyObject *> __str__();
 
 	bool is_pyobject() const override { return true; }

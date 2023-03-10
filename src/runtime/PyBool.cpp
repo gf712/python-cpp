@@ -42,13 +42,13 @@ PyResult<PyObject *> PyBool::__new__(const PyType *type, PyTuple *args, PyDict *
 
 	if (value.unwrap()->type() == py::bool_()) return value;
 
-	return value.unwrap()->bool_().and_then(
+	return value.unwrap()->true_().and_then(
 		[](const auto &v) { return Ok(v ? py_true() : py_false()); });
 }
 
 PyResult<PyObject *> PyBool::__repr__() const { return PyString::create(to_string()); }
 
-PyResult<bool> PyBool::__bool__() const
+PyResult<bool> PyBool::true_()
 {
 	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
 	return Ok(value());

@@ -7,29 +7,12 @@
 
 using namespace py;
 
-PyResult<Value> JumpIfFalseOrPop::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> JumpIfFalseOrPop::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	ASSERT(m_offset.has_value())
 	auto &result = vm.reg(m_test_register);
 
-	const auto test_result =
-		std::visit(overloaded{ [](PyObject *const &obj) -> PyResult<bool> {
-								  ASSERT(obj)
-								  return obj->bool_();
-							  },
-					   [](const String &str) -> PyResult<bool> { return Ok(!str.s.empty()); },
-					   [](const auto &) -> PyResult<bool> {
-						   TODO();
-						   return Ok(false);
-					   },
-					   [](const NameConstant &value) -> PyResult<bool> {
-						   if (auto *bool_type = std::get_if<bool>(&value.value)) {
-							   return Ok(*bool_type);
-						   } else {
-							   return Ok(false);
-						   }
-					   } },
-			result);
+	const auto test_result = truthy(result, interpreter);
 
 	if (test_result.is_err()) { return Err(test_result.unwrap_err()); }
 	if (!test_result.unwrap()) {

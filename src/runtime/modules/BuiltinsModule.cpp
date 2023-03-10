@@ -743,7 +743,7 @@ PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	if (iterator.is_err()) return iterator;
 	auto next_value = iterator.unwrap()->next();
 	while (!next_value.is_err()) {
-		const auto is_truthy = next_value.unwrap()->bool_();
+		const auto is_truthy = next_value.unwrap()->true_();
 		if (is_truthy.is_err()) return Err(is_truthy.unwrap_err());
 		if (!is_truthy.unwrap()) { return Ok(py_false()); }
 		next_value = iterator.unwrap()->next();

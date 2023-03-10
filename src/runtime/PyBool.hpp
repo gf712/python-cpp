@@ -21,7 +21,8 @@ class PyBool : public PyInteger
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
-	PyResult<bool> __bool__() const;
+
+	PyResult<bool> true_() final;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

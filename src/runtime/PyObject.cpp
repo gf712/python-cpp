@@ -802,13 +802,22 @@ PyResult<PyObject *> PyObject::invert() const
 	return Err(type_error("bad operand type for unary ~: '{}'", type_prototype().__name__));
 }
 
-
-PyResult<bool> PyObject::bool_() const
+PyResult<bool> PyObject::true_()
 {
-	ASSERT(type_prototype().__bool__.has_value())
-	return call_slot(*type_prototype().__bool__, "__bool__ should return bool", this);
+	if (type_prototype().__bool__.has_value()) {
+		return call_slot(*type_prototype().__bool__, "__bool__ should return bool", this);
+	} else if (auto mapping = as_mapping();
+			   mapping.is_ok() && type_prototype().mapping_type_protocol->__len__.has_value()) {
+		return mapping.unwrap().len().and_then(
+			[](size_t l) -> PyResult<bool> { return Ok(l > 0); });
+	} else if (auto sequence = as_sequence();
+			   sequence.is_ok() && type_prototype().sequence_type_protocol->__len__.has_value()) {
+		return sequence.unwrap().len().and_then(
+			[](size_t l) -> PyResult<bool> { return Ok(l > 0); });
+	} else {
+		return Ok(true);
+	}
 }
-
 
 PyResult<PyObject *> PyObject::iter() const
 {
@@ -1120,8 +1129,6 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 
 	return Ok(std::monostate{});
 }
-
-PyResult<bool> PyObject::__bool__() const { return Ok(true); }
 
 PyResult<int64_t> PyObject::__hash__() const { return Ok(bit_cast<size_t>(this) >> 4); }
 

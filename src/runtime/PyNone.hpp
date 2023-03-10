@@ -20,6 +20,8 @@ class PyNone : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<bool> __bool__() const;
 
+	PyResult<bool> true_() final;
+
 	bool value() const { return m_value; }
 
 	void visit_graph(Visitor &) override {}

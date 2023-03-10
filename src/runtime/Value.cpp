@@ -819,7 +819,7 @@ PyResult<bool> truthy(const Value &value, Interpreter &)
 						  [](const String &str) -> PyResult<bool> { return Ok(!str.s.empty()); },
 						  [](const Bytes &bytes) -> PyResult<bool> { return Ok(!bytes.b.empty()); },
 						  [](const Ellipsis &) -> PyResult<bool> { return Ok(true); },
-						  [](PyObject *obj) -> PyResult<bool> { return obj->bool_(); } },
+						  [](PyObject *obj) -> PyResult<bool> { return obj->true_(); } },
 		value);
 }
 

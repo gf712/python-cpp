@@ -18,6 +18,8 @@ PyResult<PyObject *> PyNone::__add__(const PyObject *) const { TODO(); }
 
 PyResult<bool> PyNone::__bool__() const { return Ok(false); }
 
+PyResult<bool> PyNone::true_() { return Ok(false); }
+
 PyNone *PyNone::create()
 {
 	auto &heap = VirtualMachine::the().heap();
