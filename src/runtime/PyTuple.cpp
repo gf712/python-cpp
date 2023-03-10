@@ -1,4 +1,5 @@
 #include "PyTuple.hpp"
+#include "IndexError.hpp"
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyInteger.hpp"
@@ -167,19 +168,26 @@ PyResult<PyObject *> PyTuple::__eq__(const PyObject *other) const
 	return Ok(result ? py_true() : py_false());
 }
 
+PyResult<PyObject *> PyTuple::__getitem__(int64_t index)
+{
+	if (index < 0) {
+		if (static_cast<size_t>(std::abs(index)) > m_elements.size()) {
+			return Err(index_error("tuple index out of range"));
+		}
+		index += m_elements.size();
+	}
+	ASSERT(index >= 0);
+	if (static_cast<size_t>(index) >= m_elements.size()) {
+		return Err(index_error("tuple index out of range"));
+	}
+	return PyObject::from(m_elements[index]);
+}
+
 PyResult<PyObject *> PyTuple::__getitem__(PyObject *index)
 {
 	if (auto index_int = as<PyInteger>(index)) {
 		const auto i = index_int->as_i64();
-		if (i >= 0) {
-			if (static_cast<size_t>(i) >= m_elements.size()) {
-				// FIXME: should be IndexError
-				return Err(value_error("list index out of range"));
-			}
-			return PyObject::from(m_elements[i]);
-		} else {
-			TODO();
-		}
+		return __getitem__(i);
 	} else if (auto slice = as<PySlice>(index)) {
 		auto indices_ = slice->unpack();
 		if (indices_.is_err()) return Err(indices_.unwrap_err());

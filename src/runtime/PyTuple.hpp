@@ -41,6 +41,8 @@ class PyTuple
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 	PyResult<PyObject *> __getitem__(PyObject *key);
 
+	PyResult<PyObject *> __getitem__(int64_t index);
+
 	PyTupleIterator begin() const;
 	PyTupleIterator end() const;
 
