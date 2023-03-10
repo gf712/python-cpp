@@ -8,29 +8,28 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
+namespace {
+	PyType *s_base_exception_type = nullptr;
+}
 
-PyType *BaseException::s_base_exception_type = nullptr;
-
-template<> BaseException *py::as(PyObject *obj)
+template<> BaseException *as(PyObject *obj)
 {
-	ASSERT(BaseException::s_base_exception_type)
-	if (obj->type() == BaseException::s_base_exception_type) {
-		return static_cast<BaseException *>(obj);
-	}
+	ASSERT(s_base_exception_type)
+	if (obj->type() == s_base_exception_type) { return static_cast<BaseException *>(obj); }
 	return nullptr;
 }
 
-template<> const BaseException *py::as(const PyObject *obj)
+template<> const BaseException *as(const PyObject *obj)
 {
-	ASSERT(BaseException::s_base_exception_type)
-	if (obj->type() == BaseException::s_base_exception_type) {
-		return static_cast<const BaseException *>(obj);
-	}
+	ASSERT(s_base_exception_type)
+	if (obj->type() == s_base_exception_type) { return static_cast<const BaseException *>(obj); }
 	return nullptr;
 }
 
 BaseException::BaseException(PyType *type) : PyBaseObject(type->underlying_type()) {}
+
+BaseException::BaseException(PyType *type, PyTuple *args) : PyBaseObject(type), m_args(args) {}
 
 BaseException::BaseException(PyTuple *args)
 	: PyBaseObject(s_base_exception_type->underlying_type()), m_args(args)
@@ -140,3 +139,4 @@ PyType *BaseException::register_type(PyModule *module)
 	}
 	return s_base_exception_type;
 }
+}// namespace py

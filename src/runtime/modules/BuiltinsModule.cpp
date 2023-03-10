@@ -32,6 +32,8 @@
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
+#include "runtime/warnings/ImportWarning.hpp"
+#include "runtime/warnings/Warning.hpp"
 
 #include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
@@ -954,6 +956,8 @@ auto initialize_exceptions(PyModule *blt)
 	OSError::register_type(blt);
 	LookupError::register_type(blt);
 	IndexError::register_type(blt);
+	Warning::register_type(blt);
+	ImportWarning::register_type(blt);
 }
 
 }// namespace

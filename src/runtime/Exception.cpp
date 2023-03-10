@@ -9,6 +9,8 @@ PyType *Exception::s_exception_type = nullptr;
 
 Exception::Exception(PyType *t) : BaseException(t->underlying_type(), nullptr) {}
 
+Exception::Exception(PyType *t, PyTuple *args) : BaseException(t, args) {}
+
 Exception::Exception(PyTuple *args) : BaseException(s_exception_type->underlying_type(), args) {}
 
 Exception::Exception(const TypePrototype &type, PyTuple *args) : BaseException(type, args) {}
@@ -29,7 +31,7 @@ PyType *Exception::register_type(PyModule *module)
 {
 	if (!s_exception_type) {
 		s_exception_type =
-			klass<Exception>(module, "Exception", BaseException::s_base_exception_type).finalize();
+			klass<Exception>(module, "Exception", BaseException::class_type()).finalize();
 	} else {
 		module->add_symbol(PyString::create("Exception").unwrap(), s_exception_type);
 	}

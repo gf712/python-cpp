@@ -15,6 +15,7 @@ class Exception : public BaseException
   protected:
 	Exception(PyType *);
 
+	Exception(PyType *, PyTuple *args);
 	Exception(const TypePrototype &type, PyTuple *args);
 
 	static PyType *s_exception_type;

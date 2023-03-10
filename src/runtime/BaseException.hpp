@@ -18,9 +18,9 @@ class BaseException : public PyBaseObject
 
 	BaseException(PyType *type);
 
-	BaseException(const TypePrototype &type, PyTuple *args);
+	BaseException(PyType *type, PyTuple *args);
 
-	static PyType *s_base_exception_type;
+	BaseException(const TypePrototype &type, PyTuple *args);
 
 	BaseException(PyTuple *args);
 

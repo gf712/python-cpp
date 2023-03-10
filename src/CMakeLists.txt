@@ -114,6 +114,8 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/WarningsModule.cpp
     runtime/modules/WeakRefModule.cpp
     runtime/types/builtin.cpp
+    runtime/warnings/ImportWarning.cpp
+    runtime/warnings/Warning.cpp
     runtime/AssertionError.cpp
     runtime/AttributeError.cpp
     runtime/BaseException.cpp

@@ -16,12 +16,25 @@ ImportError::ImportError(PyTuple *args) : Exception(s_import_error->underlying_t
 PyResult<PyObject *> ImportError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == s_import_error)
-	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = ImportError::create(args)) {
+		if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
+			result->m_name = PyObject::from(it->second).unwrap();
+		}
+
 		return Ok(static_cast<PyObject *>(result));
 	} else {
 		TODO();
 	}
+}
+
+PyResult<int32_t> ImportError::__init__(PyTuple *args, PyDict *kwargs)
+{
+	m_args = args;
+	if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
+		m_name = PyObject::from(it->second).unwrap();
+	}
+
+	return Ok(1);
 }
 
 PyType *ImportError::class_type()
@@ -45,4 +58,10 @@ PyType *ImportError::register_type(PyModule *module)
 		module->add_symbol(PyString::create("ImportError").unwrap(), s_import_error);
 	}
 	return s_import_error;
+}
+
+void ImportError::visit_graph(Visitor &visitor)
+{
+	Exception::visit_graph(visitor);
+	if (m_name) visitor.visit(*m_name);
 }

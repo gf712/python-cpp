@@ -13,6 +13,8 @@ class ImportError : public Exception
 	template<typename... Args>
 	friend BaseException *import_error(const std::string &message, Args &&...args);
 
+	PyObject *m_name{ nullptr };
+
   protected:
 	ImportError(PyType *);
 
@@ -29,12 +31,15 @@ class ImportError : public Exception
 
   public:
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 
 	static PyType *register_type(PyModule *);
 
 	static PyType *class_type();
 
 	PyType *static_type() const override;
+
+	void visit_graph(Visitor &) override;
 };
 
 
