@@ -8,7 +8,7 @@ class PyCell : public PyBaseObject
 {
 	friend class ::Heap;
 
-	Value m_content;
+	Value m_content{ nullptr };
 
   protected:
 	PyCell(PyType *);

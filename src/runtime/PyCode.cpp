@@ -6,6 +6,7 @@
 #include "PyFrame.hpp"
 #include "PyFunction.hpp"
 #include "PyGenerator.hpp"
+#include "PyList.hpp"
 #include "PyTuple.hpp"
 #include "executable/Function.hpp"
 #include "executable/bytecode/Bytecode.hpp"
@@ -199,15 +200,16 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 
 	if (args) {
 		size_t max_args = std::min(args->size(), m_arg_count);
-		for (size_t idx = 0; idx < max_args; ++idx) {
+		for (size_t idx = 0, stack_local_index = 0; idx < max_args; ++idx) {
 			const auto &obj = args->elements()[idx];
-			VirtualMachine::the().stack_local(idx) = obj;
 			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), idx);
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
 				auto cell = PyCell::create(obj);
 				if (cell.is_err()) return cell;
 				function_frame->freevars()[free_var_idx] = cell.unwrap();
+			} else {
+				VirtualMachine::the().stack_local(stack_local_index++) = obj;
 			}
 		}
 		args_count = max_args;
@@ -252,16 +254,20 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		int64_t i = m_arg_count - 1;
 		while (default_iter != defaults.rend()) {
 			ASSERT(i >= 0);
-			auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
-			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-				VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *default_iter;
-			}
 			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), static_cast<size_t>(i));
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-				auto cell = PyCell::create(*default_iter);
-				if (cell.is_err()) return cell;
-				function_frame->freevars()[free_var_idx] = cell.unwrap();
+				ASSERT(function_frame->freevars()[free_var_idx]);
+				auto *cell = function_frame->freevars()[free_var_idx];
+				if (std::holds_alternative<PyObject *>(cell->content())
+					&& !std::get<PyObject *>(cell->content())) {
+					cell->set_cell(*default_iter);
+				}
+			} else {
+				auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
+				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
+					VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *default_iter;
+				}
 			}
 			default_iter = std::next(default_iter);
 			i--;
@@ -272,16 +278,20 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		int64_t i = m_kwonly_arg_count + m_arg_count - 1;
 		while (kw_default_iter != kw_defaults.rend()) {
 			ASSERT(i >= 0);
-			auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
-			if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-				VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *kw_default_iter;
-			}
 			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), static_cast<size_t>(i));
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-				auto cell = PyCell::create(*kw_default_iter);
-				if (cell.is_err()) return cell;
-				function_frame->freevars()[free_var_idx] = cell.unwrap();
+				ASSERT(function_frame->freevars()[free_var_idx]);
+				auto *cell = function_frame->freevars()[free_var_idx];
+				if (std::holds_alternative<PyObject *>(cell->content())
+					&& !std::get<PyObject *>(cell->content())) {
+					cell->set_cell(*kw_default_iter);
+				}
+			} else {
+				auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
+				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
+					VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *kw_default_iter;
+				}
 			}
 			kw_default_iter = std::next(kw_default_iter);
 			i--;
@@ -289,21 +299,27 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	}
 
 	if (m_flags.is_set(CodeFlags::Flag::VARARGS)) {
-		std::vector<Value> remaining_args;
+		auto remaining_args_list_ = PyList::create();
+		if (remaining_args_list_.is_err()) { return remaining_args_list_; }
+		auto *remaining_args_list = remaining_args_list_.unwrap();
 		if (args) {
 			for (size_t idx = args_count; idx < args->size(); ++idx) {
-				remaining_args.push_back(args->elements()[idx]);
+				remaining_args_list->elements().push_back(args->elements()[idx]);
 			}
 		}
-		auto args_ = PyTuple::create(remaining_args);
+		auto args_ = PyTuple::create(remaining_args_list->elements());
 		if (args_.is_err()) { return args_; }
-		VirtualMachine::the().stack_local(total_arguments_count) = args_.unwrap();
-		size_t i = m_kwonly_arg_count + m_arg_count;
-		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), i); it != m_cell2arg.end()) {
+		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), total_arguments_count);
+			it != m_cell2arg.end()) {
 			const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-			auto cell = PyCell::create(args_.unwrap());
-			if (cell.is_err()) return cell;
-			function_frame->freevars()[free_var_idx] = cell.unwrap();
+			ASSERT(function_frame->freevars()[free_var_idx]);
+			auto *cell = function_frame->freevars()[free_var_idx];
+			if (std::holds_alternative<PyObject *>(cell->content())
+				&& !std::get<PyObject *>(cell->content())) {
+				cell->set_cell(args_.unwrap());
+			}
+		} else {
+			VirtualMachine::the().stack_local(total_arguments_count) = args_.unwrap();
 		}
 	} else if (args_count < args->size()) {
 		return Err(type_error("{}() takes {} positional arguments but {} given",
@@ -326,30 +342,26 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 					kwargs_count++;
 					continue;
 				}
-
-				auto &arg =
-					VirtualMachine::the().stack_local(std::distance(argnames.begin(), arg_iter));
-				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-					remaining_kwargs->insert(key, value);
-					kwargs_count++;
-				}
 			}
 		}
-		size_t kwargs_index = [&]() {
+		const size_t kwargs_index = [&]() {
 			if (m_flags.is_set(CodeFlags::Flag::VARARGS)) {
 				return total_arguments_count + 1;
 			} else {
 				return total_arguments_count;
 			}
 		}();
-		VirtualMachine::the().stack_local(kwargs_index) = remaining_kwargs;
-		size_t i = m_kwonly_arg_count + m_arg_count;
-		if (m_flags.is_set(CodeFlags::Flag::VARARGS)) { i++; }
-		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), i); it != m_cell2arg.end()) {
+		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), kwargs_index);
+			it != m_cell2arg.end()) {
 			const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-			auto cell = PyCell::create(remaining_kwargs);
-			if (cell.is_err()) return cell;
-			function_frame->freevars()[free_var_idx] = cell.unwrap();
+			ASSERT(function_frame->freevars()[free_var_idx]);
+			auto *cell = function_frame->freevars()[free_var_idx];
+			if (std::holds_alternative<PyObject *>(cell->content())
+				&& !std::get<PyObject *>(cell->content())) {
+				cell->set_cell(remaining_kwargs);
+			}
+		} else {
+			VirtualMachine::the().stack_local(kwargs_index) = remaining_kwargs;
 		}
 	}
 
@@ -387,10 +399,6 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 				return Ok(generator);
 			});
 	} else {
-		// spdlog::debug("Frame: {}", (void *)execution_frame);
-		// spdlog::debug("Locals: {}", execution_frame->locals()->to_string());
-		// spdlog::debug("Globals: {}", execution_frame->globals()->to_string());
-		// if (ns) { spdlog::info("Namespace: {}", ns->to_string()); }
 		return VirtualMachine::the().interpreter().call(m_function, function_frame);
 	}
 }
