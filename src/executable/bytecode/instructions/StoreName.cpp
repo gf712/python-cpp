@@ -10,8 +10,9 @@ using namespace py;
 PyResult<Value> StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &value = vm.reg(m_source);
-	interpreter.store_object(m_object_name, value);
-	return Ok(Value{ py_none() });
+	return interpreter.store_object(m_object_name, value).and_then([](auto) {
+		return Ok(py_none());
+	});
 }
 
 std::vector<uint8_t> StoreName::serialize() const

@@ -48,7 +48,8 @@ class Interpreter
 
 	void set_execution_frame(py::PyFrame *frame) { m_current_frame = frame; }
 
-	void store_object(const std::string &name, const py::Value &value);
+	[[nodiscard]] py::PyResult<std::monostate> store_object(const std::string &name,
+		const py::Value &value);
 
 	py::PyResult<py::Value> get_object(const std::string &name);
 

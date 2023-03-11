@@ -45,7 +45,9 @@ PyResult<Value> ImportStar::execute(VirtualMachine &vm, Interpreter &interpreter
 					module_obj->name()->value(),
 					name->value()));
 			}
-			interpreter.store_object(name->value(), it->second);
+			if (auto r = interpreter.store_object(name->value(), it->second); r.is_err()) {
+				return Err(r.unwrap_err());
+			}
 		}
 	} else {
 		for (const auto &[key, value] : symbol_table->map()) {
@@ -62,7 +64,11 @@ PyResult<Value> ImportStar::execute(VirtualMachine &vm, Interpreter &interpreter
 			}();
 
 			ASSERT(!key_str.empty());
-			if (key_str[0] != '_') { interpreter.store_object(key_str, value); }
+			if (key_str[0] != '_') {
+				if (auto r = interpreter.store_object(key_str, value); r.is_err()) {
+					return Err(r.unwrap_err());
+				}
+			}
 		}
 	}
 	return Ok(py_none());

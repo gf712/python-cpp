@@ -61,8 +61,8 @@ class PyFrame : public PyBaseObject
 		const std::vector<std::string> names,
 		PyObject *generator);
 
-	void put_local(const std::string &name, const Value &);
-	void put_global(const std::string &name, const Value &);
+	[[nodiscard]] PyResult<std::monostate> put_local(const std::string &name, const Value &);
+	[[nodiscard]] PyResult<std::monostate> put_global(const std::string &name, const Value &);
 
 	PyFrame *parent() const { return m_f_back; }
 

@@ -310,7 +310,7 @@ PyResult<PyObject *>
 	});
 }
 
-void Interpreter::store_object(const std::string &name, const Value &value)
+PyResult<std::monostate> Interpreter::store_object(const std::string &name, const Value &value)
 {
 	if (spdlog::get_level() == spdlog::level::debug) {
 		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
@@ -324,7 +324,7 @@ void Interpreter::store_object(const std::string &name, const Value &value)
 				value),
 			(void *)m_current_frame);
 	}
-	m_current_frame->put_local(name, value);
+	return m_current_frame->put_local(name, value);
 }
 
 PyResult<Value> Interpreter::get_object(const std::string &name)

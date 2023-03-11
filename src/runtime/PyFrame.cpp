@@ -125,22 +125,24 @@ bool PyFrame::catch_exception(PyObject *exception) const
 		return false;
 }
 
-void PyFrame::put_local(const std::string &name, const Value &value)
+PyResult<std::monostate> PyFrame::put_local(const std::string &name, const Value &value)
 {
 	if (auto *locals = as<PyDict>(m_locals)) {
 		locals->insert(String{ name }, value);
+		return Ok(std::monostate{});
 	} else {
-		m_locals->as_mapping().unwrap().setitem(
+		return m_locals->as_mapping().unwrap().setitem(
 			PyString::create(name).unwrap(), PyObject::from(value).unwrap());
 	}
 }
 
-void PyFrame::put_global(const std::string &name, const Value &value)
+PyResult<std::monostate> PyFrame::put_global(const std::string &name, const Value &value)
 {
 	if (auto *globals = as<PyDict>(m_globals)) {
 		globals->insert(String{ name }, value);
+		return Ok(std::monostate{});
 	} else {
-		m_globals->as_mapping().unwrap().setitem(
+		return m_globals->as_mapping().unwrap().setitem(
 			PyString::create(name).unwrap(), PyObject::from(value).unwrap());
 	}
 }
