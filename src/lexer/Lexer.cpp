@@ -536,7 +536,10 @@ bool Lexer::single_triple_quote_string(size_t n)
 		// [^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''
 
 		// [^'\\]*
-		while (peek(n) != '\\' && peek(n) != '\'') { n++; }
+		while (peek(n) != '\\' && peek(n) != '\'') {
+			if (peek(n) == '\n') { increment_row_position(); }
+			n++;
+		}
 
 		auto advance = [this](size_t n) -> std::optional<size_t> {
 			// (?:\\.|'(?!''))
@@ -549,6 +552,7 @@ bool Lexer::single_triple_quote_string(size_t n)
 
 				// '
 				if (peek(n) != '\'') return {};
+				if (peek(n) == '\n') { increment_row_position(); }
 				n++;
 
 				// (?!'')
@@ -562,7 +566,10 @@ bool Lexer::single_triple_quote_string(size_t n)
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
 				n = *inc;
-				while (peek(n) != '\\' && peek(n) != '\'') { n++; }
+				while (peek(n) != '\\' && peek(n) != '\'') {
+					if (peek(n) == '\n') { increment_row_position(); }
+					n++;
+				}
 			} else {
 				break;
 			}
@@ -597,7 +604,10 @@ bool Lexer::double_triple_quote_string(size_t n)
 		// [^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""
 
 		// [^"\\]*
-		while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+		while (peek(n) != '\\' && peek(n) != '\"') {
+			if (peek(n) == '\n') { increment_row_position(); }
+			n++;
+		}
 
 		auto advance = [this](size_t n) -> std::optional<size_t> {
 			// (?:\\.|"(?!""))
@@ -610,6 +620,7 @@ bool Lexer::double_triple_quote_string(size_t n)
 
 				// "
 				if (peek(n) != '\"') return {};
+				if (peek(n) == '\n') { increment_row_position(); }
 				n++;
 
 				// (?!"")
@@ -623,7 +634,10 @@ bool Lexer::double_triple_quote_string(size_t n)
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
 				n = *inc;
-				while (peek(n) != '\\' && peek(n) != '\"') { n++; }
+				while (peek(n) != '\\' && peek(n) != '\"') {
+					if (peek(n) == '\n') { increment_row_position(); }
+					n++;
+				}
 			} else {
 				break;
 			}
