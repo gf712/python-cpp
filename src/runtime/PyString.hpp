@@ -48,6 +48,7 @@ class PyString : public PyBaseObject
 
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __mod__(const PyObject *obj) const;
 
 	PyResult<PyObject *> isalpha() const;
 	PyResult<PyObject *> isalnum() const;
@@ -74,12 +75,14 @@ class PyString : public PyBaseObject
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
 
-	PyResult<PyObject*> operator[](int64_t) const;
+	PyResult<PyObject *> operator[](int64_t) const;
 
   private:
 	PyString(std::string s);
 
 	size_t get_position_from_slice(int64_t) const;
+
+	PyResult<PyString *> printf(const PyObject *values) const;
 };
 
 class PyStringIterator : public PyBaseObject

@@ -1,6 +1,7 @@
 #include "PyString.hpp"
 #include "IndexError.hpp"
 #include "MemoryError.hpp"
+#include "NotImplementedError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyInteger.hpp"
@@ -154,6 +155,8 @@ PyResult<PyObject *> PyString::__add__(const PyObject *obj) const
 			obj->type()->name()));
 	}
 }
+
+PyResult<PyObject *> PyString::__mod__(const PyObject *obj) const { return printf(obj); }
 
 PyResult<PyObject *> PyString::__eq__(const PyObject *obj) const
 {
@@ -951,6 +954,129 @@ PyResult<PyObject *> PyString::operator[](int64_t index) const
 	std::string str;
 	uni_str.toUTF8String(str);
 	return PyString::create(str);
+}
+
+namespace {
+	struct Conversion
+	{
+		size_t start;
+		size_t end;
+		std::optional<std::string> mapping;
+		std::optional<char> conversion_flag;
+		std::optional<uint32_t> minimum_width;
+		std::optional<uint32_t> precision;
+		std::optional<char> conversion_type;
+
+		PyResult<std::string> apply(PyObject *obj) const
+		{
+			if (mapping.has_value()) { TODO(); }
+			if (conversion_flag.has_value()) { TODO(); }
+			if (minimum_width.has_value()) { TODO(); }
+			if (precision.has_value()) { TODO(); }
+			if (mapping.has_value()) { TODO(); }
+			ASSERT(conversion_type.has_value());
+			switch (*conversion_type) {
+			case 's': {
+				return PyString::create(obj).and_then(
+					[](PyString *str) { return Ok(str->value()); });
+			} break;
+			default:
+				return Err(not_implemented_error(
+					"printf conversion type '{}' not implemented", *conversion_type));
+			}
+		}
+	};
+}// namespace
+
+PyResult<PyString *> PyString::printf(const PyObject *values) const
+{
+	static constexpr std::array conversion_types = {
+		'd', 'i', 'o', 'u', 'x', 'X', 'e', 'E', 'f', 'F', 'g', 'G', 'c', 'r', 's', 'a', '%'
+	};
+	// find conversion specifiers
+	std::vector<Conversion> conversions;
+	const auto codepoints = this->codepoints();
+	for (size_t i = 0, start = 0; i < codepoints.size(); ++i) {
+		auto codepoint = codepoints[i];
+		size_t end = start + utf8::codepoint_length(codepoint);
+		if (codepoint == '%') {
+			auto &conversion = conversions.emplace_back();
+			codepoint = codepoints[++i];
+			end += utf8::codepoint_length(codepoint);
+			if (codepoint == '(') {
+				// mapping
+				TODO();
+				codepoint = codepoints[++i];
+				end += utf8::codepoint_length(codepoint);
+			}
+			if (codepoint == '#' || codepoint == '0' || codepoint == '-' || codepoint == ' '
+				|| codepoint == '+') {
+				// conversion flag
+				TODO();
+				codepoint = codepoints[++i];
+				end += utf8::codepoint_length(codepoint);
+			}
+			if ((codepoint >= '0' && codepoint <= '9') || codepoint == '*') {
+				// Minimum field width flag
+				TODO();
+				codepoint = codepoints[++i];
+				end += utf8::codepoint_length(codepoint);
+			}
+			if (codepoint == '.') {
+				// precision
+				TODO();
+				codepoint = codepoints[++i];
+				end += utf8::codepoint_length(codepoint);
+			}
+			if (codepoint == 'h' || codepoint == 'l' || codepoint == 'L') {
+				// A length modifier (h, l, or L) may be present, but is ignored as it is not
+				// necessary for Python – so e.g. %ld is identical to %d.
+				codepoint = codepoints[++i];
+				end += utf8::codepoint_length(codepoint);
+			}
+			if (codepoint > 127) {
+				return Err(
+					value_error("unsupported format character '?' ({}) at index {}", codepoint, i));
+			}
+			auto conversion_type_it = std::find(
+				conversion_types.begin(), conversion_types.end(), static_cast<char>(codepoint));
+			if (conversion_type_it == conversion_types.end()) {
+				return Err(value_error("unsupported format character '{}' ({}) at index {}",
+					static_cast<char>(codepoint),
+					codepoint,
+					i));
+			}
+			conversion.conversion_type = *conversion_type_it;
+			conversion.start = start;
+			conversion.end = end;
+		}
+		start = end;
+	}
+
+	std::string new_value;
+	new_value.reserve(static_cast<size_t>(m_value.size() * 1.5));
+
+	if (auto tuple = as<PyTuple>(values)) {
+		if (tuple->size() != conversions.size()) {
+			return Err(type_error("not enough arguments for format string"));
+		}
+		size_t start = 0;
+		for (size_t index = 0; const auto &el : tuple->elements()) {
+			const size_t end = conversions[index].start;
+			ASSERT(end >= start);
+			new_value.append(m_value.substr(start, end - start));
+			auto obj_ = PyObject::from(el);
+			if (obj_.is_err()) { return Err(obj_.unwrap_err()); }
+			const auto conversion = conversions[index].apply(obj_.unwrap());
+			if (conversion.is_err()) { return Err(conversion.unwrap_err()); }
+			new_value.append(conversion.unwrap());
+			start = conversions[index].end;
+			index++;
+		}
+		new_value.append(m_value.substr(start));
+	}
+	new_value.shrink_to_fit();
+	return PyString::create(new_value);
 }
 
 namespace {
