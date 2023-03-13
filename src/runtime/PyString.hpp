@@ -16,6 +16,9 @@ class PyString : public PyBaseObject
 
   public:
 	static PyResult<PyString *> create(const std::string &value);
+
+	static PyResult<PyString *> create(PyObject *);
+
 	static PyResult<PyString *> create(PyString *self, PyTuple *args, PyDict *kwargs)
 	{
 		// FIXME with proper error handling

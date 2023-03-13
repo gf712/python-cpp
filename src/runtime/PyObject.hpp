@@ -400,7 +400,8 @@ class PyObject : public Cell
 	PyResult<PyObject *> abs() const;
 	PyResult<PyObject *> invert() const;
 
-	PyResult<PyObject *> repr() const;
+	PyResult<PyString *> repr() const;
+	PyResult<PyString *> str();
 
 	PyResult<int64_t> hash() const;
 
@@ -417,7 +418,6 @@ class PyObject : public Cell
 	PyResult<PyObject *> next();
 
 	PyResult<PyObject *> call(PyTuple *args, PyDict *kwargs);
-	PyResult<PyObject *> str();
 	virtual PyResult<PyObject *> new_(PyTuple *args, PyDict *kwargs) const;
 	PyResult<int32_t> init(PyTuple *args, PyDict *kwargs);
 

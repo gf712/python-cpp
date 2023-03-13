@@ -94,6 +94,23 @@ PyResult<PyString *> PyString::create(const std::string &value)
 	return Ok(result);
 }
 
+PyResult<PyString *> PyString::create(PyObject *obj)
+{
+	if (auto *s = as<PyString>(obj)) {
+		return PyString::create(s->value());
+	} else if (obj->type()->underlying_type().__str__.has_value()) {
+		return obj->str();
+	} else {
+		return obj->repr().and_then([](PyObject *str) -> PyResult<PyString *> {
+			if (!as<PyString>(str)) {
+				return Err(
+					type_error("__repr_ returned non-string (type {})", str->type()->name()));
+			}
+			return Ok(as<PyString>(str));
+		});
+	}
+}
+
 PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a

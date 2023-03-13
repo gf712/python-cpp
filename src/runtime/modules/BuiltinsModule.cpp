@@ -89,7 +89,7 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 			end = std::get<String>(maybe_str).s;
 		}
 	}
-	auto reprfunc = [](const PyResult<PyObject *> &arg) {
+	auto reprfunc = [](const PyResult<PyObject *> &arg) -> PyResult<PyObject *> {
 		if (arg.is_err()) return arg;
 		return arg.unwrap()->repr();
 	};

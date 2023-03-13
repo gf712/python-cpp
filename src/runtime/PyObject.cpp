@@ -578,17 +578,37 @@ PyResult<std::monostate> PyObject::setattribute(PyObject *attribute, PyObject *v
 	}
 }
 
-PyResult<PyObject *> PyObject::repr() const
+PyResult<PyString *> PyObject::repr() const
 {
 	if (type_prototype().__repr__.has_value()) {
-		return call_slot(*type_prototype().__repr__, this);
+		return call_slot(*type_prototype().__repr__, this)
+			.and_then([](PyObject *str) -> PyResult<PyString *> {
+				if (!as<PyString>(str)) {
+					return Err(
+						type_error("__repr__ returned non-string (type {})", str->type()->name()));
+				}
+				return Ok(as<PyString>(str));
+			});
+	} else {
+		return PyObject::__repr__().and_then([](PyObject *obj) -> PyResult<PyString *> {
+			ASSERT(as<PyString>(obj));
+			return Ok(as<PyString>(obj));
+		});
 	}
-	TODO();
 }
 
-PyResult<PyObject *> PyObject::str()
+PyResult<PyString *> PyObject::str()
 {
-	if (type_prototype().__str__.has_value()) { return call_slot(*type_prototype().__str__, this); }
+	if (type_prototype().__str__.has_value()) {
+		return call_slot(*type_prototype().__str__, this)
+			.and_then([](PyObject *str) -> PyResult<PyString *> {
+				if (!as<PyString>(str)) {
+					return Err(
+						type_error("__str__ returned non-string (type {})", str->type()->name()));
+				}
+				return Ok(as<PyString>(str));
+			});
+	}
 	return repr();
 }
 
