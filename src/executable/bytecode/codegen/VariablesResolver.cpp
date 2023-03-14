@@ -51,7 +51,10 @@ void VariablesResolver::annotate_free_and_cell_variables(const std::string &name
 		ASSERT(child)
 	}
 
-	top_node->visibility[name] = Visibility::CELL;
+	ASSERT(top_node->visibility.contains(name));
+	if (top_node->visibility[name] != Visibility::FREE) {
+		top_node->visibility[name] = Visibility::CELL;
+	}
 }
 
 void VariablesResolver::store(const std::string &name, SourceLocation source_location)
@@ -91,6 +94,16 @@ void VariablesResolver::store(const std::string &name, SourceLocation source_loc
 	}
 }
 
+VariablesResolver::Scope *VariablesResolver::find_outer_scope_of_type(Scope::Type type) const
+{
+	auto *parent = m_current_scope->get().parent;
+	while (parent) {
+		if (parent->type == type) { return parent; }
+		parent = parent->parent;
+	}
+	return nullptr;
+}
+
 void VariablesResolver::load(const std::string &name, SourceLocation source_location)
 {
 	const auto mangled_name = Mangler::default_mangler().function_mangle(
@@ -100,12 +113,16 @@ void VariablesResolver::load(const std::string &name, SourceLocation source_loca
 
 	if (auto it = current_scope_vars.find(name); it != current_scope_vars.end()) { return; }
 
-	const bool outer_is_class =
-		m_current_scope->get().parent && m_current_scope->get().parent->type == Scope::Type::CLASS;
-	if (outer_is_class && (name == "__class__" || name == "super")) {
-		m_current_scope->get().parent->requires_class_ref = true;
+	if (auto *scope = find_outer_scope_of_type(Scope::Type::CLASS);
+		scope && (name == "__class__" || name == "super")) {
+		scope->requires_class_ref = true;
 		// artificially lookup __class__
-		if (name == "super") load("__class__", source_location);
+		if (name == "super")
+			load("__class__", source_location);
+		else {
+			annotate_free_and_cell_variables("__class__");
+			return;
+		}
 	}
 
 	if (m_current_scope->get().type == Scope::Type::MODULE) {

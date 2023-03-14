@@ -182,7 +182,7 @@ PyResult<PyObject *> PySuper::infer_object(PyFrame *, PyCode *)
 
 PyResult<PyType *> PySuper::infer_type(PyFrame *frame, PyCode *code)
 {
-	for (size_t i = 0; const auto &name : code->m_freevars) {
+	for (size_t i = code->cellvars_count(); const auto &name : code->m_freevars) {
 		if (name == "__class__") {
 			auto *cell = frame->freevars()[i];
 			if (!cell || !as<PyCell>(cell)) {

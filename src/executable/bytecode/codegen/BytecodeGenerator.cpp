@@ -723,6 +723,13 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 			m_stack.top().locals.emplace(arg_name, value);
 		}
 	}
+
+	for (const auto &cellvar : f->function_info().function.metadata.cellvars) {
+		if (!m_stack.top().locals.contains(cellvar)) {
+			auto *value = create_free_value(cellvar);
+			m_stack.top().locals.emplace(cellvar, value);
+		}
+	}
 	for (const auto &capture : m_variable_visibility.at(function_name)->captures) {
 		auto *value = create_free_value(capture);
 		captures.emplace_back(capture, value);
@@ -966,6 +973,12 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 		auto *value = create_free_value(capture);
 		captures.emplace_back(capture, value);
 		m_stack.top().locals.emplace(capture, value);
+	}
+	for (const auto &cellvar : f->function_info().function.metadata.cellvars) {
+		if (!m_stack.top().locals.contains(cellvar)) {
+			auto *value = create_free_value(cellvar);
+			m_stack.top().locals.emplace(cellvar, value);
+		}
 	}
 
 	auto *block = allocate_block(f->function_info().function_id);
