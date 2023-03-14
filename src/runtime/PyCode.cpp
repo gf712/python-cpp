@@ -189,11 +189,18 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		function_frame->freevars()[i] = cell.unwrap();
 	}
 
-	const size_t total_arguments_count = m_arg_count + m_kwonly_arg_count;
+	const size_t total_named_arguments_count = m_arg_count + m_kwonly_arg_count;
+	const size_t total_arguments_count = m_arg_count + m_kwonly_arg_count
+										 + m_flags.is_set(CodeFlags::Flag::VARARGS)
+										 + m_flags.is_set(CodeFlags::Flag::VARKEYWORDS);
+	const size_t arg_cells_count = std::count_if(m_cell2arg.begin(),
+		m_cell2arg.end(),
+		[total_arguments_count](size_t arg_idx) { return total_arguments_count != arg_idx; });
+
 	std::vector<std::string> positional_args{ m_varnames.begin(),
 		m_varnames.begin() + m_arg_count };
 	std::vector<std::string> keyword_only_args{ m_varnames.begin() + m_arg_count,
-		m_varnames.begin() + total_arguments_count };
+		m_varnames.begin() + total_named_arguments_count };
 
 	size_t args_count = 0;
 	size_t kwargs_count = 0;
@@ -309,7 +316,7 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		}
 		auto args_ = PyTuple::create(remaining_args_list->elements());
 		if (args_.is_err()) { return args_; }
-		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), total_arguments_count);
+		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), total_named_arguments_count);
 			it != m_cell2arg.end()) {
 			const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
 			ASSERT(function_frame->freevars()[free_var_idx]);
@@ -319,7 +326,13 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 				cell->set_cell(args_.unwrap());
 			}
 		} else {
-			VirtualMachine::the().stack_local(total_arguments_count) = args_.unwrap();
+			const size_t local_index = total_named_arguments_count
+									   + m_flags.is_set(CodeFlags::Flag::VARARGS) - arg_cells_count
+									   - 1;
+			ASSERT(
+				std::holds_alternative<PyObject *>(VirtualMachine::the().stack_local(local_index)));
+			ASSERT(!std::get<PyObject *>(VirtualMachine::the().stack_local(local_index)));
+			VirtualMachine::the().stack_local(local_index) = args_.unwrap();
 		}
 	} else if (args_count < args->size()) {
 		return Err(type_error("{}() takes {} positional arguments but {} given",
@@ -346,9 +359,9 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		}
 		const size_t kwargs_index = [&]() {
 			if (m_flags.is_set(CodeFlags::Flag::VARARGS)) {
-				return total_arguments_count + 1;
+				return total_named_arguments_count + 1;
 			} else {
-				return total_arguments_count;
+				return total_named_arguments_count;
 			}
 		}();
 		if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), kwargs_index);
@@ -361,7 +374,12 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 				cell->set_cell(remaining_kwargs);
 			}
 		} else {
-			VirtualMachine::the().stack_local(kwargs_index) = remaining_kwargs;
+			const size_t local_index =
+				kwargs_index + m_flags.is_set(CodeFlags::Flag::VARKEYWORDS) - arg_cells_count - 1;
+			ASSERT(
+				std::holds_alternative<PyObject *>(VirtualMachine::the().stack_local(local_index)));
+			ASSERT(!std::get<PyObject *>(VirtualMachine::the().stack_local(local_index)));
+			VirtualMachine::the().stack_local(local_index) = remaining_kwargs;
 		}
 	}
 

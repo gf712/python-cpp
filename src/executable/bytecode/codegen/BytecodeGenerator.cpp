@@ -446,7 +446,7 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	case VariablesResolver::Visibility::LOCAL: {
 		ASSERT(m_stack.top().locals.contains(name));
 		const auto &l = m_stack.top().locals.at(name);
-		ASSERT(std::holds_alternative<BytecodeStackValue *>(l))
+		ASSERT(std::holds_alternative<BytecodeStackValue *>(l));
 		emit<LoadFast>(
 			dst->get_register(), std::get<BytecodeStackValue *>(l)->get_stack_index(), name);
 	} break;
@@ -655,20 +655,43 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	}
 
 	std::vector<std::string> varnames;
-	std::vector<size_t> cell2arg;
 
 	m_ctx.push_local_args(node->args());
 	const std::string &function_name = Mangler::default_mangler().function_mangle(
 		mangle_namespace(m_stack), node->name(), node->source_location());
 	auto *f = create_function(function_name);
 
-	create_nested_scope(node->name(), function_name);
-	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
-
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
 	ASSERT(name_visibility_it != m_variable_visibility.end())
 	const auto &name_visibility = name_visibility_it->second->visibility;
 	const bool is_generator = name_visibility_it->second->is_generator;
+
+	for (const auto &[varname, v] : name_visibility) {
+		if (v == VariablesResolver::Visibility::FREE) {
+			f->function_info().function.metadata.freevars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::CELL) {
+			f->function_info().function.metadata.cellvars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::LOCAL) {
+			f->function_info().function.metadata.varnames.push_back(varname);
+		} else {
+			// TODO: add to co_names
+			// A tuple containing names used by the bytecode:
+			//  * global variables,
+			//  * functions
+			//  * classes
+			//	* attributes loaded from objects
+		}
+	}
+
+	const auto &cellvars = f->function_info().function.metadata.cellvars;
+	const size_t arg_count_ = node->args()->argument_names().size()
+							  + node->args()->kw_only_argument_names().size()
+							  + static_cast<size_t>(node->args()->vararg() != nullptr)
+							  + static_cast<size_t>(node->args()->kwarg() != nullptr);
+	std::vector<size_t> cell2arg(cellvars.size(), arg_count_);
+
+	create_nested_scope(node->name(), function_name);
+	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
 
 	for (const auto &arg_name : node->args()->argument_names()) {
 		if (auto it = name_visibility.find(arg_name);
@@ -724,9 +747,12 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	for (size_t idx = 0; const auto &arg_name : node->args()->argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 		idx++;
 	}
@@ -734,9 +760,12 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		 const auto &arg_name : node->args()->kw_only_argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 		idx++;
 	}
@@ -747,9 +776,12 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		const auto &arg_name = node->args()->vararg()->name();
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 	}
 
@@ -760,9 +792,12 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		const auto &arg_name = node->args()->kwarg()->name();
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 	}
 
@@ -816,24 +851,6 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		flags.set(CodeFlags::Flag::COROUTINE);
 	}
 
-	f->function_info().function.metadata.varnames = varnames;
-
-	for (const auto &[varname, v] : name_visibility) {
-		if (v == VariablesResolver::Visibility::FREE) {
-			f->function_info().function.metadata.freevars.push_back(varname);
-		} else if (v == VariablesResolver::Visibility::CELL) {
-			f->function_info().function.metadata.cellvars.push_back(varname);
-		} else if (v == VariablesResolver::Visibility::LOCAL) {
-			f->function_info().function.metadata.varnames.push_back(varname);
-		} else {
-			// TODO: add to co_names
-			// A tuple containing names used by the bytecode:
-			//  * global variables,
-			//  * functions
-			//  * classes
-			//	* attributes loaded from objects
-		}
-	}
 
 	// TODO
 	// f->function_info().function.metadata.filename = ;
@@ -842,6 +859,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
 	f->function_info().function.metadata.nlocals = varnames.size();
 	f->function_info().function.metadata.flags = flags;
+	f->function_info().function.metadata.varnames = std::move(varnames);
 
 	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
@@ -875,20 +893,44 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 {
 	// TODO: abstract away logic from here and FunctionDefinition* to avoid repetition
 	std::vector<std::string> varnames;
-	std::vector<size_t> cell2arg;
 
 	m_ctx.push_local_args(node->args());
 	const std::string &function_name = Mangler::default_mangler().function_mangle(
 		mangle_namespace(m_stack), "<lambda>", node->source_location());
 	auto *f = create_function(function_name);
 
-	create_nested_scope("<lambda>", function_name);
-	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
-
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
 	ASSERT(name_visibility_it != m_variable_visibility.end())
 	const auto &name_visibility = name_visibility_it->second->visibility;
 	const bool is_generator = name_visibility_it->second->is_generator;
+
+	for (const auto &[varname, v] : name_visibility) {
+		if (v == VariablesResolver::Visibility::FREE) {
+			f->function_info().function.metadata.freevars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::CELL) {
+			f->function_info().function.metadata.cellvars.push_back(varname);
+		} else if (v == VariablesResolver::Visibility::LOCAL) {
+			f->function_info().function.metadata.varnames.push_back(varname);
+		} else {
+			// TODO: add to co_names
+			// A tuple containing names used by the bytecode:
+			//  * global variables,
+			//  * functions
+			//  * classes
+			//	* attributes loaded from objects
+		}
+	}
+
+	const auto &cellvars = f->function_info().function.metadata.cellvars;
+	const size_t arg_count_ = node->args()->argument_names().size()
+							  + node->args()->kw_only_argument_names().size()
+							  + node->args()->kw_only_argument_names().size()
+							  + static_cast<size_t>(node->args()->vararg() != nullptr)
+							  + static_cast<size_t>(node->args()->kwarg() != nullptr);
+	std::vector<size_t> cell2arg(cellvars.size(), arg_count_);
+
+	create_nested_scope("<lambda>", function_name);
+	std::vector<std::pair<std::string, BytecodeFreeValue *>> captures;
 
 	for (const auto &arg_name : node->args()->argument_names()) {
 		if (auto it = name_visibility.find(arg_name);
@@ -946,9 +988,12 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	for (size_t idx = 0; const auto &arg_name : node->args()->argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 		idx++;
 	}
@@ -956,9 +1001,12 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 		 const auto &arg_name : node->args()->kw_only_argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 		idx++;
 	}
@@ -969,9 +1017,12 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 		const auto &arg_name = node->args()->vararg()->name();
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 	}
 
@@ -982,9 +1033,12 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 		const auto &arg_name = node->args()->kwarg()->name();
 		varnames.push_back(arg_name);
 		ASSERT(name_visibility.find(arg_name) != name_visibility.end())
-		if (auto it = name_visibility.find(arg_name);
-			it->second == VariablesResolver::Visibility::CELL) {
-			cell2arg.push_back(idx);
+		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
+			ASSERT(m_stack.top().locals.contains(arg_name));
+			const auto &l = m_stack.top().locals.at(arg_name);
+			ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
+			const size_t cell_idx = std::get<BytecodeFreeValue *>(l)->get_free_var_index();
+			cell2arg[cell_idx] = idx;
 		}
 	}
 
@@ -1034,24 +1088,6 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	if (node->args()->kwarg() != nullptr) { flags.set(CodeFlags::Flag::VARKEYWORDS); }
 	if (is_generator) { flags.set(CodeFlags::Flag::GENERATOR); }
 
-	f->function_info().function.metadata.varnames = varnames;
-
-	for (const auto &[varname, v] : name_visibility) {
-		if (v == VariablesResolver::Visibility::FREE) {
-			f->function_info().function.metadata.freevars.push_back(varname);
-		} else if (v == VariablesResolver::Visibility::CELL) {
-			f->function_info().function.metadata.cellvars.push_back(varname);
-		} else if (v == VariablesResolver::Visibility::LOCAL) {
-			f->function_info().function.metadata.varnames.push_back(varname);
-		} else {
-			// TODO: add to co_names
-			// A tuple containing names used by the bytecode:
-			//  * global variables,
-			//  * functions
-			//  * classes
-			//	* attributes loaded from objects
-		}
-	}
 
 	// TODO
 	// f->function_info().function.metadata.filename = ;
@@ -1060,6 +1096,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
 	f->function_info().function.metadata.nlocals = varnames.size();
 	f->function_info().function.metadata.flags = flags;
+	f->function_info().function.metadata.varnames = std::move(varnames);
 
 	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
