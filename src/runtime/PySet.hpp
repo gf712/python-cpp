@@ -32,6 +32,7 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 	PyResult<bool> __contains__(const PyObject *value) const;
 
+	PyResult<PyObject *> __and__(PyObject *other);
 
 	const SetType &elements() const { return m_elements; }
 	SetType &elements() { return m_elements; }
@@ -41,6 +42,7 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> add(PyObject *element);
 	PyResult<PyObject *> discard(PyObject *element);
 	PyResult<PyObject *> remove(PyObject *element);
+	PyResult<PySet *> intersection(PyTuple* args, PyDict* kwargs) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

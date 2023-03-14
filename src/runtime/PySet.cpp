@@ -74,6 +74,34 @@ PyResult<PyObject *> PySet::remove(PyObject *element)
 	}
 }
 
+PyResult<PySet *> PySet::intersection(PyTuple *args, PyDict *kwargs) const
+{
+	if (kwargs && kwargs->map().size() > 0) {
+		return Err(type_error("intersection() takes no keyword arguments"));
+	}
+
+	SetType result;
+	for (const auto &el_ : m_elements) {
+		auto el_obj_ = PyObject::from(el_);
+		if (el_obj_.is_err()) { return Err(el_obj_.unwrap_err()); }
+		auto *el = el_obj_.unwrap();
+		bool contains_value = true;
+		for (size_t i = 1; i < args->elements().size(); ++i) {
+			const auto &arg = args->elements()[i];
+			auto obj_ = PyObject::from(arg);
+			if (obj_.is_err()) { return Err(obj_.unwrap_err()); }
+			auto contains_ = obj_.unwrap()->contains(el);
+			if (contains_.is_err()) { return Err(contains_.unwrap_err()); }
+			contains_value &= contains_.unwrap();
+			if (!contains_value) { break; }
+		}
+		if (contains_value) { result.insert(el_); }
+	}
+
+	return PySet::create(result);
+}
+
+
 std::string PySet::to_string() const
 {
 	std::ostringstream os;
@@ -151,6 +179,22 @@ PyResult<bool> PySet::__contains__(const PyObject *value) const
 	return Ok(m_elements.contains(value_));
 }
 
+PyResult<PyObject *> PySet::__and__(PyObject *other)
+{
+	if (!other->type()->issubclass(set())) {
+		return Err(
+			type_error("unsupported operand type(s) for &: 'set' and '{}'", other->type()->name()));
+	}
+	const auto *other_set = static_cast<PySet *>(other);
+
+	SetType result;
+	std::copy_if(m_elements.begin(),
+		m_elements.end(),
+		std::inserter(result, result.begin()),
+		[other_set](const auto &element) { return other_set->m_elements.contains(element); });
+
+	return PySet::create(result);
+}
 
 void PySet::visit_graph(Visitor &visitor)
 {
@@ -174,6 +218,7 @@ namespace {
 							 .def("add", &PySet::add)
 							 .def("discard", &PySet::discard)
 							 .def("remove", &PySet::remove)
+							 .def("intersection", &PySet::intersection)
 							 .type);
 	}
 }// namespace
