@@ -50,6 +50,38 @@ PyResult<PyObject *> PyMappingProxy::__getitem__(PyObject *index)
 		});
 }
 
+PyResult<PyObject *> PyMappingProxy::get(PyTuple *args, PyDict *kwargs) const
+{
+	auto parse_result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"mappingproxy.get",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 2>{},
+		py_none());
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+
+	auto [key, default_] = parse_result.unwrap();
+
+	if (auto dict = as<PyDict>(m_mapping)) {
+		if (auto it = dict->map().find(key); it != dict->map().end()) {
+			return PyObject::from(it->second);
+		}
+		return Ok(default_);
+	}
+	return m_mapping->contains(key).and_then(
+		[this, key = key, default_ = default_](bool contains_value) -> PyResult<PyObject *> {
+			if (contains_value) { return m_mapping->getitem(key); }
+			return Ok(default_);
+		});
+}
+
+PyResult<PyObject *> PyMappingProxy::items() const
+{
+	return m_mapping->get_method(PyString::create("items").unwrap()).and_then([](PyObject *items) {
+		return items->call(nullptr, nullptr);
+	});
+}
+
 PyType *PyMappingProxy::static_type() const { return mappingproxy(); }
 
 void PyMappingProxy::visit_graph(Visitor &visitor)
@@ -64,7 +96,10 @@ namespace {
 
 	std::unique_ptr<TypePrototype> mappingproxy_reversed()
 	{
-		return std::move(klass<PyMappingProxy>("mappingproxy").type);
+		return std::move(klass<PyMappingProxy>("mappingproxy")
+							 .def("get", &PyMappingProxy::get)
+							 .def("items", &PyMappingProxy::items)
+							 .type);
 	}
 }// namespace
 

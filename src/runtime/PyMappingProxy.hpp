@@ -21,6 +21,9 @@ class PyMappingProxy : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __getitem__(PyObject *index);
 
+	PyResult<PyObject *> get(PyTuple *, PyDict *) const;
+	PyResult<PyObject *> items() const;
+
 	std::string to_string() const override;
 	void visit_graph(Visitor &) override;
 
