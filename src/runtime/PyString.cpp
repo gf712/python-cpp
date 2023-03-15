@@ -980,6 +980,9 @@ namespace {
 				return PyString::create(obj).and_then(
 					[](PyString *str) { return Ok(str->value()); });
 			} break;
+			case 'r': {
+				return obj->repr().and_then([](PyString *str) { return Ok(str->value()); });
+			} break;
 			default:
 				return Err(not_implemented_error(
 					"printf conversion type '{}' not implemented", *conversion_type));
