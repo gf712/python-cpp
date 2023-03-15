@@ -82,6 +82,8 @@ class PyType : public PyBaseObject
 
 	static PyResult<PyObject *> heap_object_allocation(PyType *);
 
+	static PyResult<const PyType *> calculate_metaclass(const PyType *type_, PyTuple *bases);
+
   protected:
 	PyResult<PyTuple *> mro_internal() const;
 
@@ -108,8 +110,6 @@ class PyType : public PyBaseObject
 		compute_bases(const PyType *type_, PyTuple *bases, PyTuple *args, PyDict *kwargs);
 
 	static PyResult<PyType *> best_base(PyTuple *bases);
-
-	static PyResult<const PyType *> calculate_metaclass(const PyType *type_, PyTuple *bases);
 };
 
 }// namespace py

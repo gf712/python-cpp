@@ -156,16 +156,18 @@ PyResult<PyObject *>
 	if (args->size() < 2) {
 		return Err(type_error("__build_class__: not enough arguments, got {}", args->size()));
 	}
-	// FIXME
-	if (kwargs && kwargs->map().size() != 1) { TODO(); }
-	auto metaclass_ = [kwargs]() -> PyResult<PyObject *> {
-		if (kwargs && kwargs->map().size() == 1) {
+	bool metaclass_is_class = false;
+	auto metaclass_ = [kwargs, &metaclass_is_class]() -> PyResult<PyObject *> {
+		if (kwargs && kwargs->map().size() > 0) {
 			auto it = kwargs->map().find(String{ "metaclass" });
-			ASSERT(it != kwargs->map().end());
-			return PyObject::from(it->second);
-		} else {
-			return Ok(type());
+			if (it != kwargs->map().end()) {
+				return PyObject::from(it->second).and_then([&metaclass_is_class](PyObject *obj) {
+					if (obj->type()->issubclass(py::type())) { metaclass_is_class = true; }
+					return Ok(obj);
+				});
+			}
 		}
+		return Ok(py_none());
 	}();
 	if (metaclass_.is_err()) return metaclass_;
 	auto *metaclass = metaclass_.unwrap();
@@ -225,15 +227,40 @@ PyResult<PyObject *>
 	if (bases_.is_err()) { return Err(bases_.unwrap_err()); }
 	auto *bases = bases_.unwrap();
 
+	// finalize this class' metaclass
+	if (metaclass == py_none()) {
+		if (bases->size() == 0) {
+			// if there are no bases, use `type`
+			metaclass = py::type();
+		} else {
+			// else get the type of the first base
+			metaclass = PyObject::from(bases->elements()[0]).unwrap()->type();
+		}
+		metaclass_is_class = true;
+	}
+
+	if (metaclass_is_class) {
+		auto winner = PyType::calculate_metaclass(static_cast<PyType *>(metaclass), bases);
+		if (winner.is_err()) { return Err(winner.unwrap_err()); }
+		metaclass = const_cast<PyType *>(winner.unwrap());
+	}
+
+	// lookup __prepare__ and instantiate namespace
 	auto ns_ = [metaclass, class_name, bases, kwargs]() -> PyResult<PyObject *> {
 		if (metaclass == type()) {
 			return PyDict::create();
 		} else {
 			auto prepare = PyString::create("__prepare__");
 			if (prepare.is_err()) { return prepare; }
-			auto prepare_kwargs = kwargs->map();
-			prepare_kwargs.erase(String{ "metaclass" });
-			auto new_kwargs_ = PyDict::create(prepare_kwargs);
+			auto new_kwargs_ = [kwargs]() {
+				if (kwargs && !kwargs->map().empty()) {
+					auto prepare_kwargs = kwargs->map();
+					prepare_kwargs.erase(String{ "metaclass" });
+					return PyDict::create(prepare_kwargs);
+				} else {
+					return PyDict::create();
+				}
+			}();
 			if (new_kwargs_.is_err()) { return new_kwargs_; }
 			auto *new_kwargs = new_kwargs_.unwrap();
 			auto result = metaclass->lookup_attribute(prepare.unwrap());
@@ -252,7 +279,7 @@ PyResult<PyObject *>
 	if (ns_.is_err()) { return Err(ns_.unwrap_err()); }
 	auto *ns = ns_.unwrap();
 
-	// this calls a function that defines a call
+	// this calls a function that defines a class
 	// For example:
 	// class A:
 	//   def foo(self):
