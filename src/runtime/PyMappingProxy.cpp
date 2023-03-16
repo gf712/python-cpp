@@ -42,6 +42,8 @@ PyResult<PyObject *> PyMappingProxy::__repr__() const
 	}
 }
 
+PyResult<PyObject *> PyMappingProxy::__iter__() const { return m_mapping->iter(); }
+
 PyResult<PyObject *> PyMappingProxy::__getitem__(PyObject *index)
 {
 	return m_mapping->as_mapping().and_then(
