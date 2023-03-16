@@ -853,6 +853,8 @@ Value *VariablesResolver::visit(const GeneratorExp *node)
 	return nullptr;
 }
 
+Value *VariablesResolver::visit(const Await *node) { return node->value()->codegen(this); }
+
 Value *VariablesResolver::visit(const SetComp *node)
 {
 	auto caller = m_current_scope;

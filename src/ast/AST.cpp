@@ -119,6 +119,8 @@ void NodeVisitor::visit(AsyncFunctionDefinition *node)
 	dispatch(node->returns().get());
 }
 
+void NodeVisitor::visit(Await *node) { dispatch(node->value().get()); }
+
 void NodeVisitor::visit(Lambda *node)
 {
 	dispatch(node->args().get());
@@ -485,6 +487,12 @@ std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(
 	transform_multiple_nodes(node->body());
 	for (auto &el : node->decorator_list()) { transform_single_node(el); }
 	transform_single_node(node->returns());
+	return { node };
+}
+
+std::vector<std::shared_ptr<ASTNode>> NodeTransformVisitor::visit(std::shared_ptr<Await> node)
+{
+	transform_single_node(node->value());
 	return { node };
 }
 
@@ -1102,6 +1110,19 @@ void AsyncFunctionDefinition::print_this_node(const std::string &indent) const
 	spdlog::debug("{}  - returns:", indent);
 	if (m_returns) m_returns->print_node(new_indent);
 	spdlog::debug("{}  - type_comment:{}", indent, m_type_comment);
+}
+
+void Await::print_this_node(const std::string &indent) const
+{
+	spdlog::debug("{}Await [{}:{}-{}:{}]",
+		indent,
+		source_location().start.row + 1,
+		source_location().start.column + 1,
+		source_location().end.row + 1,
+		source_location().end.column + 1);
+	spdlog::debug("{}  - value:", indent);
+	std::string new_indent = indent + std::string(6, ' ');
+	m_value->print_node(new_indent);
 }
 
 void Lambda::print_this_node(const std::string &indent) const

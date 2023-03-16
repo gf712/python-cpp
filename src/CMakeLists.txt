@@ -26,6 +26,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
+    executable/bytecode/instructions/GetAwaitable.cpp
     executable/bytecode/instructions/GetIter.cpp
     executable/bytecode/instructions/GetYieldFromIter.cpp
     executable/bytecode/instructions/InplaceOp.cpp

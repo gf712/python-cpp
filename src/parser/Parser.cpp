@@ -2709,8 +2709,9 @@ struct AwaitPrimaryPattern : PatternV2<AwaitPrimaryPattern>
 			PrimaryPattern>;
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("AWAIT primary");
-			auto [_, el] = *result;
-			TODO_NO_FAIL();
+			auto [await_token, el] = *result;
+			SourceLocation sc{ await_token.start(), el->source_location().end };
+			return std::make_shared<Await>(std::move(el), std::move(sc));
 		}
 
 		// primary

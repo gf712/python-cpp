@@ -19,6 +19,7 @@
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
+#include "executable/bytecode/instructions/GetAwaitable.hpp"
 #include "executable/bytecode/instructions/GetIter.hpp"
 #include "executable/bytecode/instructions/GetYieldFromIter.hpp"
 #include "executable/bytecode/instructions/ImportFrom.hpp"
@@ -2952,6 +2953,20 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
 	emit_call(f->get_register(), { iterator->get_register() });
 	return create_return_value();
+}
+
+Value *BytecodeGenerator::visit(const Await *node)
+{
+	auto *iterable = generate(node->value().get(), m_function_id);
+	ASSERT(iterable);
+	auto iterator = create_value();
+	emit<GetAwaitable>(iterator->get_register(), iterable->get_register());
+	auto *none_static = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
+	auto *none = create_value();
+	emit<LoadConst>(none->get_register(), none_static->get_index());
+	auto *result = create_value();
+	emit<::YieldFrom>(result->get_register(), iterator->get_register(), none->get_register());
+	return result;
 }
 
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)

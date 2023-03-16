@@ -31,6 +31,7 @@ namespace ast {
 	__AST_NODE_TYPE(Assign)                  \
 	__AST_NODE_TYPE(Assert)                  \
 	__AST_NODE_TYPE(AsyncFunctionDefinition) \
+	__AST_NODE_TYPE(Await)                   \
 	__AST_NODE_TYPE(AugAssign)               \
 	__AST_NODE_TYPE(Break)                   \
 	__AST_NODE_TYPE(BinaryExpr)              \
@@ -741,6 +742,22 @@ class AsyncFunctionDefinition final : public ASTNode
 	{
 		m_decorator_list.push_back(std::move(decorator));
 	}
+
+	Value *codegen(CodeGenerator *) const override;
+};
+
+class Await final : public ASTNode
+{
+	const std::shared_ptr<ASTNode> m_value;
+
+	void print_this_node(const std::string &indent) const final;
+
+  public:
+	Await(std::shared_ptr<ASTNode> value, SourceLocation source_location)
+		: ASTNode(ASTNodeType::Await, std::move(source_location)), m_value(std::move(value))
+	{}
+
+	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 
 	Value *codegen(CodeGenerator *) const override;
 };
