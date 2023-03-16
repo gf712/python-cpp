@@ -1509,8 +1509,8 @@ Value *BytecodeGenerator::visit(const For *node)
 	emit<Jump>(forloop_start_label);
 
 	// orelse
-	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 	bind(*forloop_end_label);
+	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
 	m_ctx.set_current_loop_start_label(previous_start_label);
 	m_ctx.set_current_loop_end_label(previous_end_label);
