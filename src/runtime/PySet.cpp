@@ -101,6 +101,12 @@ PyResult<PySet *> PySet::intersection(PyTuple *args, PyDict *kwargs) const
 	return PySet::create(result);
 }
 
+PyResult<PyObject *> PySet::pop()
+{
+	if (m_elements.empty()) { return Err(key_error("pop from an empty set")); }
+	m_elements.erase(m_elements.begin());
+	return Ok(py_none());
+}
 
 std::string PySet::to_string() const
 {
@@ -219,6 +225,7 @@ namespace {
 							 .def("discard", &PySet::discard)
 							 .def("remove", &PySet::remove)
 							 .def("intersection", &PySet::intersection)
+							 .def("pop", &PySet::pop)
 							 .type);
 	}
 }// namespace

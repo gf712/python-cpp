@@ -43,6 +43,7 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> discard(PyObject *element);
 	PyResult<PyObject *> remove(PyObject *element);
 	PyResult<PySet *> intersection(PyTuple* args, PyDict* kwargs) const;
+	PyResult<PyObject *> pop();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
