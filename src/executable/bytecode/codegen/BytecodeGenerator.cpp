@@ -1864,6 +1864,13 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 			auto *r = generate(attr.get(), m_function_id);
 			ASSERT(r);
 			return r;
+		} else if (auto subscript = as<Subscript>(node->target())) {
+			const auto *value = generate(subscript->value().get(), m_function_id);
+			const auto *index = build_slice(subscript->slice());
+			auto *result = create_value();
+			emit<BinarySubscript>(
+				result->get_register(), value->get_register(), index->get_register());
+			return result;
 		} else {
 			TODO();
 		}
@@ -1920,6 +1927,10 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 		emit<StoreAttr>(obj->get_register(),
 			lhs->get_register(),
 			load_name(attr->attr(), m_function_id)->get_index());
+	} else if (auto subscript = as<Subscript>(node->target())) {
+		auto *obj = generate(subscript->value().get(), m_function_id);
+		const auto *index = build_slice(subscript->slice());
+		emit<StoreSubscript>(obj->get_register(), index->get_register(), lhs->get_register());
 	} else {
 		TODO();
 	}
@@ -2086,7 +2097,6 @@ Value *BytecodeGenerator::visit(const Subscript *node)
 		emit<BinarySubscript>(result->get_register(), value->get_register(), index->get_register());
 	} break;
 	case ContextType::STORE: {
-		// handled in Assign
 		TODO();
 	} break;
 	case ContextType::UNSET: {
