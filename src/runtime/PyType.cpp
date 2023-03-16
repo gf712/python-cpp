@@ -500,8 +500,10 @@ void PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, P
 		if (auto fn = as<PyFunction>(new_slot)) {
 			auto new_fn = PyStaticMethod::create(fn);
 			ASSERT(new_fn.is_ok());
-			m_attributes->insert(String{ "__new__" }, new_fn.unwrap());
+			new_slot = new_fn.unwrap();
+			m_attributes->insert(String{ "__new__" }, new_slot);
 		}
+		underlying_type().__new__ = new_slot;
 	}
 
 	// TODO: uncomment when classmethod is fixed
@@ -796,14 +798,19 @@ namespace {
 				type->name(),
 				subtype->type()->name()));
 		}
-		if (subtype->issubclass(type)) {
+		if (!subtype->issubclass(type)) {
 			return Err(type_error("{}.__new__({}): {} is not a subtype of {}",
 				type->name(),
 				subtype->name(),
 				subtype->name(),
 				type->name()));
 		}
+
+		// check that the most derived base that's not a heap type is this type.
 		auto staticbase = subtype;
+		while (staticbase && staticbase->underlying_type().is_heaptype) {
+			staticbase = staticbase->underlying_type().__base__;
+		}
 		auto same_slot = []<typename SlotFnType>(
 							 std::optional<std::variant<SlotFnType, PyObject *>> &lhs,
 							 std::variant<SlotFnType, PyObject *> rhs) -> bool {
@@ -812,12 +819,6 @@ namespace {
 			if (std::holds_alternative<PyObject *>(*lhs)) { return false; }
 			return get_address(rhs) == get_address(*lhs);
 		};
-		ASSERT(py::type()->underlying_type().__new__.has_value());
-		while (staticbase
-			   && same_slot(
-				   staticbase->underlying_type().__new__, *py::type()->underlying_type().__new__)) {
-			staticbase = staticbase->underlying_type().__base__;
-		}
 		ASSERT(type->underlying_type().__new__.has_value());
 		if (staticbase
 			&& !same_slot(
@@ -827,20 +828,22 @@ namespace {
 				subtype->name(),
 				staticbase->name()));
 		}
+
 		std::vector<Value> new_args_vec;
-		new_args_vec.reserve(args->elements().size() - 1);
-		for (size_t i = 1; new_args_vec.size(); ++i) {
-			new_args_vec.push_back(args->elements()[i]);
-		}
+		new_args_vec.insert(
+			new_args_vec.end(), args->elements().begin() + 1, args->elements().end());
 		auto new_args = PyTuple::create(std::move(new_args_vec));
 		if (new_args.is_err()) return new_args;
-		return type->__new__(subtype, new_args.unwrap(), kwargs);
+		auto &new_slot = *type->underlying_type().__new__;
+		ASSERT(std::holds_alternative<NewSlotFunctionType>(new_slot));
+		return std::get<NewSlotFunctionType>(new_slot)(subtype, new_args.unwrap(), kwargs);
 	}
 }// namespace
 
 PyResult<std::monostate> PyType::add_operators()
 {
 	for (auto &&slot : slotdefs) {
+		if (slot.name == "__new__") { continue; }
 		if (auto it = m_attributes->map().find(String{ std::string{ slot.name } });
 			it != m_attributes->map().end()) {
 			auto fn = PyObject::from(it->second);
@@ -938,7 +941,8 @@ PyResult<std::monostate> PyType::add_properties()
 
 void PyType::inherit_special(PyType *base)
 {
-	if (&base->underlying_type() != &BuiltinTypes::the().type() && underlying_type().is_heaptype) {
+	if (&base->underlying_type() != &BuiltinTypes::the().object()
+		|| underlying_type().is_heaptype) {
 		if (!underlying_type().__new__.has_value()) {
 			underlying_type().__new__ = base->underlying_type().__new__;
 		}
