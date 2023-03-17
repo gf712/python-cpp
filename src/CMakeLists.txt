@@ -108,12 +108,13 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/itertools/ISlice.cpp
     runtime/modules/itertools/Repeat.cpp
     runtime/modules/itertools/StarMap.cpp
+    runtime/modules/weakref/module.cpp
+    runtime/modules/weakref/PyWeakRef.cpp
     runtime/modules/MarshalModule.cpp
     runtime/modules/PosixModule.cpp
     runtime/modules/SysModule.cpp
     runtime/modules/ThreadModule.cpp
     runtime/modules/WarningsModule.cpp
-    runtime/modules/WeakRefModule.cpp
     runtime/types/builtin.cpp
     runtime/warnings/ImportWarning.cpp
     runtime/warnings/Warning.cpp
@@ -178,7 +179,6 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyTraceback.cpp
     runtime/PyTuple.cpp
     runtime/PyType.cpp
-    runtime/PyWeakRef.cpp
     runtime/PyZip.cpp
     runtime/RuntimeError.cpp
     runtime/StopIteration.cpp

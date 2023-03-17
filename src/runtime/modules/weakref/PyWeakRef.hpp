@@ -1,13 +1,13 @@
 #pragma once
 
-#include "PyObject.hpp"
+#include "runtime/PyObject.hpp"
 
 namespace py {
 
 class PyWeakRef : public PyBaseObject
 {
 	friend class ::Heap;
-	PyObject *m_object{ nullptr };
+	mutable PyObject *m_object{ nullptr };
 	PyObject *m_callback{ nullptr };
 
   protected:

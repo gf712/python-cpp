@@ -1,7 +1,7 @@
-#include "Modules.hpp"
+#include "../Modules.hpp"
+#include "PyWeakRef.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
-#include "runtime/PyWeakRef.hpp"
 
 namespace py {
 PyModule *weakref_module()

@@ -20,9 +20,9 @@ MarkSweepGC::MarkSweepGC() : GarbageCollector() { set_frequency(10'000); }
 namespace {
 
 template<class To, class From>
-__attribute__((no_sanitize_address)) typename std::enable_if_t<
-	sizeof(To) == sizeof(From)
-		&& std::is_trivially_copyable_v<From> && std::is_trivially_copyable_v<To>,
+__attribute__((no_sanitize_address))
+typename std::enable_if_t<sizeof(To) == sizeof(From) && std::is_trivially_copyable_v<From>
+							  && std::is_trivially_copyable_v<To>,
 	To>
 	bit_cast_without_sanitizer(const From &src) noexcept
 {
@@ -92,6 +92,11 @@ bool is_static_memory(uint8_t *cell_start, const Heap &heap)
 }
 
 }// namespace
+
+void GarbageCollector::remove_weakref(Heap &heap, uint8_t *obj) const
+{
+	heap.m_weakrefs.erase(obj);
+}
 
 std::stack<Cell *> MarkSweepGC::collect_roots(const Heap &heap) const
 {
@@ -272,7 +277,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 	// sweep all the dead objects
 	for (const auto &block : blocks) {
 		for (auto &chunk : block.get()->chunks()) {
-			chunk.for_each_cell_alive([&chunk](uint8_t *memory) {
+			chunk.for_each_cell_alive([this, &chunk, &heap](uint8_t *memory) {
 				auto *header = bit_cast<GarbageCollected *>(memory);
 				if (header->white()) {
 					auto *cell = bit_cast<Cell *>(memory + sizeof(GarbageCollected));
@@ -281,6 +286,7 @@ void MarkSweepGC::sweep(Heap &heap) const
 						spdlog::debug("Deallocating {}@{}", obj->type()->name(), (void *)obj);
 					}
 					spdlog::debug("Calling destructor of object at {}", (void *)cell);
+					this->remove_weakref(heap, bit_cast<uint8_t *>(cell));
 					cell->~Cell();
 					chunk.deallocate(memory);
 					new (header) GarbageCollected();

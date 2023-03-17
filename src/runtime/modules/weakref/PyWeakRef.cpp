@@ -1,9 +1,9 @@
 #include "PyWeakRef.hpp"
-#include "MemoryError.hpp"
-#include "PyModule.hpp"
-#include "PyNone.hpp"
-#include "PyType.hpp"
-#include "types/api.hpp"
+#include "runtime/MemoryError.hpp"
+#include "runtime/PyModule.hpp"
+#include "runtime/PyNone.hpp"
+#include "runtime/PyType.hpp"
+#include "runtime/types/api.hpp"
 #include "vm/VM.hpp"
 
 namespace py {
@@ -20,15 +20,14 @@ PyWeakRef::PyWeakRef(PyObject *object, PyObject *callback)
 
 PyResult<PyWeakRef *> PyWeakRef::create(PyObject *object, PyObject *callback)
 {
-	auto *result = VirtualMachine::the().heap().allocate<PyWeakRef>(object, callback);
+	auto *result = VirtualMachine::the().heap().allocate_weakref<PyWeakRef>(object, callback);
 	if (!result) { return Err(memory_error(sizeof(PyWeakRef))); }
 	return Ok(result);
 }
 
 void PyWeakRef::visit_graph(Visitor &visitor)
 {
-	// FIXME: should not keep strong reference to object
-	if (m_object) visitor.visit(*m_object);
+	PyObject::visit_graph(visitor);
 	if (m_callback) visitor.visit(*m_callback);
 }
 
@@ -60,10 +59,15 @@ PyResult<PyObject *> PyWeakRef::__repr__() const { return PyString::create(to_st
 
 PyResult<PyObject *> PyWeakRef::__call__(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!args || args->size() == 0)
-	ASSERT(!kwargs || kwargs->size() == 0)
+	if (args && args->size() > 0) {
+		return Err(type_error("__call__() takes at most 0 arguments ({} given)", args->size()));
+	}
+	if (kwargs && !kwargs->map().empty()) {
+		return Err(
+			type_error("__call__() takes at most 0 keyword arguments ({} given)", args->size()));
+	}
 	if (is_alive()) {
-		ASSERT(m_object)
+		ASSERT(m_object);
 		return Ok(m_object);
 	} else {
 		return Ok(py_none());
@@ -81,6 +85,13 @@ PyType *PyWeakRef::register_type(PyModule *module, std::string_view name)
 	return s_weak_ref;
 }
 
-bool PyWeakRef::is_alive() const { return true; }
+bool PyWeakRef::is_alive() const
+{
+	if (m_object
+		&& !VirtualMachine::the().heap().has_weakref_object(bit_cast<uint8_t *>(m_object))) {
+		m_object = nullptr;
+	}
+	return m_object != nullptr;
+}
 
 }// namespace py

@@ -6,6 +6,7 @@
 #include <bitset>
 #include <memory>
 #include <optional>
+#include <set>
 
 static constexpr size_t KB = 1024;
 static constexpr size_t MB = 1024 * KB;
@@ -273,6 +274,7 @@ class Heap
 	, NonMoveable
 {
 	friend class VirtualMachine;
+	friend GarbageCollector;
 	friend struct TestHeap;
 
 	std::unique_ptr<uint8_t[]> m_static_memory;
@@ -280,6 +282,7 @@ class Heap
 	size_t m_static_offset{ 8 };
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;
+	std::set<uint8_t *> m_weakrefs;
 	uintptr_t *m_bottom_stack_pointer;
 	bool m_allocate_in_static{ false };
 
@@ -334,6 +337,14 @@ class Heap
 		return obj;
 	}
 
+	template<typename T, typename TargetT, typename... Args>
+	T *__attribute__((noinline)) allocate_weakref(TargetT &&target, Args &&...args)
+	{
+		T *obj = allocate<T>(std::forward<TargetT>(target), std::forward<Args>(args)...);
+		if (obj) { m_weakrefs.insert(bit_cast<uint8_t *>(target)); }
+		return obj;
+	}
+
 	void collect_garbage();
 
 	GarbageCollector &garbage_collector()
@@ -362,6 +373,8 @@ class Heap
 	{
 		return ScopedStaticAllocation(*this);
 	}
+
+	bool has_weakref_object(uint8_t *obj) const { return m_weakrefs.contains(obj); }
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;

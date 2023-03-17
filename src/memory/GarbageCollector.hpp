@@ -69,6 +69,8 @@ class GarbageCollector
 	virtual void pause() = 0;
 	virtual bool is_active() const = 0;
 
+	void remove_weakref(Heap &heap, uint8_t *obj) const;
+
 	void set_frequency(size_t new_frequency) { m_frequency = new_frequency; }
 
   protected:
