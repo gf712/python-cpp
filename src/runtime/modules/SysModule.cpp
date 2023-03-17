@@ -364,6 +364,9 @@ PyModule *sys_module(Interpreter &interpreter)
 			return exc_info(interpreter);
 		}).unwrap());
 
+	s_sys_module->add_symbol(PyString::create("maxsize").unwrap(),
+		PyInteger::create(std::numeric_limits<size_t>::max()).unwrap());
+
 	return s_sys_module;
 }
 
