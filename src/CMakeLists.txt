@@ -109,6 +109,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/itertools/Repeat.cpp
     runtime/modules/itertools/StarMap.cpp
     runtime/modules/weakref/module.cpp
+    runtime/modules/weakref/PyWeakProxy.cpp
     runtime/modules/weakref/PyWeakRef.cpp
     runtime/modules/MarshalModule.cpp
     runtime/modules/PosixModule.cpp

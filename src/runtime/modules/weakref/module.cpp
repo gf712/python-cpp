@@ -1,4 +1,5 @@
 #include "../Modules.hpp"
+#include "PyWeakProxy.hpp"
 #include "PyWeakRef.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
@@ -12,6 +13,7 @@ PyModule *weakref_module()
 								  .unwrap();
 
 	PyWeakRef::register_type(s_weak_ref_module, "ref");
+	PyWeakProxy::register_type(s_weak_ref_module, "proxy");
 
 	return s_weak_ref_module;
 }
