@@ -343,10 +343,6 @@ class PySequenceWrapper
 
 class PyObject : public Cell
 {
-	struct NotImplemented_
-	{
-	};
-
 	friend class ::Heap;
 	friend PyMappingWrapper;
 	friend PySequenceWrapper;
@@ -431,6 +427,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
 	PyResult<std::monostate> __setattribute__(PyObject *attribute, PyObject *value);
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
+	PyResult<PyObject *> __ne__(const PyObject *other) const;
 	PyResult<PyObject *> __repr__() const;
 	PyResult<int64_t> __hash__() const;
 	PyResult<PyObject *> __str__();

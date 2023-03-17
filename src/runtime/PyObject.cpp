@@ -503,10 +503,29 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 
 PyResult<PyObject *> PyObject::eq(const PyObject *other) const
 {
-	if (type_prototype().__eq__.has_value()) {
-		return call_slot(*type_prototype().__eq__, this, other);
+	if (this == other) { return Ok(py_true()); }
+	bool checked_reverse_op = false;
+	if (type() != other->type() && other->type()->issubclass(type())
+		&& other->type()->underlying_type().__eq__.has_value()) {
+		checked_reverse_op = true;
+		if (auto result = call_slot(*other->type()->underlying_type().__eq__, other, this);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
 	}
-	return Ok(not_implemented());
+	if (type_prototype().__eq__.has_value()) {
+		if (auto result = call_slot(*type_prototype().__eq__, this, other);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
+	}
+	if (!checked_reverse_op && other->type()->underlying_type().__eq__.has_value()) {
+		if (auto result = call_slot(*other->type()->underlying_type().__eq__, other, this);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
+	}
+	return Ok(this == other ? py_true() : py_false());
 }
 
 PyResult<PyObject *> PyObject::ge(const PyObject *other) const
@@ -543,10 +562,29 @@ PyResult<PyObject *> PyObject::lt(const PyObject *other) const
 
 PyResult<PyObject *> PyObject::ne(const PyObject *other) const
 {
-	if (type_prototype().__ne__.has_value()) {
-		return call_slot(*type_prototype().__ne__, this, other);
+	if (this == other) { return Ok(py_false()); }
+	bool checked_reverse_op = false;
+	if (type() != other->type() && other->type()->issubclass(type())
+		&& other->type()->underlying_type().__ne__.has_value()) {
+		checked_reverse_op = true;
+		if (auto result = call_slot(*other->type()->underlying_type().__ne__, other, this);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
 	}
-	return Ok(not_implemented());
+	if (type_prototype().__ne__.has_value()) {
+		if (auto result = call_slot(*type_prototype().__ne__, this, other);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
+	}
+	if (!checked_reverse_op && other->type()->underlying_type().__ne__.has_value()) {
+		if (auto result = call_slot(*other->type()->underlying_type().__ne__, other, this);
+			result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
+	}
+	return Ok(this != other ? py_true() : py_false());
 }
 
 PyResult<PyObject *> PyObject::getattribute(PyObject *attribute) const
@@ -985,7 +1023,17 @@ PyResult<std::monostate> PyObject::delitem(PyObject *key)
 
 PyResult<PyObject *> PyObject::__eq__(const PyObject *other) const
 {
-	return Ok(this == other ? py_true() : py_false());
+	return Ok(this == other ? py_true() : not_implemented());
+}
+
+PyResult<PyObject *> PyObject::__ne__(const PyObject *other) const
+{
+	if (!type_prototype().__eq__.has_value()) { return Ok(not_implemented()); }
+	return call_slot(*type_prototype().__eq__, this, other).and_then([](PyObject *obj) {
+		return truthy(obj, VirtualMachine::the().interpreter()).and_then([](bool value) {
+			return Ok(value ? py_true() : py_false());
+		});
+	});
 }
 
 PyResult<PyObject *> PyObject::__getattribute__(PyObject *attribute) const
