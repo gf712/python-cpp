@@ -128,8 +128,7 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 		return PyString::create(std::get<String>(string).s);
 	} else if (std::holds_alternative<PyObject *>(string)) {
 		auto s = std::get<PyObject *>(string);
-		ASSERT(as<PyString>(s));
-		return PyString::create(as<PyString>(s)->value());
+		return PyString::create(s);
 	} else {
 		TODO();
 	}
