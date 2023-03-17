@@ -51,7 +51,12 @@ template<typename T> struct klass
 				-> std::optional<std::function<PyResult<PyObject *>(PyObject *)>> {
 				if (getter.has_value()) {
 					return [getter_ = std::move(getter)](PyObject *self) -> PyResult<PyObject *> {
-						return getter_->operator()(static_cast<T *>(self));
+						if (auto obj = getter_->operator()(static_cast<T *>(self));
+							obj.is_ok() && !obj.unwrap()) {
+							return Ok(py_none());
+						} else {
+							return obj;
+						}
 					};
 				} else {
 					return std::nullopt;
@@ -107,7 +112,8 @@ template<typename T> struct klass
 					();
 				}
 			},
-			.member_setter = [member](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
+			.member_setter = [member, name = std::string(name)](
+								 PyObject *self, PyObject *value) -> PyResult<std::monostate> {
 				using MemberType = std::remove_pointer_t<
 					std::remove_reference_t<decltype(static_cast<T *>(self)->*member)>>;
 				if constexpr (std::is_same_v<MemberType, PyObject>) {
@@ -117,7 +123,10 @@ template<typename T> struct klass
 					if (auto *obj = as<MemberType>(value)) {
 						static_cast<T *>(self)->*member = obj;
 					} else {
-						return Err(type_error("attribute value type must be '{}'", type->name()));
+						return Err(type_error("'{}' must be a '{}', not '{}'",
+							name,
+							type->name(),
+							value->type()->name()));
 					}
 				} else {
 					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }

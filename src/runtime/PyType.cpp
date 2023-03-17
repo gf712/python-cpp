@@ -2,6 +2,7 @@
 #include "AttributeError.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"
+#include "PyBuiltInMethod.hpp"
 #include "PyCell.hpp"
 #include "PyClassMethodDescriptor.hpp"
 #include "PyDict.hpp"
@@ -883,6 +884,8 @@ PyResult<std::monostate> PyType::add_methods()
 		auto descriptor = [&, flags = flags]() -> PyResult<PyObject *> {
 			if (flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
 				return PyClassMethodDescriptor::create(name_str, this, method);
+			} else if (flags.is_set(MethodFlags::Flag::STATICMETHOD)) {
+				return PyBuiltInMethod::create(method, this);
 			} else {
 				return PyMethodDescriptor::create(name_str, this, method);
 			}

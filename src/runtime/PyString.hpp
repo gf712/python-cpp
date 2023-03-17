@@ -70,6 +70,8 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> rstrip(PyTuple *args, PyDict *kwargs) const;
 
+	static PyResult<PyObject *> maketrans(PyTuple *args, PyDict *kwargs);
+
 	PyResult<PyObject *> format(PyTuple *args, PyDict *kwargs) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();

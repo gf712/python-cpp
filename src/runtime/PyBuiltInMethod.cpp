@@ -34,6 +34,7 @@ void PyBuiltInMethod::visit_graph(Visitor &visitor)
 std::string PyBuiltInMethod::to_string() const
 {
 	ASSERT(m_ml);
+	ASSERT(m_self);
 
 	return fmt::format("<built-in method '{}' of '{}' object at {}>",
 		m_ml->get().name,
@@ -50,6 +51,8 @@ PyResult<PyObject *> PyBuiltInMethod::__call__(PyTuple *args, PyDict *kwargs)
 	if (m_ml->get().flags.flags() == MethodFlags::create().flags()) {
 		return m_ml->get().method(m_self, args, kwargs);
 	} else if (m_ml->get().flags.is_set(MethodFlags::Flag::CLASSMETHOD)) {
+		return m_ml->get().method(m_self->type(), args, kwargs);
+	} else if (m_ml->get().flags.is_set(MethodFlags::Flag::STATICMETHOD)) {
 		return m_ml->get().method(m_self->type(), args, kwargs);
 	} else {
 		TODO();

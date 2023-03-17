@@ -1081,6 +1081,65 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	return PyString::create(new_value);
 }
 
+PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
+{
+	auto parse_result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"str.maketrans",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr,
+		nullptr);
+
+	if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
+	auto [x, y, z] = parse_result.unwrap();
+	if (y || z) {
+		return Err(
+			not_implemented_error("str.maketrans with two or three arguments is not implemented"));
+	}
+	if (!x->type()->issubclass(dict())) {
+		return Err(type_error("if you give only one argument to maketrans it must be a dict"));
+	}
+
+	const auto *x_dict = static_cast<PyDict *>(x);
+	auto result_ = PyDict::create();
+	if (result_.is_err()) { return result_; }
+	auto *result = result_.unwrap();
+	for (const auto &[key, value] : x_dict->map()) {
+		PyObject *key_obj = nullptr;
+		PyObject *value_obj = nullptr;
+		auto key_ = PyObject::from(key);
+		if (key_.is_err()) { return key_; }
+		if (key_.unwrap()->type()->issubclass(integer())) {
+			key_obj = key_.unwrap();
+		} else if (key_.unwrap()->type()->issubclass(py::str())) {
+			auto *key_str = static_cast<const PyString *>(key_.unwrap());
+			const auto cp = key_str->codepoint();
+			if (!cp.has_value()) {
+				return Err(value_error(" string keys in translate table must be of length 1"));
+			}
+			key_obj = PyInteger::create(*cp).unwrap();
+		} else {
+			return Err(type_error("keys in translate table must be strings or integers"));
+		}
+
+		auto value_ = PyObject::from(value);
+		if (value_.is_err()) { return value_; }
+		if (value_.unwrap()->type()->issubclass(integer())
+			|| value_.unwrap()->type()->issubclass(py::str()) || value_.unwrap() == py_none()) {
+			value_obj = value_.unwrap();
+		} else {
+			return Err(type_error("keys in translate table must be strings or integers"));
+		}
+
+		ASSERT(key_obj);
+		ASSERT(value_obj);
+		result->insert(key_obj, value_obj);
+	}
+
+	return Ok(result);
+}
+
 namespace {
 
 	std::once_flag str_flag;
@@ -1107,6 +1166,7 @@ namespace {
 							 .def("rpartition", &PyString::rpartition)
 							 .def("rstrip", &PyString::rstrip)
 							 .def("format", &PyString::format)
+							 .staticmethod("maketrans", &PyString::maketrans)
 							 .type);
 	}
 }// namespace
