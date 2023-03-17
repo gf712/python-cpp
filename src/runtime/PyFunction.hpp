@@ -11,21 +11,21 @@ class PyFunction : public PyBaseObject
 {
 	friend class ::Heap;
 
-	PyString *m_name = nullptr;
-	PyString *m_doc = nullptr;
-	PyCode *m_code = nullptr;
-	PyObject *m_globals = nullptr;
-	PyDict *m_dict = nullptr;
+	PyString *m_name{ nullptr };
+	PyObject *m_doc{ nullptr };
+	PyCode *m_code{ nullptr };
+	PyObject *m_globals{ nullptr };
+	PyDict *m_dict{ nullptr };
 	const std::vector<Value> m_defaults;
 	const std::vector<Value> m_kwonly_defaults;
 	PyTuple *m_closure{ nullptr };
-	PyString *m_module = nullptr;
+	PyObject *m_module{ nullptr };
+	PyString *m_qualname{ nullptr };
 
 	PyFunction(PyType *);
 
   public:
-	PyFunction(std::string,
-		std::vector<Value> defaults,
+	PyFunction(std::vector<Value> defaults,
 		std::vector<Value> kwonly_defaults,
 		PyCode *code,
 		PyTuple *closure,

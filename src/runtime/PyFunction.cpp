@@ -21,8 +21,7 @@ namespace py {
 
 PyFunction::PyFunction(PyType *type) : PyBaseObject(type) {}
 
-PyFunction::PyFunction(std::string name,
-	std::vector<Value> defaults,
+PyFunction::PyFunction(std::vector<Value> defaults,
 	std::vector<Value> kwonly_defaults,
 	PyCode *code,
 	PyTuple *closure,
@@ -31,9 +30,11 @@ PyFunction::PyFunction(std::string name,
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
 	  m_closure(closure)
 {
-	auto name_ = PyString::create(name);
+	auto name_ = PyString::create(code->name());
 	if (name_.is_err()) { TODO(); }
 	m_name = name_.unwrap();
+
+	m_qualname = m_name;
 
 	// FIXME: get the docstring from PyCode
 	auto doc_ = PyString::create("");
@@ -47,8 +48,15 @@ PyFunction::PyFunction(std::string name,
 
 	if (!m_closure) { m_closure = PyTuple::create().unwrap(); }
 
-	m_dict->insert(String{ "__closure__" }, m_closure);
-	m_dict->insert(String{ "__doc__" }, m_doc);
+	if (auto g = as<PyDict>(globals)) {
+		if (auto it = g->map().find(String{ "__name__" }); it != g->map().end()) {
+			m_module = PyObject::from(it->second).unwrap();
+		}
+	} else {
+		auto it = globals->getitem(PyString::create("__name__").unwrap());
+		ASSERT(!it.is_err());
+		if (it.is_ok()) { m_module = it.unwrap(); }
+	}
 }
 
 void PyFunction::visit_graph(Visitor &visitor)
@@ -59,6 +67,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_module) visitor.visit(*m_module);
 	if (m_dict) visitor.visit(*m_dict);
 	if (m_name) visitor.visit(*m_name);
+	if (m_qualname) visitor.visit(*m_qualname);
 	if (m_doc) visitor.visit(*m_doc);
 	if (m_closure) visitor.visit(*m_closure);
 }
@@ -67,8 +76,10 @@ PyType *PyFunction::static_type() const { return function(); }
 
 PyResult<PyObject *> PyFunction::__repr__() const
 {
-	return PyString::create(
-		fmt::format("<function {} at {}>", m_name->value(), static_cast<const void *>(this)));
+	return PyString::create(m_qualname).and_then([this](PyString *qualname) {
+		return PyString::create(
+			fmt::format("<function {} at {}>", qualname->value(), static_cast<const void *>(this)));
+	});
 }
 
 PyResult<PyObject *> PyFunction::__get__(PyObject *instance, PyObject * /*owner*/) const
@@ -77,8 +88,7 @@ PyResult<PyObject *> PyFunction::__get__(PyObject *instance, PyObject * /*owner*
 	return PyBoundMethod::create(instance, const_cast<PyFunction *>(this));
 }
 
-PyResult<PyObject *>
-	PyFunction::call_with_frame(PyObject *ns, PyTuple *args, PyDict *kwargs) const
+PyResult<PyObject *> PyFunction::call_with_frame(PyObject *ns, PyTuple *args, PyDict *kwargs) const
 {
 	return m_code->eval(m_globals,
 		ns,
@@ -116,8 +126,26 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 								 .attr("__globals__", &PyFunction::m_globals)
 								 .attr("__dict__", &PyFunction::m_dict)
 								 .attr("__name__", &PyFunction::m_name)
+								 .attr("__qualname__", &PyFunction::m_qualname)
 								 .attr("__doc__", &PyFunction::m_doc)
-								 .attribute_readonly("__closure__", &PyFunction::m_closure)
+								 .property_readonly("__closure__",
+									 [](PyFunction *self) { return Ok(self->m_closure); })
+								 .property(
+									 "__doc__",
+									 [](PyFunction *self) { return Ok(self->m_doc); },
+									 [](PyFunction *self, PyObject *d) {
+										 self->m_doc = d;
+										 return Ok(std::monostate{});
+									 })
+								 .property_readonly("__globals__",
+									 [](PyFunction *self) { return Ok(self->m_globals); })
+								 .property(
+									 "__module__",
+									 [](PyFunction *self) { return Ok(self->m_module); },
+									 [](PyFunction *self, PyObject *m) {
+										 self->m_module = m;
+										 return Ok(std::monostate{});
+									 })
 								 .type);
 		});
 		return std::move(type);

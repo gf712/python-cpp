@@ -74,7 +74,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 		main_func.metadata.positional_arg_count,
 		main_func.metadata.kwonly_arg_count,
 		main_func.metadata.stack_size,
-		main_func.metadata.function_name,
+		"<module>",
 		main_func.metadata.names,
 		main_func.metadata.nlocals,
 		main_func.metadata.varnames);
@@ -106,6 +106,8 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 			program);
 		consts = PyTuple::create(func.metadata.consts);
 		if (consts.is_err()) { TODO(); }
+		const auto &func_demangled_name =
+			Mangler::default_mangler().function_demangle(func.metadata.function_name);
 		auto code = PyCode::create(std::move(bytecode),
 			func.metadata.cell2arg,
 			func.metadata.arg_count,
@@ -118,7 +120,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 			func.metadata.positional_arg_count,
 			func.metadata.kwonly_arg_count,
 			func.metadata.stack_size,
-			func.metadata.function_name,
+			func_demangled_name,
 			func.metadata.names,
 			func.metadata.nlocals,
 			func.metadata.varnames);
@@ -204,9 +206,7 @@ PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 			});
 		it != m_functions.end()) {
 		auto *code = *it;
-		const auto &demangled_name = Mangler::default_mangler().function_demangle(function_name);
-		return VirtualMachine::the().heap().allocate<PyFunction>(demangled_name,
-			default_values,
+		return VirtualMachine::the().heap().allocate<PyFunction>(default_values,
 			kw_default_values,
 			code,
 			closure,
