@@ -2,6 +2,7 @@
 
 #include "AttributeError.hpp"
 #include "CustomPyObject.hpp"
+#include "NotImplemented.hpp"
 #include "NotImplementedError.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"

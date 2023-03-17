@@ -83,7 +83,7 @@ void initialize_types()
 	classmethod();
 	member_descriptor();
 	traceback();
-	not_implemented();
+	not_implemented_();
 	frame();
 	namespace_();
 	generator();

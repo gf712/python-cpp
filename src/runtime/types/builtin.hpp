@@ -180,7 +180,7 @@ class BuiltinTypes
 
 	TypePrototype &frame() const { return get_type(m_frame); }
 
-	TypePrototype &not_implemented() const { return get_type(m_not_implemented); }
+	TypePrototype &not_implemented_() const { return get_type(m_not_implemented); }
 
 	TypePrototype &namespace_() const { return get_type(m_namespace); }
 
@@ -245,7 +245,7 @@ PyType *property();
 PyType *classmethod();
 PyType *member_descriptor();
 PyType *traceback();
-PyType *not_implemented();
+PyType *not_implemented_();
 PyType *frame();
 PyType *namespace_();
 PyType *generator();

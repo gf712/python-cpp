@@ -171,7 +171,7 @@ INITIALIZE_TYPE(member_descriptor)
 
 INITIALIZE_TYPE(traceback)
 
-INITIALIZE_TYPE(not_implemented)
+INITIALIZE_TYPE(not_implemented_)
 INITIALIZE_TYPE(frame)
 
 INITIALIZE_TYPE(namespace_)

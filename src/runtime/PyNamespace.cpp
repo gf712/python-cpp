@@ -1,5 +1,6 @@
 #include "PyNamespace.hpp"
 #include "MemoryError.hpp"
+#include "NotImplemented.hpp"
 #include "PyDict.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
