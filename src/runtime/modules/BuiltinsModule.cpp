@@ -949,6 +949,7 @@ auto builtin_types()
 		integer(),
 		none(),
 		object(),
+		memoryview(),
 		dict(),
 		list(),
 		tuple(),

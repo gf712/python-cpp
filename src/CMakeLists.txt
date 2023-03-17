@@ -161,8 +161,8 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyLLVMFunction.cpp
     runtime/PyMappingProxy.cpp
     runtime/PyMemberDescriptor.cpp
+    runtime/PyMemoryView.cpp
     runtime/PyMethodDescriptor.cpp
-    runtime/PyMemberDescriptor.cpp
     runtime/PyModule.cpp
     runtime/PyNamespace.cpp
     runtime/PyNone.cpp

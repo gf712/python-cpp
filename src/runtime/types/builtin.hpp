@@ -26,6 +26,7 @@ class BuiltinTypes
 	mutable Type m_none;
 	mutable Type m_module;
 	mutable Type m_object;
+	mutable Type m_memoryview;
 
 	mutable Type m_function;
 	mutable Type m_native_function;
@@ -124,6 +125,7 @@ class BuiltinTypes
 	TypePrototype &none() const { return get_type(m_none); }
 	TypePrototype &module() const { return get_type(m_module); }
 	TypePrototype &object() const { return get_type(m_object); }
+	TypePrototype &memoryview() const { return get_type(m_memoryview); }
 
 	TypePrototype &dict() const { return get_type(m_dict); }
 	TypePrototype &dict_items() const { return get_type(m_dict_items); }
@@ -204,6 +206,7 @@ PyType *integer();
 PyType *none();
 PyType *module();
 PyType *object();
+PyType *memoryview();
 PyType *dict();
 PyType *dict_items();
 PyType *dict_items_iterator();

@@ -27,6 +27,7 @@
 #include "runtime/PyList.hpp"
 #include "runtime/PyMappingProxy.hpp"
 #include "runtime/PyMemberDescriptor.hpp"
+#include "runtime/PyMemoryView.hpp"
 #include "runtime/PyMethodDescriptor.hpp"
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNamespace.hpp"
@@ -56,8 +57,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_bytearray_iterator(PyByteArrayIterator::type_factory()),
 	  m_ellipsis(PyEllipsis::type_factory()), m_float(PyFloat::type_factory()),
 	  m_none(PyNone::type_factory()), m_module(PyModule::type_factory()),
-	  m_object(PyObject::type_factory()), m_function(PyFunction::type_factory()),
-	  m_native_function(PyNativeFunction::type_factory()),
+	  m_object(PyObject::type_factory()), m_memoryview(PyMemoryView::type_factory()),
+	  m_function(PyFunction::type_factory()), m_native_function(PyNativeFunction::type_factory()),
 	  m_llvm_function(PyLLVMFunction::type_factory()), m_code(PyCode::type_factory()),
 	  m_cell(PyCell::type_factory()), m_dict(PyDict::type_factory()),
 	  m_dict_items(PyDictItems::type_factory()),
@@ -118,6 +119,7 @@ INITIALIZE_TYPE(integer)
 INITIALIZE_TYPE(none)
 INITIALIZE_TYPE(module)
 INITIALIZE_TYPE(object)
+INITIALIZE_TYPE(memoryview)
 
 INITIALIZE_TYPE(dict)
 INITIALIZE_TYPE(dict_items)

@@ -38,6 +38,7 @@ void initialize_types()
 	bytes_iterator();
 	bytearray();
 	bytearray_iterator();
+	memoryview();
 	ellipsis();
 	str();
 	str_iterator();
