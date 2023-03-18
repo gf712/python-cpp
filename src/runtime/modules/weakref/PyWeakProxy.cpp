@@ -76,6 +76,37 @@ PyResult<PyObject *> PyWeakProxy::__repr__() const
 	return PyString::create(to_string());
 }
 
+PyResult<PyObject *> PyWeakProxy::__getattribute__(PyObject *attribute) const
+{
+	auto obj = [this]() -> PyResult<const PyObject *> {
+		if (type() == s_weak_proxy) {
+			if (!static_cast<const PyWeakProxy *>(this)->is_alive()) {
+				// FIXME: should be a ReferenceError
+				return Err(value_error("weakly-referenced object no longer exists"));
+			} else {
+				return Ok(static_cast<const PyWeakProxy *>(this)->m_object);
+			}
+		}
+		return Ok(this);
+	}();
+	if (obj.is_err()) { return Err(obj.unwrap_err()); }
+
+	auto attr = [attribute]() -> PyResult<PyObject *> {
+		if (attribute->type() == s_weak_proxy) {
+			if (!static_cast<const PyWeakProxy *>(attribute)->is_alive()) {
+				// FIXME: should be a ReferenceError
+				return Err(value_error("weakly-referenced object no longer exists"));
+			} else {
+				return Ok(static_cast<const PyWeakProxy *>(attribute)->m_object);
+			}
+		}
+		return Ok(attribute);
+	}();
+	if (attr.is_err()) { return attr; }
+
+	return obj.unwrap()->get_attribute(attr.unwrap());
+}
+
 PyType *PyWeakProxy::register_type(PyModule *module, std::string_view name)
 {
 	if (!s_weak_proxy) {

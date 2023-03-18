@@ -25,6 +25,7 @@ class PyWeakProxy : public PyBaseObject
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __str__() const;
+	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
 
 	static PyType *register_type(PyModule *module, std::string_view name);
 
