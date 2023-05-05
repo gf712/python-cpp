@@ -26,7 +26,7 @@ PyMemberDescriptor::PyMemberDescriptor(PyType *type) : PyBaseObject(type) {}
 
 PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 	PyType *underlying_type,
-	std::function<PyObject *(PyObject *)> member,
+	std::function<PyResult<PyObject *>(PyObject *)> member,
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> setter)
 	: PyBaseObject(BuiltinTypes::the().member_descriptor()), m_name(std::move(name)),
 	  m_underlying_type(underlying_type), m_member_accessor(std::move(member)),
@@ -35,7 +35,7 @@ PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 
 PyResult<PyMemberDescriptor *> PyMemberDescriptor::create(PyString *name,
 	PyType *underlying_type,
-	std::function<PyObject *(PyObject *)> member,
+	std::function<PyResult<PyObject *>(PyObject *)> member,
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> setter)
 {
 	auto *obj = VirtualMachine::the().heap().allocate<PyMemberDescriptor>(
@@ -72,7 +72,7 @@ PyResult<PyObject *> PyMemberDescriptor::__get__(PyObject *instance, PyObject * 
 				instance->type()->underlying_type().__name__));
 	}
 
-	return Ok(m_member_accessor(instance));
+	return m_member_accessor(instance);
 }
 
 PyResult<std::monostate> PyMemberDescriptor::__set__(PyObject *obj, PyObject *value)

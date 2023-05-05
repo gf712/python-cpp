@@ -367,6 +367,11 @@ const TypePrototype &PyObject::type_prototype() const
 void PyObject::visit_graph(Visitor &visitor)
 {
 	if (m_attributes) { visitor.visit(*m_attributes); }
+	for (size_t i = 0, offset = type()->underlying_type().basicsize; i < type()->__slots__.size();
+		 ++i, offset += sizeof(PyObject *)) {
+		auto *slot = *bit_cast<PyObject **>(bit_cast<uint8_t *>(this) + offset);
+		if (slot) { visitor.visit(*slot); }
+	}
 	if (std::holds_alternative<PyType *>(m_type)) {
 		if (auto *t = std::get<PyType *>(m_type)) { visitor.visit(*t); }
 	} else {
@@ -1323,3 +1328,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyObject::type_factory()
 		return std::move(type);
 	};
 }
+
+namespace py::detail {
+size_t slot_count(PyType *t) { return t->__slots__.size(); }
+}// namespace py::detail

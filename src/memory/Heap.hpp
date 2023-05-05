@@ -215,6 +215,39 @@ class Slab
 		}
 	}
 
+	template<typename T>
+	uint8_t *allocate(size_t extra_bytes)
+		requires std::is_base_of_v<Cell, T>
+	{
+		spdlog::trace("Allocating Cell object memory for object of size {}", sizeof(T));
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 16) {
+			return block16->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 32) {
+			return block32->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 64) {
+			return block64->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 128) {
+			return block128->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 256) {
+			return block256->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 512) {
+			return block512->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 1024) {
+			return block1024->allocate();
+		}
+		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 2048) {
+			return block2048->allocate();
+		} else {
+			TODO();
+		}
+	}
+
 	template<typename T> uint8_t *allocate()
 	{
 		[]<bool flag = false>()
@@ -333,6 +366,21 @@ class Heap
 
 		uint8_t *obj_ptr = allocate_gc(ptr);
 		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
+
+		return obj;
+	}
+
+	template<typename T, typename... Args>
+	T *__attribute__((noinline)) allocate_with_extra_bytes(size_t bytes, Args &&...args)
+	{
+		if (bytes == 0) { return allocate<T>(std::forward<Args>(args)...); }
+		if (m_allocate_in_static) { TODO(); }
+		collect_garbage();
+		auto *ptr = m_slab.allocate<T>(bytes);
+
+		uint8_t *obj_ptr = allocate_gc(ptr);
+		T *obj = new (obj_ptr) T(std::forward<Args>(args)...);
+		memset(obj_ptr + sizeof(T), 0, bytes);
 
 		return obj;
 	}

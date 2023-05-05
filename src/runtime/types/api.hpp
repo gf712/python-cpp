@@ -88,29 +88,29 @@ template<typename T> struct klass
 	{
 		type->add_member(MemberDefinition{
 			.name = std::string(name),
-			.member_accessor = [member](PyObject *self) -> PyObject * {
+			.member_accessor = [member](PyObject *self) -> PyResult<PyObject *> {
 				static_assert(member_pointer<ClassMemberType>{});
 				using MemberType =
 					typename std::remove_cvref_t<typename member_pointer<ClassMemberType>::type>;
 
 				if constexpr (std::is_convertible_v<MemberType, PyObject *>) {
 					PyObject *obj = static_cast<T *>(self)->*member;
-					if (!obj) { return py_none(); }
-					return obj;
+					if (!obj) { return Ok(py_none()); }
+					return Ok(obj);
 				} else if constexpr (std::numeric_limits<MemberType>::is_integer) {
 					if constexpr (std::numeric_limits<MemberType>::is_signed) {
 						return PyInteger::create(
-							static_cast<int64_t>(static_cast<T *>(self)->*member))
-							.unwrap();
+							static_cast<int64_t>(static_cast<T *>(self)->*member));
 					} else {
 						const auto value = static_cast<uint64_t>(static_cast<T *>(self)->*member);
 						if (value > std::numeric_limits<int64_t>::max()) { TODO(); }
-						return PyInteger::create(static_cast<int64_t>(value)).unwrap();
+						return PyInteger::create(static_cast<int64_t>(value));
 					}
 				} else {
 					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }
 					();
 				}
+				TODO();
 			},
 			.member_setter = [member, name = std::string(name)](
 								 PyObject *self, PyObject *value) -> PyResult<std::monostate> {
@@ -144,31 +144,31 @@ template<typename T> struct klass
 	{
 		type->add_member(MemberDefinition{
 			.name = std::string(name),
-			.member_accessor = [member](PyObject *self) -> PyObject * {
+			.member_accessor = [member](PyObject *self) -> PyResult<PyObject *> {
 				static_assert(member_pointer<ClassMemberType>{});
 				using MemberType =
 					typename std::remove_cvref_t<typename member_pointer<ClassMemberType>::type>;
 
 				if constexpr (std::is_convertible_v<MemberType, PyObject *>) {
 					PyObject *obj = static_cast<T *>(self)->*member;
-					if (!obj) { return py_none(); }
-					return obj;
+					if (!obj) { return Ok(py_none()); }
+					return Ok(obj);
 				} else if constexpr (std::numeric_limits<MemberType>::is_integer) {
 					if constexpr (std::numeric_limits<MemberType>::is_signed) {
 						return PyInteger::create(
-							static_cast<int64_t>(static_cast<T *>(self)->*member))
-							.unwrap();
+							static_cast<int64_t>(static_cast<T *>(self)->*member));
 					} else {
 						const auto value = static_cast<uint64_t>(static_cast<T *>(self)->*member);
 						if (value > std::numeric_limits<int64_t>::max()) { TODO(); }
-						return PyInteger::create(static_cast<int64_t>(value)).unwrap();
+						return PyInteger::create(static_cast<int64_t>(value));
 					}
 				} else if constexpr (std::is_same_v<MemberType, std::string>) {
-					return PyString::create(static_cast<T *>(self)->*member).unwrap();
+					return PyString::create(static_cast<T *>(self)->*member);
 				} else {
 					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }
 					();
 				}
+				TODO();
 			},
 		});
 		return *this;
@@ -225,8 +225,8 @@ template<typename T> struct klass
 	template<typename FuncType>
 	klass &def(std::string_view name, FuncType &&F)
 		requires requires(PyObject *self, PyTuple *args, PyDict *kwargs) {
-					 (static_cast<T *>(self)->*F)(args, kwargs);
-				 }
+			(static_cast<T *>(self)->*F)(args, kwargs);
+		}
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),
@@ -242,8 +242,8 @@ template<typename T> struct klass
 	template<typename FuncType>
 	klass &def(std::string_view name, FuncType &&F)
 		requires requires(PyObject *self, PyTuple *args, PyDict *kwargs) {
-					 F(static_cast<T *>(self), args, kwargs);
-				 }
+			F(static_cast<T *>(self), args, kwargs);
+		}
 	{
 		type->add_method(MethodDefinition{
 			.name = std::string(name),

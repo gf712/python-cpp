@@ -75,7 +75,7 @@ struct MethodDefinition
 struct MemberDefinition
 {
 	std::string name;
-	std::function<PyObject *(PyObject *)> member_accessor;
+	std::function<PyResult<PyObject *>(PyObject *)> member_accessor;
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> member_setter;
 };
 
@@ -219,6 +219,8 @@ struct TypePrototype
 
   public:
 	std::string __name__;
+	size_t basicsize;
+
 	PyType *__base__{ nullptr };
 	PyTuple *__bases__{ nullptr };
 
@@ -459,14 +461,26 @@ template<> PyResult<PyObject *> PyObject::from(const Value &value);
 
 BaseException *memory_error(size_t failed_allocation_size);
 
+namespace detail {
+	size_t slot_count(PyType *);
+}
+
 template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
 {
 	using namespace concepts;
 
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
+	type_prototype->basicsize = sizeof(Type);
 	type_prototype->__alloc__ = [](PyType *t) -> PyResult<PyObject *> {
-		auto *obj = VirtualMachine::the().heap().allocate<Type>(t);
+		auto *obj = [t]() -> Type * {
+			if (const auto nslots = py::detail::slot_count(t); nslots > 0) {
+				return VirtualMachine::the().heap().allocate_with_extra_bytes<Type>(
+					nslots * sizeof(PyObject *), t);
+			} else {
+				return VirtualMachine::the().heap().allocate<Type>(t);
+			};
+		}();
 		if (!obj) { return Err(memory_error(sizeof(Type))); }
 		return Ok(obj);
 	};

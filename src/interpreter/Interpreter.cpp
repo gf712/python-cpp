@@ -89,6 +89,7 @@ void initialize_types()
 	generator();
 	coroutine();
 	async_generator();
+	mappingproxy();
 }
 
 Interpreter::Interpreter() {}
