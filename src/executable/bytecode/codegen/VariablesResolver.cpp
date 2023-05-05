@@ -222,8 +222,6 @@ Value *VariablesResolver::visit(const Call *node)
 
 Value *VariablesResolver::visit(const ClassDefinition *node)
 {
-	auto caller = m_current_scope;
-
 	for (const auto &decorator : node->decorator_list()) { decorator->codegen(this); }
 	store(node->name(), node->source_location());
 	for (const auto &base : node->bases()) { base->codegen(this); }
@@ -241,6 +239,7 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 		.namespace_ = std::move(ns),
 		.type = Scope::Type::CLASS,
 		.parent = &m_current_scope->get() });
+	auto caller = m_current_scope;
 	m_current_scope = std::ref(*m_visibility.at(class_name));
 
 	m_visibility[class_name]->visibility["__class__"] = Visibility::CELL;
@@ -249,7 +248,7 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 		m_to_visit.emplace_back(*m_current_scope, statement);
 	}
 
-	m_current_scope = caller;
+	m_current_scope = std::move(caller);
 
 	return nullptr;
 }

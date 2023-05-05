@@ -1787,7 +1787,9 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 			std::move(keyword_names));
 	}
 
-	emit<StoreName>(node->name(), Register{ 0 });
+	BytecodeValue return_value{"return_value", 0};
+	store_name(node->name(), &return_value);
+	emit<StoreName>(node->name(), return_value.get_register());
 
 	return nullptr;
 }
