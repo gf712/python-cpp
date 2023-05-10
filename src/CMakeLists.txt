@@ -224,7 +224,7 @@ add_executable(unittests_ ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp
   PUBLIC spdlog_header_only
-  PRIVATE project_options project_warnings ICU::uc ${GMPXX_LIBRARIES} ${GMP_LIBRARIES}
+  PRIVATE project_options project_warnings ICU::uc ICU::data ${GMPXX_LIBRARIES} ${GMP_LIBRARIES}
 )
 
 target_include_directories(python-cpp

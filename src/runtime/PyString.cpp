@@ -18,6 +18,7 @@
 #include <mutex>
 #include <numeric>
 
+#include <unicode/uchar.h>
 #include <unicode/unistr.h>
 
 namespace py {
@@ -1140,6 +1141,21 @@ PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 	return Ok(result);
 }
 
+PyResult<PyObject *> PyString::isidentifier() const
+{
+	for (size_t i = 0; i < m_value.size();) {
+		int length = utf8::codepoint_length(m_value[i]);
+		const auto cp = utf8::codepoint(m_value.c_str() + i, length);
+		if (i == 0 && !u_hasBinaryProperty(cp, UProperty::UCHAR_XID_START)) {
+			return Ok(py_false());
+		} else if (!u_hasBinaryProperty(cp, UProperty::UCHAR_XID_CONTINUE)) {
+			return Ok(py_false());
+		}
+		i += length;
+	}
+	return Ok(py_true());
+}
+
 namespace {
 
 	std::once_flag str_flag;
@@ -1153,6 +1169,7 @@ namespace {
 							 .def("isdigit", &PyString::isdigit)
 							 .def("islower", &PyString::islower)
 							 .def("isupper", &PyString::isupper)
+							 .def("isidentifier", &PyString::isidentifier)
 							 .def("capitalize", &PyString::capitalize)
 							 .def("casefold", &PyString::casefold)
 							 .def("count", &PyString::count)

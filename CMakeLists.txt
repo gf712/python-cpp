@@ -34,7 +34,7 @@ FetchContent_MakeAvailable(cpython)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(GMP REQUIRED)
 
-find_package(ICU REQUIRED COMPONENTS uc)
+find_package(ICU REQUIRED COMPONENTS uc data)
 # if (NOT ${ICU_FOUND})
 # 	ExternalProject_Add(icu
 # 		GIT_REPOSITORY    https://github.com/unicode-org/icu.git

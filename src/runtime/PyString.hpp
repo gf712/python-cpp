@@ -56,6 +56,7 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> isdigit() const;
 	PyResult<PyObject *> islower() const;
 	PyResult<PyObject *> isupper() const;
+	PyResult<PyObject *> isidentifier() const;
 
 	PyResult<PyObject *> capitalize() const;
 	PyResult<PyObject *> casefold() const;
