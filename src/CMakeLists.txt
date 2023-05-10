@@ -108,13 +108,13 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/itertools/ISlice.cpp
     runtime/modules/itertools/Repeat.cpp
     runtime/modules/itertools/StarMap.cpp
+    runtime/modules/thread/module.cpp
     runtime/modules/weakref/module.cpp
     runtime/modules/weakref/PyWeakProxy.cpp
     runtime/modules/weakref/PyWeakRef.cpp
     runtime/modules/MarshalModule.cpp
     runtime/modules/PosixModule.cpp
     runtime/modules/SysModule.cpp
-    runtime/modules/ThreadModule.cpp
     runtime/modules/WarningsModule.cpp
     runtime/types/builtin.cpp
     runtime/warnings/ImportWarning.cpp

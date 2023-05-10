@@ -1,4 +1,3 @@
-#include "Modules.hpp"
 #include "runtime/MemoryError.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
@@ -15,7 +14,7 @@ namespace py {
 
 namespace {
 	static PyType *s_lock = nullptr;
-}
+}// namespace
 
 class Lock : public PyBaseObject
 {
@@ -24,7 +23,7 @@ class Lock : public PyBaseObject
 	std::timed_mutex m_mutex;
 	bool m_locked{ false };
 
-	Lock(PyType* type): PyBaseObject(type) {}
+	Lock(PyType *type) : PyBaseObject(type) {}
 
 	Lock() : PyBaseObject(s_lock->underlying_type()) {}
 
@@ -149,29 +148,4 @@ class Lock : public PyBaseObject
 		return s_lock;
 	}
 };
-
-PyModule *thread_module()
-{
-	auto *s_thread_module = PyModule::create(PyDict::create().unwrap(),
-		PyString::create("_thread").unwrap(),
-		PyString::create("").unwrap())
-								.unwrap();
-
-	(void)Lock::register_type(s_thread_module);
-
-	auto *allocate_lock =
-		PyNativeFunction::create("allocate_lock", [](PyTuple *, PyDict *) -> PyResult<PyObject *> {
-			return Lock::create();
-		}).unwrap();
-
-	s_thread_module->add_symbol(PyString::create("allocate_lock").unwrap(), allocate_lock);
-	s_thread_module->add_symbol(PyString::create("allocate").unwrap(), allocate_lock);
-
-	s_thread_module->add_symbol(PyString::create("get_ident").unwrap(),
-		PyNativeFunction::create("get_ident", [](PyTuple *, PyDict *) -> PyResult<PyObject *> {
-			return PyInteger::create(std::hash<std::thread::id>{}(std::this_thread::get_id()));
-		}).unwrap());
-
-	return s_thread_module;
-}
 }// namespace py
