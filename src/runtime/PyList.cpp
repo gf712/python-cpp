@@ -224,6 +224,23 @@ PyResult<PyObject *> PyList::__getitem__(PyObject *index)
 
 PyResult<size_t> PyList::__len__() const { return Ok(m_elements.size()); }
 
+PyResult<PyObject *> PyList::__add__(const PyObject *other) const
+{
+	if (!other->type()->issubclass(list())) {
+		return Err(
+			type_error("can only concatenate list (not \"{}\") to list", other->type()->name()));
+	}
+	const auto &other_list = static_cast<const PyList &>(*other);
+	auto result = PyList::create(this->elements());
+	if (result.is_err()) { return result; }
+
+	result.unwrap()->elements().insert(result.unwrap()->elements().end(),
+		other_list.elements().begin(),
+		other_list.elements().end());
+
+	return result;
+}
+
 PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
 {
 	if (!as<PyList>(other)) { return Ok(py_false()); }
