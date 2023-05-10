@@ -57,3 +57,24 @@ class D:
         return __class__ == D
 
 assert D().test()
+
+def class_closure():
+    def foo(value):
+        class A:
+            def value(self):
+                return value
+            bar = value
+            del value
+        return A
+
+    assert foo(10)().bar() == 10
+
+    try:
+        foo(10)().value()
+        assert False
+    except AttributeError:
+        pass
+    else:
+        assert False
+
+class_closure()

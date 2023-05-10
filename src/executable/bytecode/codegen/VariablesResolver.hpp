@@ -7,7 +7,73 @@
 class VariablesResolver : public ast::CodeGenerator
 {
   public:
-	enum class Visibility { GLOBAL = 0, NAME = 1, LOCAL = 2, CELL = 3, FREE = 4 };
+	enum class Visibility {
+		GLOBAL = 0,
+		NAME = 1,
+		LOCAL = 2,
+		CELL = 3,
+		FREE = 4,
+		HIDDEN = 5,// assignments in a class scope are hidden, ie. cannot be referred to
+	};
+
+	struct Symbol
+	{
+		std::string name;
+		Visibility visibility;
+		SourceLocation source_location;
+
+		auto operator<=>(const Symbol &other) const = default;
+	};
+
+	struct SymbolMap
+	{
+		std::set<Symbol> symbols;
+		bool contains(std::string name) const
+		{
+			return std::find_if(symbols.begin(), symbols.end(), [&name](const auto &s) {
+				return s.name == name;
+			}) != symbols.end();
+		}
+
+		std::optional<std::reference_wrapper<const Symbol>> get_hidden_symbol(
+			std::string name) const
+		{
+			auto it = std::find_if(symbols.begin(), symbols.end(), [&name](const auto &s) {
+				return s.name == name && s.visibility == Visibility::HIDDEN;
+			});
+			if (it == symbols.end()) { return std::nullopt; }
+			return *it;
+		}
+
+		std::optional<std::reference_wrapper<const Symbol>> get_visible_symbol(
+			std::string name) const
+		{
+			auto it = std::find_if(symbols.begin(), symbols.end(), [&name](const auto &s) {
+				return s.name == name && s.visibility != Visibility::HIDDEN;
+			});
+			if (it == symbols.end()) { return std::nullopt; }
+			return *it;
+		}
+
+		std::optional<std::reference_wrapper<const Symbol>> get_symbol(std::string name) const
+		{
+			auto it = std::find_if(
+				symbols.begin(), symbols.end(), [&name](const auto &s) { return s.name == name; });
+			if (it == symbols.end()) { return std::nullopt; }
+			return *it;
+		}
+
+		void add_symbol(Symbol s)
+		{
+			if (s.visibility == Visibility::HIDDEN) {
+				ASSERT(!get_hidden_symbol(s.name).has_value());
+			} else {
+				ASSERT(!get_visible_symbol(s.name).has_value());
+			}
+			symbols.insert(std::move(s));
+		}
+		void delete_symbol(const Symbol &s) { symbols.erase(s); }
+	};
 
 	struct Scope : NonCopyable
 	{
@@ -19,7 +85,7 @@ class VariablesResolver : public ast::CodeGenerator
 		Scope *parent;
 		std::vector<std::reference_wrapper<Scope>> children;
 		std::set<std::string> captures;
-		std::unordered_map<std::string, Visibility> visibility;
+		SymbolMap symbol_map;
 		// this is beyond the scope of this class, but it is simple and cheap to check if a function
 		// is a generator at this stage
 		bool is_generator{ false };
@@ -38,8 +104,8 @@ class VariablesResolver : public ast::CodeGenerator
 	AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
-	void store(const std::string &name, SourceLocation source_location);
-	void load(const std::string &name, SourceLocation source_location);
+	void store(const std::string &name, SourceLocation source_location, Scope::Type type);
+	void load(const std::string &name, SourceLocation source_location, Scope::Type type);
 	void annotate_free_and_cell_variables(const std::string &name);
 	Scope *top_level_node(const std::string &name) const;
 	Scope *find_outer_scope_of_type(Scope::Type) const;

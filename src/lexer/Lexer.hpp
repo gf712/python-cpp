@@ -25,6 +25,7 @@ struct Position
 		os << position.row + 1 << ':' << position.column;
 		return os;
 	}
+	auto operator<=>(const Position &other) const = default;
 };
 
 

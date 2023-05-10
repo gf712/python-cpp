@@ -20,7 +20,24 @@ struct SourceLocation
 {
 	Position start;
 	Position end;
+	auto operator<=>(const SourceLocation &other) const = default;
+	friend std::ostream &operator<<(std::ostream &os, const SourceLocation &sc)
+	{
+		os << '[' << sc.start << '-' << sc.end << ']';
+		return os;
+	}
 };
+
+template<> struct fmt::formatter<SourceLocation>
+{
+	constexpr auto parse(format_parse_context &ctx) { return ctx.end(); }
+
+	template<typename FormatContext> auto format(const SourceLocation &sc, FormatContext &ctx)
+	{
+		return format_to(ctx.out(), "[{}-{}]", sc.start, sc.end);
+	}
+};
+
 
 namespace ast {
 
