@@ -60,6 +60,7 @@ class BuiltinTypes
 	mutable Type m_reversed;
 
 	mutable Type m_zip;
+	mutable Type m_map;
 
 	mutable Type m_enumerate;
 
@@ -153,6 +154,7 @@ class BuiltinTypes
 	TypePrototype &reversed() const { return get_type(m_reversed); }
 
 	TypePrototype &zip() const { return get_type(m_zip); }
+	TypePrototype &map() const { return get_type(m_map); }
 
 	TypePrototype &enumerate() const { return get_type(m_enumerate); }
 
@@ -227,6 +229,7 @@ PyType *range();
 PyType *range_iterator();
 PyType *reversed();
 PyType *zip();
+PyType *map();
 PyType *enumerate();
 PyType *slice();
 PyType *function();

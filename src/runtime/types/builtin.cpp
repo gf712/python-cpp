@@ -25,6 +25,7 @@
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyLLVMFunction.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyMap.hpp"
 #include "runtime/PyMappingProxy.hpp"
 #include "runtime/PyMemberDescriptor.hpp"
 #include "runtime/PyMemoryView.hpp"
@@ -74,8 +75,9 @@ BuiltinTypes::BuiltinTypes()
 	  m_set(PySet::type_factory()), m_frozenset(PyFrozenSet::type_factory()),
 	  m_set_iterator(PySetIterator::type_factory()), m_range(PyRange::type_factory()),
 	  m_range_iterator(PyRangeIterator::type_factory()), m_reversed(PyReversed::type_factory()),
-	  m_zip(PyZip::type_factory()), m_enumerate(PyEnumerate::type_factory()),
-	  m_slice(PySlice::type_factory()), m_builtin_method(PyBuiltInMethod::type_factory()),
+	  m_zip(PyZip::type_factory()), m_map(PyMap::type_factory()),
+	  m_enumerate(PyEnumerate::type_factory()), m_slice(PySlice::type_factory()),
+	  m_builtin_method(PyBuiltInMethod::type_factory()),
 	  m_slot_wrapper(PySlotWrapper::type_factory()), m_bound_method(PyBoundMethod::type_factory()),
 	  m_method_wrapper(PyMethodDescriptor::type_factory()),
 	  m_classmethod_descriptor(PyClassMethodDescriptor::type_factory()),
@@ -147,6 +149,7 @@ INITIALIZE_TYPE(range_iterator)
 INITIALIZE_TYPE(reversed)
 
 INITIALIZE_TYPE(zip)
+INITIALIZE_TYPE(map)
 
 INITIALIZE_TYPE(enumerate)
 

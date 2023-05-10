@@ -159,6 +159,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyInteger.cpp
     runtime/PyList.cpp
     runtime/PyLLVMFunction.cpp
+    runtime/PyMap.cpp
     runtime/PyMappingProxy.cpp
     runtime/PyMemberDescriptor.cpp
     runtime/PyMemoryView.cpp

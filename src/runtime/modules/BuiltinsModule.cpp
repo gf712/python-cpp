@@ -964,6 +964,7 @@ auto builtin_types()
 		zip(),
 		enumerate(),
 		not_implemented_(),
+		map(),
 	};
 }
 
