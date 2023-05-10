@@ -963,6 +963,7 @@ auto builtin_types()
 		reversed(),
 		zip(),
 		enumerate(),
+		not_implemented_(),
 	};
 }
 
