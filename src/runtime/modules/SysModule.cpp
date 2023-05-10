@@ -367,6 +367,21 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module->add_symbol(PyString::create("maxsize").unwrap(),
 		PyInteger::create(std::numeric_limits<size_t>::max()).unwrap());
 
+	s_sys_module->add_symbol(PyString::create("intern").unwrap(),
+		PyNativeFunction::create("intern",
+			[](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				auto result = PyArgsParser<PyString *>::unpack_tuple(args,
+					kwargs,
+					"sys.intern",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) { return Err(result.unwrap_err()); }
+				auto [string] = result.unwrap();
+				// TODO: add string to intern table when this is implemented
+				return Ok(string);
+			})
+			.unwrap());
+
 	return s_sys_module;
 }
 
