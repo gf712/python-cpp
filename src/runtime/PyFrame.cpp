@@ -147,7 +147,56 @@ PyResult<std::monostate> PyFrame::put_global(const std::string &name, const Valu
 	}
 }
 
-PyObject *PyFrame::locals() const { return m_locals; }
+PyObject *PyFrame::locals() const
+{
+	auto insert = [this](const Value &key, const Value &value) {
+		if (auto l = as<PyDict>(m_locals)) {
+			l->insert(key, value);
+		} else {
+			m_locals->setitem(PyObject::from(key).unwrap(), PyObject::from(value).unwrap());
+		}
+	};
+	auto remove = [this](const Value &key) {
+		if (auto l = as<PyDict>(m_locals)) {
+			l->remove(key);
+		} else {
+			m_locals->delitem(PyObject::from(key).unwrap());
+		}
+	};
+	const auto &fast_locals = VirtualMachine::the().stack_locals();
+	for (size_t i = 0; const auto &varname : m_f_code->m_varnames) {
+		ASSERT(fast_locals.has_value());
+		const auto &value = fast_locals.value().get()[i++];
+		if (std::holds_alternative<PyObject *>(value) && !std::get<PyObject *>(value)) {
+			remove(String{ varname });
+		} else {
+			insert(String{ varname }, value);
+		}
+	}
+
+	size_t i = 0;
+	for (const auto &cell_name : m_f_code->m_cellvars) {
+		const auto &cell = freevars()[i++];
+		if (!cell || cell->empty()) {
+			remove(String{ cell_name });
+		} else {
+			insert(String{ cell_name }, cell->content());
+		}
+	}
+
+	if (!m_f_code->flags().is_set(CodeFlags::Flag::CLASS)) {
+		for (const auto &freevar_name : m_f_code->m_freevars) {
+			const auto &cell = freevars()[i++];
+			if (!cell || cell->empty()) {
+				remove(String{ freevar_name });
+			} else {
+				insert(String{ freevar_name }, cell->content());
+			}
+		}
+	}
+
+	return m_locals;
+}
 
 PyObject *PyFrame::globals() const { return m_globals; }
 

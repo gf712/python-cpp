@@ -237,7 +237,7 @@ std::optional<size_t> Lexer::parse_digits(size_t n, FunctorType &&f) const
 		}
 		n++;
 	}
-	if (peek(n - 1) == '_') {
+	if (n > 0 && peek(n - 1) == '_') {
 		// number cannot end in an underscore
 		TODO();
 		return {};

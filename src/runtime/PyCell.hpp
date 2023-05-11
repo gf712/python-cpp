@@ -29,6 +29,8 @@ class PyCell : public PyBaseObject
 
 	const Value &content() const;
 
+	bool empty() const;
+
 	PyResult<PyObject *> __repr__() const;
 };
 

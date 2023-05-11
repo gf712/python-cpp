@@ -1827,7 +1827,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		}
 	}();
 
-	auto flags = CodeFlags::create();
+	auto flags = CodeFlags::create(CodeFlags::Flag::CLASS);
 
 	class_builder_func->function_info().function.metadata.arg_count = 0;
 	class_builder_func->function_info().function.metadata.kwonly_arg_count = 0;

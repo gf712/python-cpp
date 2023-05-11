@@ -69,6 +69,14 @@ PyType *PyCell::static_type() const { return cell(); }
 
 const Value &PyCell::content() const { return m_content; }
 
+bool PyCell::empty() const
+{
+	if (std::holds_alternative<PyObject *>(m_content)) {
+		if (!std::get<PyObject *>(m_content)) { return true; }
+	}
+	return false;
+}
+
 PyResult<PyObject *> PyCell::__repr__() const { return PyString::create(to_string()); }
 
 void PyCell::set_cell(const Value &new_value) { m_content = new_value; }

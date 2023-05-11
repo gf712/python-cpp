@@ -10,6 +10,7 @@
 #include "runtime/NameError.hpp"
 #include "runtime/NotImplementedError.hpp"
 #include "runtime/OSError.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyCell.hpp"
@@ -39,6 +40,7 @@
 #include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
+#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 
 #include "interpreter/Interpreter.hpp"
@@ -850,6 +852,75 @@ PyResult<PyObject *> exec(const PyTuple *args, const PyDict *, Interpreter &inte
 	}
 }
 
+PyResult<PyObject *> eval(PyTuple *args, PyDict *kwargs, Interpreter &interpreter)
+{
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"eval",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		py_none() /* globals */,
+		py_none() /* locals */);
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+
+	auto [source, globals, locals] = result.unwrap();
+
+	if (globals == py_none()) {
+		globals = interpreter.execution_frame()->globals();
+		if (locals == py_none()) { locals = interpreter.execution_frame()->locals(); }
+	} else if (locals == py_none()) {
+		locals = globals;
+	}
+
+	if (!as<PyDict>(globals)) {
+		return Err(type_error("eval() globals must be a dict, not {}", globals->type()->name()));
+	}
+
+	if (locals != py_none() && locals->as_mapping().is_err()) {
+		return Err(type_error("locals must be a mapping"));
+	}
+
+	ASSERT(globals && globals != py_none() && locals && locals != py_none());
+
+	if (!as<PyDict>(globals)->map().contains(String{ "__builtin__" })) {
+		as<PyDict>(globals)->insert(
+			String{ "__builtin__" }, interpreter.execution_frame()->builtins());
+	}
+
+	if (!as<PyDict>(locals)) { TODO(); }
+
+	if (auto code = as<PyCode>(source)) {
+		return code->eval(as<PyDict>(globals),
+			as<PyDict>(locals),
+			PyTuple::create().unwrap(),
+			PyDict::create().unwrap(),
+			{},
+			{},
+			{},
+			PyString::create("").unwrap());
+	} else if (auto s = as<PyString>(source)) {
+		auto l = Lexer::create(s->value() + "\n", "");
+		parser::Parser p{ l };
+		auto m = p.parse_expression();
+		if (m.is_err()) { return Err(m.unwrap_err()); }
+		auto program =
+			codegen::BytecodeGenerator::compile(m.unwrap(), {}, compiler::OptimizationLevel::None);
+		auto code = program->main_function();
+		ASSERT(as<PyCode>(code));
+		return as<PyCode>(code)->eval(as<PyDict>(globals),
+			as<PyDict>(locals),
+			PyTuple::create().unwrap(),
+			PyDict::create().unwrap(),
+			{},
+			{},
+			{},
+			PyString::create("").unwrap());
+	}
+
+	TODO();
+}
+
 PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 {
 	ASSERT(args)
@@ -1144,6 +1215,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("max").unwrap(),
 		heap.allocate<PyNativeFunction>("max", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return max(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("eval").unwrap(),
+		heap.allocate<PyNativeFunction>("eval", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return eval(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;

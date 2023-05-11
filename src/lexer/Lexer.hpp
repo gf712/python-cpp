@@ -203,6 +203,8 @@ class Lexer
 		return Lexer(std::move(p), std::move(filename));
 	}
 
+	const std::string &program() const { return m_program; }
+
 	const std::string &filename() const { return m_filename; }
 
 	// std::optional<Token> next_token()
