@@ -184,6 +184,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyZip.cpp
     runtime/RuntimeError.cpp
     runtime/StopIteration.cpp
+    runtime/SyntaxError.cpp
     runtime/TypeError.cpp
     runtime/Value.cpp
     runtime/ValueError.cpp)
