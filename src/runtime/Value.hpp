@@ -78,6 +78,8 @@ struct String
 		return os;
 	}
 
+	static String from_unescaped_string(const std::string &str);
+
 	bool operator==(const String &rhs) const { return s == rhs.s; }
 	bool operator==(const PyObject *other) const;
 	bool operator==(const Bytes &) const { return false; }

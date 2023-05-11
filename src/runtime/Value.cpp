@@ -274,6 +274,82 @@ Number Number::floordiv(const Number &other) const
 		other.value);
 }
 
+String String::from_unescaped_string(const std::string &str)
+{
+	std::string output;
+	for (size_t i = 0; i < str.size(); ++i) {
+		auto c = str[i];
+		if (c != '\\') {
+			output.push_back(static_cast<unsigned char>(c));
+			continue;
+		}
+
+		c = str[++i];
+		switch (c) {
+		case '\n':
+			break;
+		case '\\': {
+			output.push_back('\\');
+		} break;
+		case '\'': {
+			output.push_back('\'');
+		} break;
+		case '\"': {
+			output.push_back('\"');
+		} break;
+		case 'b': {
+			output.push_back('\b');
+		} break;
+		case 'f': {
+			output.push_back('\014');
+		} break;
+		case 't': {
+			output.push_back('\t');
+		} break;
+		case 'n': {
+			output.push_back('\n');
+		} break;
+		case 'r': {
+			output.push_back('\r');
+		} break;
+		case 'v': {
+			output.push_back('\013');
+		} break;
+		case 'a': {
+			output.push_back('\007');
+		} break;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7': {
+			if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
+				c = (c << 3) + str[i + 1] - '0';
+				i++;
+				if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
+					c = (c << 3) + str[i + 1] - '0';
+					i++;
+				}
+			}
+			ASSERT(static_cast<int>(c) < static_cast<int>(std::numeric_limits<std::byte>::max()));
+			output.push_back(static_cast<unsigned char>(c));
+		} break;
+		case 'x': {
+			TODO();
+		} break;
+		default: {
+			output.push_back('\\');
+			output.push_back(static_cast<unsigned char>(c));
+		} break;
+		}
+	}
+
+	return String{ std::move(output) };
+}
+
 bool String::operator==(const PyObject *other) const
 {
 	if (auto other_pystr = as<PyString>(other)) {

@@ -1492,7 +1492,8 @@ struct StringPattern : PatternV2<StringPattern>
 					auto &byte_collection = std::get<Bytes>(collection).b;
 					byte_collection.insert(byte_collection.begin(), bytes.b.begin(), bytes.b.end());
 				} else {
-					std::get<std::string>(collection).append(el);
+					auto &s = std::get<std::string>(collection);
+					s.append(String::from_unescaped_string(el).s);
 				}
 			};
 			for (const auto &token : strings) {
