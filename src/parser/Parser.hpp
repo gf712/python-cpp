@@ -59,6 +59,7 @@ class Parser
 	size_t &token_position() { return m_token_position; }
 
 	void parse();
+	py::PyResult<std::shared_ptr<ast::Module>> parse_expression();
 };
 
 }// namespace parser

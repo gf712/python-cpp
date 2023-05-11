@@ -29,6 +29,7 @@
 #include "runtime/PyType.hpp"
 #include "runtime/RuntimeError.hpp"
 #include "runtime/StopIteration.hpp"
+#include "runtime/SyntaxError.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
@@ -988,6 +989,7 @@ auto initialize_exceptions(PyModule *blt)
 	IndexError::register_type(blt);
 	Warning::register_type(blt);
 	ImportWarning::register_type(blt);
+	SyntaxError::register_type(blt);
 }
 
 }// namespace

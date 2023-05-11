@@ -1,4 +1,5 @@
 #include "Parser.hpp"
+#include "runtime/SyntaxError.hpp"
 #include "runtime/Value.hpp"
 
 #include <gmpxx.h>
@@ -7163,6 +7164,44 @@ struct StatementsPattern : PatternV2<StatementsPattern>
 	}
 };
 
+template<> struct traits<struct ExpressionsPattern>
+{
+	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+};
+
+struct ExpressionsPattern : PatternV2<ExpressionsPattern>
+{
+	using ResultType = typename traits<ExpressionsPattern>::result_type;
+
+	// expressions: expression ((',' expression))+ ','?
+	// 				| expression ','
+	// 				| expression
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<ApplyInBetweenPatternV2<ExpressionPattern,
+											SingleTokenPatternV2<Token::TokenType::COMMA>>,
+			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::COMMA>>>;
+		if (auto result = pattern1::match(p)) {
+			auto [expressions, _] = *result;
+			return expressions;
+		}
+
+		using pattern2 =
+			PatternMatchV2<ExpressionPattern, SingleTokenPatternV2<Token::TokenType::COMMA>>;
+		if (auto result = pattern2::match(p)) {
+			auto [expression, _] = *result;
+			return { { expression } };
+		}
+		using pattern3 = PatternMatchV2<ExpressionPattern>;
+		if (auto result = pattern3::match(p)) {
+			auto [expression] = *result;
+			return { { expression } };
+		}
+
+		return {};
+	}
+};
+
 template<> struct traits<struct FilePattern>
 {
 	using result_type = std::shared_ptr<Module>;
@@ -7211,5 +7250,29 @@ void Parser::parse()
 		m_module->print_node("");
 	}
 	DEBUG_LOG("Parser return code: {}", result.has_value());
+}
+
+PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()
+{
+	// eval: expressions NEWLINE* $
+	auto result = PatternMatchV2<ExpressionsPattern,
+		ZeroOrMorePatternV2<SingleTokenPatternV2<Token::TokenType::NEWLINE>>,
+		SingleTokenPatternV2<Token::TokenType::ENDMARKER>>::match(*this);
+	if (result.has_value()) {
+		auto expressions = std::get<0>(*result);
+		if (expressions.size() == 1) {
+			m_module->emplace(std::make_shared<Return>(
+				expressions.back(), expressions.back()->source_location()));
+		} else {
+			auto result = std::make_shared<Tuple>(expressions,
+				ContextType::LOAD,
+				SourceLocation{ .start = expressions.front()->source_location().start,
+					.end = expressions.back()->source_location().end });
+			m_module->emplace(std::make_shared<Return>(result, result->source_location()));
+		}
+		m_module->print_node("");
+		return Ok(m_module);
+	}
+	return Err(syntax_error(m_lexer.program()));
 }
 }// namespace parser
