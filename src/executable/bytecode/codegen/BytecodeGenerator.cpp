@@ -356,10 +356,6 @@ void BytecodeGenerator::make_function(Register dst,
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 {
-	auto &varnames = std::next(m_functions.functions.begin(), m_function_id)->metadata.varnames;
-	if (std::find(varnames.begin(), varnames.end(), name) != varnames.end()) {
-		varnames.push_back(name);
-	}
 	const auto &scope_name = m_stack.top().mangled_name;
 	const auto &visibility = [&] {
 		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
@@ -885,9 +881,11 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	f->function_info().function.metadata.arg_count = arg_count;
 	f->function_info().function.metadata.kwonly_arg_count = kwonly_arg_count;
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
-	f->function_info().function.metadata.nlocals = varnames.size();
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.flags = flags;
-	f->function_info().function.metadata.varnames = std::move(varnames);
 
 	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
@@ -1130,9 +1128,11 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	f->function_info().function.metadata.arg_count = arg_count;
 	f->function_info().function.metadata.kwonly_arg_count = kwonly_arg_count;
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
-	f->function_info().function.metadata.nlocals = varnames.size();
 	f->function_info().function.metadata.flags = flags;
-	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 
 	make_function(f->get_register(), f->get_name(), defaults, kw_defaults, captures_tuple);
 
@@ -2734,8 +2734,10 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 			//	* attributes loaded from objects
 		}
 	}
-	f->function_info().function.metadata.nlocals = varnames.size();
-	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
 	f->function_info().function.metadata.kwonly_arg_count = 0;
 	f->function_info().function.metadata.cell2arg = {};
@@ -2835,8 +2837,10 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 			//	* attributes loaded from objects
 		}
 	}
-	f->function_info().function.metadata.nlocals = varnames.size();
-	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
 	f->function_info().function.metadata.kwonly_arg_count = 0;
 	f->function_info().function.metadata.cell2arg = {};
@@ -2935,8 +2939,10 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 			//	* attributes loaded from objects
 		}
 	}
-	f->function_info().function.metadata.nlocals = varnames.size();
-	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
 	f->function_info().function.metadata.kwonly_arg_count = 0;
 	f->function_info().function.metadata.cell2arg = {};
@@ -3034,8 +3040,10 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 			//	* attributes loaded from objects
 		}
 	}
-	f->function_info().function.metadata.nlocals = varnames.size();
-	f->function_info().function.metadata.varnames = std::move(varnames);
+	f->function_info().function.metadata.varnames.insert(
+		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+	f->function_info().function.metadata.nlocals =
+		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
 	f->function_info().function.metadata.kwonly_arg_count = 0;
 	f->function_info().function.metadata.cell2arg = {};
