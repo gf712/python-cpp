@@ -1,5 +1,6 @@
 #include "PyString.hpp"
 #include "IndexError.hpp"
+#include "KeyError.hpp"
 #include "MemoryError.hpp"
 #include "NotImplementedError.hpp"
 #include "PyBool.hpp"
@@ -55,7 +56,7 @@ namespace utf8 {
 			return 1;
 	}
 
-	size_t codepoint_length(int32_t codepoint)
+	size_t codepoint_length(uint32_t codepoint)
 	{
 		if (codepoint <= 0x00007F) { return 1; }
 		if (codepoint <= 0x0007FF) { return 2; }
@@ -65,23 +66,23 @@ namespace utf8 {
 	}
 
 	// take from http://www.zedwood.com/article/cpp-utf8-char-to-codepoint
-	int32_t codepoint(const char *str, size_t length)
+	std::optional<uint32_t> codepoint(const char *str, size_t length)
 	{
-		if (length < 1) return -1;
+		if (length < 1) return std::nullopt;
 		unsigned char u0 = str[0];
 		if (u0 <= 127) return u0;
-		if (length < 2) return -1;
+		if (length < 2) return std::nullopt;
 		unsigned char u1 = str[1];
 		if (u0 >= 192 && u0 <= 223) return (u0 - 192) * 64 + (u1 - 128);
 		if (u0 == 0xed && (u1 & 0xa0) == 0xa0) return -1;// code points, 0xd800 to 0xdfff
-		if (length < 3) return -1;
+		if (length < 3) return std::nullopt;
 		unsigned char u2 = str[2];
 		if (u0 >= 224 && u0 <= 239) return (u0 - 224) * 4096 + (u1 - 128) * 64 + (u2 - 128);
-		if (length < 4) return -1;
+		if (length < 4) return std::nullopt;
 		unsigned char u3 = str[3];
 		if (u0 >= 240 && u0 <= 247)
 			return (u0 - 240) * 262144 + (u1 - 128) * 4096 + (u2 - 128) * 64 + (u3 - 128);
-		return -1;
+		return std::nullopt;
 	}
 
 }// namespace utf8
@@ -818,8 +819,8 @@ PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->size() == 0)
 
-	const auto chars = [args]() -> PyResult<std::vector<int32_t>> {
-		if (!args || args->size() == 0) { return Ok(std::vector<int32_t>{}); }
+	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
+		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
 		auto args0 = PyObject::from(args->elements()[0]);
 
 		auto str = as<PyString>(args0.unwrap());
@@ -863,27 +864,22 @@ PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 	}
 }
 
-
-PyResult<PyObject *> PyString::format(PyTuple *, PyDict *) const
+std::vector<uint32_t> PyString::codepoints() const
 {
-	// TODO: do some actual string formatting :)
-	return create(m_value);
-}
-
-std::vector<int32_t> PyString::codepoints() const
-{
-	std::vector<int32_t> codepoints;
+	std::vector<uint32_t> codepoints;
 
 	for (size_t i = 0; i < m_value.size();) {
 		int length = utf8::codepoint_length(m_value[i]);
-		codepoints.push_back(utf8::codepoint(m_value.c_str() + i, length));
+		const auto cp = utf8::codepoint(m_value.c_str() + i, length);
+		ASSERT(cp.has_value());
+		codepoints.push_back(*cp);
 		i += length;
 	}
 	return codepoints;
 }
 
 
-std::optional<int32_t> PyString::codepoint() const
+std::optional<uint32_t> PyString::codepoint() const
 {
 	if (auto codepoint_length = utf8::codepoint_length(m_value[0]);
 		codepoint_length != m_value.size()) {
@@ -926,7 +922,10 @@ PyResult<PyObject *> PyString::__getitem__(PyObject *index)
 		std::string str;
 
 		for (int64_t idx = start, i = 0; i < slice_length; idx += step, ++i) {
-			icu::UnicodeString uni_str(codepoints[idx]);
+			const auto cp = codepoints[idx];
+			// is this a valid unicode codepoint?
+			ASSERT(cp < 0x110000);
+			icu::UnicodeString uni_str(static_cast<UChar32>(cp));
 			str.clear();
 			uni_str.toUTF8String(str);
 			new_str += str;
@@ -950,14 +949,16 @@ PyResult<PyObject *> PyString::operator[](int64_t index) const
 
 	if (index >= str_size) { return Err(index_error("string index out of range")); }
 
-	icu::UnicodeString uni_str(codepoints()[index]);
+	const auto cp = codepoints()[index];
+	ASSERT(cp < 0x110000);
+	icu::UnicodeString uni_str(static_cast<UChar32>(cp));
 	std::string str;
 	uni_str.toUTF8String(str);
 	return PyString::create(str);
 }
 
 namespace {
-	struct Conversion
+	struct FormatSpec
 	{
 		size_t start;
 		size_t end;
@@ -997,7 +998,7 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 		'd', 'i', 'o', 'u', 'x', 'X', 'e', 'E', 'f', 'F', 'g', 'G', 'c', 'r', 's', 'a', '%'
 	};
 	// find conversion specifiers
-	std::vector<Conversion> conversions;
+	std::vector<FormatSpec> conversions;
 	const auto codepoints = this->codepoints();
 	for (size_t i = 0, start = 0; i < codepoints.size(); ++i) {
 		auto codepoint = codepoints[i];
@@ -1082,6 +1083,162 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	return PyString::create(new_value);
 }
 
+namespace {
+	struct ReplacementField
+	{
+		enum class Conversion {
+			REPR,
+			STR,
+			ASCII,
+		};
+		std::optional<std::string> field_name;
+		std::optional<Conversion> conversion;
+		std::optional<FormatSpec> format_spec;
+		size_t start;
+		size_t end;
+
+		static PyResult<ReplacementField> parse(std::string_view str, size_t start, size_t end)
+		{
+			// replacement_field ::=  "{" [field_name] ["!" conversion] [":" format_spec] "}"
+			// field_name        ::=  arg_name ("." attribute_name | "[" element_index "]")*
+			// arg_name          ::=  [identifier | digit+]
+			// attribute_name    ::=  identifier
+			// element_index     ::=  digit+ | index_string
+			// index_string      ::=  <any source character except "]"> +
+			// conversion        ::=  "r" | "s" | "a"
+			// format_spec       ::=  <described in the next section>
+			ASSERT(str.front() == '{');
+			ASSERT(str.back() == '}');
+			ReplacementField replacement_field{ .start = start, .end = end };
+			str = str.substr(1, str.size() - 2);
+			if (!str.empty() && str[0] != '!' && str[0] != ':') {
+				auto end = str.find_first_of("!:");
+				replacement_field.field_name = str.substr(0, end);
+				if (end == std::string_view::npos) { return Ok(replacement_field); }
+				str = end == std::string_view::npos ? "" : str.substr(end);
+			}
+			if (!str.empty() && str[0] == '!') {
+				str = str.substr(1);
+				auto end = str.find(':');
+				const auto conversion = str.substr(0, end);
+				if (conversion == "r") {
+					replacement_field.conversion = Conversion::REPR;
+				} else if (conversion == "s") {
+					replacement_field.conversion = Conversion::STR;
+				} else if (conversion == "a") {
+					replacement_field.conversion = Conversion::ASCII;
+				} else {
+					return Err(value_error("Invalid conversion specifier '{}'", conversion));
+				}
+				str = end == std::string_view::npos ? "" : str.substr(end);
+			}
+			if (!str.empty() && str[0] == ':') {
+				return Err(not_implemented_error("Format spec in str.format not implemented"));
+			}
+			ASSERT(str.empty());
+			return Ok(replacement_field);
+		}
+	};
+
+}// namespace
+
+PyResult<PyObject *> PyString::format(PyTuple *args, PyDict *kwargs) const
+{
+	std::string_view str{ m_value };
+	std::string new_string;
+	const auto &cps = codepoints();
+	size_t start = 0;
+	size_t index = 0;
+	size_t args_index = 0;
+	auto increment = [&start, &index, &cps, this](size_t count) {
+		while (count-- > 0) {
+			ASSERT(index < cps.size());
+			const auto cp = cps[index++];
+			ASSERT(start < m_value.size());
+			start += utf8::codepoint_length(cp);
+		}
+	};
+	for (; index < cps.size(); increment(1)) {
+		const auto cp = cps[index];
+		if (cp == '{') {
+			if (cps[index + 1] == '{') {
+				increment(1);
+				new_string.push_back('{');
+				continue;
+			}
+			const auto it = std::find(cps.begin() + start, cps.end(), '}');
+			if (it == cps.end()) {
+				return Err(value_error("Single '{{' encountered in format string"));
+			}
+			const auto end = std::distance(cps.begin() + start, it) + 1;
+
+			auto replacement_field_ =
+				ReplacementField::parse(str.substr(start, end), start, start + end);
+			if (replacement_field_.is_err()) { return Err(replacement_field_.unwrap_err()); }
+
+			const auto &replacement_field = replacement_field_.unwrap();
+			auto r = [args, kwargs, &args_index, &replacement_field, &str, start, end]()
+				-> PyResult<PyString *> {
+				return [args, kwargs, &args_index, &replacement_field]()
+						   -> PyResult<PyObject *> {
+					if (replacement_field.field_name.has_value()) {
+						if (!kwargs) { return Err(key_error(*replacement_field.field_name)); }
+						const auto it = kwargs->map().find(String{ *replacement_field.field_name });
+						if (it != kwargs->map().end()) { return PyObject::from(it->second); }
+						return Err(key_error(*replacement_field.field_name));
+					} else {
+						if (!args || args_index >= args->elements().size()) {
+							return Err(index_error(
+								"Replacement index {} out of range for positional args tuple",
+								args_index));
+						}
+						return PyObject::from(args->elements()[args_index++]);
+					}
+				}()
+								  .and_then(
+									  [&replacement_field](PyObject *obj) -> PyResult<PyString *> {
+										  if (replacement_field.conversion.has_value()) {
+											  switch (*replacement_field.conversion) {
+											  case ReplacementField::Conversion::REPR: {
+												  return obj->repr();
+											  } break;
+											  case ReplacementField::Conversion::STR: {
+												  return obj->str();
+											  } break;
+											  case ReplacementField::Conversion::ASCII: {
+												  return Err(not_implemented_error(
+													  "Replacement field with ASCII conversion not "
+													  "implemented"));
+											  } break;
+											  }
+										  }
+										  return obj->str();
+									  })
+								  .and_then([&replacement_field, &str, start, end](
+												PyString *obj) -> PyResult<PyString *> {
+									  if (replacement_field.format_spec.has_value()) {
+										  return Err(not_implemented_error(
+											  "Replacement field '{}' not implemented",
+											  str.substr(start + 1, end - 2)));
+									  }
+									  return Ok(obj);
+								  });
+			}()
+					   .and_then([&new_string](PyString *stringified) -> PyResult<std::monostate> {
+						   new_string += stringified->value();
+						   return Ok(std::monostate{});
+					   });
+
+			if (r.is_err()) { return Err(r.unwrap_err()); }
+			increment(replacement_field.end - start - 1);
+		} else {
+			new_string += str.substr(start, utf8::codepoint_length(cp));
+		}
+	}
+
+	return create(new_string);
+}
+
 PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 {
 	auto parse_result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
@@ -1146,9 +1303,10 @@ PyResult<PyObject *> PyString::isidentifier() const
 	for (size_t i = 0; i < m_value.size();) {
 		int length = utf8::codepoint_length(m_value[i]);
 		const auto cp = utf8::codepoint(m_value.c_str() + i, length);
-		if (i == 0 && !u_hasBinaryProperty(cp, UProperty::UCHAR_XID_START)) {
+		ASSERT(cp.has_value());
+		if (i == 0 && !u_hasBinaryProperty(*cp, UProperty::UCHAR_XID_START)) {
 			return Ok(py_false());
-		} else if (!u_hasBinaryProperty(cp, UProperty::UCHAR_XID_CONTINUE)) {
+		} else if (!u_hasBinaryProperty(*cp, UProperty::UCHAR_XID_CONTINUE)) {
 			return Ok(py_false());
 		}
 		i += length;
@@ -1217,7 +1375,9 @@ PyResult<PyObject *> PyStringIterator::__repr__() const { return PyString::creat
 PyResult<PyObject *> PyStringIterator::__next__()
 {
 	if (m_current_index < m_pystring.size()) {
-		icu::UnicodeString uni_str(m_pystring.codepoints()[m_current_index++]);
+		const auto cp = m_pystring.codepoints()[m_current_index++];
+		ASSERT(cp < 0x110000);
+		icu::UnicodeString uni_str(static_cast<UChar32>(cp));
 		std::string str;
 		uni_str.toUTF8String(str);
 		return PyString::create(str);

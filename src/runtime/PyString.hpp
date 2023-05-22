@@ -30,8 +30,8 @@ class PyString : public PyBaseObject
 	}
 
 	const std::string &value() const { return m_value; }
-	std::vector<int32_t> codepoints() const;
-	std::optional<int32_t> codepoint() const;
+	std::vector<uint32_t> codepoints() const;
+	std::optional<uint32_t> codepoint() const;
 
 	std::string to_string() const override { return m_value; }
 	size_t size() const;
