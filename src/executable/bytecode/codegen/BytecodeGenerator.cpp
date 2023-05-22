@@ -1418,11 +1418,22 @@ Value *BytecodeGenerator::visit(const Call *node)
 			requires_kwargs_expansion);
 	} else {
 		if (node->function()->node_type() == ASTNodeType::Attribute) {
-			auto attr_name = as<Attribute>(node->function())->attr();
 			std::vector<Register> arg_registers;
 			arg_registers.reserve(arg_values.size());
 			for (const auto &arg : arg_values) { arg_registers.push_back(arg->get_register()); }
-			emit<MethodCall>(func->get_register(), std::move(arg_registers));
+			if (keyword_values.empty()) {
+				emit<MethodCall>(func->get_register(), std::move(arg_registers));
+			} else {
+				std::vector<Register> keyword_registers;
+				keyword_registers.reserve(keyword_values.size());
+				for (const auto &kw : keyword_values) {
+					keyword_registers.push_back(kw->get_register());
+				}
+				emit<FunctionCallWithKeywords>(func->get_register(),
+					std::move(arg_registers),
+					std::move(keyword_registers),
+					std::move(keywords));
+			}
 		} else {
 			std::vector<Register> arg_registers;
 			std::vector<Register> keyword_registers;
