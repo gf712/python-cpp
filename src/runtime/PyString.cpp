@@ -15,9 +15,11 @@
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include "utilities.hpp"
 
 #include <mutex>
 #include <numeric>
+#include <span>
 
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
@@ -100,17 +102,11 @@ PyResult<PyString *> PyString::create(const std::string &value)
 PyResult<PyString *> PyString::create(PyObject *obj)
 {
 	if (auto *s = as<PyString>(obj)) {
-		return PyString::create(s->value());
+		return Ok(s);
 	} else if (obj->type()->underlying_type().__str__.has_value()) {
 		return obj->str();
 	} else {
-		return obj->repr().and_then([](PyObject *str) -> PyResult<PyString *> {
-			if (!as<PyString>(str)) {
-				return Err(
-					type_error("__repr_ returned non-string (type {})", str->type()->name()));
-			}
-			return Ok(as<PyString>(str));
-		});
+		return obj->repr();
 	}
 }
 
@@ -144,7 +140,10 @@ PyResult<int64_t> PyString::__hash__() const
 	return Ok(static_cast<int64_t>(std::hash<std::string>{}(m_value)));
 }
 
-PyResult<PyObject *> PyString::__repr__() const { return PyString::create(m_value); }
+PyResult<PyObject *> PyString::__repr__() const
+{
+	return PyString::create(fmt::format("'{}'", m_value));
+}
 
 PyResult<PyObject *> PyString::__add__(const PyObject *obj) const
 {
@@ -1314,9 +1313,19 @@ PyResult<PyObject *> PyString::isidentifier() const
 
 PyResult<PyString *> PyString::convert_to_ascii(PyObject *obj)
 {
-	return obj->repr().and_then([](PyString *str) {
+	return obj->repr().and_then([obj](PyString *str) {
 		std::string new_string;
-		for (const auto &cp : str->codepoints()) {
+		const auto &cps = str->codepoints();
+		auto s = [obj, &cps]() {
+			if (compare_slot_address(obj->type()->underlying_type().__repr__,
+					py::str()->underlying_type().__repr__)) {
+				// if we got the representation with str.__repr__, remove the surrounding single
+				// quotes
+				return std::span{ cps.begin() + 1, cps.size() - 2 };
+			}
+			return std::span{ cps.begin(), cps.size() };
+		}();
+		for (const auto &cp : s) {
 			if (cp <= 128) {
 				new_string.push_back(static_cast<char>(cp));
 			} else {

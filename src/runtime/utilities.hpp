@@ -10,11 +10,10 @@ namespace py {
 
 namespace detail {
 	template<typename T>
-	concept has_output_iterator_error = requires(const T iterator)
-	{
+	concept has_output_iterator_error = requires(const T iterator) {
 		{
 			iterator.last_error()
-			} -> std::convertible_to<BaseException *>;
+		} -> std::convertible_to<BaseException *>;
 	};
 }// namespace detail
 
@@ -53,6 +52,24 @@ PyResult<std::monostate> from_iterable(PyObject *iterable, OutputIterator result
 	}
 
 	return Ok(std::monostate{});
+}
+
+template<typename FnReturnType, typename... FnArgs>
+bool compare_slot_address(
+	const std::optional<std::variant<std::function<FnReturnType(FnArgs...)>, PyObject *>> &lhs,
+	const std::optional<std::variant<std::function<FnReturnType(FnArgs...)>, PyObject *>> &rhs)
+{
+	using FnType = std::function<FnReturnType(FnArgs...)>;
+	using FnPointerType = FnReturnType (*)(FnArgs...);
+	if (!lhs.has_value() || !rhs.has_value()) { return false; }
+	if (lhs->index() != rhs->index()) { return false; }
+	if (std::holds_alternative<FnType>(*lhs)) {
+		ASSERT(std::get<FnType>(*lhs).template target<FnPointerType>());
+		ASSERT(std::get<FnType>(*rhs).template target<FnPointerType>());
+		return std::get<FnType>(*lhs).template target<FnPointerType>()
+			   == std::get<FnType>(*rhs).template target<FnPointerType>();
+	}
+	return std::get<PyObject *>(*lhs) == std::get<PyObject *>(*rhs);
 }
 
 }// namespace py
