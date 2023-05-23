@@ -1206,9 +1206,7 @@ PyResult<PyObject *> PyString::format(PyTuple *args, PyDict *kwargs) const
 												  return obj->str();
 											  } break;
 											  case ReplacementField::Conversion::ASCII: {
-												  return Err(not_implemented_error(
-													  "Replacement field with ASCII conversion not "
-													  "implemented"));
+												  return PyString::convert_to_ascii(obj);
 											  } break;
 											  }
 										  }
@@ -1312,6 +1310,22 @@ PyResult<PyObject *> PyString::isidentifier() const
 		i += length;
 	}
 	return Ok(py_true());
+}
+
+PyResult<PyString *> PyString::convert_to_ascii(PyObject *obj)
+{
+	return obj->repr().and_then([](PyString *str) {
+		std::string new_string;
+		for (const auto &cp : str->codepoints()) {
+			if (cp <= 128) {
+				new_string.push_back(static_cast<char>(cp));
+			} else {
+				new_string += fmt::format("\\U{:08x}", cp);
+			}
+		}
+
+		return PyString::create(new_string);
+	});
 }
 
 namespace {

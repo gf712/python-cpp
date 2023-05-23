@@ -1007,6 +1007,20 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
+PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
+{
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"ascii",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+	auto [obj] = result.unwrap();
+
+	return PyString::convert_to_ascii(obj);
+}
+
 auto builtin_types()
 {
 	return std::array{
@@ -1220,6 +1234,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("eval").unwrap(),
 		heap.allocate<PyNativeFunction>("eval", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return eval(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("ascii").unwrap(),
+		heap.allocate<PyNativeFunction>("ascii", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return ascii(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;

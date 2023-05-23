@@ -75,6 +75,8 @@ class PyString : public PyBaseObject
 
 	PyResult<PyObject *> format(PyTuple *args, PyDict *kwargs) const;
 
+	static PyResult<PyString *> convert_to_ascii(PyObject *obj);
+
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
 
