@@ -86,5 +86,7 @@ static constexpr uint8_t GET_YIELD_FROM_ITER = 68;
 static constexpr uint8_t YIELD_FROM = 69;
 static constexpr uint8_t IMPORT_STAR = 70;
 static constexpr uint8_t GET_AWAITABLE = 71;
+static constexpr uint8_t BUILD_STRING = 72;
+static constexpr uint8_t FORMAT_VALUE = 73;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

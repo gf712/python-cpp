@@ -58,8 +58,14 @@ class Parser
 	const size_t &token_position() const { return m_token_position; }
 	size_t &token_position() { return m_token_position; }
 
+	// parses a file
 	void parse();
+
+	// parses an expression used by the builtin `eval` function
 	py::PyResult<std::shared_ptr<ast::Module>> parse_expression();
+
+	// parses the rule inside the {} in an fstring
+	py::PyResult<std::shared_ptr<ast::ASTNode>> parse_fstring();
 };
 
 }// namespace parser

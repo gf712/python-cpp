@@ -38,6 +38,7 @@ class PyString : public PyBaseObject
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __str__() const;
 	PyResult<int64_t> __hash__() const;
 	PyResult<PyObject *> __eq__(const PyObject *obj) const;
 	PyResult<PyObject *> __ne__(const PyObject *obj) const;

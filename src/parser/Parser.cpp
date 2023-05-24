@@ -1456,9 +1456,191 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 	}
 };
 
+std::shared_ptr<Constant> parse_bytes(std::vector<Token> strings)
+{
+	Bytes byte_collection;
+	auto start_token = strings.front();
+	auto end_token = strings.back();
+	for (const auto &token : strings) {
+		auto *start = token.start().pointer_to_program;
+		const auto *end = token.end().pointer_to_program;
+
+		if (start[0] != 'b' && start[0] != 'B') {
+			// FIXME: should be a SyntaxError
+			spdlog::error("cannot mix bytes and nonbytes literals");
+			std::abort();
+		}
+		start++;
+
+		const bool is_triple_quote = (start[0] == '\"' || start[0] == '\'')
+									 && (start[1] == '\"' || start[1] == '\'')
+									 && (start[2] == '\"' || start[2] == '\'');
+
+		const auto value = [is_triple_quote, start, end]() {
+			if (is_triple_quote) {
+				return std::string{ start + 3, end - 3 };
+			} else {
+				return std::string{ start + 1, end - 1 };
+			}
+		}();
+		const auto bytes = Bytes::from_unescaped_string(value);
+		byte_collection.b.insert(byte_collection.b.begin(), bytes.b.begin(), bytes.b.end());
+		end_token = token;
+	}
+	Bytes transformed;
+	transformed.b.reserve(byte_collection.b.size());
+	for (size_t i = 0; i < byte_collection.b.size();) {
+		if (i < (byte_collection.b.size() - 1) && static_cast<char>(byte_collection.b[i]) == '\\'
+			&& static_cast<char>(byte_collection.b[i + 1]) == '\n') {
+			i += 2;
+		} else {
+			transformed.b.push_back(byte_collection.b[i++]);
+		}
+	}
+	transformed.b.shrink_to_fit();
+	return std::make_shared<Constant>(
+		transformed, SourceLocation{ start_token.start(), end_token.end() });
+}
+
+std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
+{
+	std::vector<std::shared_ptr<ASTNode>> string_nodes;
+	for (const auto &token : strings) {
+		auto *start = token.start().pointer_to_program;
+		const auto *end = token.end().pointer_to_program;
+
+		if (start[0] == 'b' && start[0] == 'B') {
+			// FIXME: should be a SyntaxError
+			spdlog::error("cannot mix bytes and nonbytes literals");
+			std::abort();
+		}
+		if (start[0] == 'f' || start[0] == 'F') { start++; }
+
+		const bool is_triple_quote = (start[0] == '\"' || start[0] == '\'')
+									 && (start[1] == '\"' || start[1] == '\'')
+									 && (start[2] == '\"' || start[2] == '\'');
+
+		auto value = [is_triple_quote, start, end]() {
+			if (is_triple_quote) {
+				return std::string_view{ start + 3, end - 3 };
+			} else {
+				return std::string_view{ start + 1, end - 1 };
+			}
+		}();
+
+		size_t start_idx = 0;
+		size_t end_idx = value.size() - 1;
+
+		while (start_idx < end_idx) {
+			const auto expr_start = value.find('{', start_idx);
+			if (expr_start != std::string_view::npos) {
+				if (expr_start != start_idx) {
+					string_nodes.push_back(std::make_shared<Constant>(
+						std::string{ value.substr(start_idx, expr_start - start_idx) },
+						SourceLocation{ .start = token.start(), .end = token.end() }));
+				}
+
+				const auto expr_end = value.find('}', expr_start);
+				if (expr_end == std::string_view::npos) {
+					// FIXME: should be a SyntaxError
+					spdlog::error("f-string: expecting '}'");
+					std::abort();
+				}
+				auto expr = value.substr(expr_start + 1, expr_end - 1);
+				auto lexer = Lexer::create(std::string{ expr }, l.filename());
+				Parser p{ lexer };
+				auto formatted_value = p.parse_fstring();
+				if (formatted_value.is_err()) {
+					// FIXME: should be a SyntaxError
+					spdlog::error(formatted_value.unwrap_err()->to_string());
+					std::abort();
+				}
+				string_nodes.push_back(std::make_shared<FormattedValue>(formatted_value.unwrap(),
+					FormattedValue::Conversion::NONE,
+					nullptr,
+					SourceLocation{ .start = token.start(), .end = token.end() }));
+				start_idx = expr_end + 1;
+			} else {
+				string_nodes.push_back(
+					std::make_shared<Constant>(std::string{ value.substr(start_idx) },
+						SourceLocation{ .start = token.start(), .end = token.end() }));
+				start_idx = value.size();
+			}
+		}
+	}
+	return std::make_shared<JoinedStr>(std::move(string_nodes),
+		SourceLocation{ .start = string_nodes.front()->source_location().start,
+			.end = string_nodes.back()->source_location().end });
+}
+
+std::shared_ptr<ASTNode> parse_strings(Lexer &l, std::vector<Token> strings)
+{
+	auto start_token = strings.front();
+	auto end_token = strings.back();
+	const bool is_bytes = [start_token] {
+		if (start_token.start().pointer_to_program[0] == 'b'
+			|| start_token.start().pointer_to_program[0] == 'B') {
+			return true;
+		}
+		return false;
+	}();
+	if (is_bytes) { return parse_bytes(std::move(strings)); }
+
+	const bool is_fstring = [start_token] {
+		if (start_token.start().pointer_to_program[0] == 'f'
+			|| start_token.start().pointer_to_program[0] == 'F') {
+			return true;
+		}
+		return false;
+	}();
+	if (is_fstring) { return parse_fstring(l, std::move(strings)); }
+
+	std::string str;
+	for (const auto &token : strings) {
+		auto *start = token.start().pointer_to_program;
+		const auto *end = token.end().pointer_to_program;
+
+		if (start[0] == 'b' || start[0] == 'B') {
+			if (!is_bytes) {
+				// FIXME: should be a SyntaxError
+				spdlog::error("cannot mix bytes and nonbytes literals");
+				std::abort();
+			}
+			start++;
+		}
+
+		const bool is_triple_quote = [start]() {
+			return (start[0] == '\"' || start[0] == '\'') && (start[1] == '\"' || start[1] == '\'')
+				   && (start[2] == '\"' || start[2] == '\'');
+		}();
+
+		const auto value = [is_triple_quote, start, end]() {
+			if (is_triple_quote) {
+				return std::string{ start + 3, end - 3 };
+			} else {
+				return std::string{ start + 1, end - 1 };
+			}
+		}();
+		str.append(String::from_unescaped_string(value).s);
+		end_token = token;
+	}
+	std::string transformed;
+	transformed.reserve(str.size());
+	for (size_t i = 0; i < str.size();) {
+		if (i < (str.size() - 1) && str[i] == '\\' && str[i + 1] == '\n') {
+			i += 2;
+		} else {
+			transformed.push_back(str[i++]);
+		}
+	}
+	transformed.shrink_to_fit();
+	return std::make_shared<Constant>(
+		transformed, SourceLocation{ start_token.start(), end_token.end() });
+}
+
 template<> struct traits<struct StringPattern>
 {
-	using result_type = std::shared_ptr<Constant>;
+	using result_type = std::shared_ptr<ASTNode>;
 };
 
 struct StringPattern : PatternV2<StringPattern>
@@ -1472,94 +1654,7 @@ struct StringPattern : PatternV2<StringPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("strings: STRING+");
 			auto [strings] = *result;
-			auto start_token = strings.front();
-			auto end_token = strings.back();
-			const bool is_bytes = [start_token] {
-				if (start_token.start().pointer_to_program[0] == 'b'
-					|| start_token.start().pointer_to_program[0] == 'B') {
-					return true;
-				}
-				return false;
-			}();
-			std::variant<Bytes, std::string> collection = [is_bytes] {
-				if (is_bytes) {
-					return std::variant<Bytes, std::string>{ std::in_place_type_t<Bytes>{} };
-				}
-				return std::variant<Bytes, std::string>{ std::in_place_type_t<std::string>{} };
-			}();
-			auto builder = [is_bytes, &collection](const std::string &el) {
-				if (is_bytes) {
-					const auto bytes = Bytes::from_unescaped_string(el);
-					auto &byte_collection = std::get<Bytes>(collection).b;
-					byte_collection.insert(byte_collection.begin(), bytes.b.begin(), bytes.b.end());
-				} else {
-					auto &s = std::get<std::string>(collection);
-					s.append(String::from_unescaped_string(el).s);
-				}
-			};
-			for (const auto &token : strings) {
-				auto *start = token.start().pointer_to_program;
-				const auto *end = token.end().pointer_to_program;
-
-				if (start[0] == 'b' || start[0] == 'B') {
-					if (!is_bytes) {
-						// FIXME: should be a SyntaxError
-						spdlog::error("cannot mix bytes and nonbytes literals");
-						std::abort();
-					}
-					start++;
-				} else if (is_bytes) {
-					// FIXME: should be a SyntaxError
-					spdlog::error("cannot mix bytes and nonbytes literals");
-					std::abort();
-				}
-
-				const bool is_triple_quote = [start]() {
-					return (start[0] == '\"' || start[0] == '\'')
-						   && (start[1] == '\"' || start[1] == '\'')
-						   && (start[2] == '\"' || start[2] == '\'');
-				}();
-
-				const auto value = [is_triple_quote, start, end]() {
-					if (is_triple_quote) {
-						return std::string{ start + 3, end - 3 };
-					} else {
-						return std::string{ start + 1, end - 1 };
-					}
-				}();
-				builder(value);
-				end_token = token;
-			}
-			if (is_bytes) {
-				const auto &bytes = std::get<Bytes>(collection);
-				Bytes transformed;
-				transformed.b.reserve(bytes.b.size());
-				for (size_t i = 0; i < bytes.b.size();) {
-					if (i < (bytes.b.size() - 1) && static_cast<char>(bytes.b[i]) == '\\'
-						&& static_cast<char>(bytes.b[i + 1]) == '\n') {
-						i += 2;
-					} else {
-						transformed.b.push_back(bytes.b[i++]);
-					}
-				}
-				transformed.b.shrink_to_fit();
-				return std::make_shared<Constant>(
-					transformed, SourceLocation{ start_token.start(), end_token.end() });
-			} else {
-				const auto &str = std::get<std::string>(collection);
-				std::string transformed;
-				transformed.reserve(str.size());
-				for (size_t i = 0; i < str.size();) {
-					if (i < (str.size() - 1) && str[i] == '\\' && str[i + 1] == '\n') {
-						i += 2;
-					} else {
-						transformed.push_back(str[i++]);
-					}
-				}
-				transformed.shrink_to_fit();
-				return std::make_shared<Constant>(
-					transformed, SourceLocation{ start_token.start(), end_token.end() });
-			}
+			return parse_strings(p.lexer(), std::move(strings));
 		}
 		return {};
 	}
@@ -7275,4 +7370,16 @@ PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()
 	}
 	return Err(syntax_error(m_lexer.program()));
 }
+
+PyResult<std::shared_ptr<ASTNode>> Parser::parse_fstring()
+{
+	// fstring: star_expressions
+	auto result = PatternMatchV2<StarExpressionPattern>::match(*this);
+	if (result.has_value()) {
+		auto [expressions] = *result;
+		return Ok(expressions);
+	}
+	return Err(syntax_error(m_lexer.program()));
+}
+
 }// namespace parser

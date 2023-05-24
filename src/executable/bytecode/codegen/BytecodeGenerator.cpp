@@ -6,6 +6,7 @@
 #include "executable/bytecode/instructions/BuildList.hpp"
 #include "executable/bytecode/instructions/BuildSet.hpp"
 #include "executable/bytecode/instructions/BuildSlice.hpp"
+#include "executable/bytecode/instructions/BuildString.hpp"
 #include "executable/bytecode/instructions/BuildTuple.hpp"
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/ClearTopCleanup.hpp"
@@ -18,6 +19,7 @@
 #include "executable/bytecode/instructions/ForIter.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
+#include "executable/bytecode/instructions/FormatValue.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GetAwaitable.hpp"
 #include "executable/bytecode/instructions/GetIter.hpp"
@@ -301,6 +303,28 @@ BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &eleme
 		emit<BuildTuple>(result->get_register(), element_registers.size(), *offset);
 	} else {
 		emit<BuildTuple>(result->get_register(), 0, 0);
+	}
+	return result;
+}
+
+BytecodeValue *BytecodeGenerator::build_string(const std::vector<Register> &element_registers)
+{
+	auto *result = create_value();
+	if (!element_registers.empty()) {
+		std::optional<size_t> offset;
+		bool first = true;
+		for (const auto &el : element_registers) {
+			auto *dst = create_value();
+			if (first) {
+				offset = dst->get_register();
+				first = false;
+			}
+			emit<Move>(dst->get_register(), el);
+		}
+		ASSERT(offset.has_value())
+		emit<BuildString>(result->get_register(), element_registers.size(), *offset);
+	} else {
+		emit<BuildString>(result->get_register(), 0, 0);
 	}
 	return result;
 }
@@ -2577,9 +2601,57 @@ Value *BytecodeGenerator::visit(const NamedExpr *node)
 	return dst;
 }
 
-Value *BytecodeGenerator::visit(const JoinedStr *) { TODO(); }
+Value *BytecodeGenerator::visit(const JoinedStr *node)
+{
+	const auto only_static_strings = std::all_of(
+		node->values().begin(), node->values().end(), [](const std::shared_ptr<ASTNode> &value) {
+			return as<Constant>(value)
+				   && std::holds_alternative<py::String>(*as<Constant>(value)->value());
+		});
+	if (only_static_strings) {
+		const auto string = std::accumulate(node->values().begin(),
+			node->values().end(),
+			py::String{},
+			[](py::String s, const std::shared_ptr<ASTNode> &value) {
+				return py::String{ s.s + std::get<py::String>(*as<Constant>(value)->value()).s };
+			});
+		auto *static_string = load_const(string, m_function_id);
+		auto *string_value = create_value();
+		emit<LoadConst>(string_value->get_register(), static_string->get_index());
+		return string_value;
+	}
+	py::String current_string;
+	std::vector<Register> strings;
+	for (const auto &value : node->values()) {
+		if (auto c = as<Constant>(value); c && std::holds_alternative<py::String>(*c->value())) {
+			current_string.s += std::get<py::String>(*as<Constant>(value)->value()).s;
+		} else {
+			BytecodeValue *string_value = nullptr;
+			if (!current_string.s.empty()) {
+				auto *static_string = load_const(current_string, m_function_id);
+				string_value = create_value();
+				emit<LoadConst>(string_value->get_register(), static_string->get_index());
+				strings.push_back(string_value->get_register());
+				current_string.s.clear();
+			}
+			ASSERT(as<FormattedValue>(value));
+			auto *str_value = generate(value.get(), m_function_id);
+			ASSERT(str_value);
+			strings.push_back(str_value->get_register());
+		}
+	}
+	return build_string(strings);
+}
 
-Value *BytecodeGenerator::visit(const FormattedValue *) { TODO(); }
+Value *BytecodeGenerator::visit(const FormattedValue *node)
+{
+	if (node->format_spec()) { TODO(); }
+	auto *value = generate(node->value().get(), m_function_id);
+	ASSERT(value);
+	auto *dst = create_value();
+	emit<FormatValue>(dst->get_register(), value->get_register());
+	return dst;
+}
 
 Value *BytecodeGenerator::visit(const Comprehension *) { TODO(); }
 

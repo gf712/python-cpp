@@ -145,6 +145,8 @@ PyResult<PyObject *> PyString::__repr__() const
 	return PyString::create(fmt::format("'{}'", m_value));
 }
 
+PyResult<PyObject *> PyString::__str__() const { return Ok(const_cast<PyString *>(this)); }
+
 PyResult<PyObject *> PyString::__add__(const PyObject *obj) const
 {
 	if (auto rhs = as<PyString>(obj)) {

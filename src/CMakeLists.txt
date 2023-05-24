@@ -14,6 +14,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/BuildTuple.cpp
     executable/bytecode/instructions/BuildSet.cpp
     executable/bytecode/instructions/BuildSlice.cpp
+    executable/bytecode/instructions/BuildString.cpp
     executable/bytecode/instructions/CompareOperation.cpp
     executable/bytecode/instructions/ClearExceptionState.cpp
     executable/bytecode/instructions/ClearTopCleanup.cpp
@@ -23,6 +24,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/DeleteName.cpp
     executable/bytecode/instructions/DeleteSubscript.cpp
     executable/bytecode/instructions/ForIter.cpp
+    executable/bytecode/instructions/FormatValue.cpp
     executable/bytecode/instructions/FunctionCall.cpp
     executable/bytecode/instructions/FunctionCallEx.cpp
     executable/bytecode/instructions/FunctionCallWithKeywords.cpp
