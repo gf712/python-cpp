@@ -165,7 +165,7 @@ PyResult<PyObject *>
 			auto it = kwargs->map().find(String{ "metaclass" });
 			if (it != kwargs->map().end()) {
 				return PyObject::from(it->second).and_then([&metaclass_is_class](PyObject *obj) {
-					if (obj->type()->issubclass(py::type())) { metaclass_is_class = true; }
+					if (obj->type()->issubclass(py::types::type())) { metaclass_is_class = true; }
 					return Ok(obj);
 				});
 			}
@@ -234,7 +234,7 @@ PyResult<PyObject *>
 	if (metaclass == py_none()) {
 		if (bases->size() == 0) {
 			// if there are no bases, use `type`
-			metaclass = py::type();
+			metaclass = py::types::type();
 		} else {
 			// else get the type of the first base
 			metaclass = PyObject::from(bases->elements()[0]).unwrap()->type();
@@ -250,7 +250,7 @@ PyResult<PyObject *>
 
 	// lookup __prepare__ and instantiate namespace
 	auto ns_ = [metaclass, class_name, bases, kwargs]() -> PyResult<PyObject *> {
-		if (metaclass == type()) {
+		if (metaclass == types::type()) {
 			return PyDict::create();
 		} else {
 			auto prepare = PyString::create("__prepare__");
@@ -1024,33 +1024,33 @@ PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
 auto builtin_types()
 {
 	return std::array{
-		type(),
-		super(),
-		bool_(),
-		bytes(),
-		bytearray(),
-		ellipsis(),
-		str(),
-		float_(),
-		integer(),
-		none(),
-		object(),
-		memoryview(),
-		dict(),
-		list(),
-		tuple(),
-		range(),
-		set(),
-		frozenset(),
-		property(),
-		static_method(),
-		classmethod(),
-		slice(),
-		reversed(),
-		zip(),
-		enumerate(),
-		not_implemented_(),
-		map(),
+		types::type(),
+		types::super(),
+		types::bool_(),
+		types::bytes(),
+		types::bytearray(),
+		types::ellipsis(),
+		types::str(),
+		types::float_(),
+		types::integer(),
+		types::none(),
+		types::object(),
+		types::memoryview(),
+		types::dict(),
+		types::list(),
+		types::tuple(),
+		types::range(),
+		types::set(),
+		types::frozenset(),
+		types::property(),
+		types::static_method(),
+		types::classmethod(),
+		types::slice(),
+		types::reversed(),
+		types::zip(),
+		types::enumerate(),
+		types::not_implemented(),
+		types::map(),
 	};
 }
 

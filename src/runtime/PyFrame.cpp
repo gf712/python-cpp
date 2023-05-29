@@ -17,20 +17,20 @@ namespace py {
 
 template<> PyFrame *as(PyObject *obj)
 {
-	if (obj->type() == frame()) { return static_cast<PyFrame *>(obj); }
+	if (obj->type() == types::frame()) { return static_cast<PyFrame *>(obj); }
 	return nullptr;
 }
 
 template<> const PyFrame *as(const PyObject *obj)
 {
-	if (obj->type() == frame()) { return static_cast<const PyFrame *>(obj); }
+	if (obj->type() == types::frame()) { return static_cast<const PyFrame *>(obj); }
 	return nullptr;
 }
 
 PyFrame::PyFrame(PyType *type) : PyBaseObject(type) {}
 
 PyFrame::PyFrame(const std::vector<std::string> names)
-	: PyBaseObject(BuiltinTypes::the().frame()), m_names(std::move(names))
+	: PyBaseObject(types::BuiltinTypes::the().frame()), m_names(std::move(names))
 {}
 
 PyFrame *PyFrame::create(PyFrame *parent,
@@ -202,8 +202,8 @@ PyObject *PyFrame::globals() const { return m_globals; }
 
 PyModule *PyFrame::builtins() const { return m_builtins; }
 
-const std::vector<py::PyCell *> &PyFrame::freevars() const { return m_freevars; }
-std::vector<py::PyCell *> &PyFrame::freevars() { return m_freevars; }
+const std::vector<PyCell *> &PyFrame::freevars() const { return m_freevars; }
+std::vector<PyCell *> &PyFrame::freevars() { return m_freevars; }
 
 PyFrame *PyFrame::exit()
 {
@@ -283,6 +283,6 @@ std::function<std::unique_ptr<TypePrototype>()> PyFrame::type_factory()
 	};
 }
 
-PyType *PyFrame::static_type() const { return frame(); }
+PyType *PyFrame::static_type() const { return types::frame(); }
 
 }// namespace py

@@ -4,9 +4,9 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
-PyNone::PyNone() : PyBaseObject(BuiltinTypes::the().none()) {}
+PyNone::PyNone() : PyBaseObject(types::BuiltinTypes::the().none()) {}
 
 PyNone::PyNone(PyType *type) : PyBaseObject(type) {}
 
@@ -26,25 +26,28 @@ PyNone *PyNone::create()
 	return heap.allocate_static<PyNone>().get();
 }
 
-PyType *PyNone::static_type() const { return none(); }
+PyType *PyNone::static_type() const { return types::none(); }
 
 namespace {
 
-std::once_flag none_flag;
+	std::once_flag none_flag;
 
-std::unique_ptr<TypePrototype> register_none() { return std::move(klass<PyNone>("NoneType").type); }
+	std::unique_ptr<TypePrototype> register_none()
+	{
+		return std::move(klass<PyNone>("NoneType").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyNone::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(none_flag, []() { type = ::register_none(); });
+		std::call_once(none_flag, []() { type = register_none(); });
 		return std::move(type);
 	};
 }
 
-PyObject *py::py_none()
+PyObject *py_none()
 {
 	static PyObject *value = nullptr;
 
@@ -52,3 +55,4 @@ PyObject *py::py_none()
 
 	return value;
 }
+}// namespace py

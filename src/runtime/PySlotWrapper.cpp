@@ -8,7 +8,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 PySlotWrapper::PySlotWrapper(PyType *type) : PyBaseObject(type) {}
 
@@ -71,8 +71,8 @@ PyResult<PyObject *> PySlotWrapper::__get__(PyObject *instance, PyObject * /*own
 }
 
 PySlotWrapper::PySlotWrapper(PyString *name, PyType *slot_type, Slot &base, FunctionType &&function)
-	: PyBaseObject(BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)), m_type(slot_type),
-	  m_base(base), m_slot(std::move(function))
+	: PyBaseObject(types::BuiltinTypes::the().slot_wrapper()), m_name(std::move(name)),
+	  m_type(slot_type), m_base(base), m_slot(std::move(function))
 {}
 
 PyResult<PySlotWrapper *>
@@ -86,35 +86,36 @@ PyResult<PySlotWrapper *>
 	return Ok(obj);
 }
 
-PyType *PySlotWrapper::static_type() const { return slot_wrapper(); }
+PyType *PySlotWrapper::static_type() const { return types::slot_wrapper(); }
 
 namespace {
 
-std::once_flag slot_wrapper_flag;
+	std::once_flag slot_wrapper_flag;
 
-std::unique_ptr<TypePrototype> register_slot_wrapper()
-{
-	return std::move(klass<PySlotWrapper>("slot_wrapper").type);
-}
+	std::unique_ptr<TypePrototype> register_slot_wrapper()
+	{
+		return std::move(klass<PySlotWrapper>("slot_wrapper").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PySlotWrapper::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(slot_wrapper_flag, []() { type = ::register_slot_wrapper(); });
+		std::call_once(slot_wrapper_flag, []() { type = register_slot_wrapper(); });
 		return std::move(type);
 	};
 }
 
-template<> PySlotWrapper *py::as(PyObject *obj)
+template<> PySlotWrapper *as(PyObject *obj)
 {
-	if (obj->type() == slot_wrapper()) { return static_cast<PySlotWrapper *>(obj); }
+	if (obj->type() == types::slot_wrapper()) { return static_cast<PySlotWrapper *>(obj); }
 	return nullptr;
 }
 
-template<> const PySlotWrapper *py::as(const PyObject *obj)
+template<> const PySlotWrapper *as(const PyObject *obj)
 {
-	if (obj->type() == slot_wrapper()) { return static_cast<const PySlotWrapper *>(obj); }
+	if (obj->type() == types::slot_wrapper()) { return static_cast<const PySlotWrapper *>(obj); }
 	return nullptr;
 }
+}// namespace py

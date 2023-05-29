@@ -2897,8 +2897,7 @@ class BlockingIOError : public OSError
 	{
 		if (!s_blocking_io_error) {
 			s_blocking_io_error =
-				klass<BlockingIOError>(module, "BlockingIOError", OSError::class_type())
-					.finalize();
+				klass<BlockingIOError>(module, "BlockingIOError", OSError::class_type()).finalize();
 		} else {
 			module->add_symbol(PyString::create("BlockingIOError").unwrap(), s_blocking_io_error);
 		}
@@ -2964,7 +2963,7 @@ PyModule *io_module()
 	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(), Number{ 0 });
 
 	// >> type("UnsupportedOperation", (_io.OSError, ValueError), {})
-	auto unsupported_operation_type = type()->call(
+	auto unsupported_operation_type = types::type()->call(
 		PyTuple::create(PyString::create("UnsupportedOperation").unwrap(),
 			PyTuple::create(OSError::class_type(), ValueError::class_type()).unwrap(),
 			PyDict::create().unwrap())

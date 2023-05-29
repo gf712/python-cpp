@@ -9,7 +9,7 @@
 
 #include "interpreter/Interpreter.hpp"
 
-using namespace py;
+namespace py {
 
 PyNumber::PyNumber(PyType *type) : PyBaseObject(type) {}
 
@@ -19,9 +19,9 @@ PyResult<PyObject *> PyNumber::__repr__() const { return PyString::create(to_str
 
 const PyNumber *PyNumber::as_number(const PyObject *obj)
 {
-	if (obj->type()->issubclass(py::float_())) {
+	if (obj->type()->issubclass(types::float_())) {
 		return static_cast<const PyFloat *>(obj);
-	} else if (obj->type()->issubclass(py::integer())) {
+	} else if (obj->type()->issubclass(types::integer())) {
 		return static_cast<const PyInteger *>(obj);
 	}
 	return nullptr;
@@ -210,3 +210,4 @@ PyResult<PyNumber *> PyNumber::create(const Number &number)
 		return PyInteger::create(std::get<mpz_class>(number.value));
 	}
 }
+}// namespace py

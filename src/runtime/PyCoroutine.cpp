@@ -9,13 +9,13 @@ namespace py {
 
 template<> PyCoroutine *as(PyObject *obj)
 {
-	if (obj->type() == coroutine()) { return static_cast<PyCoroutine *>(obj); }
+	if (obj->type() == types::coroutine()) { return static_cast<PyCoroutine *>(obj); }
 	return nullptr;
 }
 
 template<> const PyCoroutine *as(const PyObject *obj)
 {
-	if (obj->type() == coroutine()) { return static_cast<const PyCoroutine *>(obj); }
+	if (obj->type() == types::coroutine()) { return static_cast<const PyCoroutine *>(obj); }
 	return nullptr;
 }
 
@@ -27,7 +27,7 @@ PyCoroutine::PyCoroutine(PyFrame *frame,
 	PyObject *code,
 	PyString *name,
 	PyString *qualname)
-	: GeneratorInterface(BuiltinTypes::the().coroutine(),
+	: GeneratorInterface(types::BuiltinTypes::the().coroutine(),
 		frame,
 		std::move(stack_frame),
 		is_running,
@@ -69,7 +69,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyCoroutine::type_factory()
 	};
 }
 
-PyType *PyCoroutine::static_type() const { return coroutine(); }
+PyType *PyCoroutine::static_type() const { return types::coroutine(); }
 
 void PyCoroutine::visit_graph(Visitor &visitor)
 {

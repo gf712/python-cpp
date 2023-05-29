@@ -8,7 +8,7 @@ namespace py {
 PyLLVMFunction::PyLLVMFunction(PyType *type) : PyBaseObject(type) {}
 
 PyLLVMFunction::PyLLVMFunction(std::string &&name, FunctionType &&function)
-	: PyBaseObject(BuiltinTypes::the().llvm_function()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().llvm_function()), m_name(std::move(name)),
 	  m_function(std::move(function))
 {}
 
@@ -30,7 +30,7 @@ void PyLLVMFunction::visit_graph(Visitor &visitor)
 	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
-PyType *PyLLVMFunction::static_type() const { return llvm_function(); }
+PyType *PyLLVMFunction::static_type() const { return types::llvm_function(); }
 
 namespace {
 	std::once_flag llvm_function_flag;
@@ -52,13 +52,15 @@ std::function<std::unique_ptr<TypePrototype>()> PyLLVMFunction::type_factory()
 
 template<> PyLLVMFunction *as(PyObject *node)
 {
-	if (node->type() == llvm_function()) { return static_cast<PyLLVMFunction *>(node); }
+	if (node->type() == types::llvm_function()) { return static_cast<PyLLVMFunction *>(node); }
 	return nullptr;
 }
 
 template<> const PyLLVMFunction *as(const PyObject *node)
 {
-	if (node->type() == llvm_function()) { return static_cast<const PyLLVMFunction *>(node); }
+	if (node->type() == types::llvm_function()) {
+		return static_cast<const PyLLVMFunction *>(node);
+	}
 	return nullptr;
 }
 

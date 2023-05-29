@@ -13,13 +13,13 @@ namespace py {
 
 template<> PyGetSetDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == getset_descriptor()) { return static_cast<PyGetSetDescriptor *>(obj); }
+	if (obj->type() == types::getset_descriptor()) { return static_cast<PyGetSetDescriptor *>(obj); }
 	return nullptr;
 }
 
 template<> const PyGetSetDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == getset_descriptor()) { return static_cast<const PyGetSetDescriptor *>(obj); }
+	if (obj->type() == types::getset_descriptor()) { return static_cast<const PyGetSetDescriptor *>(obj); }
 	return nullptr;
 }
 
@@ -28,7 +28,7 @@ PyGetSetDescriptor::PyGetSetDescriptor(PyType *type) : PyBaseObject(type) {}
 PyGetSetDescriptor::PyGetSetDescriptor(PyString *name,
 	PyType *underlying_type,
 	PropertyDefinition &getset)
-	: PyBaseObject(BuiltinTypes::the().getset_descriptor()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().getset_descriptor()), m_name(std::move(name)),
 	  m_underlying_type(underlying_type), m_getset(getset)
 {}
 
@@ -99,7 +99,7 @@ PyResult<std::monostate> PyGetSetDescriptor::__set__(PyObject *obj, PyObject *va
 }
 
 
-PyType *PyGetSetDescriptor::static_type() const { return getset_descriptor(); }
+PyType *PyGetSetDescriptor::static_type() const { return types::getset_descriptor(); }
 
 namespace {
 

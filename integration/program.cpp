@@ -36,12 +36,12 @@ template<typename T, typename U> struct is_unordered_map<std::unordered_map<T, U
 template<typename T> void check_value(const PyObject *obj, T expected_value)
 {
 	if constexpr (std::is_integral_v<T>) {
-		ASSERT_EQ(obj->type(), integer());
+		ASSERT_EQ(obj->type(), types::integer());
 		auto pynum = as<PyInteger>(obj);
 		ASSERT_TRUE(pynum);
 		ASSERT_EQ(std::get<BigIntType>(pynum->value().value), expected_value);
 	} else if constexpr (std::is_same_v<T, const char *> || std::is_same_v<T, std::string>) {
-		ASSERT_EQ(obj->type(), str());
+		ASSERT_EQ(obj->type(), types::str());
 		auto pystring = as<PyString>(obj);
 		ASSERT_TRUE(pystring);
 		ASSERT_EQ(pystring->value(), expected_value);
@@ -64,7 +64,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 	auto *obj = obj_.unwrap();
 	ASSERT_TRUE(obj);
 	if constexpr (is_vector<T>{}) {
-		ASSERT_EQ(obj->type(), list());
+		ASSERT_EQ(obj->type(), types::list());
 		auto pylist = as<PyList>(obj);
 		ASSERT_TRUE(pylist);
 		size_t i = 0;
@@ -78,7 +78,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 			i++;
 		}
 	} else if constexpr (is_unordered_map<T>{}) {
-		ASSERT_EQ(obj->type(), dict());
+		ASSERT_EQ(obj->type(), types::dict());
 		auto pydict = as<PyDict>(obj);
 		ASSERT_TRUE(pydict);
 		// FIXME: this prolongs the lifetime of items should be just be:

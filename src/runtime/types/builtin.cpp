@@ -47,7 +47,7 @@
 #include "runtime/PyType.hpp"
 #include "runtime/PyZip.hpp"
 
-using namespace py;
+namespace py::types {
 
 BuiltinTypes::BuiltinTypes()
 	: m_type(PyType::type_factory()), m_super(PySuper::type_factory()),
@@ -104,7 +104,6 @@ BuiltinTypes::BuiltinTypes()
 		return type;                                                                      \
 	}
 
-namespace py {
 INITIALIZE_TYPE(type)
 INITIALIZE_TYPE(super)
 
@@ -174,7 +173,7 @@ INITIALIZE_TYPE(member_descriptor)
 
 INITIALIZE_TYPE(traceback)
 
-INITIALIZE_TYPE(not_implemented_)
+INITIALIZE_TYPE(not_implemented)
 INITIALIZE_TYPE(frame)
 
 INITIALIZE_TYPE(namespace_)
@@ -184,4 +183,4 @@ INITIALIZE_TYPE(coroutine)
 INITIALIZE_TYPE(async_generator)
 
 INITIALIZE_TYPE(generic_alias)
-}// namespace py
+}// namespace py::types

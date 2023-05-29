@@ -47,7 +47,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyMemoryView::type_factory()
 	};
 }
 
-PyType *PyMemoryView::static_type() const { return memoryview(); }
+PyType *PyMemoryView::static_type() const { return types::memoryview(); }
 
 void PyMemoryView::visit_graph(Visitor &visitor)
 {

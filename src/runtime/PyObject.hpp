@@ -295,21 +295,19 @@ struct TypePrototype
 	void visit_graph(::Cell::Visitor &visitor);
 };
 
-namespace {
-	template<typename T, typename... U>
-	size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
-	{
-		// adapted from https://stackoverflow.com/a/35920804
-		if (std::holds_alternative<std::function<T(U...)>>(f)) {
-			using FunctionType = T (*)(U...);
-			auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
-			return bit_cast<size_t>(*fn_ptr);
-		} else {
-			// FIXME: is it valid to take this path? Is there use case?
-			return bit_cast<size_t>(std::get<PyObject *>(f));
-		}
+template<typename T, typename... U>
+size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
+{
+	// adapted from https://stackoverflow.com/a/35920804
+	if (std::holds_alternative<std::function<T(U...)>>(f)) {
+		using FunctionType = T (*)(U...);
+		auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
+		return bit_cast<size_t>(*fn_ptr);
+	} else {
+		// FIXME: is it valid to take this path? Is there use case?
+		return bit_cast<size_t>(std::get<PyObject *>(f));
 	}
-}// namespace
+}
 
 enum class LookupAttrResult { NOT_FOUND = 0, FOUND = 1 };
 

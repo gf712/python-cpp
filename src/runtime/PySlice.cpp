@@ -14,14 +14,14 @@ namespace py {
 
 template<> PySlice *as(PyObject *obj)
 {
-	if (obj->type() == slice()) { return static_cast<PySlice *>(obj); }
+	if (obj->type() == types::slice()) { return static_cast<PySlice *>(obj); }
 	return nullptr;
 }
 
 
 template<> const PySlice *as(const PyObject *obj)
 {
-	if (obj->type() == slice()) { return static_cast<const PySlice *>(obj); }
+	if (obj->type() == types::slice()) { return static_cast<const PySlice *>(obj); }
 	return nullptr;
 }
 
@@ -34,7 +34,7 @@ PySlice::PySlice() : PySlice(py_none(), py_none(), py_none()) {}
 PySlice::PySlice(PyObject *stop) : PySlice(py_none(), stop, py_none()) {}
 
 PySlice::PySlice(PyObject *start, PyObject *stop, PyObject *step)
-	: PyBaseObject(BuiltinTypes::the().slice()), m_start(start), m_stop(stop), m_step(step)
+	: PyBaseObject(types::BuiltinTypes::the().slice()), m_start(start), m_stop(stop), m_step(step)
 {}
 
 PyResult<PySlice *> PySlice::create(int64_t stop)
@@ -75,7 +75,7 @@ PyResult<PySlice *> PySlice::create(PyObject *start, PyObject *stop, PyObject *e
 
 PyResult<PyObject *> PySlice::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == slice());
+	ASSERT(type == types::slice());
 
 	auto &heap = VirtualMachine::the().heap();
 	if (auto *obj = heap.allocate<PySlice>()) { return Ok(obj); }
@@ -323,7 +323,7 @@ std::function<std::unique_ptr<TypePrototype>()> PySlice::type_factory()
 	};
 }
 
-PyType *PySlice::static_type() const { return slice(); }
+PyType *PySlice::static_type() const { return types::slice(); }
 
 void PySlice::visit_graph(Visitor &visitor)
 {

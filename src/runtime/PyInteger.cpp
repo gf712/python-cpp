@@ -13,20 +13,20 @@ namespace py {
 
 template<> PyInteger *as(PyObject *obj)
 {
-	if (obj->type() == integer()) { return static_cast<PyInteger *>(obj); }
+	if (obj->type() == types::integer()) { return static_cast<PyInteger *>(obj); }
 	return nullptr;
 }
 
 template<> const PyInteger *as(const PyObject *obj)
 {
-	if (obj->type() == integer()) { return static_cast<const PyInteger *>(obj); }
+	if (obj->type() == types::integer()) { return static_cast<const PyInteger *>(obj); }
 	return nullptr;
 }
 
 PyInteger::PyInteger(PyType *type) : Interface(type) {}
 
 PyInteger::PyInteger(BigIntType value)
-	: Interface(Number{ std::move(value) }, BuiltinTypes::the().integer())
+	: Interface(Number{ std::move(value) }, types::BuiltinTypes::the().integer())
 {}
 
 PyInteger::PyInteger(TypePrototype &type, BigIntType value)
@@ -48,7 +48,7 @@ PyResult<PyInteger *> PyInteger::create(BigIntType value)
 
 PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == integer());
+	ASSERT(type == types::integer());
 
 	ASSERT(!kwargs || kwargs->map().empty())
 	PyObject *value = nullptr;
@@ -93,7 +93,7 @@ PyResult<int64_t> PyInteger::__hash__() const
 
 PyResult<PyObject *> PyInteger::__and__(PyObject *obj)
 {
-	if (obj->type() != integer()) {
+	if (obj->type() != types::integer()) {
 		return Err(
 			type_error("unsupported operand type(s) for &: 'int' and '{}'", obj->type()->name()));
 	}
@@ -103,7 +103,7 @@ PyResult<PyObject *> PyInteger::__and__(PyObject *obj)
 
 PyResult<PyObject *> PyInteger::__or__(PyObject *obj)
 {
-	if (obj->type() != integer()) {
+	if (obj->type() != types::integer()) {
 		return Err(
 			type_error("unsupported operand type(s) for |: 'int' and '{}'", obj->type()->name()));
 	}
@@ -113,7 +113,7 @@ PyResult<PyObject *> PyInteger::__or__(PyObject *obj)
 
 PyResult<PyObject *> PyInteger::__lshift__(const PyObject *obj) const
 {
-	if (obj->type() != integer()) {
+	if (obj->type() != types::integer()) {
 		return Err(
 			type_error("unsupported operand type(s) for <<: 'int' and '{}'", obj->type()->name()));
 	}
@@ -123,7 +123,7 @@ PyResult<PyObject *> PyInteger::__lshift__(const PyObject *obj) const
 
 PyResult<PyObject *> PyInteger::__rshift__(const PyObject *obj) const
 {
-	if (obj->type() != integer()) {
+	if (obj->type() != types::integer()) {
 		return Err(
 			type_error("unsupported operand type(s) for >>: 'int' and '{}'", obj->type()->name()));
 	}
@@ -191,7 +191,7 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 
 	if (args->size() != 2) { return Err(type_error("from_bytes expected two arguments")); }
 
-	ASSERT(type == integer());
+	ASSERT(type == types::integer());
 
 	auto bytes_ = PyObject::from(args->elements()[0]);
 	if (bytes_.is_err()) return bytes_;
@@ -231,7 +231,7 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 
 	auto result = PyInteger::create(static_cast<int64_t>(value));
 	if (result.is_err()) return result;
-	if (type != integer()) {
+	if (type != types::integer()) {
 		return type->__call__(PyTuple::create(result.unwrap()).unwrap(), PyDict::create().unwrap());
 	}
 	return result;
@@ -257,7 +257,7 @@ BigIntType PyInteger::as_big_int() const
 	return std::get<BigIntType>(m_value.value);
 }
 
-PyType *PyInteger::static_type() const { return integer(); }
+PyType *PyInteger::static_type() const { return types::integer(); }
 
 namespace {
 

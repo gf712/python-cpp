@@ -9,7 +9,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 PyRange::PyRange(PyType *type) : PyBaseObject(type) {}
 
@@ -17,7 +17,7 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 {
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	ASSERT(args && args->size() > 0 && args->size() < 4)
-	ASSERT(type == range())
+	ASSERT(type == types::range())
 
 	auto obj = [&]() -> std::variant<PyRange *, PyResult<PyRange *>> {
 		if (args->size() == 1) {
@@ -80,21 +80,22 @@ PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict 
 }
 
 PyRange::PyRange(BigIntType start, BigIntType stop, BigIntType step)
-	: PyBaseObject(BuiltinTypes::the().range()), m_start(start), m_stop(stop), m_step(step)
+	: PyBaseObject(types::BuiltinTypes::the().range()), m_start(start), m_stop(stop), m_step(step)
 {}
 
 PyRange::PyRange(PyInteger *stop)
-	: PyBaseObject(BuiltinTypes::the().range()), m_stop(std::get<BigIntType>(stop->value().value))
+	: PyBaseObject(types::BuiltinTypes::the().range()),
+	  m_stop(std::get<BigIntType>(stop->value().value))
 {}
 
 PyRange::PyRange(PyInteger *start, PyInteger *stop)
-	: PyBaseObject(BuiltinTypes::the().range()),
+	: PyBaseObject(types::BuiltinTypes::the().range()),
 	  m_start(std::get<BigIntType>(start->value().value)),
 	  m_stop(std::get<BigIntType>(stop->value().value))
 {}
 
 PyRange::PyRange(PyInteger *start, PyInteger *stop, PyInteger *step)
-	: PyBaseObject(BuiltinTypes::the().range()),
+	: PyBaseObject(types::BuiltinTypes::the().range()),
 	  m_start(std::get<BigIntType>(start->value().value)),
 	  m_stop(std::get<BigIntType>(stop->value().value)),
 	  m_step(std::get<BigIntType>(step->value().value))
@@ -134,30 +135,30 @@ PyResult<PyObject *> PyRange::__reversed__() const
 	return range->__iter__();
 }
 
-PyType *PyRange::static_type() const { return range(); }
+PyType *PyRange::static_type() const { return types::range(); }
 
 namespace {
 
-std::once_flag range_flag;
+	std::once_flag range_flag;
 
-std::unique_ptr<TypePrototype> register_range()
-{
-	return std::move(klass<PyRange>("range").def("__reversed__", &PyRange::__reversed__).type);
-}
+	std::unique_ptr<TypePrototype> register_range()
+	{
+		return std::move(klass<PyRange>("range").def("__reversed__", &PyRange::__reversed__).type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyRange::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(range_flag, []() { type = ::register_range(); });
+		std::call_once(range_flag, []() { type = register_range(); });
 		return std::move(type);
 	};
 }
 
 
 PyRangeIterator::PyRangeIterator(const PyRange &pyrange)
-	: PyBaseObject(BuiltinTypes::the().range_iterator()), m_pyrange(pyrange),
+	: PyBaseObject(types::BuiltinTypes::the().range_iterator()), m_pyrange(pyrange),
 	  m_current_index(m_pyrange.start())
 {}
 
@@ -190,7 +191,7 @@ PyResult<PyObject *> PyRangeIterator::__iter__() const
 	return Ok(const_cast<PyRangeIterator *>(this));
 }
 
-PyType *PyRangeIterator::static_type() const { return range_iterator(); }
+PyType *PyRangeIterator::static_type() const { return types::range_iterator(); }
 
 void PyRangeIterator::visit_graph(Visitor &visitor)
 {
@@ -200,19 +201,20 @@ void PyRangeIterator::visit_graph(Visitor &visitor)
 
 namespace {
 
-std::once_flag range_iterator_flag;
+	std::once_flag range_iterator_flag;
 
-std::unique_ptr<TypePrototype> register_range_iterator()
-{
-	return std::move(klass<PyRangeIterator>("range_iterator").type);
-}
+	std::unique_ptr<TypePrototype> register_range_iterator()
+	{
+		return std::move(klass<PyRangeIterator>("range_iterator").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyRangeIterator::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(range_iterator_flag, []() { type = ::register_range_iterator(); });
+		std::call_once(range_iterator_flag, []() { type = register_range_iterator(); });
 		return std::move(type);
 	};
 }
+}// namespace py

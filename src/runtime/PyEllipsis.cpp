@@ -5,11 +5,10 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
-
+namespace py {
 PyEllipsis::PyEllipsis(PyType *type) : PyBaseObject(type) {}
 
-PyEllipsis::PyEllipsis() : PyBaseObject(BuiltinTypes::the().ellipsis()) {}
+PyEllipsis::PyEllipsis() : PyBaseObject(types::BuiltinTypes::the().ellipsis()) {}
 
 PyResult<PyEllipsis *> PyEllipsis::create()
 {
@@ -23,9 +22,9 @@ PyResult<PyObject *> PyEllipsis::__add__(const PyObject *) const { TODO(); }
 
 PyResult<PyObject *> PyEllipsis::__repr__() const { return PyString::create("Ellipsis"); }
 
-PyType *PyEllipsis::static_type() const { return ellipsis(); }
+PyType *PyEllipsis::static_type() const { return types::ellipsis(); }
 
-PyObject *py::py_ellipsis()
+PyObject *py_ellipsis()
 {
 	static PyObject *ellipsis = nullptr;
 	if (!ellipsis) {
@@ -38,19 +37,20 @@ PyObject *py::py_ellipsis()
 
 namespace {
 
-std::once_flag ellipsis_flag;
+	std::once_flag ellipsis_flag;
 
-std::unique_ptr<TypePrototype> register_ellipsis()
-{
-	return std::move(klass<PyEllipsis>("ellipsis").type);
-}
+	std::unique_ptr<TypePrototype> register_ellipsis()
+	{
+		return std::move(klass<PyEllipsis>("ellipsis").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyEllipsis::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(ellipsis_flag, []() { type = ::register_ellipsis(); });
+		std::call_once(ellipsis_flag, []() { type = register_ellipsis(); });
 		return std::move(type);
 	};
 }
+}// namespace py

@@ -17,13 +17,13 @@ namespace py {
 
 template<> PyTuple *as(PyObject *obj)
 {
-	if (obj->type() == tuple()) { return static_cast<PyTuple *>(obj); }
+	if (obj->type() == types::tuple()) { return static_cast<PyTuple *>(obj); }
 	return nullptr;
 }
 
 template<> const PyTuple *as(const PyObject *obj)
 {
-	if (obj->type() == tuple()) { return static_cast<const PyTuple *>(obj); }
+	if (obj->type() == types::tuple()) { return static_cast<const PyTuple *>(obj); }
 	return nullptr;
 }
 
@@ -52,7 +52,7 @@ namespace {
 PyTuple::PyTuple(PyType *type) : PyBaseObject(type) {}
 
 PyTuple::PyTuple(std::vector<Value> &&elements)
-	: PyBaseObject(BuiltinTypes::the().tuple()), m_elements(std::move(elements))
+	: PyBaseObject(types::BuiltinTypes::the().tuple()), m_elements(std::move(elements))
 {
 	ASSERT(std::all_of(m_elements.begin(), m_elements.end(), [](const auto &el) {
 		if (std::holds_alternative<PyObject *>(el)) return std::get<PyObject *>(el) != nullptr;
@@ -232,7 +232,7 @@ void PyTuple::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyTuple::static_type() const { return tuple(); }
+PyType *PyTuple::static_type() const { return types::tuple(); }
 
 namespace {
 
@@ -255,7 +255,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyTuple::type_factory()
 
 
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple)
-	: PyBaseObject(BuiltinTypes::the().tuple_iterator()), m_pytuple(pytuple)
+	: PyBaseObject(types::BuiltinTypes::the().tuple_iterator()), m_pytuple(pytuple)
 {}
 
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
@@ -316,7 +316,7 @@ void PyTupleIterator::visit_graph(Visitor &visitor)
 }
 
 
-PyType *PyTupleIterator::static_type() const { return tuple_iterator(); }
+PyType *PyTupleIterator::static_type() const { return types::tuple_iterator(); }
 
 namespace {
 

@@ -18,21 +18,21 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
-template<> PyList *py::as(PyObject *obj)
+template<> PyList *as(PyObject *obj)
 {
-	if (obj->type() == list()) { return static_cast<PyList *>(obj); }
+	if (obj->type() == types::list()) { return static_cast<PyList *>(obj); }
 	return nullptr;
 }
 
-template<> const PyList *py::as(const PyObject *obj)
+template<> const PyList *as(const PyObject *obj)
 {
-	if (obj->type() == list()) { return static_cast<const PyList *>(obj); }
+	if (obj->type() == types::list()) { return static_cast<const PyList *>(obj); }
 	return nullptr;
 }
 
-PyList::PyList() : PyBaseObject(BuiltinTypes::the().list()) {}
+PyList::PyList() : PyBaseObject(types::BuiltinTypes::the().list()) {}
 
 PyList::PyList(PyType *type) : PyBaseObject(type) {}
 
@@ -226,7 +226,7 @@ PyResult<size_t> PyList::__len__() const { return Ok(m_elements.size()); }
 
 PyResult<PyObject *> PyList::__add__(const PyObject *other) const
 {
-	if (!other->type()->issubclass(list())) {
+	if (!other->type()->issubclass(types::list())) {
 		return Err(
 			type_error("can only concatenate list (not \"{}\") to list", other->type()->name()));
 	}
@@ -295,62 +295,62 @@ void PyList::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyList::static_type() const { return list(); }
+PyType *PyList::static_type() const { return types::list(); }
 
 namespace {
 
-std::once_flag list_flag;
+	std::once_flag list_flag;
 
-std::unique_ptr<TypePrototype> register_list()
-{
-	return std::move(
-		klass<PyList>("list")
-			.def("append", &PyList::append)
-			.def("extend", &PyList::extend)
-			.def(
-				"pop",
-				+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-					auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
-						kwargs,
-						"pop",
-						std::integral_constant<size_t, 0>{},
-						std::integral_constant<size_t, 1>{},
-						nullptr);
-					if (result.is_err()) return Err(result.unwrap_err());
-					return static_cast<PyList *>(self)->pop(std::get<0>(result.unwrap()));
-				})
-			//  .def(
-			// 	 "sort",
-			// 	 +[](PyObject *self) {
-			// 		 self->sort();
-			// 		 return py_none();
-			// 	 })
-			.classmethod(
-				"__class_getitem__",
-				+[](PyType *type, PyTuple *args, PyDict *kwargs) {
-					ASSERT(args && args->elements().size() == 1);
-					ASSERT(!kwargs || kwargs->map().empty());
-					return PyObject::from(args->elements()[0]).and_then([type](PyObject *arg) {
-						return PyGenericAlias::create(type, arg);
-					});
-				})
-			.def("__reversed__", &PyList::__reversed__)
-			.type);
-}
+	std::unique_ptr<TypePrototype> register_list()
+	{
+		return std::move(
+			klass<PyList>("list")
+				.def("append", &PyList::append)
+				.def("extend", &PyList::extend)
+				.def(
+					"pop",
+					+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+							kwargs,
+							"pop",
+							std::integral_constant<size_t, 0>{},
+							std::integral_constant<size_t, 1>{},
+							nullptr);
+						if (result.is_err()) return Err(result.unwrap_err());
+						return static_cast<PyList *>(self)->pop(std::get<0>(result.unwrap()));
+					})
+				//  .def(
+				// 	 "sort",
+				// 	 +[](PyObject *self) {
+				// 		 self->sort();
+				// 		 return py_none();
+				// 	 })
+				.classmethod(
+					"__class_getitem__",
+					+[](PyType *type, PyTuple *args, PyDict *kwargs) {
+						ASSERT(args && args->elements().size() == 1);
+						ASSERT(!kwargs || kwargs->map().empty());
+						return PyObject::from(args->elements()[0]).and_then([type](PyObject *arg) {
+							return PyGenericAlias::create(type, arg);
+						});
+					})
+				.def("__reversed__", &PyList::__reversed__)
+				.type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyList::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(list_flag, []() { type = ::register_list(); });
+		std::call_once(list_flag, []() { type = register_list(); });
 		return std::move(type);
 	};
 }
 
 
 PyListIterator::PyListIterator(const PyList &pylist)
-	: PyBaseObject(BuiltinTypes::the().list_iterator()), m_pylist(pylist)
+	: PyBaseObject(types::BuiltinTypes::the().list_iterator()), m_pylist(pylist)
 {}
 
 std::string PyListIterator::to_string() const
@@ -377,23 +377,23 @@ PyResult<PyObject *> PyListIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyListIterator::static_type() const { return list_iterator(); }
+PyType *PyListIterator::static_type() const { return types::list_iterator(); }
 
 namespace {
 
-std::once_flag list_iterator_flag;
+	std::once_flag list_iterator_flag;
 
-std::unique_ptr<TypePrototype> register_list_iterator()
-{
-	return std::move(klass<PyListIterator>("list_iterator").type);
-}
+	std::unique_ptr<TypePrototype> register_list_iterator()
+	{
+		return std::move(klass<PyListIterator>("list_iterator").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(list_iterator_flag, []() { type = ::register_list_iterator(); });
+		std::call_once(list_iterator_flag, []() { type = register_list_iterator(); });
 		return std::move(type);
 	};
 }
@@ -401,7 +401,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
 PyListReverseIterator::PyListReverseIterator(PyType *type) : PyBaseObject(type) {}
 
 PyListReverseIterator::PyListReverseIterator(PyList &pylist, size_t start_index)
-	: PyBaseObject(BuiltinTypes::the().list_reverseiterator()), m_pylist(pylist),
+	: PyBaseObject(types::BuiltinTypes::the().list_reverseiterator()), m_pylist(pylist),
 	  m_current_index(start_index)
 {}
 
@@ -435,16 +435,16 @@ PyResult<PyObject *> PyListReverseIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyListReverseIterator::static_type() const { return list_reverseiterator(); }
+PyType *PyListReverseIterator::static_type() const { return types::list_reverseiterator(); }
 
 namespace {
 
-std::once_flag list_reverseiterator_flag;
+	std::once_flag list_reverseiterator_flag;
 
-std::unique_ptr<TypePrototype> register_list_reverseiterator()
-{
-	return std::move(klass<PyListReverseIterator>("list_reverseiterator").type);
-}
+	std::unique_ptr<TypePrototype> register_list_reverseiterator()
+	{
+		return std::move(klass<PyListReverseIterator>("list_reverseiterator").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyListReverseIterator::type_factory()
@@ -452,7 +452,8 @@ std::function<std::unique_ptr<TypePrototype>()> PyListReverseIterator::type_fact
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
 		std::call_once(
-			list_reverseiterator_flag, []() { type = ::register_list_reverseiterator(); });
+			list_reverseiterator_flag, []() { type = register_list_reverseiterator(); });
 		return std::move(type);
 	};
 }
+}// namespace py

@@ -13,19 +13,19 @@ namespace py {
 
 template<> PyClassMethod *as(PyObject *obj)
 {
-	if (obj->type() == classmethod()) { return static_cast<PyClassMethod *>(obj); }
+	if (obj->type() == types::classmethod()) { return static_cast<PyClassMethod *>(obj); }
 	return nullptr;
 }
 
 template<> const PyClassMethod *as(const PyObject *obj)
 {
-	if (obj->type() == classmethod()) { return static_cast<const PyClassMethod *>(obj); }
+	if (obj->type() == types::classmethod()) { return static_cast<const PyClassMethod *>(obj); }
 	return nullptr;
 }
 
 PyResult<PyObject *> PyClassMethod::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == classmethod())
+	ASSERT(type == types::classmethod())
 
 	return PyClassMethod::create();
 }
@@ -42,7 +42,7 @@ PyResult<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
 	return Ok(0);
 }
 
-PyClassMethod::PyClassMethod() : PyBaseObject(BuiltinTypes::the().classmethod()) {}
+PyClassMethod::PyClassMethod() : PyBaseObject(types::BuiltinTypes::the().classmethod()) {}
 
 PyClassMethod::PyClassMethod(PyType *type) : PyBaseObject(type) {}
 
@@ -80,7 +80,7 @@ void PyClassMethod::visit_graph(Visitor &visitor)
 	if (m_callable) visitor.visit(*m_callable);
 }
 
-PyType *PyClassMethod::static_type() const { return classmethod(); }
+PyType *PyClassMethod::static_type() const { return types::classmethod(); }
 
 namespace {
 

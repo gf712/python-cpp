@@ -11,7 +11,7 @@ namespace py {
 
 template<> PyClassMethodDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == classmethod_descriptor()) {
+	if (obj->type() == types::classmethod_descriptor()) {
 		return static_cast<PyClassMethodDescriptor *>(obj);
 	}
 	return nullptr;
@@ -19,7 +19,7 @@ template<> PyClassMethodDescriptor *as(PyObject *obj)
 
 template<> const PyClassMethodDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == classmethod_descriptor()) {
+	if (obj->type() == types::classmethod_descriptor()) {
 		return static_cast<const PyClassMethodDescriptor *>(obj);
 	}
 	return nullptr;
@@ -31,7 +31,7 @@ PyClassMethodDescriptor::PyClassMethodDescriptor(PyString *name,
 	PyType *underlying_type,
 	MethodDefinition &method_definition,
 	std::vector<PyObject *> &&captures)
-	: PyBaseObject(BuiltinTypes::the().classmethod_descriptor()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().classmethod_descriptor()), m_name(std::move(name)),
 	  m_underlying_type(underlying_type), m_method(method_definition),
 	  m_captures(std::move(captures))
 {}
@@ -117,7 +117,7 @@ PyResult<PyObject *> PyClassMethodDescriptor::__get__(PyObject *object, PyObject
 }
 
 
-PyType *PyClassMethodDescriptor::static_type() const { return classmethod_descriptor(); }
+PyType *PyClassMethodDescriptor::static_type() const { return types::classmethod_descriptor(); }
 
 namespace {
 

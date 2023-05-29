@@ -26,7 +26,7 @@ PyFunction::PyFunction(std::vector<Value> defaults,
 	PyCode *code,
 	PyTuple *closure,
 	PyObject *globals)
-	: PyBaseObject(BuiltinTypes::the().function()), m_code(code), m_globals(globals),
+	: PyBaseObject(types::BuiltinTypes::the().function()), m_code(code), m_globals(globals),
 	  m_defaults(std::move(defaults)), m_kwonly_defaults(std::move(kwonly_defaults)),
 	  m_closure(closure)
 {
@@ -72,7 +72,7 @@ void PyFunction::visit_graph(Visitor &visitor)
 	if (m_closure) visitor.visit(*m_closure);
 }
 
-PyType *PyFunction::static_type() const { return function(); }
+PyType *PyFunction::static_type() const { return types::function(); }
 
 PyResult<PyObject *> PyFunction::__repr__() const
 {
@@ -155,7 +155,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 PyNativeFunction::PyNativeFunction(PyType *type) : PyBaseObject(type) {}
 
 PyNativeFunction::PyNativeFunction(std::string &&name, FunctionType &&function)
-	: PyBaseObject(BuiltinTypes::the().native_function()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().native_function()), m_name(std::move(name)),
 	  m_function(std::move(function))
 {}
 
@@ -190,7 +190,7 @@ void PyNativeFunction::visit_graph(Visitor &visitor)
 	for (auto *obj : m_captures) { visitor.visit(*obj); }
 }
 
-PyType *PyNativeFunction::static_type() const { return native_function(); }
+PyType *PyNativeFunction::static_type() const { return types::native_function(); }
 
 namespace {
 	std::once_flag native_function_flag;
@@ -212,25 +212,27 @@ std::function<std::unique_ptr<TypePrototype>()> PyNativeFunction::type_factory()
 
 template<> PyFunction *as(PyObject *node)
 {
-	if (node->type() == function()) { return static_cast<PyFunction *>(node); }
+	if (node->type() == types::function()) { return static_cast<PyFunction *>(node); }
 	return nullptr;
 }
 
 template<> const PyFunction *as(const PyObject *node)
 {
-	if (node->type() == function()) { return static_cast<const PyFunction *>(node); }
+	if (node->type() == types::function()) { return static_cast<const PyFunction *>(node); }
 	return nullptr;
 }
 
 template<> PyNativeFunction *as(PyObject *node)
 {
-	if (node->type() == native_function()) { return static_cast<PyNativeFunction *>(node); }
+	if (node->type() == types::native_function()) { return static_cast<PyNativeFunction *>(node); }
 	return nullptr;
 }
 
 template<> const PyNativeFunction *as(const PyObject *node)
 {
-	if (node->type() == native_function()) { return static_cast<const PyNativeFunction *>(node); }
+	if (node->type() == types::native_function()) {
+		return static_cast<const PyNativeFunction *>(node);
+	}
 	return nullptr;
 }
 
