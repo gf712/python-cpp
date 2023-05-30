@@ -3,27 +3,34 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
-
-static PyType *s_name_error = nullptr;
+namespace py {
 
 NameError::NameError(PyType *type) : Exception(type) {}
 
-NameError::NameError(PyTuple *args) : Exception(s_name_error->underlying_type(), args) {}
+NameError::NameError(PyTuple *args) : Exception(types::BuiltinTypes::the().name_error(), args) {}
 
 PyType *NameError::static_type() const
 {
-	ASSERT(s_name_error)
-	return s_name_error;
+	ASSERT(types::name_error());
+	return types::name_error();
 }
 
-PyType *NameError::register_type(PyModule *module)
-{
-	if (!s_name_error) {
-		s_name_error =
-			klass<Exception>(module, "NameError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("NameError").unwrap(), s_name_error);
+namespace {
+
+	std::once_flag name_error_flag;
+
+	std::unique_ptr<TypePrototype> register_name_error()
+	{
+		return std::move(klass<NameError>("NameError", Exception::class_type()).type);
 	}
-	return s_name_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> NameError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(name_error_flag, []() { type = register_name_error(); });
+		return std::move(type);
+	};
 }
+}// namespace py

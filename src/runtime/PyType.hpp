@@ -82,7 +82,8 @@ class PyType : public PyBaseObject
 
 	static PyResult<PyObject *> heap_object_allocation(PyType *);
 
-	static PyResult<const PyType *> calculate_metaclass(const PyType *type_, PyTuple *bases);
+	static PyResult<const PyType *> calculate_metaclass(const PyType *type_,
+		const std::vector<PyType *> &bases);
 
   protected:
 	PyResult<PyTuple *> mro_internal() const;
@@ -97,20 +98,24 @@ class PyType : public PyBaseObject
 	void inherit_special(PyType *base);
 	void fixup_slots();
 
-	PyResult<std::monostate>
-		initialize(const std::string &name, PyType *base, PyTuple *bases, const PyDict *ns);
+	PyResult<std::monostate> initialize(const std::string &name,
+		PyType *base,
+		std::vector<PyType *> bases,
+		const PyDict *ns);
 
 	static PyResult<PyType *> build_type(const PyType *metatype,
 		PyString *type_name,
 		PyType *base,
-		PyTuple *bases,
+		std::vector<PyType *> bases,
 		const PyDict *ns);
 
-	using BasePair = std::tuple<PyType *, PyTuple *>;
-	static PyResult<std::variant<BasePair, PyObject *>>
-		compute_bases(const PyType *type_, PyTuple *bases, PyTuple *args, PyDict *kwargs);
+	using BasePair = std::tuple<PyType *, std::vector<PyType *>>;
+	static PyResult<std::variant<BasePair, PyObject *>> compute_bases(const PyType *type_,
+		std::vector<PyType *> bases,
+		PyTuple *args,
+		PyDict *kwargs);
 
-	static PyResult<PyType *> best_base(PyTuple *bases);
+	static PyResult<PyType *> best_base(const std::vector<PyType *> &bases);
 };
 
 }// namespace py

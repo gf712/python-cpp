@@ -243,7 +243,17 @@ PyResult<PyObject *>
 	}
 
 	if (metaclass_is_class) {
-		auto winner = PyType::calculate_metaclass(static_cast<PyType *>(metaclass), bases);
+		std::vector<PyType *> bases_vector;
+		for (const auto &base : bases->elements()) {
+			auto base_ = PyObject::from(base);
+			if (base_.is_err()) { return base_; }
+			if (auto *b = as<PyType>(base_.unwrap())) {
+				bases_vector.push_back(b);
+			} else {
+				return Err(type_error("bases must be types"));
+			}
+		}
+		auto winner = PyType::calculate_metaclass(static_cast<PyType *>(metaclass), bases_vector);
 		if (winner.is_err()) { return Err(winner.unwrap_err()); }
 		metaclass = const_cast<PyType *>(winner.unwrap());
 	}
@@ -1051,30 +1061,34 @@ auto builtin_types()
 		types::enumerate(),
 		types::not_implemented(),
 		types::map(),
+
 	};
 }
 
-auto initialize_exceptions(PyModule *blt)
+auto builtin_exceptions()
 {
-	BaseException::register_type(blt);
-	Exception::register_type(blt);
-	TypeError::register_type(blt);
-	AssertionError::register_type(blt);
-	AttributeError::register_type(blt);
-	StopIteration::register_type(blt);
-	ValueError::register_type(blt);
-	NameError::register_type(blt);
-	RuntimeError::register_type(blt);
-	ImportError::register_type(blt);
-	KeyError::register_type(blt);
-	NotImplementedError::register_type(blt);
-	ModuleNotFoundError::register_type(blt);
-	OSError::register_type(blt);
-	LookupError::register_type(blt);
-	IndexError::register_type(blt);
-	Warning::register_type(blt);
-	ImportWarning::register_type(blt);
-	SyntaxError::register_type(blt);
+	return std::array{
+		types::base_exception(),
+		types::exception(),
+		types::type_error(),
+		types::assertion_error(),
+		types::attribute_error(),
+		types::value_error(),
+		types::name_error(),
+		types::runtime_error(),
+		types::import_error(),
+		types::key_error(),
+		types::not_implemented_error(),
+		types::module_not_found_error(),
+		types::os_error(),
+		types::lookup_error(),
+		types::index_error(),
+		types::warning(),
+		types::import_warning(),
+		types::syntax_error(),
+		types::memory_error(),
+		types::stop_iteration(),
+	};
 }
 
 }// namespace
@@ -1095,6 +1109,7 @@ PyModule *builtins_module(Interpreter &interpreter)
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
 	auto types = builtin_types();
+	auto exceptions = builtin_exceptions();
 
 	s_builtin_module = PyModule::create(PyDict::create().unwrap(),
 		PyString::create("__builtins__").unwrap(),
@@ -1105,7 +1120,9 @@ PyModule *builtins_module(Interpreter &interpreter)
 		s_builtin_module->add_symbol(PyString::create(type->name()).unwrap(), type);
 	}
 
-	initialize_exceptions(s_builtin_module);
+	for (auto *type : exceptions) {
+		s_builtin_module->add_symbol(PyString::create(type->name()).unwrap(), type);
+	}
 
 	s_builtin_module->add_symbol(PyString::create("__build_class__").unwrap(),
 		heap.allocate<PyNativeFunction>(

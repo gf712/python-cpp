@@ -91,6 +91,27 @@ void initialize_types()
 	types::async_generator();
 	types::mappingproxy();
 	types::map();
+
+	types::base_exception();
+	types::exception();
+	types::type_error();
+	types::assertion_error();
+	types::attribute_error();
+	types::value_error();
+	types::name_error();
+	types::runtime_error();
+	types::import_error();
+	types::key_error();
+	types::not_implemented_error();
+	types::module_not_found_error();
+	types::os_error();
+	types::lookup_error();
+	types::index_error();
+	types::warning();
+	types::import_warning();
+	types::syntax_error();
+	types::memory_error();
+	types::stop_iteration();
 }
 
 Interpreter::Interpreter() {}

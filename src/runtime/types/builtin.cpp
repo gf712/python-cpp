@@ -1,6 +1,17 @@
 #include "builtin.hpp"
 
+#include "runtime/AssertionError.hpp"
+#include "runtime/AttributeError.hpp"
+#include "runtime/ImportError.hpp"
+#include "runtime/IndexError.hpp"
+#include "runtime/KeyError.hpp"
+#include "runtime/LookupError.hpp"
+#include "runtime/MemoryError.hpp"
+#include "runtime/ModuleNotFoundError.hpp"
+#include "runtime/NameError.hpp"
 #include "runtime/NotImplemented.hpp"
+#include "runtime/NotImplementedError.hpp"
+#include "runtime/OSError.hpp"
 #include "runtime/PyAsyncGenerator.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBoundMethod.hpp"
@@ -46,6 +57,12 @@
 #include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/PyZip.hpp"
+#include "runtime/RuntimeError.hpp"
+#include "runtime/StopIteration.hpp"
+#include "runtime/SyntaxError.hpp"
+#include "runtime/ValueError.hpp"
+#include "runtime/warnings/ImportWarning.hpp"
+#include "runtime/warnings/Warning.hpp"
 
 namespace py::types {
 
@@ -89,7 +106,18 @@ BuiltinTypes::BuiltinTypes()
 	  m_not_implemented(NotImplemented::type_factory()), m_namespace(PyNamespace::type_factory()),
 	  m_generator(PyGenerator::type_factory()), m_coroutine(PyCoroutine::type_factory()),
 	  m_async_generator(PyAsyncGenerator::type_factory()),
-	  m_generic_alias(PyGenericAlias::type_factory())
+	  m_generic_alias(PyGenericAlias::type_factory()),
+	  m_base_exception(BaseException::type_factory()), m_exception(Exception::type_factory()),
+	  m_type_error(TypeError::type_factory()), m_assertion_error(AssertionError::type_factory()),
+	  m_attribute_error(AttributeError::type_factory()), m_value_error(ValueError::type_factory()),
+	  m_name_error(NameError::type_factory()), m_runtime_error(RuntimeError::type_factory()),
+	  m_import_error(ImportError::type_factory()), m_key_error(KeyError::type_factory()),
+	  m_not_implemented_error(NotImplementedError::type_factory()),
+	  m_module_not_found_error(ModuleNotFoundError::type_factory()),
+	  m_os_error(OSError::type_factory()), m_lookup_error(LookupError::type_factory()),
+	  m_index_error(IndexError::type_factory()), m_warning(Warning::type_factory()),
+	  m_import_warning(ImportWarning::type_factory()), m_syntax_error(SyntaxError::type_factory()),
+	  m_memory_error(MemoryError::type_factory()), m_stop_iteration(StopIteration::type_factory())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                                                         \
@@ -183,4 +211,26 @@ INITIALIZE_TYPE(coroutine)
 INITIALIZE_TYPE(async_generator)
 
 INITIALIZE_TYPE(generic_alias)
+
+INITIALIZE_TYPE(base_exception)
+INITIALIZE_TYPE(exception)
+INITIALIZE_TYPE(type_error)
+INITIALIZE_TYPE(assertion_error)
+INITIALIZE_TYPE(attribute_error)
+INITIALIZE_TYPE(value_error)
+INITIALIZE_TYPE(name_error)
+INITIALIZE_TYPE(runtime_error)
+INITIALIZE_TYPE(import_error)
+INITIALIZE_TYPE(key_error)
+INITIALIZE_TYPE(not_implemented_error)
+INITIALIZE_TYPE(module_not_found_error)
+INITIALIZE_TYPE(os_error)
+INITIALIZE_TYPE(lookup_error)
+INITIALIZE_TYPE(index_error)
+INITIALIZE_TYPE(warning)
+INITIALIZE_TYPE(import_warning)
+INITIALIZE_TYPE(syntax_error)
+INITIALIZE_TYPE(memory_error)
+INITIALIZE_TYPE(stop_iteration)
+
 }// namespace py::types

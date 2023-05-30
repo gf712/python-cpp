@@ -9,21 +9,18 @@
 #include "vm/VM.hpp"
 
 namespace py {
-namespace {
-	PyType *s_base_exception_type = nullptr;
-}
 
 template<> BaseException *as(PyObject *obj)
 {
-	ASSERT(s_base_exception_type)
-	if (obj->type() == s_base_exception_type) { return static_cast<BaseException *>(obj); }
+	ASSERT(types::base_exception());
+	if (obj->type() == types::base_exception()) { return static_cast<BaseException *>(obj); }
 	return nullptr;
 }
 
 template<> const BaseException *as(const PyObject *obj)
 {
-	ASSERT(s_base_exception_type)
-	if (obj->type() == s_base_exception_type) { return static_cast<const BaseException *>(obj); }
+	ASSERT(types::base_exception());
+	if (obj->type() == types::base_exception()) { return static_cast<const BaseException *>(obj); }
 	return nullptr;
 }
 
@@ -32,7 +29,7 @@ BaseException::BaseException(PyType *type) : PyBaseObject(type->underlying_type(
 BaseException::BaseException(PyType *type, PyTuple *args) : PyBaseObject(type), m_args(args) {}
 
 BaseException::BaseException(PyTuple *args)
-	: PyBaseObject(s_base_exception_type->underlying_type()), m_args(args)
+	: PyBaseObject(types::BuiltinTypes::the().base_exception()), m_args(args)
 {}
 
 BaseException::BaseException(const TypePrototype &type, PyTuple *args)
@@ -49,7 +46,7 @@ PyResult<BaseException *> BaseException::create(PyTuple *args)
 
 PyResult<PyObject *> BaseException::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_base_exception_type)
+	ASSERT(type == types::base_exception());
 	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = BaseException::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
@@ -67,14 +64,14 @@ PyResult<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
 
 PyType *BaseException::static_type() const
 {
-	ASSERT(s_base_exception_type)
-	return s_base_exception_type;
+	ASSERT(types::base_exception());
+	return types::base_exception();
 }
 
 PyType *BaseException::class_type()
 {
-	ASSERT(s_base_exception_type)
-	return s_base_exception_type;
+	ASSERT(types::base_exception())
+	return types::base_exception();
 }
 
 std::string BaseException::what() const { return BaseException::to_string(); }
@@ -128,15 +125,22 @@ PyResult<PyObject *> BaseException::__repr__() const
 	}
 }
 
-PyType *BaseException::register_type(PyModule *module)
-{
-	if (!s_base_exception_type) {
-		s_base_exception_type = klass<BaseException>(module, "BaseException")
-									.attr("args", &BaseException::m_args)
-									.finalize();
-	} else {
-		module->add_symbol(PyString::create("BaseException").unwrap(), s_base_exception_type);
+namespace {
+
+	std::once_flag base_exception_flag;
+
+	std::unique_ptr<TypePrototype> register_base_exception()
+	{
+		return std::move(klass<BaseException>("BaseException").type);
 	}
-	return s_base_exception_type;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> BaseException::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(base_exception_flag, []() { type = register_base_exception(); });
+		return std::move(type);
+	};
 }
 }// namespace py

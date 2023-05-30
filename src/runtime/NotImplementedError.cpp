@@ -3,19 +3,17 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
-
-static PyType *s_not_implemented_error = nullptr;
+namespace py {
 
 NotImplementedError::NotImplementedError(PyType *type) : Exception(type) {}
 
 NotImplementedError::NotImplementedError(PyTuple *args)
-	: Exception(s_not_implemented_error->underlying_type(), args)
+	: Exception(types::BuiltinTypes::the().not_implemented_error(), args)
 {}
 
 PyResult<PyObject *> NotImplementedError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_not_implemented_error)
+	ASSERT(type == types::not_implemented_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = NotImplementedError::create(args)) {
 		return Ok(static_cast<PyObject *>(result));
@@ -26,19 +24,28 @@ PyResult<PyObject *> NotImplementedError::__new__(const PyType *type, PyTuple *a
 
 PyType *NotImplementedError::static_type() const
 {
-	ASSERT(s_not_implemented_error)
-	return s_not_implemented_error;
+	ASSERT(types::not_implemented_error());
+	return types::not_implemented_error();
 }
 
-PyType *NotImplementedError::register_type(PyModule *module)
-{
-	if (!s_not_implemented_error) {
-		s_not_implemented_error =
-			klass<NotImplementedError>(module, "NotImplementedError", Exception::s_exception_type)
-				.finalize();
-	} else {
-		module->add_symbol(
-			PyString::create("NotImplementedError").unwrap(), s_not_implemented_error);
+namespace {
+
+	std::once_flag not_implemented_error_flag;
+
+	std::unique_ptr<TypePrototype> register_not_implemented_error()
+	{
+		return std::move(
+			klass<NotImplementedError>("NotImplementedError", Exception::class_type()).type);
 	}
-	return s_not_implemented_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> NotImplementedError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(
+			not_implemented_error_flag, []() { type = register_not_implemented_error(); });
+		return std::move(type);
+	};
 }
+}// namespace py

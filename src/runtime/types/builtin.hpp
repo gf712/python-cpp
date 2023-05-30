@@ -79,7 +79,6 @@ namespace types {
 		mutable Type m_classmethod;
 		mutable Type m_member_descriptor;
 
-		mutable Type m_base_exception;
 		mutable Type m_traceback;
 
 		mutable Type m_frame;
@@ -93,6 +92,27 @@ namespace types {
 		mutable Type m_async_generator;
 
 		mutable Type m_generic_alias;
+
+		mutable Type m_base_exception;
+		mutable Type m_exception;
+		mutable Type m_type_error;
+		mutable Type m_assertion_error;
+		mutable Type m_attribute_error;
+		mutable Type m_value_error;
+		mutable Type m_name_error;
+		mutable Type m_runtime_error;
+		mutable Type m_import_error;
+		mutable Type m_key_error;
+		mutable Type m_not_implemented_error;
+		mutable Type m_module_not_found_error;
+		mutable Type m_os_error;
+		mutable Type m_lookup_error;
+		mutable Type m_index_error;
+		mutable Type m_warning;
+		mutable Type m_import_warning;
+		mutable Type m_syntax_error;
+		mutable Type m_memory_error;
+		mutable Type m_stop_iteration;
 
 		BuiltinTypes();
 
@@ -179,7 +199,6 @@ namespace types {
 		TypePrototype &classmethod() const { return get_type(m_classmethod); }
 		TypePrototype &member_descriptor() const { return get_type(m_member_descriptor); }
 
-		TypePrototype &base_exception() const { return get_type(m_base_exception); }
 		TypePrototype &traceback() const { return get_type(m_traceback); }
 
 		TypePrototype &frame() const { return get_type(m_frame); }
@@ -193,6 +212,27 @@ namespace types {
 		TypePrototype &async_generator() const { return get_type(m_async_generator); }
 
 		TypePrototype &generic_alias() const { return get_type(m_generic_alias); }
+
+		TypePrototype &base_exception() const { return get_type(m_base_exception); }
+		TypePrototype &exception() const { return get_type(m_exception); }
+		TypePrototype &type_error() const { return get_type(m_type_error); }
+		TypePrototype &assertion_error() const { return get_type(m_assertion_error); }
+		TypePrototype &attribute_error() const { return get_type(m_attribute_error); }
+		TypePrototype &value_error() const { return get_type(m_value_error); }
+		TypePrototype &name_error() const { return get_type(m_name_error); }
+		TypePrototype &runtime_error() const { return get_type(m_runtime_error); }
+		TypePrototype &import_error() const { return get_type(m_import_error); }
+		TypePrototype &key_error() const { return get_type(m_key_error); }
+		TypePrototype &not_implemented_error() const { return get_type(m_not_implemented_error); }
+		TypePrototype &module_not_found_error() const { return get_type(m_module_not_found_error); }
+		TypePrototype &os_error() const { return get_type(m_os_error); }
+		TypePrototype &lookup_error() const { return get_type(m_lookup_error); }
+		TypePrototype &index_error() const { return get_type(m_index_error); }
+		TypePrototype &warning() const { return get_type(m_warning); }
+		TypePrototype &import_warning() const { return get_type(m_import_warning); }
+		TypePrototype &syntax_error() const { return get_type(m_syntax_error); }
+		TypePrototype &memory_error() const { return get_type(m_memory_error); }
+		TypePrototype &stop_iteration() const { return get_type(m_stop_iteration); }
 	};
 
 	PyType *type();
@@ -257,5 +297,26 @@ namespace types {
 	PyType *coroutine();
 	PyType *async_generator();
 	PyType *generic_alias();
+
+	PyType *base_exception();
+	PyType *exception();
+	PyType *type_error();
+	PyType *assertion_error();
+	PyType *attribute_error();
+	PyType *value_error();
+	PyType *name_error();
+	PyType *runtime_error();
+	PyType *import_error();
+	PyType *key_error();
+	PyType *not_implemented_error();
+	PyType *module_not_found_error();
+	PyType *os_error();
+	PyType *lookup_error();
+	PyType *index_error();
+	PyType *warning();
+	PyType *import_warning();
+	PyType *syntax_error();
+	PyType *memory_error();
+	PyType *stop_iteration();
 }// namespace types
 }// namespace py

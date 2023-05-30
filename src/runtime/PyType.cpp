@@ -168,11 +168,9 @@ std::vector<PyObject *> mro_(PyType *type)
 
 	std::vector<std::vector<PyObject *>> bases_mro;
 
-	auto *bases = type->underlying_type().__bases__;
-	spdlog::debug("bases [mro]: @{}", (void *)bases);
-	ASSERT(bases);
-	for (const auto &base : bases->elements()) {
-		if (auto *precomputed_mro = static_cast<PyType *>(std::get<PyObject *>(base))->__mro__) {
+	const auto &bases = type->underlying_type().__bases__;
+	for (const auto &base : bases) {
+		if (auto *precomputed_mro = base->__mro__) {
 			std::vector<PyObject *> base_mro;
 			base_mro.reserve(precomputed_mro->size());
 			for (const auto &el : precomputed_mro->elements()) {
@@ -180,7 +178,7 @@ std::vector<PyObject *> mro_(PyType *type)
 			}
 			bases_mro.push_back(base_mro);
 		} else {
-			bases_mro.push_back(mro_(as<PyType>(std::get<PyObject *>(base))));
+			bases_mro.push_back(mro_(base));
 		}
 	}
 
@@ -270,8 +268,14 @@ namespace {
 					})
 				.property_readonly(
 					"__dict__", [](PyType *self) { return PyMappingProxy::create(self->dict()); })
-				.property_readonly(
-					"__bases__", [](PyType *self) { return Ok(self->underlying_type().__bases__); })
+				.property_readonly("__bases__",
+					[](PyType *self) {
+						std::vector<PyObject *> bases;
+						bases.insert(bases.begin(),
+							self->underlying_type().__bases__.begin(),
+							self->underlying_type().__bases__.end());
+						return PyTuple::create(std::move(bases));
+					})
 				.property(
 					"__abstractmethods__",
 					[](PyType *self) -> PyResult<PyObject *> {
@@ -395,8 +399,10 @@ PyResult<PyObject *> PyType::heap_object_allocation(PyType *type)
 		});
 }
 
-PyResult<std::monostate>
-	PyType::initialize(const std::string &name, PyType *base, PyTuple *bases, const PyDict *ns)
+PyResult<std::monostate> PyType::initialize(const std::string &name,
+	PyType *base,
+	std::vector<PyType *> bases,
+	const PyDict *ns)
 {
 	auto dict_ = PyDict::create(ns->map());
 	if (dict_.is_err()) { return Err(dict_.unwrap_err()); }
@@ -436,7 +442,7 @@ PyResult<std::monostate>
 	}
 
 	underlying_type().__name__ = name;
-	underlying_type().__bases__ = bases;
+	underlying_type().__bases__ = std::move(bases);
 	underlying_type().__base__ = base;
 	underlying_type().basicsize = base->underlying_type().basicsize;
 
@@ -1180,21 +1186,10 @@ PyResult<std::monostate> PyType::ready()
 	if (base) { base->ready(); }
 
 	// initialize bases
-	auto *bases = underlying_type().__bases__;
-	if (!bases
-		|| (as<PyTuple>(bases)->elements().empty()
-			&& &underlying_type() != &types::BuiltinTypes::the().object())) {
-		auto bases_ = [&]() -> PyResult<PyTuple *> {
-			if (base) {
-				return PyTuple::create(base);
-			} else {
-				return PyTuple::create();
-			}
-		}();
-		if (bases_.is_err()) return Err(bases_.unwrap_err());
-		underlying_type().__bases__ = bases_.unwrap();
+	auto bases = underlying_type().__bases__;
+	if (bases.empty() && &underlying_type() != &types::BuiltinTypes::the().object()) {
+		if (base) { underlying_type().__bases__ = { base }; }
 	}
-	spdlog::debug("bases: @{}", (void *)bases);
 	// initialize dict
 	if (!underlying_type().__dict__) {
 		auto dict = PyDict::create();
@@ -1221,7 +1216,8 @@ PyResult<std::monostate> PyType::ready()
 		auto *base = base_.unwrap();
 
 		// type(base) == type
-		if ((std::holds_alternative<PyType *>(m_type) && std::get<PyType *>(m_type) == types::type())
+		if ((std::holds_alternative<PyType *>(m_type)
+				&& std::get<PyType *>(m_type) == types::type())
 			|| (&std::get<std::reference_wrapper<const TypePrototype>>(m_type).get()
 				== &types::BuiltinTypes::the().type())) {
 			inherit_slots(static_cast<PyType *>(base));
@@ -1409,7 +1405,18 @@ PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict 
 	ASSERT(bases);
 	auto *ns = PyObject::from(args->elements()[2]).unwrap();
 
-	auto bases_result = compute_bases(type_, bases, args, kwargs);
+	std::vector<PyType *> bases_vector;
+	for (const auto &base : bases->elements()) {
+		auto base_ = PyObject::from(base);
+		if (base_.is_err()) { return base_; }
+		if (auto *b = as<PyType>(base_.unwrap())) {
+			bases_vector.push_back(b);
+		} else {
+			return Err(type_error("bases must be types"));
+		}
+	}
+
+	auto bases_result = compute_bases(type_, std::move(bases_vector), args, kwargs);
 	if (bases_result.is_err()) { return Err(bases_result.unwrap_err()); }
 
 	if (std::holds_alternative<PyObject *>(bases_result.unwrap())) {
@@ -1417,47 +1424,38 @@ PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict 
 		return Ok(std::get<PyObject *>(bases_result.unwrap()));
 	}
 	auto [base, bases_] = std::get<BasePair>(bases_result.unwrap());
-	bases = bases_;
+	bases_vector = std::move(bases_);
 
 	if (!ns->type()->issubclass(types::dict())) {
 		return Err(
 			type_error("type.__new__() argument 3 must be dict, not '{}'", ns->type()->name()));
 	}
 
-	return PyType::build_type(type_, name, base, bases, static_cast<const PyDict *>(ns));
+	return PyType::build_type(
+		type_, name, base, std::move(bases_vector), static_cast<const PyDict *>(ns));
 }
 
-PyResult<PyType *> PyType::best_base(PyTuple *bases)
+PyResult<PyType *> PyType::best_base(const std::vector<PyType *> &bases)
 {
 	// FIXME: find the "solid base" (https://peps.python.org/pep-0253/#multiple-inheritance)
-	for (const auto &el : bases->elements()) {
-		auto base_ = PyObject::from(el);
-		if (base_.is_err()) return Err(base_.unwrap_err());
-		auto *base = base_.unwrap();
-		if (!as<PyType>(base)) { return Err(type_error("bases must be types")); }
-	}
-	auto base_ = PyObject::from(bases->elements()[0]);
-	if (base_.is_err()) return Err(base_.unwrap_err());
-	return Ok(as<PyType>(base_.unwrap()));
+	return Ok(bases[0]);
 }
 
-PyResult<std::variant<PyType::BasePair, PyObject *>>
-	PyType::compute_bases(const PyType *type_, PyTuple *bases, PyTuple *args, PyDict *kwargs)
+PyResult<std::variant<PyType::BasePair, PyObject *>> PyType::compute_bases(const PyType *type_,
+	std::vector<PyType *> bases,
+	PyTuple *args,
+	PyDict *kwargs)
 {
-	if (!bases->elements().empty()) {
+	if (!bases.empty()) {
 		std::unordered_set<PyObject *> bases_set;
-		for (const auto &b : bases->elements()) {
-			ASSERT(std::holds_alternative<PyObject *>(b))
-			auto *base = std::get<PyObject *>(b);
-			if (as<PyType>(base)) {
-				if (bases_set.contains(base)) {
-					auto *duplicate_type = as<PyType>(base);
-					return Err(type_error(
-						"duplicate base class {}", duplicate_type->underlying_type().__name__));
-				}
-				bases_set.insert(std::get<PyObject *>(b));
-				continue;
+		for (const auto &base : bases) {
+			if (bases_set.contains(base)) {
+				auto *duplicate_type = as<PyType>(base);
+				return Err(type_error(
+					"duplicate base class {}", duplicate_type->underlying_type().__name__));
 			}
+			bases_set.insert(base);
+			continue;
 			if (auto [attr, r] =
 					base->lookup_attribute(PyString::create("__mro_entries__").unwrap());
 				attr.is_err() || r == LookupAttrResult::NOT_FOUND) {
@@ -1484,19 +1482,16 @@ PyResult<std::variant<PyType::BasePair, PyObject *>>
 		return Ok(std::make_tuple(base.unwrap(), bases));
 	}
 	// by default set object as a base if none provided
-	auto *base = types::object();
-	auto bases_ = PyTuple::create(types::object());
-	if (bases_.is_err()) { return bases_; }
-	return Ok(std::make_tuple(base, bases_.unwrap()));
+	return Ok(std::make_tuple(types::object(), std::vector<PyType *>{ types::object() }));
 }
 
 PyResult<PyType *> PyType::build_type(const PyType *metatype,
 	PyString *type_name,
 	PyType *base,
-	PyTuple *bases,
+	std::vector<PyType *> bases,
 	const PyDict *ns)
 {
-	ASSERT(!bases->elements().empty());
+	ASSERT(!bases.empty());
 
 	for (const auto &[key, _] : ns->map()) {
 		auto key_ = PyObject::from(key);
@@ -1510,7 +1505,7 @@ PyResult<PyType *> PyType::build_type(const PyType *metatype,
 	return PyType::create(const_cast<PyType *>(metatype)).and_then([&](PyType *type) {
 		type->underlying_type().is_heaptype = true;
 		type->__mro__ = nullptr;
-		type->initialize(type_name->value(), base, bases, ns);
+		type->initialize(type_name->value(), base, std::move(bases), ns);
 
 		spdlog::trace("Created type@{} #{}", (void *)type, type->name());
 
@@ -1518,13 +1513,11 @@ PyResult<PyType *> PyType::build_type(const PyType *metatype,
 	});
 }
 
-PyResult<const PyType *> PyType::calculate_metaclass(const PyType *type_, PyTuple *bases)
+PyResult<const PyType *> PyType::calculate_metaclass(const PyType *type_,
+	const std::vector<PyType *> &bases)
 {
 	auto *winner = type_;
-	for (const auto &el : bases->elements()) {
-		auto base_ = PyObject::from(el);
-		if (base_.is_err()) return Err(base_.unwrap_err());
-		auto *base = base_.unwrap();
+	for (const auto &base : bases) {
 		if (winner->issubclass(base->type())) { continue; }
 		if (base->type()->issubclass(winner)) {
 			winner = base->type();

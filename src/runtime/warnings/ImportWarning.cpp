@@ -5,10 +5,6 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_import_warning = nullptr;
-}
-
 ImportWarning::ImportWarning(PyType *type) : Warning(type) {}
 
 ImportWarning::ImportWarning(PyType *type, PyTuple *args) : Warning(type, args) {}
@@ -29,25 +25,33 @@ PyResult<PyObject *> ImportWarning::__new__(const PyType *type, PyTuple *args, P
 
 PyType *ImportWarning::static_type() const
 {
-	ASSERT(s_import_warning)
-	return s_import_warning;
+	ASSERT(types::import_warning());
+	return types::import_warning();
 }
 
 PyType *ImportWarning::class_type()
 {
-	ASSERT(s_import_warning)
-	return s_import_warning;
+	ASSERT(types::import_warning())
+	return types::import_warning();
 }
 
-PyType *ImportWarning::register_type(PyModule *module)
-{
-	if (!s_import_warning) {
-		s_import_warning =
-			klass<ImportWarning>(module, "ImportWarning", Warning::class_type()).finalize();
-	} else {
-		module->add_symbol(PyString::create("ImportWarning").unwrap(), s_import_warning);
+namespace {
+
+	std::once_flag import_warning_flag;
+
+	std::unique_ptr<TypePrototype> register_import_warning()
+	{
+		return std::move(klass<ImportWarning>("ImportWarning", Exception::class_type()).type);
 	}
-	return s_import_warning;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> ImportWarning::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(import_warning_flag, []() { type = register_import_warning(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

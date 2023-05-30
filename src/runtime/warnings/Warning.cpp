@@ -5,13 +5,9 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_warning = nullptr;
-}
-
 Warning::Warning(PyType *type) : Exception(type) {}
 
-Warning::Warning(PyType *, PyTuple *args) : Exception(s_warning, args) {}
+Warning::Warning(PyType *, PyTuple *args) : Exception(types::BuiltinTypes::the().warning(), args) {}
 
 PyResult<Warning *> Warning::create(PyType *type, PyTuple *args)
 {
@@ -29,24 +25,33 @@ PyResult<PyObject *> Warning::__new__(const PyType *type, PyTuple *args, PyDict 
 
 PyType *Warning::static_type() const
 {
-	ASSERT(s_warning)
-	return s_warning;
+	ASSERT(types::warning());
+	return types::warning();
 }
 
 PyType *Warning::class_type()
 {
-	ASSERT(s_warning)
-	return s_warning;
+	ASSERT(types::warning());
+	return types::warning();
 }
 
-PyType *Warning::register_type(PyModule *module)
-{
-	if (!s_warning) {
-		s_warning = klass<Warning>(module, "Warning", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("Warning").unwrap(), s_warning);
+namespace {
+
+	std::once_flag warning_flag;
+
+	std::unique_ptr<TypePrototype> register_warning()
+	{
+		return std::move(klass<Warning>("Warning", Exception::class_type()).type);
 	}
-	return s_warning;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> Warning::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(warning_flag, []() { type = register_warning(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

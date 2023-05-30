@@ -5,19 +5,18 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_lookup_error = nullptr;
-}
-
 LookupError::LookupError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
 
 LookupError::LookupError(PyType *type, PyTuple *args) : Exception(type->underlying_type(), args) {}
 
-LookupError::LookupError(PyTuple *args) : Exception(s_lookup_error->underlying_type(), args) {}
+LookupError::LookupError(TypePrototype &type, PyTuple *args) : Exception(type, args) {}
+
+LookupError::LookupError(PyTuple *args) : Exception(types::BuiltinTypes::the().lookup_error(), args)
+{}
 
 PyResult<PyObject *> LookupError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_lookup_error)
+	ASSERT(type == types::lookup_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = LookupError::create(args)) {
 		return Ok(static_cast<PyObject *>(result));
@@ -28,24 +27,32 @@ PyResult<PyObject *> LookupError::__new__(const PyType *type, PyTuple *args, PyD
 
 PyType *LookupError::class_type()
 {
-	ASSERT(s_lookup_error)
-	return s_lookup_error;
+	ASSERT(types::lookup_error());
+	return types::lookup_error();
 }
 
 PyType *LookupError::static_type() const
 {
-	ASSERT(s_lookup_error)
-	return s_lookup_error;
+	ASSERT(types::lookup_error());
+	return types::lookup_error();
 }
 
-PyType *LookupError::register_type(PyModule *module)
-{
-	if (!s_lookup_error) {
-		s_lookup_error =
-			klass<LookupError>(module, "LookupError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("LookupError").unwrap(), s_lookup_error);
+namespace {
+
+	std::once_flag lookup_error_flag;
+
+	std::unique_ptr<TypePrototype> register_lookup_error()
+	{
+		return std::move(klass<LookupError>("LookupError", Exception::class_type()).type);
 	}
-	return s_lookup_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> LookupError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(lookup_error_flag, []() { type = register_lookup_error(); });
+		return std::move(type);
+	};
 }
 }// namespace py

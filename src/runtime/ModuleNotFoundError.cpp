@@ -5,19 +5,16 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_module_not_found_error = nullptr;
-}
-
 ModuleNotFoundError::ModuleNotFoundError(PyType *type) : ImportError(type, nullptr) {}
 
 ModuleNotFoundError::ModuleNotFoundError(PyTuple *args, PyObject *name, PyObject *path)
-	: ImportError(s_module_not_found_error, args), m_name(name), m_path(path)
+	: ImportError(types::BuiltinTypes::the().module_not_found_error(), args), m_name(name),
+	  m_path(path)
 {}
 
 PyResult<PyObject *> ModuleNotFoundError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_module_not_found_error);
+	ASSERT(type == types::module_not_found_error());
 	auto name = [kwargs]() -> PyResult<PyObject *> {
 		auto *name = PyString::create("name").unwrap();
 		if (kwargs->map().contains(name)) { return PyObject::from(kwargs->map().at(name)); }
@@ -44,20 +41,29 @@ PyResult<int32_t> ModuleNotFoundError::__init__(PyTuple *, PyDict *) { return Ok
 
 PyType *ModuleNotFoundError::static_type() const
 {
-	ASSERT(s_module_not_found_error)
-	return s_module_not_found_error;
+	ASSERT(types::module_not_found_error());
+	return types::module_not_found_error();
 }
 
-PyType *ModuleNotFoundError::register_type(PyModule *module)
-{
-	if (!s_module_not_found_error) {
-		s_module_not_found_error =
-			klass<ModuleNotFoundError>(module, "ModuleNotFoundError", ImportError::class_type())
-				.finalize();
-	} else {
-		module->add_symbol(
-			PyString::create("ModuleNotFoundError").unwrap(), s_module_not_found_error);
+namespace {
+
+	std::once_flag module_not_found_error_flag;
+
+	std::unique_ptr<TypePrototype> register_module_not_found_error()
+	{
+		return std::move(
+			klass<ModuleNotFoundError>("ModuleNotFoundError", ImportError::class_type()).type);
 	}
-	return s_module_not_found_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> ModuleNotFoundError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(
+			module_not_found_error_flag, []() { type = register_module_not_found_error(); });
+		return std::move(type);
+	};
 }
+
 }// namespace py

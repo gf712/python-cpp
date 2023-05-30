@@ -3,34 +3,43 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
-
-static PyType *s_syntax_error = nullptr;
+namespace py {
 
 SyntaxError::SyntaxError(PyType *type) : Exception(type) {}
 
-SyntaxError::SyntaxError(PyTuple *args) : Exception(s_syntax_error->underlying_type(), args) {}
+SyntaxError::SyntaxError(PyTuple *args) : Exception(types::BuiltinTypes::the().syntax_error(), args)
+{}
 
 PyResult<PyObject *> SyntaxError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_syntax_error)
+	ASSERT(type == types::syntax_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	return Ok(SyntaxError::create(args));
 }
 
 PyType *SyntaxError::static_type() const
 {
-	ASSERT(s_syntax_error)
-	return s_syntax_error;
+	ASSERT(types::syntax_error());
+	return types::syntax_error();
 }
 
-PyType *SyntaxError::register_type(PyModule *module)
-{
-	if (!s_syntax_error) {
-		s_syntax_error =
-			klass<SyntaxError>(module, "SyntaxError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("SyntaxError").unwrap(), s_syntax_error);
+namespace {
+
+	std::once_flag syntax_error_flag;
+
+	std::unique_ptr<TypePrototype> register_syntax_error()
+	{
+		return std::move(klass<SyntaxError>("SyntaxError", Exception::class_type()).type);
 	}
-	return s_syntax_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> SyntaxError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(syntax_error_flag, []() { type = register_syntax_error(); });
+		return std::move(type);
+	};
 }
+
+}// namespace py

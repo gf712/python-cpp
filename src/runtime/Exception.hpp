@@ -18,8 +18,6 @@ class Exception : public BaseException
 	Exception(PyType *, PyTuple *args);
 	Exception(const TypePrototype &type, PyTuple *args);
 
-	static PyType *s_exception_type;
-
   private:
 	Exception(PyTuple *args);
 
@@ -30,7 +28,7 @@ class Exception : public BaseException
 	}
 
   public:
-	static PyType *register_type(PyModule *);
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *static_type() const override;
 

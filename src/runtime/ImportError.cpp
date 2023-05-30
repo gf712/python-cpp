@@ -3,19 +3,22 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
+namespace py {
 
-static PyType *s_import_error = nullptr;
+ImportError::ImportError(PyType *type) : ImportError(type->underlying_type(), nullptr) {}
 
-ImportError::ImportError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+ImportError::ImportError(PyType *type, PyTuple *args) : ImportError(type->underlying_type(), args)
+{}
 
-ImportError::ImportError(PyType *type, PyTuple *args) : Exception(type->underlying_type(), args) {}
+ImportError::ImportError(TypePrototype &type, PyTuple *args) : Exception(type, args) {}
 
-ImportError::ImportError(PyTuple *args) : Exception(s_import_error->underlying_type(), args) {}
+ImportError::ImportError(PyTuple *args)
+	: ImportError(types::BuiltinTypes::the().import_error(), args)
+{}
 
 PyResult<PyObject *> ImportError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_import_error)
+	ASSERT(type == types::import_error());
 	if (auto result = ImportError::create(args)) {
 		if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
 			result->m_name = PyObject::from(it->second).unwrap();
@@ -39,25 +42,14 @@ PyResult<int32_t> ImportError::__init__(PyTuple *args, PyDict *kwargs)
 
 PyType *ImportError::class_type()
 {
-	ASSERT(s_import_error)
-	return s_import_error;
+	ASSERT(types::import_error());
+	return types::import_error();
 }
 
 PyType *ImportError::static_type() const
 {
-	ASSERT(s_import_error)
-	return s_import_error;
-}
-
-PyType *ImportError::register_type(PyModule *module)
-{
-	if (!s_import_error) {
-		s_import_error =
-			klass<ImportError>(module, "ImportError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("ImportError").unwrap(), s_import_error);
-	}
-	return s_import_error;
+	ASSERT(types::import_error());
+	return types::import_error();
 }
 
 void ImportError::visit_graph(Visitor &visitor)
@@ -65,3 +57,24 @@ void ImportError::visit_graph(Visitor &visitor)
 	Exception::visit_graph(visitor);
 	if (m_name) visitor.visit(*m_name);
 }
+
+namespace {
+
+	std::once_flag import_error_flag;
+
+	std::unique_ptr<TypePrototype> register_import_error()
+	{
+		return std::move(klass<ImportError>("ImportError", Exception::class_type()).type);
+	}
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> ImportError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(import_error_flag, []() { type = register_import_error(); });
+		return std::move(type);
+	};
+}
+
+}// namespace py

@@ -20,7 +20,7 @@ class ImportWarning : public Warning
   public:
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
-	static PyType *register_type(PyModule *);
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *static_type() const override;
 	static PyType *class_type();

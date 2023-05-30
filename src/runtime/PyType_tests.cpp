@@ -11,8 +11,8 @@ using namespace py;
 TEST(PyType, ObjectClassParent)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	auto *bases = types::object()->underlying_type().__bases__;
-	EXPECT_TRUE(bases->elements().empty());
+	const auto &bases = types::object()->underlying_type().__bases__;
+	EXPECT_TRUE(bases.empty());
 
 	auto mro_ = types::object()->mro();
 	ASSERT_TRUE(mro_.is_ok());
@@ -26,13 +26,11 @@ TEST(PyType, ObjectClassParent)
 }
 
 namespace {
-TypePrototype *new_type(const std::string &name, std::vector<PyObject *> bases)
+TypePrototype *new_type(const std::string &name, std::vector<PyType *> bases)
 {
 	auto *new_type = new TypePrototype{};
 	new_type->__name__ = name;
-	auto bases_ = PyTuple::create(std::move(bases));
-	EXPECT_TRUE(bases_.is_ok());
-	new_type->__bases__ = bases_.unwrap();
+	new_type->__bases__ = std::move(bases);
 	return new_type;
 }
 }// namespace

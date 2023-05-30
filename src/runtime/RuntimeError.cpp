@@ -6,27 +6,25 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_runtime_error = nullptr;
-}
-
 template<> RuntimeError *as(PyObject *obj)
 {
-	ASSERT(s_runtime_error)
-	if (obj->type() == s_runtime_error) { return static_cast<RuntimeError *>(obj); }
+	ASSERT(types::runtime_error());
+	if (obj->type() == types::runtime_error()) { return static_cast<RuntimeError *>(obj); }
 	return nullptr;
 }
 
 template<> const RuntimeError *as(const PyObject *obj)
 {
-	ASSERT(s_runtime_error)
-	if (obj->type() == s_runtime_error) { return static_cast<const RuntimeError *>(obj); }
+	ASSERT(types::runtime_error())
+	if (obj->type() == types::runtime_error()) { return static_cast<const RuntimeError *>(obj); }
 	return nullptr;
 }
 
 RuntimeError::RuntimeError(PyType *type) : Exception(type) {}
 
-RuntimeError::RuntimeError(PyTuple *args) : Exception(s_runtime_error->underlying_type(), args) {}
+RuntimeError::RuntimeError(PyTuple *args)
+	: Exception(types::BuiltinTypes::the().runtime_error(), args)
+{}
 
 PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
 {
@@ -38,20 +36,27 @@ PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
 
 PyType *RuntimeError::static_type() const
 {
-	ASSERT(s_runtime_error)
-	return s_runtime_error;
+	ASSERT(types::runtime_error());
+	return types::runtime_error();
 }
 
-PyType *RuntimeError::register_type(PyModule *module)
-{
-	if (!s_runtime_error) {
-		s_runtime_error =
-			klass<RuntimeError>(module, "RuntimeError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("RuntimeError").unwrap(), s_runtime_error);
+namespace {
+
+	std::once_flag runtime_error_flag;
+
+	std::unique_ptr<TypePrototype> register_runtime_error()
+	{
+		return std::move(klass<RuntimeError>("RuntimeError", Exception::class_type()).type);
 	}
-	spdlog::trace("RuntimeError type @{}", (void *)s_runtime_error);
-	return s_runtime_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> RuntimeError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(runtime_error_flag, []() { type = register_runtime_error(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

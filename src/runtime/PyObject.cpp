@@ -54,7 +54,9 @@ void TypePrototype::visit_graph(::Cell::Visitor &visitor)
 	if (__class__) { visitor.visit(*__class__); }
 	if (__dict__) { visitor.visit(*__dict__); }
 	if (__base__) { visitor.visit(*__base__); }
-	if (__bases__) { visitor.visit(*__bases__); }
+	for (auto *b : __bases__) {
+		if (b) visitor.visit(*b);
+	}
 }
 
 size_t ValueHash::operator()(const Value &value) const
