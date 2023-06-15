@@ -14,8 +14,11 @@ namespace ast {
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
-#define __AST_NODE_TYPE(NodeType) \
-	Value *NodeType::codegen(CodeGenerator *generator) const { return generator->visit(this); }
+#define __AST_NODE_TYPE(NodeType)                            \
+	Value *NodeType::codegen(CodeGenerator *generator) const \
+	{                                                        \
+		return generator->visit(this);                       \
+	}
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 
@@ -31,8 +34,11 @@ void NodeVisitor::dispatch(ASTNode *node)
 #undef __AST_NODE_TYPE
 }
 
-#define __AST_NODE_TYPE(NodeType) \
-	void NodeVisitor::dispatch(NodeType *node) { visit(node); }
+#define __AST_NODE_TYPE(NodeType)              \
+	void NodeVisitor::dispatch(NodeType *node) \
+	{                                          \
+		visit(node);                           \
+	}
 AST_NODE_TYPES
 #undef __AST_NODE_TYPE
 

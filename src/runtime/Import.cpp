@@ -235,10 +235,10 @@ PyResult<PyObject *> import_module_level_object(PyString *name,
 		}
 	}();
 
-	if (module.is_err()) {
-		spdlog::error("{}", module.unwrap_err()->format_traceback());
-		TODO();
-	}
+	// if (module.is_err()) {
+	// 	spdlog::error("{}", module.unwrap_err()->format_traceback());
+	// 	TODO();
+	// }
 
 	return module;
 }

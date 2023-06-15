@@ -92,9 +92,9 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 			end = std::get<String>(maybe_str).s;
 		}
 	}
-	auto reprfunc = [](const PyResult<PyObject *> &arg) -> PyResult<PyObject *> {
-		if (arg.is_err()) return arg;
-		return arg.unwrap()->repr();
+	auto strfunc = [](const PyResult<PyObject *> &arg) -> PyResult<PyString *> {
+		if (arg.is_err()) return Err(arg.unwrap_err());
+		return arg.unwrap()->str();
 	};
 
 	auto arg_it = args->begin();
@@ -107,20 +107,20 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 
 	while (arg_it != arg_it_end) {
 		spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap()));
-		auto reprobj_ = reprfunc(*arg_it);
+		auto reprobj_ = strfunc(*arg_it);
 		if (reprobj_.is_err()) { return reprobj_; }
 		auto reprobj = reprobj_.unwrap();
-		spdlog::debug("repr result: {}", reprobj->to_string());
-		std::cout << reprobj->to_string() << separator;
+		spdlog::debug("repr result: {}", reprobj->value());
+		std::cout << reprobj->value() << separator;
 		std::advance(arg_it, 1);
 	}
 
 	spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap()));
-	auto reprobj_ = reprfunc(*arg_it);
+	auto reprobj_ = strfunc(*arg_it);
 	if (reprobj_.is_err()) { return reprobj_; }
 	auto reprobj = reprobj_.unwrap();
-	spdlog::debug("repr result: {}", reprobj->to_string());
-	std::cout << reprobj->to_string() << end;
+	spdlog::debug("repr result: {}", reprobj->value());
+	std::cout << reprobj->value() << end;
 
 	return Ok(py_none());
 }

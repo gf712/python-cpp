@@ -10,8 +10,7 @@ PyResult<Value> FormatValue::execute(VirtualMachine &vm, Interpreter &) const
 
 	return PyObject::from(src)
 		.and_then([](PyObject *obj) {
-			ASSERT(as<PyString>(obj));
-            // TODO: support other conversion functions
+			// TODO: support other conversion functions
 			return obj->str();
 		})
 		.and_then([&vm, this](PyString *str) -> PyResult<Value> {

@@ -237,7 +237,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	// a non-owning list of all generated Labels
 	std::vector<Label *> m_labels;
 
-	std::vector<size_t> m_frame_register_count;
+	std::vector<std::bitset<256>> m_frame_register_occupancy;
 	std::vector<size_t> m_frame_stack_value_count;
 	std::vector<size_t> m_frame_free_var_count;
 
@@ -330,15 +330,37 @@ class BytecodeGenerator : public ast::CodeGenerator
 		spdlog::debug("bound label {}", label.name());
 	}
 
-	size_t register_count() const { return m_frame_register_count.back(); }
+	size_t register_count() const
+	{
+		const auto &register_occupancy = m_frame_register_occupancy.back();
+		return register_occupancy.size();
+	}
 	size_t stack_variable_count() const { return m_frame_stack_value_count.back(); }
 	size_t free_variable_count() const { return m_frame_free_var_count.back(); }
 
 	Register allocate_register()
 	{
-		spdlog::debug("New register: {}", m_frame_register_count.back());
-		ASSERT(m_frame_register_count.back() < std::numeric_limits<Register>::max());
-		return m_frame_register_count.back()++;
+		size_t available_register = std::numeric_limits<size_t>::max();
+		auto &register_occupancy = m_frame_register_occupancy.back();
+		for (size_t i = 0; i < register_occupancy.size(); ++i) {
+			if (!register_occupancy[i]) {
+				available_register = i;
+				break;
+			}
+		}
+		ASSERT(available_register != std::numeric_limits<size_t>::max());
+		ASSERT(available_register < std::numeric_limits<Register>::max());
+		spdlog::debug("New register: {}", available_register);
+		register_occupancy[available_register] = 1;
+		return available_register;
+	}
+
+	void deallocate_register(Register reg)
+	{
+		spdlog::debug("Deallocate register: {}", reg);
+		auto &register_occupancy = m_frame_register_occupancy.back();
+		ASSERT(register_occupancy[reg]);
+		register_occupancy[reg] = 0;
 	}
 
 	Register allocate_stack_value()
@@ -359,7 +381,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	void enter_function()
 	{
-		m_frame_register_count.emplace_back(start_register);
+		m_frame_register_occupancy.emplace_back()[start_register - 1] = 1;
 		m_frame_stack_value_count.emplace_back(start_stack_index);
 		m_frame_free_var_count.emplace_back(start_stack_index);
 	}
@@ -383,6 +405,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeValue *build_list(const std::vector<Register> &);
 	BytecodeValue *build_tuple(const std::vector<Register> &);
 	BytecodeValue *build_set(const std::vector<Register> &);
+	BytecodeValue *build_string(const std::vector<Register> &);
 	void emit_call(Register func, const std::vector<Register> &);
 	void make_function(Register,
 		const std::string &,

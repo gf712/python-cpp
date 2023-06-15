@@ -245,6 +245,7 @@ BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &elemen
 {
 	auto *result = create_value();
 	if (!element_registers.empty()) {
+		const auto frame_occupancy = m_frame_register_occupancy.back();
 		std::optional<size_t> offset;
 		bool first = true;
 		for (const auto &el : element_registers) {
@@ -257,6 +258,7 @@ BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &elemen
 		}
 		ASSERT(offset.has_value());
 		emit<BuildList>(result->get_register(), element_registers.size(), *offset);
+		m_frame_register_occupancy.back() = frame_occupancy;
 	} else {
 		emit<BuildList>(result->get_register(), 0, 0);
 	}
@@ -349,8 +351,10 @@ std::tuple<size_t, size_t> BytecodeGenerator::move_to_stack(const std::vector<Re
 void BytecodeGenerator::emit_call(Register func, const std::vector<Register> &args)
 {
 	if (!args.empty()) {
+		const auto frame_occupancy = m_frame_register_occupancy.back();
 		const auto [args_size, stack_offset] = move_to_stack(args);
 		emit<FunctionCall>(func, args_size, stack_offset);
+		m_frame_register_occupancy.back() = frame_occupancy;
 	} else {
 		emit<FunctionCall>(func, 0, 0);
 	}
@@ -1272,6 +1276,7 @@ Value *BytecodeGenerator::visit(const ast::YieldFrom *node)
 
 Value *BytecodeGenerator::visit(const Assign *node)
 {
+	const auto frame_occupancy = m_frame_register_occupancy.back();
 	auto *src = generate(node->value().get(), m_function_id);
 	ASSERT(node->targets().size() > 0)
 
@@ -1320,7 +1325,8 @@ Value *BytecodeGenerator::visit(const Assign *node)
 			TODO();
 		}
 	}
-	return src;
+	m_frame_register_occupancy.back() = std::move(frame_occupancy);
+	return nullptr;
 }
 
 Value *BytecodeGenerator::visit(const Call *node)
@@ -1748,6 +1754,8 @@ Value *BytecodeGenerator::visit(const Set *node)
 
 Value *BytecodeGenerator::visit(const ClassDefinition *node)
 {
+	const auto frame_occupancy = m_frame_register_occupancy.back();
+
 	if (!node->decorator_list().empty()) { TODO(); }
 	auto class_mangled_name = Mangler::default_mangler().class_mangle(
 		mangle_namespace(m_stack), node->name(), node->source_location());
@@ -1910,6 +1918,8 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	store_name(node->name(), &return_value);
 	emit<StoreName>(node->name(), return_value.get_register());
 
+	m_frame_register_occupancy.back() = std::move(frame_occupancy);
+
 	return nullptr;
 }
 
@@ -1940,6 +1950,7 @@ Value *BytecodeGenerator::visit(const Attribute *node)
 {
 	auto *this_value = generate(node->value().get(), m_function_id);
 
+	ASSERT(m_ctx.parent_nodes().size() >= 2);
 	const auto *parent_node = m_ctx.parent_nodes()[m_ctx.parent_nodes().size() - 2];
 	auto parent_node_type = parent_node->node_type();
 
@@ -1948,22 +1959,25 @@ Value *BytecodeGenerator::visit(const Attribute *node)
 	// and this attribute
 	if (parent_node_type == ASTNodeType::Call
 		&& static_cast<const Call *>(parent_node)->function().get() == node) {
-		auto method_name = create_value();
-		emit<LoadMethod>(method_name->get_register(),
-			this_value->get_register(),
-			load_name(node->attr(), m_function_id)->get_index());
-		return method_name;
+		auto method = create_value();
+		const auto *method_name = load_name(node->attr(), m_function_id);
+		emit<LoadMethod>(
+			method->get_register(), this_value->get_register(), method_name->get_index());
+		deallocate_register(this_value->get_register());
+		return method;
 	} else if (node->context() == ContextType::LOAD) {
 		auto *attribute_value = create_value();
-		const auto &attr_name = load_name(node->attr(), m_function_id);
+		const auto *attr_name = load_name(node->attr(), m_function_id);
 		emit<LoadAttr>(
 			attribute_value->get_register(), this_value->get_register(), attr_name->get_index());
+		deallocate_register(this_value->get_register());
 		return attribute_value;
 	} else if (node->context() == ContextType::STORE) {
 		auto *attribute_value = create_value();
 		const auto &attr_name = load_name(node->attr(), m_function_id);
 		emit<LoadAttr>(
 			attribute_value->get_register(), this_value->get_register(), attr_name->get_index());
+		deallocate_register(this_value->get_register());
 		return attribute_value;
 	} else {
 		TODO();
@@ -1998,6 +2012,7 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 		}
 	}();
 
+	const auto frame_occupancy = m_frame_register_occupancy.back();
 	const auto *rhs = generate(node->value().get(), m_function_id);
 	switch (node->op()) {
 	case BinaryOpType::PLUS: {
@@ -2056,6 +2071,8 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 	} else {
 		TODO();
 	}
+
+	m_frame_register_occupancy.back() = std::move(frame_occupancy);
 
 	return lhs;
 }
@@ -3162,7 +3179,7 @@ FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenera
 
 BytecodeGenerator::BytecodeGenerator()
 {
-	m_frame_register_count.push_back(0u);
+	m_frame_register_occupancy.emplace_back();
 	m_frame_stack_value_count.push_back(0u);
 	m_frame_free_var_count.push_back(0u);
 	(void)create_function("__main__entry__");
@@ -3177,7 +3194,7 @@ void BytecodeGenerator::exit_function(size_t function_id)
 	auto function = std::next(m_functions.functions.begin(), function_id);
 	function->metadata.register_count = register_count();
 	function->metadata.stack_size = stack_variable_count() + free_variable_count();
-	m_frame_register_count.pop_back();
+	m_frame_register_occupancy.pop_back();
 	m_frame_stack_value_count.pop_back();
 	m_frame_free_var_count.pop_back();
 }
@@ -3212,7 +3229,7 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
 	std::vector<std::string> argv)
 {
-	ASSERT(m_frame_register_count.size() == 2)
+	ASSERT(m_frame_register_occupancy.size() == 2)
 	ASSERT(m_frame_stack_value_count.size() == 2)
 	ASSERT(m_frame_free_var_count.size() == 2)
 	relocate_labels(m_functions);

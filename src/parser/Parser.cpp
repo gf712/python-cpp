@@ -1502,6 +1502,23 @@ std::shared_ptr<Constant> parse_bytes(std::vector<Token> strings)
 		transformed, SourceLocation{ start_token.start(), end_token.end() });
 }
 
+FormattedValue::Conversion to_formatted_value_conversion(
+	const std::optional<py::PyString::ReplacementField::Conversion> &c)
+{
+	if (!c.has_value()) { return FormattedValue::Conversion::NONE; }
+	switch (*c) {
+	case py::PyString::ReplacementField::Conversion::REPR: {
+		return FormattedValue::Conversion::REPR;
+	} break;
+	case py::PyString::ReplacementField::Conversion::STR: {
+		return FormattedValue::Conversion::STRING;
+	} break;
+	case py::PyString::ReplacementField::Conversion::ASCII: {
+		return FormattedValue::Conversion::ASCII;
+	} break;
+	}
+}
+
 std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
 {
 	std::vector<std::shared_ptr<ASTNode>> string_nodes;
@@ -1540,14 +1557,15 @@ std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
 						SourceLocation{ .start = token.start(), .end = token.end() }));
 				}
 
-				const auto expr_end = value.find('}', expr_start);
-				if (expr_end == std::string_view::npos) {
+				auto replacement_field_ = PyString::parse_fstring(value.substr(expr_start));
+				if (replacement_field_.is_err()) {
 					// FIXME: should be a SyntaxError
-					spdlog::error("f-string: expecting '}'");
+					spdlog::error(replacement_field_.unwrap_err()->to_string());
 					std::abort();
 				}
-				auto expr = value.substr(expr_start + 1, expr_end - 1);
-				auto lexer = Lexer::create(std::string{ expr }, l.filename());
+				auto expr_end = replacement_field_.unwrap().end + 1;
+				std::string expr{ *replacement_field_.unwrap().field_name };
+				auto lexer = Lexer::create(expr, l.filename());
 				Parser p{ lexer };
 				auto formatted_value = p.parse_fstring();
 				if (formatted_value.is_err()) {
@@ -1556,15 +1574,15 @@ std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
 					std::abort();
 				}
 				string_nodes.push_back(std::make_shared<FormattedValue>(formatted_value.unwrap(),
-					FormattedValue::Conversion::NONE,
+					to_formatted_value_conversion(replacement_field_.unwrap().conversion),
 					nullptr,
 					SourceLocation{ .start = token.start(), .end = token.end() }));
-				start_idx = expr_end + 1;
+				start_idx = expr_start + expr_end + 1;
 			} else {
 				string_nodes.push_back(
 					std::make_shared<Constant>(std::string{ value.substr(start_idx) },
 						SourceLocation{ .start = token.start(), .end = token.end() }));
-				start_idx = value.size();
+				start_idx += value.size();
 			}
 		}
 	}

@@ -7,6 +7,8 @@ project(python++)
 
 set(CMAKE_CXX_STANDARD 20)
 
+set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+
 FetchContent_Declare(
 	spdlog
 	GIT_REPOSITORY https://github.com/gabime/spdlog.git
