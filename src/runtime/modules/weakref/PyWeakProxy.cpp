@@ -80,11 +80,11 @@ PyResult<PyObject *> PyWeakProxy::__getattribute__(PyObject *attribute) const
 {
 	auto obj = [this]() -> PyResult<const PyObject *> {
 		if (type() == s_weak_proxy) {
-			if (!static_cast<const PyWeakProxy *>(this)->is_alive()) {
+			if (!is_alive()) {
 				// FIXME: should be a ReferenceError
 				return Err(value_error("weakly-referenced object no longer exists"));
 			} else {
-				return Ok(static_cast<const PyWeakProxy *>(this)->m_object);
+				return Ok(m_object);
 			}
 		}
 		return Ok(this);

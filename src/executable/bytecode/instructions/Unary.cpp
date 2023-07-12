@@ -94,6 +94,7 @@ PyResult<Value> Unary::execute(VirtualMachine &vm, Interpreter &interpreter) con
 			return unary_not(val, interpreter);
 		} break;
 		}
+		ASSERT_NOT_REACHED();
 	}();
 
 	if (result.is_err()) return result;

@@ -330,13 +330,13 @@ PyResult<PyObject *>
 
 PyResult<PyObject *> globals(const PyTuple *, const PyDict *, Interpreter &interpreter)
 {
-	return Ok(static_cast<PyObject *>(interpreter.execution_frame()->globals()));
+	return Ok(interpreter.execution_frame()->globals());
 }
 
 
 PyResult<PyObject *> locals(const PyTuple *, const PyDict *, Interpreter &interpreter)
 {
-	return Ok(static_cast<PyObject *>(interpreter.execution_frame()->locals()));
+	return Ok(interpreter.execution_frame()->locals());
 }
 
 
@@ -365,7 +365,7 @@ PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
 	ASSERT(args->size() == 1)
 	auto obj = args->operator[](0);
 	if (obj.is_err()) return obj;
-	return PyInteger::create(static_cast<int64_t>(bit_cast<intptr_t>(obj.unwrap())));
+	return PyInteger::create(bit_cast<intptr_t>(obj.unwrap()));
 }
 
 PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
@@ -448,7 +448,7 @@ PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
 		as<PyDict>(globals),
 		locals,
 		fromlist,
-		as<PyInteger>(level)->as_size_t());
+		static_cast<uint32_t>(as<PyInteger>(level)->as_size_t()));
 }
 
 PyResult<PyObject *> hasattr(const PyTuple *args, const PyDict *, Interpreter &)

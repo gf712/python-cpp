@@ -809,7 +809,7 @@ namespace {
 		if (!subtype) {
 			return Err(type_error("{}.__new__(X): X is not a type object ({})",
 				type->name(),
-				subtype->type()->name()));
+				arg0.unwrap()->type()->name()));
 		}
 		if (!subtype->issubclass(type)) {
 			return Err(type_error("{}.__new__({}): {} is not a subtype of {}",
@@ -1304,8 +1304,9 @@ namespace {
 			auto base_ = PyObject::from(b);
 			ASSERT(base_.is_ok());
 			auto *base = base_.unwrap();
-			ASSERT(as<PyType>(base));
-			auto *dict = as<PyType>(base)->attributes();
+			auto *base_astype = as<PyType>(base);
+			ASSERT(base_astype);
+			auto *dict = base_astype->attributes();
 			ASSERT(dict);
 			if (auto it = dict->map().find(String{ std::string{ slot.name } });
 				it != dict->map().end()) {
@@ -1587,7 +1588,7 @@ PyResult<PyTuple *> PyType::mro_internal() const
 		const auto &result = mro_(const_cast<PyType *>(this));
 		auto mro = PyTuple::create(result);
 		if (mro.is_err()) { return mro; }
-		__mro__ = static_cast<PyTuple *>(mro.unwrap());
+		__mro__ = mro.unwrap();
 	}
 	return Ok(__mro__);
 }

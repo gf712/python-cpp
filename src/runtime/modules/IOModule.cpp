@@ -1833,7 +1833,7 @@ typedef std::basic_ofstream<char>::__filebuf_type buffer_t;
 typedef __gnu_cxx::stdio_filebuf<char> io_buffer_t;
 FILE *cfile_impl(buffer_t *const fb)
 {
-	return (static_cast<io_buffer_t *const>(fb))->file();// type std::__c_file
+	return static_cast<io_buffer_t *>(fb)->file();
 }
 
 FILE *cfile(std::fstream const &fs) { return cfile_impl(fs.rdbuf()); }

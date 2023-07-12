@@ -160,7 +160,7 @@ class PatternMatchV2_<TypeIdx,
 	std::enable_if_t<TypeIdx == std::tuple_size_v<PatternTuple>>>
 {
   public:
-	static std::optional<std::tuple<>> match(Parser &) {}
+	static std::optional<std::tuple<>> match(Parser &) { return {}; }
 };
 
 
@@ -1509,7 +1509,7 @@ std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
 		auto *start = token.start().pointer_to_program;
 		const auto *end = token.end().pointer_to_program;
 
-		if (start[0] == 'b' && start[0] == 'B') {
+		if (start[0] == 'b' || start[0] == 'B') {
 			// FIXME: should be a SyntaxError
 			spdlog::error("cannot mix bytes and nonbytes literals");
 			std::abort();

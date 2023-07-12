@@ -59,6 +59,7 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 			}
 		} break;
 		}
+		ASSERT_NOT_REACHED();
 	}();
 
 	if (result.is_ok()) {

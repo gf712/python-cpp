@@ -17,9 +17,9 @@
 #include "executable/bytecode/instructions/DictMerge.hpp"
 #include "executable/bytecode/instructions/DictUpdate.hpp"
 #include "executable/bytecode/instructions/ForIter.hpp"
+#include "executable/bytecode/instructions/FormatValue.hpp"
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
-#include "executable/bytecode/instructions/FormatValue.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
 #include "executable/bytecode/instructions/GetAwaitable.hpp"
 #include "executable/bytecode/instructions/GetIter.hpp"
@@ -90,63 +90,6 @@ using namespace ast;
 namespace codegen {
 
 namespace {
-	class HasReturnVisitor : public NodeVisitor
-	{
-		bool m_has_return{ false };
-
-		void visit(Return *) override { m_has_return = true; }
-		void visit(FunctionDefinition *) override {}
-		void visit(ClassDefinition *) override {}
-
-	  public:
-		static bool evaluate(ASTNode *node)
-		{
-			HasReturnVisitor visitor;
-			visitor.dispatch(node);
-			return visitor.m_has_return;
-		}
-
-		static bool evaluate(const std::vector<std::shared_ptr<ASTNode>> &nodes)
-		{
-			return std::any_of(
-				nodes.begin(), nodes.end(), [](const auto &node) { return evaluate(node.get()); });
-		}
-	};
-
-	class InlineFinallyReturnVisitor : public NodeTransformVisitor
-	{
-		const std::vector<std::shared_ptr<ASTNode>> &m_finally_nodes;
-
-		std::vector<std::shared_ptr<ASTNode>> visit(std::shared_ptr<Return> node) override
-		{
-			ASSERT(m_can_return_multiple_nodes)
-			auto new_nodes = m_finally_nodes;
-			new_nodes.push_back(std::make_shared<Return>(*node));
-			return new_nodes;
-		}
-
-		std::vector<std::shared_ptr<ASTNode>> visit(std::shared_ptr<FunctionDefinition>) override
-		{
-			return {};
-		}
-		std::vector<std::shared_ptr<ASTNode>> visit(std::shared_ptr<ClassDefinition>) override
-		{
-			return {};
-		}
-
-		InlineFinallyReturnVisitor(const std::vector<std::shared_ptr<ASTNode>> &finally_nodes)
-			: m_finally_nodes(finally_nodes)
-		{}
-
-	  public:
-		static void evaluate(std::vector<std::shared_ptr<ASTNode>> &block,
-			const std::vector<std::shared_ptr<ASTNode>> &finally_nodes)
-		{
-			InlineFinallyReturnVisitor visitor{ finally_nodes };
-			visitor.transform_multiple_nodes(block);
-		}
-	};
-
 	bool compare_values(const py::Value &lhs, const py::Value &rhs)
 	{
 		if (lhs.index() != rhs.index()) { return false; }
@@ -918,7 +861,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		std::vector<BytecodeValue *> args;
 		auto *function = load_var(node->name());
 		args.push_back(function);
-		for (int32_t i = decorator_functions.size() - 1; i >= 0; --i) {
+		for (int32_t i = static_cast<int32_t>(decorator_functions.size()) - 1; i >= 0; --i) {
 			const auto &decorator_function = decorator_functions[i];
 			emit_call(decorator_function->get_register(),
 				std::vector<Register>{ args.back()->get_register() });
@@ -1427,7 +1370,8 @@ Value *BytecodeGenerator::visit(const Call *node)
 			keyword_values.push_back(generate(keyword.get(), m_function_id));
 			auto keyword_argname = keyword->arg();
 			if (!keyword_argname.has_value()) { TODO(); }
-			keywords.push_back(load_name(*keyword_argname, m_function_id)->get_index());
+			keywords.push_back(
+				static_cast<Register>(load_name(*keyword_argname, m_function_id)->get_index()));
 		}
 	}
 
@@ -1889,7 +1833,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		auto *kw_value = generate(keyword.get(), m_function_id);
 		kwarg_registers.push_back(kw_value->get_register());
 		if (!keyword->arg().has_value()) { TODO(); }
-		keyword_names.push_back(load_name(*keyword->arg(), m_function_id)->get_index());
+		keyword_names.push_back(static_cast<Register>(load_name(*keyword->arg(), m_function_id)->get_index()));
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);

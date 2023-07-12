@@ -115,5 +115,6 @@ inline auto deserialize(std::span<const uint8_t> &buffer)
 		[]<bool flag = false>() { static_assert(flag, "unsupported deserialization type"); }
 		();
 	}
+	ASSERT_NOT_REACHED();
 }
 }// namespace py

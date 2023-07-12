@@ -277,15 +277,19 @@ Number Number::floordiv(const Number &other) const
 String String::from_unescaped_string(const std::string &str)
 {
 	std::string output;
-	for (size_t i = 0; i < str.size(); ++i) {
-		auto c = str[i];
-		if (c != '\\') {
+	auto it = str.begin();
+	const auto end = str.end();
+	while (it != end) {
+		if (auto c = *it++; c != '\\') {
 			output.push_back(static_cast<unsigned char>(c));
 			continue;
 		}
 
-		c = str[++i];
-		switch (c) {
+		if (it == end) {
+			// return Err(value_error("Trailing \\ in string"));
+			TODO();
+		}
+		switch (*it++) {
 		case '\n':
 			break;
 		case '\\': {
@@ -326,15 +330,12 @@ String String::from_unescaped_string(const std::string &str)
 		case '5':
 		case '6':
 		case '7': {
-			if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
-				c = (c << 3) + str[i + 1] - '0';
-				i++;
-				if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
-					c = (c << 3) + str[i + 1] - '0';
-					i++;
-				}
+			auto c = *(it - 1) - '0';
+			if (it != end && '0' <= *it && *it <= '7') {
+				c = (c << 3) + *it++ - '0';
+				if (it != end && '0' <= *it && *it <= '7') { c = (c << 3) + *it++ - '0'; }
 			}
-			ASSERT(static_cast<int>(c) < static_cast<int>(std::numeric_limits<std::byte>::max()));
+			ASSERT(c < static_cast<int>(std::numeric_limits<unsigned char>::max()));
 			output.push_back(static_cast<unsigned char>(c));
 		} break;
 		case 'x': {
@@ -342,7 +343,7 @@ String String::from_unescaped_string(const std::string &str)
 		} break;
 		default: {
 			output.push_back('\\');
-			output.push_back(static_cast<unsigned char>(c));
+			output.push_back(static_cast<unsigned char>(*(it - 1)));
 		} break;
 		}
 	}
@@ -372,15 +373,20 @@ bool Bytes::operator==(const PyObject *other) const
 Bytes Bytes::from_unescaped_string(const std::string &str)
 {
 	std::vector<std::byte> bytes;
-	for (size_t i = 0; i < str.size(); ++i) {
-		auto c = str[i];
-		if (c != '\\') {
+	auto it = str.begin();
+	const auto end = str.end();
+	while (it != end) {
+		if (auto c = *it++; c != '\\') {
 			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
 			continue;
 		}
 
-		c = str[++i];
-		switch (c) {
+		if (it == end) {
+			// return Err(value_error("Trailing \\ in string"));
+			TODO();
+		}
+
+		switch (*it++) {
 		case '\n':
 			break;
 		case '\\': {
@@ -421,18 +427,16 @@ Bytes Bytes::from_unescaped_string(const std::string &str)
 		case '5':
 		case '6':
 		case '7': {
-			if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
-				c = (c << 3) + str[i + 1] - '0';
-				i++;
-				if (i < str.size() && str[i + 1] >= '0' && str[i + 1] <= '7') {
-					c = (c << 3) + str[i + 1] - '0';
-					i++;
-				}
+			auto c = *(it - 1) - '0';
+			if (it != end && '0' <= *it && *it <= '7') {
+				c = (c << 3) + *it++ - '0';
+				if (it != end && '0' <= *it && *it <= '7') { c = (c << 3) + *it++ - '0'; }
 			}
-			ASSERT(static_cast<int>(c) < static_cast<int>(std::numeric_limits<std::byte>::max()));
-			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
+			ASSERT(c < static_cast<int>(std::numeric_limits<unsigned char>::max()));
+			bytes.push_back(std::byte{static_cast<unsigned char>(c)});
 		} break;
 		case 'x': {
+			TODO();
 		} break;
 		default: {
 			TODO();

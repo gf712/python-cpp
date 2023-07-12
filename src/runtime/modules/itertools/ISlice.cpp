@@ -116,7 +116,7 @@ namespace itertools {
 				return Err(result.unwrap_err());
 			}
 		} else {
-			const auto next = (*m_counter) + m_step - 1;
+			const BigIntType next = (*m_counter) + m_step - 1;
 			if (const auto result = advance_iterator_to(next); result.is_err()) {
 				return Err(result.unwrap_err());
 			}

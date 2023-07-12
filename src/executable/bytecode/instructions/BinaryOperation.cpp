@@ -51,6 +51,7 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 			TODO();
 		} break;
 		}
+		ASSERT_NOT_REACHED();
 	}();
 
 	if (result.is_err()) return Err(result.unwrap_err());

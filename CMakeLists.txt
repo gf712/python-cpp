@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.25)
 include(FetchContent)
 include(ExternalProject)
 include(CheckCXXSourceCompiles)
@@ -10,19 +10,22 @@ set(CMAKE_CXX_STANDARD 20)
 FetchContent_Declare(
 	spdlog
 	GIT_REPOSITORY https://github.com/gabime/spdlog.git
-	GIT_TAG v1.8.5)
+	GIT_TAG v1.8.5
+	SYSTEM)
 FetchContent_MakeAvailable(spdlog)
 
 FetchContent_Declare(
 	gtest
 	GIT_REPOSITORY https://github.com/google/googletest.git
-	GIT_TAG release-1.11.0)
+	GIT_TAG release-1.11.0
+	SYSTEM)
 FetchContent_MakeAvailable(gtest)
 
 FetchContent_Declare(
 	cxxopts
 	GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-	GIT_TAG v3.0.0)
+	GIT_TAG v3.0.0
+	SYSTEM)
 FetchContent_MakeAvailable(cxxopts)
 
 FetchContent_Declare(
@@ -100,7 +103,7 @@ project_options(
 
 # TODO: Address all the warning below. This should be only temporary...
 target_compile_options(project_warnings
-  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shorten-64-to-32;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-implicit-int-conversion;-Wno-old-style-cast;-Wno-gnu-zero-variadic-macro-arguments;-Wno-implicit-int-float-conversion;-Wno-deprecated-copy>
+  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shorten-64-to-32;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-implicit-int-conversion;-Wno-old-style-cast;-Wno-gnu-zero-variadic-macro-arguments;-Wno-implicit-int-float-conversion;-Wno-deprecated-copy;-Wno-missing-field-initializers>
 )
 
 check_cxx_source_compiles(

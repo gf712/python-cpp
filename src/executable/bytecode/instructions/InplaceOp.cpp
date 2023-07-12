@@ -50,6 +50,7 @@ PyResult<Value> InplaceOp::execute(VirtualMachine &vm, Interpreter &interpreter)
 			TODO();
 		} break;
 		}
+		ASSERT_NOT_REACHED();
 	}();
 	if (result.is_ok()) { lhs = result.unwrap(); }
 	return result;

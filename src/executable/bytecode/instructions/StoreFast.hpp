@@ -8,7 +8,7 @@ class StoreFast final : public Instruction
 	Register m_src;
 
   public:
-	StoreFast(size_t stack_index, Register src) : m_stack_index(stack_index), m_src(src) {}
+	StoreFast(Register stack_index, Register src) : m_stack_index(stack_index), m_src(src) {}
 	~StoreFast() override {}
 	std::string to_string() const final
 	{

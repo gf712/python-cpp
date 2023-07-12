@@ -104,32 +104,36 @@ void Interpreter::internal_setup(const std::string &name,
 	Config &&config,
 	std::shared_ptr<Program> &&program)
 {
-	initialize_types();
-	m_modules = PyDict::create().unwrap();
-	m_entry_script = std::move(entry_script);
-	m_argv = std::move(argv);
+	PyModule *sys = nullptr;
+	{
+		[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
 
-	// initialize the standard types by initializing the builtins module
-	m_builtins = builtins_module(*this);
-	m_modules->insert(String{ "builtins" }, m_builtins);
-	auto *sys = sys_module(*this);
-	m_modules->insert(String{ "sys" }, sys);
+		initialize_types();
+		m_modules = PyDict::create().unwrap();
+		m_entry_script = std::move(entry_script);
+		m_argv = std::move(argv);
 
-	auto name_ = PyString::create(name);
-	if (name_.is_err()) { TODO(); }
-	auto *main_module =
-		PyModule::create(PyDict::create().unwrap(), name_.unwrap(), PyString::create("").unwrap())
-			.unwrap();
-	if (!main_module) { TODO(); }
-	m_module = main_module;
-	main_module->set_program(std::move(program));
-	main_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
-	m_modules->insert(name_.unwrap(), main_module);
+		m_builtins = builtins_module(*this);
+		m_modules->insert(String{ "builtins" }, m_builtins);
+		sys = sys_module(*this);
+		m_modules->insert(String{ "sys" }, sys);
 
-	auto code = PyCode::create(main_module->program());
+		auto name_ = PyString::create(name);
+		if (name_.is_err()) { TODO(); }
+		auto *main_module = PyModule::create(
+			PyDict::create().unwrap(), name_.unwrap(), PyString::create("").unwrap())
+								.unwrap();
+		if (!main_module) { TODO(); }
+		m_module = main_module;
+		m_module->set_program(std::move(program));
+		m_module->add_symbol(PyString::create("__builtins__").unwrap(), m_builtins);
+		m_modules->insert(name_.unwrap(), m_module);
+	}
+
+	auto code = PyCode::create(m_module->program());
 	if (code.is_err()) { TODO(); }
 
-	auto *globals = main_module->symbol_table();
+	auto *globals = m_module->symbol_table();
 	auto *locals = globals;
 	m_current_frame = PyFrame::create(
 		nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names, nullptr);
@@ -152,6 +156,7 @@ void Interpreter::internal_setup(const std::string &name,
 		auto install = m_importlib->get_method(PyString::create("_install").unwrap());
 		if (install.is_err()) { TODO(); }
 
+		ASSERT(sys);
 		auto args = PyTuple::create(sys, _imp);
 		if (args.is_err()) { TODO(); }
 		auto result = install.unwrap()->call(args.unwrap(), nullptr);
@@ -177,11 +182,14 @@ void Interpreter::setup(std::shared_ptr<BytecodeProgram> &&program)
 {
 	const auto name = fs::path(program->filename()).stem();
 	auto *code = as<PyCode>(program->main_function());
-	ASSERT(code)
+	ASSERT(code);
+	const auto &filename = program->filename();
+	const auto &argv = program->argv();
+	const auto &main_stack_size = program->main_stack_size();
 	internal_setup(name,
-		program->filename(),
-		program->argv(),
-		program->main_stack_size(),
+		filename,
+		argv,
+		main_stack_size,
 		code->consts(),
 		code->names(),
 		Config{ .requires_importlib = false },
@@ -191,11 +199,14 @@ void Interpreter::setup(std::shared_ptr<BytecodeProgram> &&program)
 void Interpreter::setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program)
 {
 	auto *code = as<PyCode>(program->main_function());
-	ASSERT(code)
+	ASSERT(code);
+	const auto &filename = program->filename();
+	const auto &argv = program->argv();
+	const auto &main_stack_size = program->main_stack_size();
 	internal_setup("__main__",
-		program->filename(),
-		program->argv(),
-		program->main_stack_size(),
+		filename,
+		argv,
+		main_stack_size,
 		code->consts(),
 		code->names(),
 		Config{ .requires_importlib = true },

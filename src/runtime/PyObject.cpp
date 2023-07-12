@@ -1216,11 +1216,11 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 
 		if (!type->underlying_type().__new__.has_value()) {
 			const auto new_fn = get_address(*type->underlying_type().__new__);
-			ASSERT(new_fn)
+			ASSERT(new_fn);
 
-			ASSERT(object()->underlying_type().__new__)
+			ASSERT(object()->underlying_type().__new__);
 			const auto custom_new_fn = get_address(*object()->underlying_type().__new__);
-			ASSERT(custom_new_fn)
+			ASSERT(custom_new_fn);
 
 			if (new_fn != custom_new_fn) {
 				return Err(type_error(
@@ -1231,11 +1231,10 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 		if (!type->underlying_type().__init__.has_value()) {
 			ASSERT(type->underlying_type().__init__)
 			const auto init_fn = get_address(*type->underlying_type().__init__);
-			ASSERT(init_fn)
+			ASSERT(init_fn);
 
-			ASSERT(object()->underlying_type().__init__)
+			ASSERT(object()->underlying_type().__init__);
 			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
-			ASSERT(object)
 			if (init_fn == custom_init_fn) {
 				return Err(type_error("object() takes no arguments"));
 			}

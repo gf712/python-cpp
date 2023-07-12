@@ -1308,7 +1308,7 @@ TEST(Parser, SimplePositiveDoubleAssignment)
 	expected_ast->emplace(
 		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
 									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(static_cast<double>(2.0), SourceLocation{}),
+			std::make_shared<Constant>(2.0, SourceLocation{}),
 			"",
 			SourceLocation{}));
 

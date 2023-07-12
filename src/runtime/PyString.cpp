@@ -216,7 +216,7 @@ PyResult<bool> PyString::__bool__() const { return Ok(!m_value.empty()); }
 PyResult<PyObject *> PyString::capitalize() const
 {
 	auto new_string = m_value;
-	new_string[0] = std::toupper(new_string[0]);
+	new_string[0] = static_cast<char>(std::toupper(new_string[0]));
 	return PyString::create(new_string);
 }
 
@@ -227,7 +227,7 @@ PyResult<PyObject *> PyString::casefold() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return std::tolower(c); });
+		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::tolower(c)); });
 	return PyString::create(new_string);
 }
 
@@ -276,7 +276,7 @@ PyResult<PyObject *> PyString::isdigit() const
 PyResult<PyObject *> PyString::isascii() const
 {
 	for (size_t i = 0; i < m_value.size();) {
-		int length = utf8::codepoint_length(m_value[i]);
+		const auto length = utf8::codepoint_length(m_value[i]);
 		const auto codepoint = utf8::codepoint(m_value.c_str(), length);
 		if (codepoint > 0x7F) { return Ok(py_false()); }
 		i += length;
@@ -468,9 +468,9 @@ PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 	}
 
 	std::optional<size_t> result;
-	while (start_idx != std::string::npos) {
+	while (start_idx < end_idx) {
 		start_idx = m_value.find(pattern->value(), start_idx);
-		if (start_idx != std::string::npos) { result = start_idx++; }
+		if (start_idx < end_idx) { result = start_idx++; }
 	}
 
 	if (result.has_value()) {
@@ -776,7 +776,7 @@ PyResult<PyObject *> PyString::lower() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return std::tolower(c); });
+		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::tolower(c)); });
 	return PyString::create(new_string);
 }
 
@@ -787,7 +787,7 @@ PyResult<PyObject *> PyString::upper() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return std::toupper(c); });
+		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::toupper(c)); });
 	return PyString::create(new_string);
 }
 
@@ -870,7 +870,7 @@ std::vector<uint32_t> PyString::codepoints() const
 	std::vector<uint32_t> codepoints;
 
 	for (size_t i = 0; i < m_value.size();) {
-		int length = utf8::codepoint_length(m_value[i]);
+		const auto length = utf8::codepoint_length(m_value[i]);
 		const auto cp = utf8::codepoint(m_value.c_str() + i, length);
 		ASSERT(cp.has_value());
 		codepoints.push_back(*cp);
@@ -1059,7 +1059,7 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	}
 
 	std::string new_value;
-	new_value.reserve(static_cast<size_t>(m_value.size() * 1.5));
+	new_value.reserve(static_cast<size_t>(static_cast<double>(m_value.size()) * 1.5));
 
 	if (auto tuple = as<PyTuple>(values)) {
 		if (tuple->size() != conversions.size()) {
@@ -1300,7 +1300,7 @@ PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 PyResult<PyObject *> PyString::isidentifier() const
 {
 	for (size_t i = 0; i < m_value.size();) {
-		int length = utf8::codepoint_length(m_value[i]);
+		const auto length = utf8::codepoint_length(m_value[i]);
 		const auto cp = utf8::codepoint(m_value.c_str() + i, length);
 		ASSERT(cp.has_value());
 		if (i == 0 && !u_hasBinaryProperty(*cp, UProperty::UCHAR_XID_START)) {
