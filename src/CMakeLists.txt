@@ -211,6 +211,10 @@ set(UNITTEST_SOURCES
     runtime/PyType_tests.cpp
     testing/main.cpp)
 
+set(PYTHON_LIB_PATH ${cpython_SOURCE_DIR}/Lib)
+
+configure_file(runtime/modules/paths.hpp.in runtime/modules/paths.hpp)
+
 add_library(
   python-cpp
   ${AST_SOURCE_FILES}
@@ -232,7 +236,8 @@ target_link_libraries(python-cpp
 
 target_include_directories(python-cpp
   PUBLIC .
-  PRIVATE ${GMP_INCLUDES})
+  PRIVATE ${GMP_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR}
+)
 
 target_compile_options(
   python-cpp

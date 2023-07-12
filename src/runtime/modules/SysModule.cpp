@@ -14,6 +14,7 @@
 
 #include "config.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/modules/paths.hpp"
 #include "vm/VM.hpp"
 
 #include <filesystem>
@@ -30,7 +31,7 @@ PyResult<PyList *> create_sys_paths(Interpreter &interpreter)
 	if (entry_parent.is_err()) return Err(entry_parent.unwrap_err());
 	auto path_list = PyList::create({
 		entry_parent.unwrap(),
-		PyString::create("/home/hobengil/Python/build/_deps/cpython-src/Lib").unwrap(),
+		PyString::create(kPythonLibPath.data()).unwrap(),
 	});
 
 	return path_list;
