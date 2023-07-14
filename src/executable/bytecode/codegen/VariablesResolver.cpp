@@ -742,13 +742,14 @@ Value *VariablesResolver::visit(const Expression *node)
 
 Value *VariablesResolver::visit(const FormattedValue *node)
 {
-	(void)node;
+	node->value()->codegen(this);
+	if (node->format_spec()) { node->format_spec()->codegen(this); }
 	return nullptr;
 }
 
 Value *VariablesResolver::visit(const JoinedStr *node)
 {
-	(void)node;
+	for (const auto &value : node->values()) { value->codegen(this); }
 	return nullptr;
 }
 

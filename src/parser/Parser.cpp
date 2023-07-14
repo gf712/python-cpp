@@ -208,7 +208,7 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 		const size_t original_token_position = p.token_position();
 
 		const auto t = p.lexer().peek_token(original_token_position);
-		ASSERT(t.has_value());
+		if (!t.has_value()) { return {}; }
 		std::optional<Parser::CacheKey> line;
 		if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 						  ::detail::ValueTypesTuple>{}) {
@@ -510,6 +510,70 @@ template<typename... Args> struct ast_nodes<std::tuple<Args...>>
 			std::conditional_t<_all_shared_ptr, _nested<Args...>, std::false_type>>::type{};
 };
 
+namespace detail {
+template<typename T, typename Args> struct is_in
+{
+	static constexpr bool value = std::is_same_v<T, Args>;
+};
+
+template<typename T, typename... Tail> struct is_in<T, std::tuple<T, Tail...>>
+{
+	static constexpr bool value = true;
+};
+
+template<typename T, typename Head, typename... Tail> struct is_in<T, std::tuple<Head, Tail...>>
+{
+	static constexpr bool value = is_in<T, std::tuple<Tail...>>::value;
+};
+
+static_assert(is_in<float, std::tuple<int, float>>::value);
+static_assert(!is_in<float, std::tuple<int>>::value);
+
+template<typename T, typename Args, bool is_duplicate = is_in<T, Args>::value> struct add_type
+{
+};
+
+template<typename T, typename... Ts> struct add_type<T, std::tuple<Ts...>, true>
+{
+	using type = std::tuple<Ts...>;
+};
+
+template<typename T, typename... Ts> struct add_type<T, std::tuple<Ts...>, false>
+{
+	using type = std::tuple<T, Ts...>;
+};
+
+template<typename... Args> struct collapse_types;
+
+template<> struct collapse_types<>
+{
+	using type = std::tuple<>;
+};
+
+template<typename Head, typename... Tail> struct collapse_types<Head, Tail...>
+{
+	using type = add_type<Head, typename collapse_types<Tail...>::type>::type;
+};
+
+static_assert(
+	std::is_same_v<typename collapse_types<int, float, int>::type, std::tuple<float, int>>);
+static_assert(std::is_same_v<typename collapse_types<std::tuple<int, float>, int>::type,
+	std::tuple<std::tuple<int, float>, int>>);
+
+template<typename> struct to_variant
+{
+};
+
+template<typename... Args> struct to_variant<std::tuple<Args...>>
+{
+	using type = std::variant<Args...>;
+};
+
+static_assert(std::is_same_v<
+	typename to_variant<typename collapse_types<std::tuple<int, float>, int>::type>::type,
+	std::variant<std::tuple<int, float>, int>>);
+}// namespace detail
+
 template<size_t TypeIdx, typename... PatternTypes> struct OrPatternV2_;
 
 template<size_t TypeIdx, typename... PatternTypes>
@@ -520,8 +584,8 @@ struct traits<OrPatternV2_<TypeIdx, PatternTypes...>>
 
 	template<typename... T> struct TypeExtractor_<std::tuple<T...>>
 	{
-		using type = std::tuple<typename traits<T>::result_type...>;
-		using type_variant = std::variant<typename traits<T>::result_type...>;
+		using type = typename ::detail::collapse_types<typename traits<T>::result_type...>::type;
+		using type_variant = typename ::detail::to_variant<type>::type;
 	};
 
 	using _result_types = typename TypeExtractor_<std::tuple<PatternTypes...>>::type;
@@ -549,8 +613,7 @@ template<size_t TypeIdx, typename... PatternTypes> struct OrPatternV2_
 		using PatternMatcher = PatternMatchV2<Pattern>;
 		static_assert(
 			std::tuple_size_v<typename std::invoke_result_t<decltype(PatternMatcher::match),
-				Parser &>::value_type>
-			== 1);
+				Parser &>::value_type> == 1);
 		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
 			if (auto result = PatternMatcher::match(p)) {
 				return std::get<0>(*result);
@@ -625,22 +688,30 @@ template<typename PatternsType> struct SingleTokenPattern_
 
 template<Token::TokenType...> struct SingleTokenPatternV2;
 
+template<Token::TokenType T> struct TokenResult
+{
+	Token token;
+};
+
 template<Token::TokenType... t> struct traits<SingleTokenPatternV2<t...>>
 {
-	using result_type = Token;
+	using result_type = typename std::conditional_t<(sizeof...(t) > 1),
+		std::variant<TokenResult<t>...>,
+		typename std::tuple_element_t<0, std::tuple<TokenResult<t>...>>>;
 };
 
 template<Token::TokenType... Patterns>
 struct SingleTokenPatternV2 : PatternV2<SingleTokenPatternV2<Patterns...>>
 {
-	using ResultType = Token;
+	using ResultType = traits<SingleTokenPatternV2<Patterns...>>::result_type;
 
 	static constexpr size_t advance_by = 1;
 
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		if (SingleTokenPattern_<ComposedTypes<Patterns...>>::match(p)) {
-			return p.lexer().peek_token(p.token_position());
+			const auto &t = p.lexer().peek_token(p.token_position());
+			return t.has_value() ? std::make_optional(ResultType{ *t }) : std::nullopt;
 		}
 		return {};
 	}
@@ -726,6 +797,22 @@ template<typename PatternType> struct LookAheadV2 : PatternV2<LookAheadV2<Patter
 	}
 };
 
+template<> struct traits<struct AnyToken>
+{
+	using result_type = Token;
+};
+
+struct AnyToken : PatternV2<AnyToken>
+{
+	using ResultType = Token;
+
+	static constexpr size_t advance_by = 1;
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		return p.lexer().peek_token(p.token_position());
+	}
+};
+
 
 template<typename... Ts> struct is_tuple : std::false_type
 {
@@ -751,15 +838,13 @@ template<typename lhs, typename rhs> struct AndLiteralV2 : PatternV2<AndLiteralV
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token)
-		requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
 	{
 		return PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token)
-		requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
 	{
 		return std::apply(
 			[&](auto... r) { return (... && decltype(r)::matches(token)); }, PatternTypes{});
@@ -784,15 +869,13 @@ template<typename lhs, typename rhs> struct AndNotLiteralV2 : PatternV2<AndNotLi
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token)
-		requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
 	{
 		return !PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token)
-		requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
 	{
 		return !std::apply(
 			[&](auto... r) { return (... || decltype(r)::matches(token)); }, PatternTypes{});
@@ -1013,12 +1096,12 @@ template<> struct traits<struct StarTargetPattern>
 
 template<> struct traits<struct NAMEPattern>
 {
-	using result_type = Token;
+	using result_type = TokenResult<Token::TokenType::NAME>;
 };
 
 struct NAMEPattern : PatternV2<NAMEPattern>
 {
-	using ResultType = Token;
+	using ResultType = typename traits<struct NAMEPattern>::result_type;
 
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
@@ -1114,9 +1197,10 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'(' NAME ')'");
 			auto [name] = *result;
-			std::string id{ name.start().pointer_to_program, name.end().pointer_to_program };
+			std::string id{ name.token.start().pointer_to_program,
+				name.token.end().pointer_to_program };
 			return std::make_shared<Name>(
-				id, ContextType::STORE, SourceLocation{ name.start(), name.end() });
+				id, ContextType::STORE, SourceLocation{ name.token.start(), name.token.end() });
 		}
 
 		// NAME
@@ -1143,7 +1227,7 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 			}
 			// create new tuple with the correct source location
 			return std::make_shared<Tuple>(
-				els, ContextType::STORE, SourceLocation{ l.start(), r.end() });
+				els, ContextType::STORE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
 		// '[' [star_targets_list_seq] ']'
@@ -1160,7 +1244,7 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 			}
 			// create new list with the correct source location
 			return std::make_shared<List>(
-				els, ContextType::STORE, SourceLocation{ l.start(), r.end() });
+				els, ContextType::STORE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
 	}
@@ -1187,7 +1271,7 @@ struct TLookahead : PatternV2<TLookahead>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("t_lookahead: '(' | '[' | '.'");
 			auto [token] = *result;
-			return token;
+			return std::visit([](const auto &t) -> Token { return t.token; }, token);
 		}
 		return {};
 	}
@@ -1250,13 +1334,13 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 			DEBUG_LOG("t_primary '.' NAME &t_lookahead");
 			auto [value, _, name_token, lookahead] = *result;
 			(void)lookahead;
-			std::string_view name{ name_token.start().pointer_to_program,
-				static_cast<size_t>(
-					name_token.end().pointer_to_program - name_token.start().pointer_to_program) };
+			std::string_view name{ name_token.token.start().pointer_to_program,
+				static_cast<size_t>(name_token.token.end().pointer_to_program
+									- name_token.token.start().pointer_to_program) };
 			return std::make_shared<Attribute>(value,
 				std::string(name),
 				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, name_token.end() });
+				SourceLocation{ value->source_location().start, name_token.token.end() });
 		}
 
 		// t_primary '[' slices ']' &t_lookahead
@@ -1271,7 +1355,7 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 			return std::make_shared<Subscript>(value,
 				slice,
 				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, r.end() });
+				SourceLocation{ value->source_location().start, r.token.end() });
 		}
 
 		// t_primary genexp &t_lookahead
@@ -1301,7 +1385,7 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 			return std::make_shared<Call>(function,
 				args,
 				kwargs,
-				SourceLocation{ function->source_location().start, r.end() });
+				SourceLocation{ function->source_location().start, r.token.end() });
 		}
 
 		// atom &t_lookahead
@@ -1339,12 +1423,12 @@ struct TargetWithStarAtomPattern : PatternV2<TargetWithStarAtomPattern>
 			DEBUG_LOG("t_primary '.' NAME !t_lookahead");
 			auto [primary, d, name_token, _] = *result;
 			(void)d;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Attribute>(primary,
 				name,
 				ContextType::STORE,
-				SourceLocation{ primary->source_location().start, name_token.end() });
+				SourceLocation{ primary->source_location().start, name_token.token.end() });
 		}
 
 		using pattern2 = PatternMatchV2<TPrimaryPattern,
@@ -1358,7 +1442,7 @@ struct TargetWithStarAtomPattern : PatternV2<TargetWithStarAtomPattern>
 			return std::make_shared<Subscript>(value,
 				subscript,
 				ContextType::STORE,
-				SourceLocation{ value->source_location().start, r.end() });
+				SourceLocation{ value->source_location().start, r.token.end() });
 		}
 
 		// star_atom
@@ -1456,12 +1540,13 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 	}
 };
 
-std::shared_ptr<Constant> parse_bytes(std::vector<Token> strings)
+std::shared_ptr<Constant> parse_bytes(std::vector<TokenResult<Token::TokenType::STRING>> strings)
 {
 	Bytes byte_collection;
-	auto start_token = strings.front();
-	auto end_token = strings.back();
-	for (const auto &token : strings) {
+	auto start_token = strings.front().token;
+	auto end_token = strings.back().token;
+	for (const auto &t : strings) {
+		const auto &token = t.token;
 		auto *start = token.start().pointer_to_program;
 		const auto *end = token.end().pointer_to_program;
 
@@ -1502,10 +1587,238 @@ std::shared_ptr<Constant> parse_bytes(std::vector<Token> strings)
 		transformed, SourceLocation{ start_token.start(), end_token.end() });
 }
 
-std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
+template<> struct traits<struct LiteralCharPattern>
 {
+	using result_type = std::shared_ptr<Constant>;
+};
+
+struct LiteralCharPattern : PatternV2<LiteralCharPattern>
+{
+	using ResultType = typename traits<LiteralCharPattern>::result_type;
+
+	// literal_char      ::=  <any code point except "{", "}" or NULL>
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<
+			OneOrMorePatternV2<NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::LBRACE>>,
+				NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::RBRACE>>,
+				NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::ENDMARKER>>,
+				AnyToken>>;
+		if (auto result = pattern1::match(p)) {
+			auto [literal_char] = *result;
+			const auto &start = std::get<3>(literal_char.front()).start();
+			const auto end_token = p.lexer().peek_token(p.token_position());
+			if (end_token.has_value()) {
+				const auto &end = end_token->start();
+				return std::make_shared<Constant>(
+					std::string{ start.pointer_to_program, end.pointer_to_program },
+					SourceLocation{ start, end });
+			} else {
+				const auto &end = std::get<3>(literal_char.front()).end();
+				return std::make_shared<Constant>(
+					std::string{ start.pointer_to_program, end.pointer_to_program },
+					SourceLocation{ start, end });
+			}
+		}
+		return {};
+	}
+};
+
+
+template<> struct traits<struct FExpressionPattern>
+{
+	using result_type = std::shared_ptr<ASTNode>;
+};
+
+
+template<> struct traits<struct YieldExpressionPattern>
+{
+	using result_type = std::shared_ptr<ASTNode>;
+};
+
+template<> struct traits<struct StarExpressionsPattern>
+{
+	using result_type = std::shared_ptr<ASTNode>;
+};
+
+struct FExpressionPattern : PatternV2<FExpressionPattern>
+{
+	using ResultType = typename traits<FExpressionPattern>::result_type;
+
+	// f_expression      ::=  (yield_expr | star_expressions)
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 =
+			PatternMatchV2<OrPatternV2<YieldExpressionPattern, StarExpressionsPattern>>;
+		if (auto result = pattern1::match(p)) {
+			auto [fexpression] = *result;
+			return fexpression;
+		}
+		return {};
+	}
+};
+
+
+template<> struct traits<struct ConversionPattern>
+{
+	using result_type = FormattedValue::Conversion;
+};
+
+
+struct ConversionPattern : PatternV2<ConversionPattern>
+{
+	using ResultType = typename traits<ConversionPattern>::result_type;
+
+	// conversion        ::=  ("s" | "r" | "a")
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::NAME>>;
+		if (auto result = pattern1::match(p)) {
+			auto [conversion] = *result;
+			std::string_view s{ conversion.token.start().pointer_to_program,
+				conversion.token.end().pointer_to_program };
+			if (s.size() == 1) { return to_formatted_value_conversion(s[0]); }
+		}
+
+		return {};
+	}
+
+	static std::optional<FormattedValue::Conversion> to_formatted_value_conversion(const char c)
+	{
+		switch (c) {
+		case 'r': {
+			return FormattedValue::Conversion::REPR;
+		} break;
+		case 's': {
+			return FormattedValue::Conversion::STRING;
+		} break;
+		case 'a': {
+			return FormattedValue::Conversion::ASCII;
+		} break;
+		}
+		return {};
+	}
+};
+
+template<> struct traits<struct ReplacementFieldPattern>
+{
+	using result_type = std::pair<std::shared_ptr<FormattedValue>, std::shared_ptr<Constant>>;
+};
+
+struct ReplacementFieldPattern : PatternV2<ReplacementFieldPattern>
+{
+	using ResultType = typename traits<ReplacementFieldPattern>::result_type;
+
+	// replacement_field ::=  "{" f_expression ["="] ["!" conversion] [":" format_spec] "}"
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LBRACE>,
+			FExpressionPattern,
+			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::EQUAL>>,
+			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::EXCLAMATION>,
+				ConversionPattern>,
+			// ZeroOrOnePattern<SingleTokenPatternV2<Token::TokenType::COLON>, FormatSpecType>,
+			SingleTokenPatternV2<Token::TokenType::RBRACE>>;
+		if (auto result = pattern1::match(p)) {
+			auto [l, expression, display, conversion, /*format_spec,*/ r] = *result;
+			auto c = [conversion = std::move(conversion)]() {
+				if (conversion.has_value()) { return std::get<1>(*conversion); }
+				return FormattedValue::Conversion::NONE;
+			}();
+			const auto next = p.lexer().peek_token(p.token_position());
+			if (next.has_value() && next->token_type() != Token::TokenType::ENDMARKER) {
+				std::string value{ r.token.end().pointer_to_program,
+					next->start().pointer_to_program };
+				if (!value.empty()) {
+					return { { std::make_shared<FormattedValue>(expression,
+								   c,
+								   nullptr,
+								   SourceLocation{ l.token.start(), l.token.end() }),
+						std::make_shared<Constant>(value, SourceLocation{}) } };
+				}
+			}
+			return {
+				{ std::make_shared<FormattedValue>(
+					  expression, c, nullptr, SourceLocation{ l.token.start(), l.token.end() }),
+					nullptr }
+			};
+		}
+
+		return {};
+	}
+};
+
+template<> struct traits<struct FStringLBrace>
+{
+	using result_type = std::shared_ptr<Constant>;
+};
+
+struct FStringLBrace : PatternV2<FStringLBrace>
+{
+	using ResultType = typename traits<FStringLBrace>::result_type;
+
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LBRACE>,
+			SingleTokenPatternV2<Token::TokenType::LBRACE>>;
+		if (auto result = pattern1::match(p)) {
+			auto [l, r] = *result;
+			auto next = p.lexer().peek_token(p.token_position());
+			if (next.has_value()) {
+				std::string value{ r.token.start().pointer_to_program,
+					next->start().pointer_to_program };
+				return std::make_shared<Constant>(value, SourceLocation{});
+			} else {
+				return std::make_shared<Constant>("{", SourceLocation{});
+			}
+		}
+		return {};
+	}
+};
+
+template<> struct traits<struct FStringRBrace>
+{
+	using result_type = std::shared_ptr<Constant>;
+};
+
+struct FStringRBrace : PatternV2<FStringRBrace>
+{
+	using ResultType = typename traits<FStringRBrace>::result_type;
+
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::RBRACE>,
+			SingleTokenPatternV2<Token::TokenType::RBRACE>>;
+		if (auto result = pattern1::match(p)) {
+			auto [l, r] = *result;
+			auto next = p.lexer().peek_token(p.token_position());
+			if (next.has_value()) {
+				std::string value{ r.token.start().pointer_to_program,
+					next->start().pointer_to_program };
+				return std::make_shared<Constant>(value, SourceLocation{});
+			} else {
+				return std::make_shared<Constant>("}", SourceLocation{});
+			}
+		}
+		return {};
+	}
+};
+
+std::shared_ptr<JoinedStr> parse_fstring(Lexer &l,
+	std::vector<TokenResult<Token::TokenType::STRING>> strings)
+{
+	// f_string          ::=  (literal_char | "{{" | "}}" | replacement_field)*
+	// replacement_field ::=  "{" f_expression ["="] ["!" conversion] [":" format_spec] "}"
+	// f_expression      ::=  (conditional_expression | "*" or_expr)
+	//                          ("," conditional_expression | "," "*" or_expr)* [","]
+	//                        | yield_expression
+	// conversion        ::=  "s" | "r" | "a"
+	// format_spec       ::=  (literal_char | NULL | replacement_field)*
+	// literal_char      ::=  <any code point except "{", "}" or NULL>
 	std::vector<std::shared_ptr<ASTNode>> string_nodes;
-	for (const auto &token : strings) {
+
+	for (const auto &t : strings) {
+		const auto &token = t.token;
 		auto *start = token.start().pointer_to_program;
 		const auto *end = token.end().pointer_to_program;
 
@@ -1528,55 +1841,47 @@ std::shared_ptr<JoinedStr> parse_fstring(Lexer &l, std::vector<Token> strings)
 			}
 		}();
 
-		size_t start_idx = 0;
-		size_t end_idx = value.size() - 1;
+		auto lexer = Lexer::create(std::string{ value }, l.filename());
+		Parser p{ lexer };
 
-		while (start_idx < end_idx) {
-			const auto expr_start = value.find('{', start_idx);
-			if (expr_start != std::string_view::npos) {
-				if (expr_start != start_idx) {
-					string_nodes.push_back(std::make_shared<Constant>(
-						std::string{ value.substr(start_idx, expr_start - start_idx) },
-						SourceLocation{ .start = token.start(), .end = token.end() }));
-				}
-
-				const auto expr_end = value.find('}', expr_start);
-				if (expr_end == std::string_view::npos) {
-					// FIXME: should be a SyntaxError
-					spdlog::error("f-string: expecting '}'");
-					std::abort();
-				}
-				auto expr = value.substr(expr_start + 1, expr_end - 1);
-				auto lexer = Lexer::create(std::string{ expr }, l.filename());
-				Parser p{ lexer };
-				auto formatted_value = p.parse_fstring();
-				if (formatted_value.is_err()) {
-					// FIXME: should be a SyntaxError
-					spdlog::error(formatted_value.unwrap_err()->to_string());
-					std::abort();
-				}
-				string_nodes.push_back(std::make_shared<FormattedValue>(formatted_value.unwrap(),
-					FormattedValue::Conversion::NONE,
-					nullptr,
-					SourceLocation{ .start = token.start(), .end = token.end() }));
-				start_idx = expr_end + 1;
-			} else {
-				string_nodes.push_back(
-					std::make_shared<Constant>(std::string{ value.substr(start_idx) },
-						SourceLocation{ .start = token.start(), .end = token.end() }));
-				start_idx = value.size();
+		// (literal_char | "{{" | "}}" | replacement_field)*
+		using pattern1 = PatternMatchV2<ZeroOrMorePatternV2<OrPatternV2<LiteralCharPattern,
+											FStringLBrace,
+											FStringRBrace,
+											ReplacementFieldPattern>>,
+			SingleTokenPatternV2<Token::TokenType::ENDMARKER>>;
+		if (auto result = pattern1::match(p)) {
+			DEBUG_LOG("(literal_char | \"{{\" | \"}}\" | replacement_field)*");
+			for (const auto &n : std::get<0>(*result)) {
+				std::visit(overloaded{
+							   [&string_nodes](const std::shared_ptr<Constant> &c) {
+								   string_nodes.push_back(c);
+							   },
+							   [&string_nodes](const std::pair<std::shared_ptr<FormattedValue>,
+								   std::shared_ptr<Constant>> &p) {
+								   auto [fv, c] = p;
+								   string_nodes.push_back(fv);
+								   if (c) { string_nodes.push_back(c); }
+							   },
+						   },
+					n);
 			}
+		} else {
+			TODO();
 		}
 	}
+
+
 	return std::make_shared<JoinedStr>(std::move(string_nodes),
 		SourceLocation{ .start = string_nodes.front()->source_location().start,
 			.end = string_nodes.back()->source_location().end });
 }
 
-std::shared_ptr<ASTNode> parse_strings(Lexer &l, std::vector<Token> strings)
+std::shared_ptr<ASTNode> parse_strings(Lexer &l,
+	std::vector<TokenResult<Token::TokenType::STRING>> strings)
 {
-	auto start_token = strings.front();
-	auto end_token = strings.back();
+	auto start_token = strings.front().token;
+	auto end_token = strings.back().token;
 	const bool is_bytes = [start_token] {
 		if (start_token.start().pointer_to_program[0] == 'b'
 			|| start_token.start().pointer_to_program[0] == 'B') {
@@ -1596,7 +1901,8 @@ std::shared_ptr<ASTNode> parse_strings(Lexer &l, std::vector<Token> strings)
 	if (is_fstring) { return parse_fstring(l, std::move(strings)); }
 
 	std::string str;
-	for (const auto &token : strings) {
+	for (const auto &t : strings) {
+		const auto &token = t.token;
 		auto *start = token.start().pointer_to_program;
 		const auto *end = token.end().pointer_to_program;
 
@@ -1689,7 +1995,7 @@ struct StarNamedExpression : PatternV2<StarNamedExpression>
 			auto [star_token, value] = *result;
 			return std::make_shared<Starred>(value,
 				ContextType::LOAD,
-				SourceLocation{ star_token.start(), value->source_location().start });
+				SourceLocation{ star_token.token.start(), value->source_location().start });
 		}
 
 		using pattern2 = PatternMatchV2<NamedExpressionPattern>;
@@ -1747,7 +2053,7 @@ struct ListPattern : PatternV2<ListPattern>
 			auto [l, els, r] = *result;
 			return std::make_shared<List>(els.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
 				ContextType::LOAD,
-				SourceLocation{ l.start(), r.end() });
+				SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
 	}
@@ -1845,8 +2151,8 @@ struct ListCompPattern : PatternV2<ListCompPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [l, elt, generators, r] = *result;
 			SourceLocation sc{
-				.start = l.start(),
-				.end = r.end(),
+				.start = l.token.start(),
+				.end = r.token.end(),
 			};
 			return std::make_shared<ListComp>(elt, std::move(generators), sc);
 		}
@@ -1879,7 +2185,7 @@ struct TuplePattern : PatternV2<TuplePattern>
 			if (!maybe_named_expression.has_value()) {
 				return std::make_shared<Tuple>(std::vector<std::shared_ptr<ASTNode>>{},
 					ContextType::LOAD,
-					SourceLocation{ l.start(), r.end() });
+					SourceLocation{ l.token.start(), r.token.end() });
 			}
 			std::vector<std::shared_ptr<ASTNode>> elements;
 			const auto &named_expression = *maybe_named_expression;
@@ -1889,18 +2195,13 @@ struct TuplePattern : PatternV2<TuplePattern>
 			elements.push_back(lhs);
 			elements.insert(elements.end(), els.begin(), els.end());
 			return std::make_shared<Tuple>(
-				elements, ContextType::LOAD, SourceLocation{ l.start(), r.end() });
+				elements, ContextType::LOAD, SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
 	}
 };
 
 template<> struct traits<struct GroupPattern>
-{
-	using result_type = std::shared_ptr<ASTNode>;
-};
-
-template<> struct traits<struct YieldExpressionPattern>
 {
 	using result_type = std::shared_ptr<ASTNode>;
 };
@@ -1943,8 +2244,8 @@ struct GenexPattern : PatternV2<GenexPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [l, expression, generators, r] = *result;
 			SourceLocation sc{
-				.start = l.start(),
-				.end = r.end(),
+				.start = l.token.start(),
+				.end = r.token.end(),
 			};
 			return std::make_shared<GeneratorExp>(expression, std::move(generators), sc);
 		}
@@ -2076,7 +2377,8 @@ struct DictPattern : PatternV2<DictPattern>
 				}
 			}
 
-			auto dict = std::make_shared<Dict>(keys, values, SourceLocation{ l.start(), r.end() });
+			auto dict = std::make_shared<Dict>(
+				keys, values, SourceLocation{ l.token.start(), r.token.end() });
 			return dict;
 		}
 
@@ -2102,8 +2404,8 @@ struct SetPattern : PatternV2<SetPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [l, set_values, r] = *result;
 			SourceLocation sl{
-				.start = l.start(),
-				.end = r.end(),
+				.start = l.token.start(),
+				.end = r.token.end(),
 			};
 			return std::make_shared<Set>(std::move(set_values), ContextType::LOAD, sl);
 		}
@@ -2130,8 +2432,8 @@ struct DictCompPattern : PatternV2<DictCompPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [l, kvpair, generators, r] = *result;
 			SourceLocation sc{
-				.start = l.start(),
-				.end = r.end(),
+				.start = l.token.start(),
+				.end = r.token.end(),
 			};
 			auto [key, value] = kvpair;
 			return std::make_shared<DictComp>(key, value, std::move(generators), sc);
@@ -2161,8 +2463,8 @@ struct SetCompPattern : PatternV2<SetCompPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [l, elt, generators, r] = *result;
 			SourceLocation sc{
-				.start = l.start(),
-				.end = r.end(),
+				.start = l.token.start(),
+				.end = r.token.end(),
 			};
 			return std::make_shared<SetComp>(elt, std::move(generators), sc);
 		}
@@ -2248,19 +2550,21 @@ struct AtomPattern : PatternV2<AtomPattern>
 			DEBUG_LOG("NAME");
 
 			auto [token] = *name_result;
-			std::string name{ token.start().pointer_to_program, token.end().pointer_to_program };
+			std::string name{ token.token.start().pointer_to_program,
+				token.token.end().pointer_to_program };
 			if (name == "True") {
 				return std::make_shared<Constant>(
-					true, SourceLocation{ token.start(), token.end() });
+					true, SourceLocation{ token.token.start(), token.token.end() });
 			} else if (name == "False") {
 				return std::make_shared<Constant>(
-					false, SourceLocation{ token.start(), token.end() });
+					false, SourceLocation{ token.token.start(), token.token.end() });
 			} else if (name == "None") {
 				return std::make_shared<Constant>(py::NameConstant{ py::NoneType{} },
-					SourceLocation{ token.start(), token.end() });
+					SourceLocation{ token.token.start(), token.token.end() });
 			} else {
-				return std::make_shared<Name>(
-					name, ContextType::LOAD, SourceLocation{ token.start(), token.end() });
+				return std::make_shared<Name>(name,
+					ContextType::LOAD,
+					SourceLocation{ token.token.start(), token.token.end() });
 			}
 		}
 		// strings
@@ -2277,8 +2581,9 @@ struct AtomPattern : PatternV2<AtomPattern>
 		if (auto result = pattern7::match(p)) {
 			DEBUG_LOG("NUMBER");
 			auto [token] = *result;
-			std::string number{ token.start().pointer_to_program, token.end().pointer_to_program };
-			return parse_number(number, SourceLocation{ token.start(), token.end() });
+			std::string number{ token.token.start().pointer_to_program,
+				token.token.end().pointer_to_program };
+			return parse_number(number, SourceLocation{ token.token.start(), token.token.end() });
 		}
 
 		// 	| (tuple | group | genexp)
@@ -2310,7 +2615,7 @@ struct AtomPattern : PatternV2<AtomPattern>
 		if (auto result = pattern11::match(p)) {
 			auto [token] = *result;
 			return std::make_shared<Constant>(
-				Ellipsis{}, SourceLocation{ token.start(), token.end() });
+				Ellipsis{}, SourceLocation{ token.token.start(), token.token.end() });
 		}
 
 		return {};
@@ -2341,11 +2646,12 @@ struct NamedExpressionPattern : PatternV2<NamedExpressionPattern>
 			DEBUG_LOG("NAME ':=' ~ expression");
 			auto [name_token, _, expr] = *result;
 
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 
-			auto target = std::make_shared<Name>(
-				name, ContextType::STORE, SourceLocation{ name_token.start(), name_token.end() });
+			auto target = std::make_shared<Name>(name,
+				ContextType::STORE,
+				SourceLocation{ name_token.token.start(), name_token.token.end() });
 			return std::make_shared<NamedExpr>(target,
 				expr,
 				SourceLocation{ target->source_location().start, expr->source_location().end });
@@ -2392,11 +2698,11 @@ struct KwargsOrStarredPattern : PatternV2<KwargsOrStarredPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME '=' expression");
 			auto [name_token, _, expression] = *result;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Keyword>(name,
 				expression,
-				SourceLocation{ name_token.start(), expression->source_location().end });
+				SourceLocation{ name_token.token.start(), expression->source_location().end });
 		}
 
 		// starred_expression
@@ -2430,7 +2736,7 @@ struct StarredExpressionPattern : PatternV2<StarredExpressionPattern>
 			auto [token, expression] = *result;
 			return std::make_shared<Starred>(expression,
 				ContextType::LOAD,
-				SourceLocation{ token.start(), expression->source_location().end });
+				SourceLocation{ token.token.start(), expression->source_location().end });
 		}
 		return {};
 	}
@@ -2458,11 +2764,11 @@ struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME '=' expression");
 			auto [name_token, _, expression] = *result;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Keyword>(name,
 				expression,
-				SourceLocation{ name_token.start(), expression->source_location().end });
+				SourceLocation{ name_token.token.start(), expression->source_location().end });
 		}
 
 		using pattern2 =
@@ -2470,8 +2776,8 @@ struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'**' expression");
 			auto [token, expression] = *result;
-			return std::make_shared<Keyword>(
-				expression, SourceLocation{ token.start(), expression->source_location().end });
+			return std::make_shared<Keyword>(expression,
+				SourceLocation{ token.token.start(), expression->source_location().end });
 		}
 
 		return {};
@@ -2719,12 +3025,12 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG(" primary '.' NAME");
 			auto [value, _, name_token] = *result;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Attribute>(value,
 				name,
 				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, name_token.end() });
+				SourceLocation{ value->source_location().start, name_token.token.end() });
 		}
 
 		//  primary genexp
@@ -2758,7 +3064,7 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 			return std::make_shared<Call>(function,
 				args,
 				kwargs,
-				SourceLocation{ function->source_location().start, r.end() });
+				SourceLocation{ function->source_location().start, r.token.end() });
 		}
 
 		// primary '[' slices ']'
@@ -2772,7 +3078,7 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 			return std::make_shared<Subscript>(value,
 				slices,
 				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, r.end() });
+				SourceLocation{ value->source_location().start, r.token.end() });
 		}
 
 		using pattern6 = PatternMatchV2<AtomPattern>;
@@ -2888,7 +3194,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 			auto [start_token, el] = *result;
 			return std::make_shared<UnaryExpr>(UnaryOpType::ADD,
 				el,
-				SourceLocation{ start_token.start(), el->source_location().end });
+				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
 
 		// '-' factor
@@ -2899,7 +3205,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 			auto [start_token, el] = *result;
 			return std::make_shared<UnaryExpr>(UnaryOpType::SUB,
 				el,
-				SourceLocation{ start_token.start(), el->source_location().end });
+				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
 
 		// '~' factor
@@ -2910,7 +3216,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 			auto [start_token, el] = *result;
 			return std::make_shared<UnaryExpr>(UnaryOpType::INVERT,
 				el,
-				SourceLocation{ start_token.start(), el->source_location().end });
+				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
 
 		// power
@@ -3784,7 +4090,7 @@ struct LambdaParamPattern : PatternV2<LambdaParamPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME");
 			auto [name] = *result;
-			return name;
+			return name.token;
 		}
 
 		return {};
@@ -3820,7 +4126,7 @@ struct LambdaParamNoDefaultPattern : PatternV2<LambdaParamNoDefaultPattern>
 			return std::make_shared<Argument>(parameter_name,
 				nullptr,
 				"",
-				SourceLocation{ lambda_param.start(), comma_token.end() });
+				SourceLocation{ lambda_param.start(), comma_token.token.end() });
 		}
 
 		// lambda_param &':'
@@ -3879,7 +4185,7 @@ struct LambdaParamWithDefaultPattern : PatternV2<LambdaParamWithDefaultPattern>
 				std::make_shared<Argument>(parameter_name,
 					nullptr,
 					"",
-					SourceLocation{ lambda_param.start(), comma_token.end() }),
+					SourceLocation{ lambda_param.start(), comma_token.token.end() }),
 				default_,
 			} };
 		}
@@ -4117,10 +4423,6 @@ struct StarExpressionPattern : PatternV2<StarExpressionPattern>
 	}
 };
 
-template<> struct traits<struct StarExpressionsPattern>
-{
-	using result_type = std::shared_ptr<ASTNode>;
-};
 
 struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 {
@@ -4160,7 +4462,7 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 			auto [expression, token] = *result;
 			return std::make_shared<Tuple>(std::vector{ expression },
 				ContextType::LOAD,
-				SourceLocation{ expression->source_location().start, token.end() });
+				SourceLocation{ expression->source_location().start, token.token.end() });
 		}
 
 		// star_expression
@@ -4198,12 +4500,12 @@ struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttribut
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("t_primary '.' NAME !t_lookahead");
 			auto [target, _, name_token, l] = *result;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Attribute>(target,
 				name,
 				ContextType::STORE,
-				SourceLocation{ target->source_location().start, name_token.end() });
+				SourceLocation{ target->source_location().start, name_token.token.end() });
 		}
 
 		// t_primary '[' slices ']' !t_lookahead
@@ -4218,7 +4520,7 @@ struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttribut
 			return std::make_shared<Subscript>(target,
 				slices,
 				ContextType::STORE,
-				SourceLocation{ target->source_location().start, r.end() });
+				SourceLocation{ target->source_location().start, r.token.end() });
 			TODO();
 		}
 
@@ -4256,10 +4558,11 @@ struct SingleTargetPattern : PatternV2<SingleTargetPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("NAME");
 			auto [name_token] = *result;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
-			return std::make_shared<Name>(
-				name, ContextType::STORE, SourceLocation{ name_token.start(), name_token.end() });
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
+			return std::make_shared<Name>(name,
+				ContextType::STORE,
+				SourceLocation{ name_token.token.start(), name_token.token.end() });
 		}
 
 		using pattern3 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LPAREN>,
@@ -4307,7 +4610,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'+='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '-='
@@ -4315,7 +4618,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'-='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '*='
@@ -4323,7 +4626,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("'*='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '@='
@@ -4331,7 +4634,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("'@='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '/='
@@ -4339,7 +4642,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern5::match(p)) {
 			DEBUG_LOG("'/='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '%='
@@ -4347,7 +4650,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern6::match(p)) {
 			DEBUG_LOG("'%='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '&='
@@ -4355,7 +4658,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern7::match(p)) {
 			DEBUG_LOG("'&='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '|='
@@ -4363,7 +4666,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern8::match(p)) {
 			DEBUG_LOG("'|='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '^='
@@ -4371,7 +4674,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern9::match(p)) {
 			DEBUG_LOG("'^='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '<<='
@@ -4379,7 +4682,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern10::match(p)) {
 			DEBUG_LOG("'<<='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		// '>>='
@@ -4387,7 +4690,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern11::match(p)) {
 			DEBUG_LOG("'>>='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		//     | '**='
@@ -4395,7 +4698,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern12::match(p)) {
 			DEBUG_LOG("'**='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		//     | '//='
@@ -4403,7 +4706,7 @@ struct AugAssignPattern : PatternV2<AugAssignPattern>
 		if (auto result = pattern13::match(p)) {
 			DEBUG_LOG("'//='");
 			auto [token] = *result;
-			return token;
+			return token.token;
 		}
 
 		return {};
@@ -4669,7 +4972,7 @@ struct DottedNamePattern : PatternV2<DottedNamePattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("dotted_name '.' NAME");
 			auto [dotted_name, _, name] = *result;
-			dotted_name.push_back(name);
+			dotted_name.push_back(name.token);
 			return dotted_name;
 		}
 
@@ -4677,7 +4980,7 @@ struct DottedNamePattern : PatternV2<DottedNamePattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("dotted_name '.' NAME");
 			auto [name] = *result;
-			return { { name } };
+			return { { name.token } };
 		}
 		return {};
 	}
@@ -4706,7 +5009,7 @@ struct DottedAsNamePattern : PatternV2<DottedAsNamePattern>
 			auto [dotted_name, as_name_group] = *result;
 			if (as_name_group.has_value()) {
 				auto [_, as_name] = *as_name_group;
-				return { { dotted_name, as_name } };
+				return { { dotted_name, as_name.token } };
 			}
 			return { { dotted_name, {} } };
 		}
@@ -4818,9 +5121,9 @@ struct ImportFromAsNamePattern : PatternV2<ImportFromAsNamePattern>
 			auto [name_token, as_name_token_] = *result;
 			if (as_name_token_.has_value()) {
 				auto [_, as_name_token] = *as_name_token_;
-				return { { name_token, as_name_token } };
+				return { { name_token.token, as_name_token.token } };
 			}
-			return { { name_token, {} } };
+			return { { name_token.token, {} } };
 		}
 
 		return {};
@@ -4899,7 +5202,7 @@ struct ImportFromTargetsPattern : PatternV2<ImportFromTargetsPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("'*'");
 			auto [star_token] = *result;
-			return { { { star_token, std::nullopt } } };
+			return { { { star_token.token, std::nullopt } } };
 		}
 
 		return {};
@@ -4958,10 +5261,8 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 			const size_t level =
-				std::accumulate(dots.begin(), dots.end(), size_t{ 0 }, [](size_t acc, Token t) {
-					ASSERT(t.token_type() == Token::TokenType::DOT
-						   || t.token_type() == Token::TokenType::ELLIPSIS);
-					if (t.token_type() == Token::TokenType::DOT) {
+				std::accumulate(dots.begin(), dots.end(), size_t{ 0 }, [](size_t acc, auto t) {
+					if (std::holds_alternative<TokenResult<Token::TokenType::DOT>>(t)) {
 						return acc + 1;
 					} else {
 						return acc + 3;
@@ -5005,10 +5306,8 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 			const size_t level =
-				std::accumulate(dots.begin(), dots.end(), size_t{ 0 }, [](size_t acc, Token t) {
-					ASSERT(t.token_type() == Token::TokenType::DOT
-						   || t.token_type() == Token::TokenType::ELLIPSIS);
-					if (t.token_type() == Token::TokenType::DOT) {
+				std::accumulate(dots.begin(), dots.end(), size_t{ 0 }, [](size_t acc, auto t) {
+					if (std::holds_alternative<TokenResult<Token::TokenType::DOT>>(t)) {
 						return acc + 1;
 					} else {
 						return acc + 3;
@@ -5140,11 +5439,11 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME");
 			auto [name_token] = *result;
-			std::string name_str{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name_str{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Name>(name_str,
 				ContextType::DELETE,
-				SourceLocation{ name_token.start(), name_token.end() });
+				SourceLocation{ name_token.token.start(), name_token.token.end() });
 		}
 
 		// '(' del_target ')'
@@ -5156,7 +5455,7 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			auto [l, del_target, r] = *result;
 			return std::make_shared<Tuple>(std::vector{ del_target },
 				ContextType::DELETE,
-				SourceLocation{ l.start(), r.end() });
+				SourceLocation{ l.token.start(), r.token.end() });
 		}
 
 		// '(' [del_targets] ')'
@@ -5167,11 +5466,12 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			DEBUG_LOG("'(' [del_targets] ')'");
 			auto [l, del_targets, r] = *result;
 			if (del_targets) {
-				return std::make_shared<Tuple>(
-					del_targets->first, ContextType::DELETE, SourceLocation{ l.start(), r.end() });
+				return std::make_shared<Tuple>(del_targets->first,
+					ContextType::DELETE,
+					SourceLocation{ l.token.start(), r.token.end() });
 			}
 			return std::make_shared<Tuple>(
-				ContextType::DELETE, SourceLocation{ l.start(), r.end() });
+				ContextType::DELETE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
 		// '[' [del_targets] ']'
@@ -5182,11 +5482,12 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			DEBUG_LOG("'[' [del_targets] ']'");
 			auto [l, del_targets, r] = *result;
 			if (del_targets) {
-				return std::make_shared<List>(
-					del_targets->first, ContextType::DELETE, SourceLocation{ l.start(), r.end() });
+				return std::make_shared<List>(del_targets->first,
+					ContextType::DELETE,
+					SourceLocation{ l.token.start(), r.token.end() });
 			}
 			return std::make_shared<List>(
-				ContextType::DELETE, SourceLocation{ l.start(), r.end() });
+				ContextType::DELETE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
 		return {};
@@ -5212,12 +5513,12 @@ struct DeleteTargetPattern : PatternV2<DeleteTargetPattern>
 			DEBUG_LOG("t_primary '.' NAME !t_lookahead");
 			auto [value, _, name_token, lookahead] = *result;
 			(void)lookahead;
-			std::string name{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string name{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 			return std::make_shared<Attribute>(value,
 				name,
 				ContextType::DELETE,
-				SourceLocation{ value->source_location().start, name_token.end() });
+				SourceLocation{ value->source_location().start, name_token.token.end() });
 		}
 
 		// t_primary '[' slices ']' !t_lookahead
@@ -5232,7 +5533,7 @@ struct DeleteTargetPattern : PatternV2<DeleteTargetPattern>
 			return std::make_shared<Subscript>(value,
 				slices,
 				ContextType::DELETE,
-				SourceLocation{ value->source_location().start, r.end() });
+				SourceLocation{ value->source_location().start, r.token.end() });
 		}
 
 		// del_t_atom
@@ -5261,7 +5562,9 @@ struct DeleteTargetsPattern : PatternV2<DeleteTargetsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("','.del_target+ [',']");
 			auto [to_delete, optional_token] = *result;
-			return { { to_delete, optional_token } };
+			return { { to_delete,
+				optional_token.has_value() ? std::make_optional(optional_token->token)
+										   : std::nullopt } };
 		}
 		return {};
 	}
@@ -5383,11 +5686,12 @@ struct GlobalStatementPattern : PatternV2<GlobalStatementPattern>
 			std::transform(name_tokens.begin(),
 				name_tokens.end(),
 				std::back_inserter(names),
-				[](const Token &el) -> std::string {
-					return { el.start().pointer_to_program, el.end().pointer_to_program };
+				[](const auto &el) -> std::string {
+					return { el.token.start().pointer_to_program,
+						el.token.end().pointer_to_program };
 				});
 			return std::make_shared<Global>(
-				names, SourceLocation{ global_token.start(), name_tokens.back().end() });
+				names, SourceLocation{ global_token.start(), name_tokens.back().token.end() });
 		}
 
 		return {};
@@ -5418,11 +5722,12 @@ struct NonLocalStatementPattern : PatternV2<NonLocalStatementPattern>
 			std::transform(name_tokens.begin(),
 				name_tokens.end(),
 				std::back_inserter(names),
-				[](const Token &el) -> std::string {
-					return { el.start().pointer_to_program, el.end().pointer_to_program };
+				[](const auto &el) -> std::string {
+					return { el.token.start().pointer_to_program,
+						el.token.end().pointer_to_program };
 				});
 			return std::make_shared<NonLocal>(
-				names, SourceLocation{ nonlocal_token.start(), name_tokens.back().end() });
+				names, SourceLocation{ nonlocal_token.start(), name_tokens.back().token.end() });
 		}
 
 		return {};
@@ -5652,15 +5957,15 @@ struct ParamPattern : PatternV2<ParamPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME annotation?");
 			auto [name_token, annotation] = *result;
-			std::string argname{ name_token.start().pointer_to_program,
-				name_token.end().pointer_to_program };
+			std::string argname{ name_token.token.start().pointer_to_program,
+				name_token.token.end().pointer_to_program };
 
 			return std::make_shared<Argument>(argname,
 				annotation.value_or(nullptr),
 				"",
-				SourceLocation{ name_token.start(),
+				SourceLocation{ name_token.token.start(),
 					annotation.has_value() ? (*annotation)->source_location().end
-										   : name_token.end() });
+										   : name_token.token.end() });
 		}
 
 		return {};
@@ -5830,7 +6135,7 @@ struct KeywordsPattern : PatternV2<KeywordsPattern>
 			return std::make_shared<Argument>(param_no_default->name(),
 				param_no_default->annotation(),
 				"",
-				SourceLocation{ token.start(), param_no_default->source_location().end });
+				SourceLocation{ token.token.start(), param_no_default->source_location().end });
 		}
 
 		return {};
@@ -6316,10 +6621,10 @@ struct FunctionNamePattern : PatternV2<FunctionNamePattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME");
 			auto [token_name] = *result;
-			std::string function_name{ token_name.start().pointer_to_program,
-				token_name.end().pointer_to_program };
+			std::string function_name{ token_name.token.start().pointer_to_program,
+				token_name.token.end().pointer_to_program };
 			return std::make_shared<Constant>(
-				function_name, SourceLocation{ token_name.start(), token_name.end() });
+				function_name, SourceLocation{ token_name.token.start(), token_name.token.end() });
 		}
 		return {};
 	}
@@ -6362,10 +6667,11 @@ struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement
 				colon_token,
 				// func_type_comment,
 				body] = *result;
-			std::string function_name{ name.start().pointer_to_program,
-				name.end().pointer_to_program };
+			std::string function_name{ name.token.start().pointer_to_program,
+				name.token.end().pointer_to_program };
 			return std::make_shared<FunctionDefinition>(function_name,
-				params.value_or(std::make_shared<Arguments>(SourceLocation{ l.start(), r.end() })),
+				params.value_or(
+					std::make_shared<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
 				body,
 				std::vector<std::shared_ptr<ASTNode>>{},
 				return_expression.has_value() ? std::get<1>(*return_expression) : nullptr,
@@ -6399,10 +6705,11 @@ struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement
 				colon_token,
 				// func_type_comment,
 				body] = *result;
-			std::string function_name{ name.start().pointer_to_program,
-				name.end().pointer_to_program };
+			std::string function_name{ name.token.start().pointer_to_program,
+				name.token.end().pointer_to_program };
 			return std::make_shared<AsyncFunctionDefinition>(function_name,
-				params.value_or(std::make_shared<Arguments>(SourceLocation{ l.start(), r.end() })),
+				params.value_or(
+					std::make_shared<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
 				body,
 				std::vector<std::shared_ptr<ASTNode>>{},
 				return_expression.has_value() ? std::get<1>(*return_expression) : nullptr,
@@ -6439,7 +6746,7 @@ struct DecoratorsPattern : PatternV2<DecoratorsPattern>
 			std::optional<Token> first_token;
 			for (bool first = true; const auto &decorator : decorators) {
 				auto [at_token, named_expression, _] = decorator;
-				if (first) { first_token = at_token; }
+				if (first) { first_token = at_token.token; }
 				decorator_vector.push_back(named_expression);
 				first = false;
 			}
@@ -6688,8 +6995,8 @@ struct ClassDefinitionRawPattern : PatternV2<ClassDefinitionRawPattern>
 				}
 			}
 			std::vector<std::shared_ptr<ASTNode>> decorator_list;
-			std::string class_name{ class_name_token.start().pointer_to_program,
-				class_name_token.end().pointer_to_program };
+			std::string class_name{ class_name_token.token.start().pointer_to_program,
+				class_name_token.token.end().pointer_to_program };
 
 			return std::make_shared<ClassDefinition>(class_name,
 				bases,
@@ -6836,8 +7143,8 @@ struct ExceptBlockPattern : PatternV2<ExceptBlockPattern>
 			auto name = [as_name_ = as_name]() -> std::string {
 				if (as_name_.has_value()) {
 					auto [_, name_token] = *as_name_;
-					return { name_token.start().pointer_to_program,
-						name_token.end().pointer_to_program };
+					return { name_token.token.start().pointer_to_program,
+						name_token.token.end().pointer_to_program };
 				} else {
 					return "";
 				}

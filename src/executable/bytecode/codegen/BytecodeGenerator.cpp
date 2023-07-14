@@ -389,7 +389,7 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	auto *dst = create_value();
 
 	const auto &scope_name = m_stack.top().mangled_name;
-	const auto &visibility = [&] {
+	const auto &visibility_map = [&] {
 		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
 			return it;
 		} else {
@@ -397,19 +397,19 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 		}
 	}();
 
-	const auto &symbol = [&] {
-		if (auto it = visibility->second->symbol_map.get_hidden_symbol(name); it.has_value()) {
-			ASSERT(visibility->second->type == VariablesResolver::Scope::Type::CLASS);
-			return *it;
-		} else if (auto it = visibility->second->symbol_map.get_visible_symbol(name);
+	const auto visibility = [&] {
+		if (auto it = visibility_map->second->symbol_map.get_hidden_symbol(name); it.has_value()) {
+			ASSERT(visibility_map->second->type == VariablesResolver::Scope::Type::CLASS);
+			return it->get().visibility;
+		} else if (auto it = visibility_map->second->symbol_map.get_visible_symbol(name);
 				   it.has_value()) {
-			return *it;
+			return it->get().visibility;
 		} else {
 			TODO();
 		}
 	}();
 
-	switch (symbol.get().visibility) {
+	switch (visibility) {
 	case VariablesResolver::Visibility::GLOBAL: {
 		emit<LoadGlobal>(dst->get_register(), load_name(name, m_function_id)->get_index());
 	} break;
@@ -1833,7 +1833,8 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		auto *kw_value = generate(keyword.get(), m_function_id);
 		kwarg_registers.push_back(kw_value->get_register());
 		if (!keyword->arg().has_value()) { TODO(); }
-		keyword_names.push_back(static_cast<Register>(load_name(*keyword->arg(), m_function_id)->get_index()));
+		keyword_names.push_back(
+			static_cast<Register>(load_name(*keyword->arg(), m_function_id)->get_index()));
 	}
 
 	emit<LoadBuildClass>(builtin_build_class_register);
@@ -2584,6 +2585,12 @@ Value *BytecodeGenerator::visit(const JoinedStr *node)
 			strings.push_back(str_value->get_register());
 		}
 	}
+	if (!current_string.s.empty()) {
+		auto *static_string = load_const(current_string, m_function_id);
+		auto *string_value = create_value();
+		emit<LoadConst>(string_value->get_register(), static_string->get_index());
+		strings.push_back(string_value->get_register());
+	}
 	return build_string(strings);
 }
 
@@ -2593,7 +2600,8 @@ Value *BytecodeGenerator::visit(const FormattedValue *node)
 	auto *value = generate(node->value().get(), m_function_id);
 	ASSERT(value);
 	auto *dst = create_value();
-	emit<FormatValue>(dst->get_register(), value->get_register());
+	emit<FormatValue>(
+		dst->get_register(), value->get_register(), static_cast<uint8_t>(node->conversion()));
 	return dst;
 }
 

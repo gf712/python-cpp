@@ -795,6 +795,7 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 	if (peek(0) == '~') return Token::TokenType::TILDE;
 	if (peek(0) == '^') return Token::TokenType::CIRCUMFLEX;
 	if (peek(0) == '@') return Token::TokenType::AT;
+	if (peek(0) == '!') return Token::TokenType::EXCLAMATION; // only appears in Python 3.11, but makes fstring easier
 	return {};
 }
 

@@ -10,6 +10,7 @@
 #include "PyNone.hpp"
 #include "PySlice.hpp"
 #include "StopIteration.hpp"
+#include "SyntaxError.hpp"
 #include "TypeError.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
@@ -227,7 +228,9 @@ PyResult<PyObject *> PyString::casefold() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::tolower(c)); });
+		[](const unsigned char c) -> unsigned char {
+			return static_cast<unsigned char>(std::tolower(c));
+		});
 	return PyString::create(new_string);
 }
 
@@ -776,7 +779,9 @@ PyResult<PyObject *> PyString::lower() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::tolower(c)); });
+		[](const unsigned char c) -> unsigned char {
+			return static_cast<unsigned char>(std::tolower(c));
+		});
 	return PyString::create(new_string);
 }
 
@@ -787,7 +792,9 @@ PyResult<PyObject *> PyString::upper() const
 	std::transform(new_string.begin(),
 		new_string.end(),
 		new_string.begin(),
-		[](const unsigned char c) -> unsigned char { return static_cast<unsigned char>(std::toupper(c)); });
+		[](const unsigned char c) -> unsigned char {
+			return static_cast<unsigned char>(std::toupper(c));
+		});
 	return PyString::create(new_string);
 }
 
@@ -958,40 +965,26 @@ PyResult<PyObject *> PyString::operator[](int64_t index) const
 	return PyString::create(str);
 }
 
-namespace {
-	struct FormatSpec
-	{
-		size_t start;
-		size_t end;
-		std::optional<std::string> mapping;
-		std::optional<char> conversion_flag;
-		std::optional<uint32_t> minimum_width;
-		std::optional<uint32_t> precision;
-		std::optional<char> conversion_type;
-
-		PyResult<std::string> apply(PyObject *obj) const
-		{
-			if (mapping.has_value()) { TODO(); }
-			if (conversion_flag.has_value()) { TODO(); }
-			if (minimum_width.has_value()) { TODO(); }
-			if (precision.has_value()) { TODO(); }
-			if (mapping.has_value()) { TODO(); }
-			ASSERT(conversion_type.has_value());
-			switch (*conversion_type) {
-			case 's': {
-				return PyString::create(obj).and_then(
-					[](PyString *str) { return Ok(str->value()); });
-			} break;
-			case 'r': {
-				return obj->repr().and_then([](PyString *str) { return Ok(str->value()); });
-			} break;
-			default:
-				return Err(not_implemented_error(
-					"printf conversion type '{}' not implemented", *conversion_type));
-			}
-		}
-	};
-}// namespace
+PyResult<std::string> PyString::FormatSpec::apply(PyObject *obj) const
+{
+	if (mapping.has_value()) { TODO(); }
+	if (conversion_flag.has_value()) { TODO(); }
+	if (minimum_width.has_value()) { TODO(); }
+	if (precision.has_value()) { TODO(); }
+	if (mapping.has_value()) { TODO(); }
+	ASSERT(conversion_type.has_value());
+	switch (*conversion_type) {
+	case 's': {
+		return PyString::create(obj).and_then([](PyString *str) { return Ok(str->value()); });
+	} break;
+	case 'r': {
+		return obj->repr().and_then([](PyString *str) { return Ok(str->value()); });
+	} break;
+	default:
+		return Err(
+			not_implemented_error("printf conversion type '{}' not implemented", *conversion_type));
+	}
+}
 
 PyResult<PyString *> PyString::printf(const PyObject *values) const
 {
@@ -1084,63 +1077,58 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	return PyString::create(new_value);
 }
 
+std::optional<PyString::ReplacementField::Conversion> PyString::ReplacementField::get_conversion(
+	char c)
+{
+	if (c == 'r') {
+		return PyString::ReplacementField::Conversion::REPR;
+	} else if (c == 's') {
+		return PyString::ReplacementField::Conversion::STR;
+	} else if (c == 'a') {
+		return PyString::ReplacementField::Conversion::ASCII;
+	}
+	return std::nullopt;
+}
+
 namespace {
-	struct ReplacementField
+	PyResult<PyString::ReplacementField>
+		parse_format(std::string_view str, size_t start, size_t end)
 	{
-		enum class Conversion {
-			REPR,
-			STR,
-			ASCII,
-		};
-		std::optional<std::string> field_name;
-		std::optional<Conversion> conversion;
-		std::optional<FormatSpec> format_spec;
-		size_t start;
-		size_t end;
-
-		static PyResult<ReplacementField> parse(std::string_view str, size_t start, size_t end)
-		{
-			// replacement_field ::=  "{" [field_name] ["!" conversion] [":" format_spec] "}"
-			// field_name        ::=  arg_name ("." attribute_name | "[" element_index "]")*
-			// arg_name          ::=  [identifier | digit+]
-			// attribute_name    ::=  identifier
-			// element_index     ::=  digit+ | index_string
-			// index_string      ::=  <any source character except "]"> +
-			// conversion        ::=  "r" | "s" | "a"
-			// format_spec       ::=  <described in the next section>
-			ASSERT(str.front() == '{');
-			ASSERT(str.back() == '}');
-			ReplacementField replacement_field{ .start = start, .end = end };
-			str = str.substr(1, str.size() - 2);
-			if (!str.empty() && str[0] != '!' && str[0] != ':') {
-				auto end = str.find_first_of("!:");
-				replacement_field.field_name = str.substr(0, end);
-				if (end == std::string_view::npos) { return Ok(replacement_field); }
-				str = end == std::string_view::npos ? "" : str.substr(end);
-			}
-			if (!str.empty() && str[0] == '!') {
-				str = str.substr(1);
-				auto end = str.find(':');
-				const auto conversion = str.substr(0, end);
-				if (conversion == "r") {
-					replacement_field.conversion = Conversion::REPR;
-				} else if (conversion == "s") {
-					replacement_field.conversion = Conversion::STR;
-				} else if (conversion == "a") {
-					replacement_field.conversion = Conversion::ASCII;
-				} else {
-					return Err(value_error("Invalid conversion specifier '{}'", conversion));
-				}
-				str = end == std::string_view::npos ? "" : str.substr(end);
-			}
-			if (!str.empty() && str[0] == ':') {
-				return Err(not_implemented_error("Format spec in str.format not implemented"));
-			}
-			ASSERT(str.empty());
-			return Ok(replacement_field);
+		// replacement_field ::=  "{" [field_name] ["!" conversion] [":" format_spec] "}"
+		// field_name        ::=  arg_name ("." attribute_name | "[" element_index "]")*
+		// arg_name          ::=  [identifier | digit+]
+		// attribute_name    ::=  identifier
+		// element_index     ::=  digit+ | index_string
+		// index_string      ::=  <any source character except "]"> +
+		// conversion        ::=  "r" | "s" | "a"
+		// format_spec       ::=  <described in the next section>
+		ASSERT(str.front() == '{');
+		ASSERT(str.back() == '}');
+		PyString::ReplacementField replacement_field{ .start = start, .end = end };
+		str = str.substr(1, str.size() - 2);
+		if (!str.empty() && str[0] != '!' && str[0] != ':') {
+			auto end = str.find_first_of("!:");
+			replacement_field.field_name = str.substr(0, end);
+			if (end == std::string_view::npos) { return Ok(replacement_field); }
+			str = end == std::string_view::npos ? "" : str.substr(end);
 		}
-	};
-
+		if (!str.empty() && str[0] == '!') {
+			str = str.substr(1);
+			auto end = str.find(':');
+			const auto conversion = PyString::ReplacementField::get_conversion(str.front());
+			if (conversion.has_value()) {
+				replacement_field.conversion = *conversion;
+			} else {
+				return Err(value_error("Invalid conversion specifier '{}'", *conversion));
+			}
+			str = end == std::string_view::npos ? "" : str.substr(end);
+		}
+		if (!str.empty() && str[0] == ':') {
+			return Err(not_implemented_error("Format spec in str.format not implemented"));
+		}
+		ASSERT(str.empty());
+		return Ok(replacement_field);
+	}
 }// namespace
 
 PyResult<PyObject *> PyString::format(PyTuple *args, PyDict *kwargs) const
@@ -1173,8 +1161,7 @@ PyResult<PyObject *> PyString::format(PyTuple *args, PyDict *kwargs) const
 			}
 			const auto end = std::distance(cps.begin() + start, it) + 1;
 
-			auto replacement_field_ =
-				ReplacementField::parse(str.substr(start, end), start, start + end);
+			auto replacement_field_ = parse_format(str.substr(start, end), start, start + end);
 			if (replacement_field_.is_err()) { return Err(replacement_field_.unwrap_err()); }
 
 			const auto &replacement_field = replacement_field_.unwrap();

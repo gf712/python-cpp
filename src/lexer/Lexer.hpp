@@ -98,7 +98,8 @@ template<> struct fmt::formatter<Position>
 	__TOKEN(ATEQUAL)          \
 	__TOKEN(RARROW)           \
 	__TOKEN(ELLIPSIS)         \
-	__TOKEN(COLONEQUAL)
+	__TOKEN(COLONEQUAL)		  \
+	__TOKEN(EXCLAMATION)
 
 class Token
 {

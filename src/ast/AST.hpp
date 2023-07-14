@@ -1703,7 +1703,7 @@ class JoinedStr : public ASTNode
 class FormattedValue : public ASTNode
 {
   public:
-	enum class Conversion { NONE, STRING, REPR, ASCII };
+	enum class Conversion { NONE = 0, REPR = 1, STRING = 2, ASCII = 3 };
 
   private:
 	std::shared_ptr<ASTNode> m_value;

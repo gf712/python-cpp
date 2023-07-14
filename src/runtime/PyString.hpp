@@ -15,6 +15,37 @@ class PyString : public PyBaseObject
 	PyString(PyType *);
 
   public:
+	struct FormatSpec
+	{
+		size_t start;
+		size_t end;
+		std::optional<std::string> mapping;
+		std::optional<char> conversion_flag;
+		std::optional<uint32_t> minimum_width;
+		std::optional<uint32_t> precision;
+		std::optional<char> conversion_type;
+
+		PyResult<std::string> apply(PyObject *obj) const;
+	};
+
+	struct ReplacementField
+	{
+		enum class Conversion {
+			REPR = 1,
+			STR = 2,
+			ASCII = 3,
+		};
+		std::optional<std::string> field_name;
+		std::optional<Conversion> conversion;
+		std::optional<FormatSpec> format_spec;
+		size_t start;
+		size_t end;
+		bool display_expression{ false };
+
+		static std::optional<Conversion> get_conversion(char);
+	};
+
+  public:
 	static PyResult<PyString *> create(const std::string &value);
 
 	static PyResult<PyString *> create(PyObject *);
