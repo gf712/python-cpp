@@ -34,6 +34,8 @@ class PyTuple
 
 	std::string to_string() const override;
 
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 	PyResult<size_t> __len__() const;

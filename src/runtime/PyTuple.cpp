@@ -3,6 +3,7 @@
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "PyInteger.hpp"
+#include "PyList.hpp"
 #include "PySlice.hpp"
 #include "PyString.hpp"
 #include "StopIteration.hpp"
@@ -124,6 +125,44 @@ std::string PyTuple::to_string() const
 	os << ")";
 
 	return os.str();
+}
+
+PyResult<PyObject *> PyTuple::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	if (!type->issubclass(tuple())) {
+		return Err(type_error(
+			"tuple.__new__({}): {} is not a subtype of tuple", type->name(), type->name()));
+	}
+
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"tuple",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr /* iterrable */);
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+
+	auto [iterable] = result.unwrap();
+
+	auto iterator_ = iterable->iter();
+	if (iterator_.is_err()) { return iterator_; }
+	auto iterator = iterator_.unwrap();
+
+	ASSERT(type == tuple());
+	auto els_ = PyList::create();
+	if (els_.is_err()) { return Err(els_.unwrap_err()); }
+	auto els = els_.unwrap();
+
+	auto value = iterator->next();
+	while (value.is_ok()) {
+		els->elements().push_back(value.unwrap());
+		value = iterator->next();
+	}
+
+	if (!value.unwrap_err()->type()->issubclass(stop_iteration()->type())) { return value; }
+
+	return PyTuple::create(els->elements());
 }
 
 PyResult<PyObject *> PyTuple::__repr__() const { return PyString::create(to_string()); }
