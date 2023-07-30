@@ -235,7 +235,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	InstructionVector *m_current_block{ nullptr };
 
 	// a non-owning list of all generated Labels
-	std::vector<Label *> m_labels;
+	std::vector<std::shared_ptr<Label>> m_labels;
 
 	std::vector<size_t> m_frame_register_count;
 	std::vector<size_t> m_frame_stack_value_count;
@@ -283,35 +283,23 @@ class BytecodeGenerator : public ast::CodeGenerator
 		spdlog::debug("New label to be added: name={} function_id={}", name, function_id);
 		auto new_label = std::make_shared<Label>(name, function_id);
 
-		ASSERT(std::find(m_labels.begin(), m_labels.end(), new_label.get()) == m_labels.end())
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), new_label) == m_labels.end())
 
-		m_labels.emplace_back(new_label.get());
+		m_labels.emplace_back(new_label);
 
 		return new_label;
 	}
 
-	const Label &label(const Label &l) const
-	{
-		if (auto it = std::find(m_labels.begin(), m_labels.end(), &l); it != m_labels.end()) {
-			return **it;
-		} else {
-			ASSERT_NOT_REACHED();
-		}
-	}
+	const std::vector<std::shared_ptr<Label>> &labels() const { return m_labels; }
 
-	const std::vector<Label *> &labels() const { return m_labels; }
-
-	void bind(Label &label)
+	void bind(const std::shared_ptr<Label> &label)
 	{
-		ASSERT(std::find(m_labels.begin(), m_labels.end(), &label) != m_labels.end())
-		auto &blocks = function(label.function_id());
-		const auto instructions_size = std::transform_reduce(
-			blocks.begin(), blocks.end(), 0u, std::plus<size_t>{}, [](const auto &ins) {
-				return ins.size();
-			});
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), label) != m_labels.end())
+		auto &instructions = function(label->function_id());
+		const auto instructions_size = instructions.size();
 		const size_t current_instruction_position = instructions_size;
-		label.set_position(current_instruction_position);
-		spdlog::debug("bound label {}", label.name());
+		label->set_position(current_instruction_position);
+		spdlog::debug("bound label {}", label->name());
 	}
 
 	size_t register_count() const { return m_frame_register_count.back(); }

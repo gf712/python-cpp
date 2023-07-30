@@ -1446,11 +1446,11 @@ Value *BytecodeGenerator::visit(const If *node)
 	emit<Jump>(end_label);
 
 	// else
-	bind(*orelse_start_label);
+	bind(orelse_start_label);
 	for (const auto &orelse_statement : node->orelse()) {
 		generate(orelse_statement.get(), m_function_id);
 	}
-	bind(*end_label);
+	bind(end_label);
 
 	return nullptr;
 }
@@ -1474,7 +1474,7 @@ Value *BytecodeGenerator::visit(const For *node)
 	// call the __iter__ implementation
 	emit<GetIter>(iterator_register, iterator_func->get_register());
 
-	bind(*forloop_start_label);
+	bind(forloop_start_label);
 	auto previous_start_label = m_ctx.set_current_loop_start_label(forloop_start_label);
 	auto previous_end_label = m_ctx.set_current_loop_end_label(forloop_end_label);
 	// call the __next__ implementation
@@ -1516,7 +1516,7 @@ Value *BytecodeGenerator::visit(const For *node)
 	emit<Jump>(forloop_start_label);
 
 	// orelse
-	bind(*forloop_end_label);
+	bind(forloop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
 	m_ctx.set_current_loop_start_label(previous_start_label);
@@ -1550,7 +1550,7 @@ Value *BytecodeGenerator::visit(const While *node)
 		make_label(fmt::format("WHILE_END_{}", while_loop_count++), m_function_id);
 
 	// test
-	bind(*while_loop_start_label);
+	bind(while_loop_start_label);
 	auto previous_start_label = m_ctx.set_current_loop_start_label(while_loop_start_label);
 	auto previous_end_label = m_ctx.set_current_loop_end_label(while_loop_end_label);
 
@@ -1562,7 +1562,7 @@ Value *BytecodeGenerator::visit(const While *node)
 	emit<Jump>(while_loop_start_label);
 
 	// orelse
-	bind(*while_loop_end_label);
+	bind(while_loop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
 
 	m_ctx.set_current_loop_start_label(previous_start_label);
@@ -2230,7 +2230,7 @@ Value *BytecodeGenerator::visit(const With *node)
 			emit<JumpIfTrue>(exit_result->get_register(), exit_label);
 		}
 		emit<ReRaise>();
-		bind(*exit_label);
+		bind(exit_label);
 		emit<ClearExceptionState>();
 	};
 
@@ -2241,7 +2241,7 @@ Value *BytecodeGenerator::visit(const With *node)
 		emit<LeaveExceptionHandling>();
 		auto *cleanup_block = allocate_block(m_function_id);
 		set_insert_point(cleanup_block);
-		bind(*cleanup_label);
+		bind(cleanup_label);
 		with_exit_factory(true);
 
 		auto *next_block = allocate_block(m_function_id);
@@ -2299,10 +2299,10 @@ Value *BytecodeGenerator::visit(const IfExpr *node)
 	emit<Jump>(end_label);
 
 	// else
-	bind(*orelse_start_label);
+	bind(orelse_start_label);
 	auto *else_result = generate(node->orelse().get(), m_function_id);
 	emit<Move>(return_value->get_register(), else_result->get_register());
-	bind(*end_label);
+	bind(end_label);
 
 	return return_value;
 }
@@ -2363,7 +2363,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		for (const auto &handler : node->handlers()) {
 			auto *exception_handler_block = allocate_block(m_function_id);
 			set_insert_point(exception_handler_block);
-			bind(*next_exception_label);
+			bind(next_exception_label);
 			if (!handler->type()) {
 				if (handler != *(node->handlers().end() - 1)) {
 					// FIXME: implement SyntaxError and error throwing when parsing source code
@@ -2392,7 +2392,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		}
 
 		if (!node->orelse().empty()) {
-			bind(*orelse_label);
+			bind(orelse_label);
 			for (const auto &statement : node->orelse()) {
 				generate(statement.get(), m_function_id);
 			}
@@ -2400,7 +2400,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		}
 	}
 
-	if (next_exception_label) bind(*next_exception_label);
+	if (next_exception_label) bind(next_exception_label);
 
 	// emit<LeaveExceptionHandling>();
 
@@ -2408,7 +2408,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		auto *empty_finally_block = allocate_block(m_function_id);
 		set_insert_point(empty_finally_block);
 		emit<ReRaise>();
-		bind(*finally_label);
+		bind(finally_label);
 	} else {
 		auto *finally_block_with_reraise = allocate_block(m_function_id);
 		set_insert_point(finally_block_with_reraise);
@@ -2420,7 +2420,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		}
 		emit<ReRaise>();
 
-		bind(*finally_label);
+		bind(finally_label);
 		auto *finally_block = allocate_block(m_function_id);
 		set_insert_point(finally_block);
 		for (const auto &statement : node->finalbody()) {
@@ -2503,7 +2503,7 @@ Value *BytecodeGenerator::visit(const BoolOp *node)
 	}
 	emit<Move>(result->get_register(), last_result->get_register());
 
-	bind(*end_label);
+	bind(end_label);
 	return result;
 }
 
@@ -2525,7 +2525,7 @@ Value *BytecodeGenerator::visit(const Assert *node)
 	emit_call(assertion_function->get_register(), std::move(args));
 	auto *exception = create_return_value();
 	emit<RaiseVarargs>(exception->get_register());
-	bind(*end_label);
+	bind(end_label);
 
 	return nullptr;
 }
@@ -2638,7 +2638,7 @@ std::
 		}
 
 		auto *dst = create_value();
-		bind(*start_label);
+		bind(start_label);
 		emit<ForIter>(dst->get_register(), it->get_register(), end_label);
 		if (node->target()->node_type() == ASTNodeType::Name) {
 			const auto name = std::static_pointer_cast<Name>(node->target());
@@ -2715,7 +2715,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 		auto start_label = start_labels.back();
 		auto end_label = end_labels.back();
 		emit<Jump>(start_label);
-		bind(*end_label);
+		bind(end_label);
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
@@ -2818,7 +2818,7 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 		auto start_label = start_labels.back();
 		auto end_label = end_labels.back();
 		emit<Jump>(start_label);
-		bind(*end_label);
+		bind(end_label);
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
@@ -2920,7 +2920,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 		auto start_label = start_labels.back();
 		auto end_label = end_labels.back();
 		emit<Jump>(start_label);
-		bind(*end_label);
+		bind(end_label);
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
@@ -3021,7 +3021,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 		auto start_label = start_labels.back();
 		auto end_label = end_labels.back();
 		emit<Jump>(start_label);
-		bind(*end_label);
+		bind(end_label);
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
