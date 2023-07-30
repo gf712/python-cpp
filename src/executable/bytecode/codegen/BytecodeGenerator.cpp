@@ -1463,7 +1463,9 @@ Value *BytecodeGenerator::visit(const For *node)
 
 	auto forloop_start_label =
 		make_label(fmt::format("FOR_START_{}", for_loop_count), m_function_id);
-	auto forloop_end_label = make_label(fmt::format("FOR_END_{}", for_loop_count++), m_function_id);
+	auto forloop_end_label = make_label(fmt::format("FOR_END_{}", for_loop_count), m_function_id);
+	auto forloop_after_else_end_label =
+		make_label(fmt::format("FOR_AFTER_ELSE_END_{}", for_loop_count++), m_function_id);
 
 	// generate the iterator
 	auto *iterator_func = generate(node->iter().get(), m_function_id);
@@ -1476,7 +1478,7 @@ Value *BytecodeGenerator::visit(const For *node)
 
 	bind(forloop_start_label);
 	auto previous_start_label = m_ctx.set_current_loop_start_label(forloop_start_label);
-	auto previous_end_label = m_ctx.set_current_loop_end_label(forloop_end_label);
+	auto previous_end_label = m_ctx.set_current_loop_end_label(forloop_after_else_end_label);
 	// call the __next__ implementation
 	emit<ForIter>(iter_variable->get_register(), iterator_register, forloop_end_label);
 
@@ -1518,6 +1520,8 @@ Value *BytecodeGenerator::visit(const For *node)
 	// orelse
 	bind(forloop_end_label);
 	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
+
+	bind(forloop_after_else_end_label);
 
 	m_ctx.set_current_loop_start_label(previous_start_label);
 	m_ctx.set_current_loop_end_label(previous_end_label);

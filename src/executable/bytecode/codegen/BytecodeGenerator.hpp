@@ -147,6 +147,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 		const std::shared_ptr<Label> &get_current_loop_end_label() const
 		{
+			// should only be used by ast::Break
 			ASSERT(m_current_loop_end_label)
 			return m_current_loop_end_label;
 		}
