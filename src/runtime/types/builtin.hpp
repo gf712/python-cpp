@@ -1,6 +1,8 @@
 #pragma once
 
+#include "runtime/PyObject.hpp"
 #include "runtime/forward.hpp"
+
 #include <functional>
 #include <memory>
 #include <variant>

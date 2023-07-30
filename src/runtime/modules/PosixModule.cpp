@@ -11,6 +11,8 @@
 
 #include <filesystem>
 
+#include <sys/stat.h>
+
 namespace fs = std::filesystem;
 
 namespace py {

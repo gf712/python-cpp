@@ -3,6 +3,8 @@
 #include "RLock.hpp"
 #include "runtime/PyDict.hpp"
 
+#include <thread>
+
 namespace py {
 PyModule *thread_module()
 {
