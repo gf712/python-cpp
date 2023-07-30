@@ -5,6 +5,7 @@
 #include "BuildList.hpp"
 #include "BuildSet.hpp"
 #include "BuildSlice.hpp"
+#include "BuildString.hpp"
 #include "BuildTuple.hpp"
 #include "ClearExceptionState.hpp"
 #include "ClearTopCleanup.hpp"
@@ -13,6 +14,7 @@
 #include "DeleteSubscript.hpp"
 #include "DictMerge.hpp"
 #include "ForIter.hpp"
+#include "FormatValue.hpp"
 #include "FunctionCall.hpp"
 #include "FunctionCallEx.hpp"
 #include "FunctionCallWithKeywords.hpp"
@@ -432,6 +434,18 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case YIELD_VALUE: {
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<YieldValue>(src);
+	}
+	case BUILD_STRING: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		const auto size = deserialize<uint8_t>(instruction_buffer);
+		const auto stack_size = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<BuildString>(dst, size, stack_size);
+	}
+	case FORMAT_VALUE: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		const auto src = deserialize<uint8_t>(instruction_buffer);
+		const auto conversion = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<FormatValue>(dst, src, conversion);
 	}
 	}
 	spdlog::error("Missing opcode: {}", instruction_code);
