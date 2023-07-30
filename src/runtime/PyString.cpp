@@ -675,12 +675,8 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 	ASSERT(args && args->size() <= 3 && args->size() > 0)
 	ASSERT(!kwargs)
 
-	auto suffix_ = PyObject::from(args->elements()[0]);
-	if (suffix_.is_err()) return suffix_;
-	PyString *suffix = as<PyString>(suffix_.unwrap());
 	PyInteger *start = nullptr;
 	PyInteger *end = nullptr;
-	bool result{ false };
 
 	if (args->size() >= 2) {
 		auto start_ = PyObject::from(args->elements()[1]);
@@ -697,49 +693,67 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 		ASSERT(end)
 	}
 
-	if (!start && !end) {
-		result = m_value.ends_with(suffix->value());
-	} else if (!end) {
-		size_t start_ =
-			std::visit(overloaded{
-						   [this](const auto &val) -> size_t {
-							   return get_position_from_slice(static_cast<int64_t>(val));
-						   },
-						   [this](const mpz_class &val) -> size_t {
-							   ASSERT(val.fits_slong_p());
-							   return get_position_from_slice(val.get_si());
-						   },
-					   },
-				start->value().value);
-		std::string_view substring{ m_value.c_str() + start_, m_value.size() - start_ };
-		result = substring.ends_with(suffix->value());
-	} else {
-		size_t start_ =
-			std::visit(overloaded{
-						   [this](const auto &val) -> size_t {
-							   return get_position_from_slice(static_cast<int64_t>(val));
-						   },
-						   [this](const mpz_class &val) -> size_t {
-							   ASSERT(val.fits_slong_p());
-							   return get_position_from_slice(val.get_si());
-						   },
-					   },
-				start->value().value);
-		size_t end_ = std::visit(overloaded{
-									 [this](const auto &val) -> size_t {
-										 return get_position_from_slice(static_cast<int64_t>(val));
-									 },
-									 [this](const mpz_class &val) -> size_t {
-										 ASSERT(val.fits_slong_p());
-										 return get_position_from_slice(val.get_si());
-									 },
-								 },
-			end->value().value);
-		std::string_view substring{ m_value.c_str() + start_, end_ - start_ };
-		result = substring.ends_with(suffix->value());
+	std::optional<size_t> start_;
+	std::optional<size_t> end_;
+	if (start) {
+		start_ = std::visit(overloaded{
+								[this](const auto &val) -> size_t {
+									return get_position_from_slice(static_cast<int64_t>(val));
+								},
+								[this](const mpz_class &val) -> size_t {
+									ASSERT(val.fits_slong_p());
+									return get_position_from_slice(val.get_si());
+								},
+							},
+			start->value().value);
 	}
 
-	return Ok(result ? py_true() : py_false());
+	if (end) {
+		end_ = std::visit(overloaded{
+							  [this](const auto &val) -> size_t {
+								  return get_position_from_slice(static_cast<int64_t>(val));
+							  },
+							  [this](const mpz_class &val) -> size_t {
+								  ASSERT(val.fits_slong_p());
+								  return get_position_from_slice(val.get_si());
+							  },
+						  },
+			end->value().value);
+	}
+
+	auto endswith_impl = [this, start = start_, end = end_](std::string_view suffix) {
+		if (!start.has_value() && !end.has_value()) {
+			return m_value.ends_with(suffix);
+		} else if (!end.has_value()) {
+			std::string_view substring{ m_value.c_str() + *start, m_value.size() - *start };
+			return substring.ends_with(suffix);
+		} else {
+			std::string_view substring{ m_value.c_str() + *start, *end - *start };
+			return substring.ends_with(suffix);
+		}
+	};
+
+	auto suffix_ = PyObject::from(args->elements()[0]);
+	if (suffix_.is_err()) return suffix_;
+	if (auto *suffix = as<PyString>(suffix_.unwrap())) {
+		return Ok(endswith_impl(suffix->value()) ? py_true() : py_false());
+	} else if (auto *suffix_tuple = as<PyTuple>(suffix_.unwrap())) {
+		for (const auto &el : suffix_tuple->elements()) {
+			auto obj = PyObject::from(el);
+			if (obj.is_err()) { return obj; }
+			if (auto *suffix = as<PyString>(obj.unwrap())) {
+				if (endswith_impl(suffix->value())) { return Ok(py_true()); }
+			} else {
+				return Err(type_error("tuple for endswith must only contain str, not '{}'",
+					obj.unwrap()->type()->name()));
+			}
+		}
+	} else {
+		return Err(type_error("endswith first arg must be str or a tuple of str, not '{}'",
+			suffix_.unwrap()->type()->name()));
+	}
+
+	return Ok(py_false());
 }
 
 PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
