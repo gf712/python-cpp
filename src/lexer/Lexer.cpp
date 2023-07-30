@@ -113,6 +113,7 @@ void Lexer::push_empty_line()
 std::optional<size_t> Lexer::comment_start() const
 {
 	size_t n = 0;
+	if (m_cursor >= m_program.size()) { return {}; }
 	if (peek(n) == '#') { return n; }
 	while (std::isblank(peek(n)) && peek(n) != '\n') {
 		if (peek(n + 1) == '#') { return n + 1; }
@@ -174,6 +175,7 @@ bool Lexer::try_empty_line()
 		}
 	}
 	while (advance_if([](const char c) { return std::isblank(c); })) {}
+	if (m_cursor >= m_program.size()) { return false; }
 	if (std::isspace(peek(0))) {
 		push_empty_line();
 		return true;
@@ -419,6 +421,9 @@ bool Lexer::try_read_number()
 {
 	const Position original_position = m_position;
 	size_t n = 0;
+
+	if (m_cursor >= m_program.size()) { return false; }
+
 	if (auto end = imag_number(n)) {
 		increment_column_position(*end);
 	} else if (auto end = float_number(n)) {
@@ -666,6 +671,8 @@ bool Lexer::double_triple_quote_string(size_t n)
 
 bool Lexer::try_read_string()
 {
+	if (m_cursor >= m_program.size()) { return false; }
+
 	static constexpr std::array<std::string_view, 25> string_possible_prefixes = { "",
 		"br",
 		"f",
@@ -795,7 +802,9 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 	if (peek(0) == '~') return Token::TokenType::TILDE;
 	if (peek(0) == '^') return Token::TokenType::CIRCUMFLEX;
 	if (peek(0) == '@') return Token::TokenType::AT;
-	if (peek(0) == '!') return Token::TokenType::EXCLAMATION; // only appears in Python 3.11, but makes fstring easier
+	if (peek(0) == '!')
+		return Token::TokenType::EXCLAMATION;// only appears in Python 3.11, but makes fstring
+											 // easier
 	return {};
 }
 
@@ -845,6 +854,8 @@ bool Lexer::try_read_operation()
 	const Position original_position = m_position;
 	std::optional<Token::TokenType> type;
 
+	if (m_cursor >= m_program.size()) { return false; }
+
 	if (type = try_read_operation_with_three_characters(); type.has_value()) {
 		advance(3);
 	} else if (type = try_read_operation_with_two_characters(); type.has_value()) {
@@ -893,6 +904,8 @@ bool Lexer::try_read_newline()
 
 bool Lexer::try_read_name()
 {
+	if (m_cursor >= m_program.size()) { return false; }
+
 	auto valid_start_name = [](const char c) { return std::isalpha(c) || c == '_'; };
 
 	if (!valid_start_name(peek(0))) { return false; }
