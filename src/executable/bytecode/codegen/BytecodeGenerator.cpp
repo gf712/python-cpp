@@ -3118,7 +3118,7 @@ BytecodeGenerator::BytecodeGenerator()
 	m_frame_stack_value_count.push_back(0u);
 	m_frame_free_var_count.push_back(0u);
 	(void)create_function("__main__entry__");
-	m_current_block = &m_functions.functions.back().blocks.back();
+	m_current_block = &m_functions.functions.back().blocks;
 }
 
 BytecodeGenerator::~BytecodeGenerator() {}
@@ -3140,7 +3140,6 @@ BytecodeFunctionValue *BytecodeGenerator::create_function(const std::string &nam
 	m_function_map.emplace(name, std::ref(new_func));
 
 	// allocate the first block
-	new_func.blocks.emplace_back();
 	new_func.metadata.function_name = name;
 	m_values.push_back(std::make_unique<BytecodeFunctionValue>(name,
 		allocate_register(),
@@ -3155,29 +3154,25 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 {
 	for (const auto &function : functions.functions) {
 		size_t instruction_idx{ 0 };
-		for (const auto &block : function.blocks) {
-			for (const auto &ins : block) { ins->relocate(instruction_idx++); }
-		}
+		for (const auto &ins : function.blocks) { ins->relocate(instruction_idx++); }
 	}
 }
 
 std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
 	std::vector<std::string> argv)
 {
-	ASSERT(m_frame_register_count.size() == 2)
 	ASSERT(m_frame_stack_value_count.size() == 2)
 	ASSERT(m_frame_free_var_count.size() == 2)
 	relocate_labels(m_functions);
 	return BytecodeProgram::create(std::move(m_functions), filename, argv);
 }
 
-InstructionBlock *BytecodeGenerator::allocate_block(size_t function_id)
+InstructionVector *BytecodeGenerator::allocate_block(size_t function_id)
 {
 	ASSERT(function_id < m_functions.functions.size())
 
 	auto function = std::next(m_functions.functions.begin(), function_id);
-	auto &new_block = function->blocks.emplace_back();
-	return &new_block;
+	return &function->blocks;
 }
 
 std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node,

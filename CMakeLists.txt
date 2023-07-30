@@ -38,21 +38,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(GMP REQUIRED)
 
 find_package(ICU REQUIRED COMPONENTS uc data)
-# if (NOT ${ICU_FOUND})
-# 	ExternalProject_Add(icu
-# 		GIT_REPOSITORY    https://github.com/unicode-org/icu.git
-# 		GIT_TAG           release-71-1
-# 		INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/external
-# 		CONFIGURE_COMMAND "./configure"
-# 		BUILD_COMMAND ${CMAKE_COMMAND} -E env
-# 			CC=${CMAKE_C_COMPILER}
-# 			CXX=${CMAKE_CXX_COMPILER}
-# 			make
-# 		BUILD_IN_SOURCE TRUE
-# 		INSTALL_COMMAND make DESTDIR=${CMAKE_CURRENT_BINARY_DIR}/external install
-# 	)
-# 	add_library(icu::)
-# endif()
 
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::GMock ALIAS gmock)

@@ -4,6 +4,7 @@
 #include "executable/Function.hpp"
 #include "executable/FunctionBlock.hpp"
 #include "executable/Program.hpp"
+#include "runtime/Value.hpp"
 #include "runtime/forward.hpp"
 
 class BytecodeProgram : public Program
@@ -20,9 +21,9 @@ class BytecodeProgram : public Program
 	static std::shared_ptr<BytecodeProgram>
 		create(FunctionBlocks &&func_blocks, std::string filename, std::vector<std::string> argv);
 
-	std::vector<View>::const_iterator begin() const;
+	InstructionVector::const_iterator begin() const;
 
-	std::vector<View>::const_iterator end() const;
+	InstructionVector::const_iterator end() const;
 
 	size_t main_stack_size() const;
 

@@ -232,7 +232,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		m_variable_visibility;
 
 	size_t m_function_id{ 0 };
-	InstructionBlock *m_current_block{ nullptr };
+	InstructionVector *m_current_block{ nullptr };
 
 	// a non-owning list of all generated Labels
 	std::vector<Label *> m_labels;
@@ -272,26 +272,10 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	const FunctionBlocks &functions() const { return m_functions; }
 
-	const std::list<InstructionBlock> &function(size_t idx) const
+	const InstructionVector &function(size_t idx) const
 	{
 		ASSERT(idx < m_functions.functions.size())
 		return std::next(m_functions.functions.begin(), idx)->blocks;
-	}
-
-	const InstructionBlock &function(size_t idx, size_t block) const
-	{
-		ASSERT(idx < m_functions.functions.size())
-		const auto f = std::next(m_functions.functions.begin(), idx);
-		ASSERT(block < f->blocks.size())
-		return *std::next(f->blocks.begin(), block);
-	}
-
-	InstructionBlock &function(size_t idx, size_t block)
-	{
-		ASSERT(idx < m_functions.functions.size())
-		const auto f = std::next(m_functions.functions.begin(), idx);
-		ASSERT(block < f->blocks.size())
-		return *std::next(f->blocks.begin(), block);
 	}
 
 	std::shared_ptr<Label> make_label(const std::string &name, size_t function_id)
@@ -357,7 +341,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	BytecodeFunctionValue *create_function(const std::string &);
 
-	InstructionBlock *allocate_block(size_t);
+	InstructionVector *allocate_block(size_t);
 
 	void enter_function()
 	{
@@ -454,7 +438,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::shared_ptr<Program> generate_executable(std::string, std::vector<std::string>);
 	void relocate_labels(const FunctionBlocks &functions);
 
-	void set_insert_point(InstructionBlock *block) { m_current_block = block; }
+	void set_insert_point(InstructionVector *block) { m_current_block = block; }
 
 	std::string mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const;
 

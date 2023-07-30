@@ -17,7 +17,7 @@ using namespace py;
 
 StackFrame::StackFrame(size_t register_count,
 	size_t stack_size,
-	InstructionBlock::const_iterator return_address,
+	InstructionVector::const_iterator return_address,
 	VirtualMachine *vm_)
 	: registers(register_count, nullptr), locals(stack_size, nullptr),
 	  return_address(return_address), vm(vm_)
@@ -216,7 +216,7 @@ void VirtualMachine::leave_cleanup_handling()
 std::unique_ptr<StackFrame> VirtualMachine::push_frame(size_t register_count, size_t stack_size)
 {
 	auto new_frame = m_stack.empty() ? StackFrame::create(
-						 register_count, stack_size, InstructionBlock::const_iterator{}, this)
+						 register_count, stack_size, InstructionVector::const_iterator{}, this)
 									 : StackFrame::create(
 										 register_count, stack_size, m_instruction_pointer, this);
 	push_frame(*new_frame);

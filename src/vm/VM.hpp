@@ -30,7 +30,7 @@ struct StackFrame : NonCopyable
 
 	StackFrame(size_t register_count,
 		size_t stack_size,
-		InstructionBlock::const_iterator return_address,
+		InstructionVector::const_iterator return_address,
 		VirtualMachine *);
 
 	StackFrame(StackFrame &&);
@@ -43,8 +43,8 @@ struct StackFrame : NonCopyable
 
 	Registers registers;
 	Registers locals;
-	InstructionBlock::const_iterator return_address;
-	InstructionBlock::const_iterator last_instruction_pointer;
+	InstructionVector::const_iterator return_address;
+	InstructionVector::const_iterator last_instruction_pointer;
 	VirtualMachine *vm{ nullptr };
 	std::unique_ptr<State> state;
 
@@ -63,7 +63,7 @@ class VirtualMachine
 	std::stack<std::reference_wrapper<StackFrame>> m_stack;
 	std::deque<std::vector<const py::Value *>> m_stack_objects;
 
-	InstructionBlock::const_iterator m_instruction_pointer;
+	InstructionVector::const_iterator m_instruction_pointer;
 	std::unique_ptr<Interpreter> m_interpreter;
 	std::unique_ptr<Heap> m_heap;
 	State *m_state{ nullptr };
@@ -145,13 +145,13 @@ class VirtualMachine
 	const Interpreter &interpreter() const;
 	bool has_interpreter() const { return m_interpreter.operator bool(); }
 
-	void set_instruction_pointer(InstructionBlock::const_iterator pos)
+	void set_instruction_pointer(InstructionVector::const_iterator pos)
 	{
 		m_instruction_pointer = pos;
 		m_stack.top().get().last_instruction_pointer = m_instruction_pointer;
 	}
 
-	const InstructionBlock::const_iterator &instruction_pointer() const
+	const InstructionVector::const_iterator &instruction_pointer() const
 	{
 		return m_instruction_pointer;
 	}

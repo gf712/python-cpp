@@ -15,18 +15,16 @@
 class Bytecode : public Function
 {
 	const InstructionVector m_instructions;
-	const std::vector<View> m_block_views;
 
   public:
 	Bytecode(size_t register_count,
 		size_t stack_size,
 		std::string function_name,
-		InstructionVector &&instructions,
-		std::vector<View> block_views,
+		InstructionVector instructions,
 		std::shared_ptr<Program> program);
 
-	auto begin() const { return m_block_views.begin(); }
-	auto end() const { return m_block_views.end(); }
+	auto begin() const { return m_instructions.begin(); }
+	auto end() const { return m_instructions.end(); }
 
 	std::string to_string() const override;
 

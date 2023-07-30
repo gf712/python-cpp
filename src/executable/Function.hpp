@@ -2,20 +2,6 @@
 
 #include "FunctionBlock.hpp"
 
-class View
-{
-	InstructionVector::const_iterator m_begin;
-	InstructionVector::const_iterator m_end;
-
-  public:
-	View(InstructionVector::const_iterator begin, InstructionVector::const_iterator end)
-		: m_begin(begin), m_end(end)
-	{}
-
-	auto begin() const { return m_begin; }
-	auto end() const { return m_end; }
-};
-
 enum class FunctionExecutionBackend { BYTECODE = 0, LLVM = 1 };
 
 class Function : NonCopyable

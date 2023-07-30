@@ -28,37 +28,14 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 	std::vector<size_t> functions_instruction_count;
 	functions_instruction_count.reserve(func_blocks.functions.size());
 	for (const auto &f : func_blocks.functions) {
-		functions_instruction_count.push_back(std::transform_reduce(
-			f.blocks.begin(), f.blocks.end(), 0u, std::plus<size_t>{}, [](const auto &ins) {
-				return ins.size();
-			}));
+		functions_instruction_count.push_back(f.blocks.size());
 	}
-
-	// have to reserve instruction vector to avoid relocations
-	// since the iterators depend on the vector memory layout
-	InstructionVector main_instructions;
-	main_instructions.reserve(functions_instruction_count[0]);
 
 	auto &main_func = func_blocks.functions.front();
-
-	std::vector<View> main_blocks;
-	main_blocks.reserve(main_func.blocks.size());
-
-	for (size_t start_idx = 0; auto &block : main_func.blocks) {
-		// ASSERT(!block.empty())
-		if (block.empty()) { continue; }
-		for (auto &ins : block) { main_instructions.push_back(std::move(ins)); }
-		InstructionVector::const_iterator start = main_instructions.cbegin() + start_idx;
-		InstructionVector::const_iterator end = main_instructions.end();
-		main_blocks.emplace_back(start, end);
-		start_idx = main_instructions.size();
-	}
-
 	auto main_bytecode = std::make_unique<Bytecode>(main_func.metadata.register_count,
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
-		std::move(main_instructions),
-		main_blocks,
+		std::move(main_func.blocks),
 		program);
 	auto consts = PyTuple::create(main_func.metadata.consts);
 	if (consts.is_err()) { TODO(); }
@@ -85,24 +62,11 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 
 	for (size_t i = 1; i < func_blocks.functions.size(); ++i) {
 		auto &func = *std::next(func_blocks.functions.begin(), i);
-		std::vector<View> func_blocks_view;
-		InstructionVector func_instructions;
-		func_instructions.reserve(functions_instruction_count[i]);
-		for (size_t start_idx = 0; auto &block : func.blocks) {
-			// ASSERT(!block.empty())
-			if (block.empty()) { continue; }
-			for (auto &ins : block) { func_instructions.push_back(std::move(ins)); }
-			InstructionVector::const_iterator start = func_instructions.cbegin() + start_idx;
-			InstructionVector::const_iterator end = func_instructions.end();
-			func_blocks_view.emplace_back(start, end);
-			start_idx = func_instructions.size();
-		}
 
 		auto bytecode = std::make_unique<Bytecode>(func.metadata.register_count,
 			func.metadata.stack_size,
 			func.metadata.function_name,
-			std::move(func_instructions),
-			func_blocks_view,
+			std::move(func.blocks),
 			program);
 		consts = PyTuple::create(func.metadata.consts);
 		if (consts.is_err()) { TODO(); }
@@ -135,14 +99,14 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 
 size_t BytecodeProgram::main_stack_size() const { return m_main_function->register_count(); }
 
-std::vector<View>::const_iterator BytecodeProgram::begin() const
+InstructionVector::const_iterator BytecodeProgram::begin() const
 {
 	// FIXME: assumes all functions are bytecode
 	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
 	return static_cast<Bytecode *>(m_main_function->function().get())->begin();
 }
 
-std::vector<View>::const_iterator BytecodeProgram::end() const
+InstructionVector::const_iterator BytecodeProgram::end() const
 {
 	// FIXME: assumes all functions are bytecode
 	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
@@ -226,11 +190,7 @@ std::string FunctionBlock::to_string() const
 {
 	std::ostringstream os;
 	os << "Function name: " << metadata.function_name << '\n';
-	size_t block_idx{ 0 };
-	for (const auto &block : blocks) {
-		os << "  block " << block_idx++ << '\n';
-		for (const auto &ins : block) { os << "    " << ins->to_string() << '\n'; }
-	}
+	for (const auto &ins : blocks) { os << "    " << ins->to_string() << '\n'; }
 	return os.str();
 }
 
