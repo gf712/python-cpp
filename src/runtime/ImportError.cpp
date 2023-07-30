@@ -17,8 +17,10 @@ PyResult<PyObject *> ImportError::__new__(const PyType *type, PyTuple *args, PyD
 {
 	ASSERT(type == s_import_error)
 	if (auto result = ImportError::create(args)) {
-		if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
-			result->m_name = PyObject::from(it->second).unwrap();
+		if (kwargs) {
+			if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
+				result->m_name = PyObject::from(it->second).unwrap();
+			}
 		}
 
 		return Ok(static_cast<PyObject *>(result));
@@ -30,10 +32,11 @@ PyResult<PyObject *> ImportError::__new__(const PyType *type, PyTuple *args, PyD
 PyResult<int32_t> ImportError::__init__(PyTuple *args, PyDict *kwargs)
 {
 	m_args = args;
-	if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
-		m_name = PyObject::from(it->second).unwrap();
+	if (kwargs) {
+		if (auto it = kwargs->map().find(String{ "name" }); it != kwargs->map().end()) {
+			m_name = PyObject::from(it->second).unwrap();
+		}
 	}
-
 	return Ok(1);
 }
 
