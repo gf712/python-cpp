@@ -15,10 +15,10 @@ PyResult<Value> BuildSet::execute(VirtualMachine &vm, Interpreter &) const
 			start = std::next(start);
 		}
 	}
-	auto result = PySet::create(elements);
-	if (result.is_err()) return Err(result.unwrap_err());
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return Ok(Value{ result.unwrap() });
+	return PySet::create(elements).and_then([&vm, this](PySet *set) {
+		vm.reg(m_dst) = set;
+		return Ok(set);
+	});
 }
 
 std::vector<uint8_t> BuildSet::serialize() const

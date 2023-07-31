@@ -23,7 +23,7 @@ class JumpIfTrue final : public Instruction
 	{
 		const std::string position =
 			m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
-		return fmt::format("JUMP_IF_TRUE    position: {}", position);
+		return fmt::format("JUMP_IF_TRUE    r{} position: {}", m_test_register, position);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

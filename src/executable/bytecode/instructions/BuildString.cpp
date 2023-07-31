@@ -26,19 +26,16 @@ PyResult<Value> BuildString::execute(VirtualMachine &vm, Interpreter &) const
 			TODO();
 		}
 	}
-	auto result = PyString::create(std::move(result_string));
-	if (result.is_err()) return Err(result.unwrap_err());
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return Ok(Value{ result.unwrap() });
+
+	return PyString::create(std::move(result_string)).and_then([&vm, this](PyString *str) {
+		vm.reg(m_dst) = str;
+		return Ok(str);
+	});
 }
 
 std::vector<uint8_t> BuildString::serialize() const
 {
 	ASSERT(m_size < std::numeric_limits<uint8_t>::max());
 
-	return {
-		BUILD_STRING,
-		m_dst,
-		static_cast<uint8_t>(m_size)
-	};
+	return { BUILD_STRING, m_dst, static_cast<uint8_t>(m_size) };
 }

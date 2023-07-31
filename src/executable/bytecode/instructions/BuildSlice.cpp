@@ -21,10 +21,11 @@ PyResult<Value> BuildSlice::execute(VirtualMachine &vm, Interpreter &) const
 		auto step_obj = PyObject::from(step);
 		if (step_obj.is_err()) return step_obj;
 
-		auto slice = PySlice::create(start_obj.unwrap(), end_obj.unwrap(), step_obj.unwrap());
-		if (slice.is_err()) return slice;
-		vm.reg(m_dst) = slice.unwrap();
-		return slice;
+		return PySlice::create(start_obj.unwrap(), end_obj.unwrap(), step_obj.unwrap())
+			.and_then([&vm, this](PySlice *slice) {
+				vm.reg(m_dst) = slice;
+				return Ok(slice);
+			});
 	} else {
 		auto start = vm.reg(*m_start);
 		auto end = vm.reg(*m_end);
@@ -35,10 +36,11 @@ PyResult<Value> BuildSlice::execute(VirtualMachine &vm, Interpreter &) const
 		auto end_obj = PyObject::from(end);
 		if (end_obj.is_err()) return end_obj;
 
-		auto slice = PySlice::create(start_obj.unwrap(), end_obj.unwrap(), py_none());
-		if (slice.is_err()) return slice;
-		vm.reg(m_dst) = slice.unwrap();
-		return slice;
+		return PySlice::create(start_obj.unwrap(), end_obj.unwrap(), py_none())
+			.and_then([&vm, this](PySlice *slice) {
+				vm.reg(m_dst) = slice;
+				return Ok(slice);
+			});
 	}
 }
 

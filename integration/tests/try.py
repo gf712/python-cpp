@@ -171,4 +171,4 @@ def try_else_return_from_finally_with_exception():
     finally:
         return 4
 
-assert try_else_return_from_finally() == 4
+assert try_else_return_from_finally_with_exception() == 4

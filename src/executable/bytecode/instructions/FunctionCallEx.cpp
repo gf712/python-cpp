@@ -41,12 +41,10 @@ PyResult<Value> FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 		args.unwrap()->to_string(),
 		kwargs.unwrap()->to_string());
 
-	auto result = callable_object->call(args.unwrap(), kwargs.unwrap());
-	if (result.is_ok()) {
-		vm.reg(0) = result.unwrap();
-		return Ok(Value{ result.unwrap() });
-	}
-	return Err(result.unwrap_err());
+	return callable_object->call(args.unwrap(), kwargs.unwrap()).and_then([&vm](PyObject *result) {
+		vm.reg(0) = result;
+		return Ok(result);
+	});
 }
 
 std::vector<uint8_t> FunctionCallEx::serialize() const

@@ -183,7 +183,7 @@ class VirtualMachine
 
 	void push(py::Value value) { *m_stack_pointer++ = value; }
 
-	py::Value pop() { return *m_stack_pointer--; }
+	py::Value pop() { return *--m_stack_pointer; }
 
 	std::deque<std::vector<const py::Value *>> stack_objects() const;
 

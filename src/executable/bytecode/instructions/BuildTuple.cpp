@@ -15,10 +15,11 @@ PyResult<Value> BuildTuple::execute(VirtualMachine &vm, Interpreter &) const
 			start = std::next(start);
 		}
 	}
-	auto result = PyTuple::create(elements);
-	if (result.is_err()) return Err(result.unwrap_err());
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return Ok(Value{ result.unwrap() });
+
+	return PyTuple::create(std::move(elements)).and_then([&vm, this](PyTuple *tuple) {
+		vm.reg(m_dst) = tuple;
+		return Ok(tuple);
+	});
 }
 
 std::vector<uint8_t> BuildTuple::serialize() const

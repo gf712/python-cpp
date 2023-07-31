@@ -36,19 +36,19 @@ TEST(VariablesResolver, GlobalNamespace)
 	ASSERT_EQ(main->symbol_map.symbols.size(), 6);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("foo").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("foo")->get().visibility,
 		VariablesResolver::Visibility::NAME);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("z").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("z")->get().visibility,
 		VariablesResolver::Visibility::NAME);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("c").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("c")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("print").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("print")->get().visibility,
 		VariablesResolver::Visibility::NAME);
@@ -70,10 +70,10 @@ TEST(VariablesResolver, FunctionDefinition)
 	ASSERT_EQ(main->symbol_map.symbols.size(), 2);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("foo").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("foo")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.foo.0:0"));
 	auto &foo = visibility.at("_bytecode_generator_tests_.foo.0:0");
@@ -104,10 +104,10 @@ TEST(VariablesResolver, Closure)
 	ASSERT_EQ(main->symbol_map.symbols.size(), 2);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("foo").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("foo")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.foo.0:0"));
 	auto &foo = visibility.at("_bytecode_generator_tests_.foo.0:0");
@@ -120,10 +120,10 @@ TEST(VariablesResolver, Closure)
 		VariablesResolver::Visibility::CELL);
 	ASSERT_TRUE(foo->symbol_map.get_visible_symbol("c").has_value());
 	ASSERT_EQ(foo->symbol_map.get_visible_symbol("c")->get().visibility,
-		VariablesResolver::Visibility::GLOBAL);
+		VariablesResolver::Visibility::EXPLICIT_GLOBAL);
 	ASSERT_TRUE(foo->symbol_map.get_visible_symbol("print").has_value());
 	ASSERT_EQ(foo->symbol_map.get_visible_symbol("print")->get().visibility,
-		VariablesResolver::Visibility::GLOBAL);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(foo->symbol_map.get_visible_symbol("bar").has_value());
 	ASSERT_EQ(foo->symbol_map.get_visible_symbol("bar")->get().visibility,
 		VariablesResolver::Visibility::LOCAL);
@@ -139,7 +139,7 @@ TEST(VariablesResolver, Closure)
 		VariablesResolver::Visibility::FREE);
 	ASSERT_TRUE(foo_bar->symbol_map.get_visible_symbol("c").has_value());
 	ASSERT_EQ(foo_bar->symbol_map.get_visible_symbol("c")->get().visibility,
-		VariablesResolver::Visibility::GLOBAL);
+		VariablesResolver::Visibility::EXPLICIT_GLOBAL);
 }
 
 TEST(VariablesResolver, ClassDefinition)
@@ -178,9 +178,9 @@ TEST(VariablesResolver, NonLocal)
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.outer.2:0"));
 	auto &outer = visibility.at("_bytecode_generator_tests_.outer.2:0");
@@ -218,17 +218,17 @@ TEST(VariablesResolver, LambdaDefinition)
 	ASSERT_EQ(main->symbol_map.symbols.size(), 1);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
-		VariablesResolver::Visibility::NAME);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.<lambda>.0:4"));
 	auto &lambda_ = visibility.at("_bytecode_generator_tests_.<lambda>.0:4");
 	ASSERT_EQ(lambda_->symbol_map.symbols.size(), 3);
 	ASSERT_TRUE(lambda_->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(lambda_->symbol_map.get_visible_symbol("a")->get().visibility,
-		VariablesResolver::Visibility::GLOBAL);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(lambda_->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(lambda_->symbol_map.get_visible_symbol("b")->get().visibility,
-		VariablesResolver::Visibility::GLOBAL);
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(lambda_->symbol_map.get_visible_symbol("c").has_value());
 	ASSERT_EQ(lambda_->symbol_map.get_visible_symbol("c")->get().visibility,
 		VariablesResolver::Visibility::LOCAL);

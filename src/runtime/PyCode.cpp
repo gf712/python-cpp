@@ -217,8 +217,11 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		}
 	}
 
+	ASSERT(m_arg_count <= m_varnames.size());
 	std::vector<std::string> positional_args{ m_varnames.begin(),
 		m_varnames.begin() + m_arg_count };
+
+	ASSERT(total_named_arguments_count <= m_varnames.size());
 	std::vector<std::string> keyword_only_args{ m_varnames.begin() + m_arg_count,
 		m_varnames.begin() + total_named_arguments_count };
 
