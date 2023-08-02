@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <stack>
 #include <string_view>
 #include <vector>
 
@@ -98,8 +99,11 @@ template<> struct fmt::formatter<Position>
 	__TOKEN(ATEQUAL)          \
 	__TOKEN(RARROW)           \
 	__TOKEN(ELLIPSIS)         \
-	__TOKEN(COLONEQUAL)		  \
-	__TOKEN(EXCLAMATION)
+	__TOKEN(COLONEQUAL)       \
+	__TOKEN(EXCLAMATION)      \
+	__TOKEN(FSTRING_START)    \
+	__TOKEN(FSTRING_MIDDLE)   \
+	__TOKEN(FSTRING_END)
 
 class Token
 {
@@ -167,7 +171,20 @@ std::optional<std::string> read_file(const std::string &filename);
 
 class Lexer
 {
+  public:
+	enum class Mode {
+		NORMAL,
+		FSTRING,
+	};
 
+	enum class Quote {
+		SINGLE_SINGLE_QUOTE,
+		SINGLE_DOUBLE_QUOTE,
+		TRIPLE_SINGLE_QUOTE,
+		TRIPLE_DOUBLE_QUOTE,
+	};
+
+  private:
 	std::deque<Token> m_tokens_to_emit;
 	const std::string m_program;
 	size_t m_cursor{ 0 };
@@ -178,6 +195,9 @@ class Lexer
 	const std::string m_filename;
 	std::vector<Token> m_current_line_tokens;
 	size_t m_parenthesis_level{ 0 };
+	std::stack<Mode> m_mode;
+	std::stack<Quote> m_quote;
+	std::stack<size_t> m_fstring_paren_level;
 
   private:
 	Lexer(const Lexer &) = delete;
@@ -187,7 +207,7 @@ class Lexer
 
 	Lexer(std::string &&program, std::string &&filename)
 		: m_program(std::move(program)), m_position({ 0, 0, &m_program[0] }),
-		  m_indent_values({ 0 }), m_filename(std::move(filename))
+		  m_indent_values({ 0 }), m_filename(std::move(filename)), m_mode({ Mode::NORMAL })
 	{}
 
   public:
@@ -280,6 +300,8 @@ class Lexer
 
 	bool try_read_name();
 
+	bool try_fstring();
+
 	std::optional<size_t> hex_number(size_t) const;
 	std::optional<size_t> bin_number(size_t) const;
 	std::optional<size_t> oct_number(size_t) const;
@@ -328,4 +350,20 @@ class Lexer
 	void increment_row_position();
 
 	void increment_column_position(size_t idx);
+
+	Mode current_mode() const { return m_mode.top(); }
+
+	Quote quote_type(std::string_view str)
+	{
+		if (str == "'") {
+			return Quote::SINGLE_SINGLE_QUOTE;
+		} else if (str == "\"") {
+			return Quote::SINGLE_DOUBLE_QUOTE;
+		} else if (str == "\'\'\'") {
+			return Quote::TRIPLE_SINGLE_QUOTE;
+		} else if (str == "\"\"\"") {
+			return Quote::TRIPLE_DOUBLE_QUOTE;
+		}
+		ASSERT_NOT_REACHED();
+	}
 };

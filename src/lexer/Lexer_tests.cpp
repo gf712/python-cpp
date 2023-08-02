@@ -681,7 +681,8 @@ TEST(Lexer, FString)
 {
 	constexpr std::string_view program =
 		"a = 1\n"
-		"b = f\"a={a}\"\n";
+		"b = f\"a={a}\"\n"
+		"c = F'{a:.2f}'\n";
 
 	std::vector<Token::TokenType> expected_tokens{
 		Token::TokenType::NAME,
@@ -690,7 +691,25 @@ TEST(Lexer, FString)
 		Token::TokenType::NEWLINE,
 		Token::TokenType::NAME,
 		Token::TokenType::EQUAL,
-		Token::TokenType::STRING,
+		Token::TokenType::FSTRING_START,
+		Token::TokenType::FSTRING_MIDDLE,
+		Token::TokenType::LBRACE,
+		Token::TokenType::NAME,
+		Token::TokenType::RBRACE,
+		Token::TokenType::FSTRING_MIDDLE,
+		Token::TokenType::FSTRING_END,
+		Token::TokenType::NEWLINE,
+		Token::TokenType::NAME,
+		Token::TokenType::EQUAL,
+		Token::TokenType::FSTRING_START,
+		Token::TokenType::FSTRING_MIDDLE,
+		Token::TokenType::LBRACE,
+		Token::TokenType::NAME,
+		Token::TokenType::COLON,
+		Token::TokenType::FSTRING_MIDDLE,
+		Token::TokenType::RBRACE,
+		Token::TokenType::FSTRING_MIDDLE,
+		Token::TokenType::FSTRING_END,
 		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER,
 	};

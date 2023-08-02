@@ -54,16 +54,21 @@ bool Lexer::read_more_tokens_loop()
 		return true;
 	}
 
-	if (try_empty_line()) { return true; }
-	if (try_read_comment()) { return true; }
-	if (try_read_indent()) { return true; }
-	if (try_read_newline()) { return true; }
-	try_read_backslash();
-	try_read_space();
-	if (try_read_string()) { return true; }
-	if (try_read_name()) { return true; }
-	if (try_read_operation()) { return true; }
-	if (try_read_number()) { return true; }
+	if (current_mode() == Mode::NORMAL) {
+		if (try_empty_line()) { return true; }
+		if (try_read_comment()) { return true; }
+		if (try_read_indent()) { return true; }
+		if (try_read_newline()) { return true; }
+		try_read_backslash();
+		try_read_space();
+		if (try_read_string()) { return true; }
+		if (try_read_name()) { return true; }
+		if (try_read_operation()) { return true; }
+		if (try_read_number()) { return true; }
+	} else {
+		if (try_fstring()) { return true; }
+	}
+
 	return false;
 }
 
@@ -700,6 +705,7 @@ bool Lexer::try_read_string()
 		"Rb" };
 
 	const Position original_position = m_position;
+	const auto original_cursor = m_cursor;
 
 	size_t idx = 0;
 
@@ -721,10 +727,32 @@ bool Lexer::try_read_string()
 		return peek(idx) == quote && peek(idx + 1) == quote && peek(idx + 2) == quote;
 	};
 
+	const bool is_fstring =
+		(it->find('f') != std::string_view::npos || it->find('F') != std::string_view::npos);
+
+	auto push_string_token =
+		[this, original_position, is_fstring, original_cursor, is_triple_quote, idx]() {
+			if (!is_fstring) {
+				push_token(Token::TokenType::STRING, original_position, m_position);
+			} else {
+				m_cursor = original_cursor;
+				m_position = original_position;
+
+				auto quote_size = (is_triple_quote('\'') || is_triple_quote('\"')) ? 3 : 1;
+				m_quote.push(quote_type(std::string_view{ m_program.begin() + m_cursor + idx,
+					m_program.begin() + m_cursor + idx + quote_size }));
+
+				Lexer::advance(idx + quote_size);
+				push_token(Token::TokenType::FSTRING_START, original_position, m_position);
+				m_mode.push(Mode::FSTRING);
+				m_fstring_paren_level.push(m_parenthesis_level);
+			}
+		};
+
 	if (is_triple_quote('\'')) {
 		idx += 3;
 		if (single_triple_quote_string(idx)) {
-			push_token(Token::TokenType::STRING, original_position, m_position);
+			push_string_token();
 			return true;
 		} else {
 			return false;
@@ -732,7 +760,7 @@ bool Lexer::try_read_string()
 	} else if (is_triple_quote('\"')) {
 		idx += 3;
 		if (double_triple_quote_string(idx)) {
-			push_token(Token::TokenType::STRING, original_position, m_position);
+			push_string_token();
 			return true;
 		} else {
 			return false;
@@ -740,7 +768,7 @@ bool Lexer::try_read_string()
 	} else if (peek(idx) == '\'') {
 		idx += 1;
 		if (single_quote_string(idx)) {
-			push_token(Token::TokenType::STRING, original_position, m_position);
+			push_string_token();
 			return true;
 		} else {
 			return false;
@@ -748,7 +776,7 @@ bool Lexer::try_read_string()
 	} else if (peek(idx) == '\"') {
 		idx += 1;
 		if (double_quote_string(idx)) {
-			push_token(Token::TokenType::STRING, original_position, m_position);
+			push_string_token();
 			return true;
 		} else {
 			return false;
@@ -756,6 +784,63 @@ bool Lexer::try_read_string()
 	}
 	return false;
 }
+
+bool Lexer::try_fstring()
+{
+	const auto original_position = m_position;
+	size_t idx = 0;
+
+	auto reached_end = [this, original_position]() {
+		auto position = m_position;
+		if ((m_cursor + 1) < m_program.size() && peek(0) == '}' && peek(1) != '}') {
+			push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
+			advance(1);
+			push_token(Token::TokenType::RBRACE, position, m_position);
+			return true;
+		} else if ((peek(0) == '\'' && m_quote.top() == Quote::SINGLE_SINGLE_QUOTE)
+				   || (peek(0) == '"' && m_quote.top() == Quote::SINGLE_DOUBLE_QUOTE)) {
+			push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
+			advance(1);
+			push_token(Token::TokenType::FSTRING_END, position, m_position);
+			m_mode.pop();
+			m_quote.pop();
+			m_fstring_paren_level.pop();
+			return true;
+		} else if (((peek(0) == '\'' && peek(1) == '\'' && peek(2) == '\'')
+					   && m_quote.top() == Quote::TRIPLE_SINGLE_QUOTE)
+				   || ((peek(0) == '\"' && peek(1) == '\"' && peek(2) == '\"')
+					   && m_quote.top() == Quote::TRIPLE_DOUBLE_QUOTE)) {
+			push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
+			advance(3);
+			push_token(Token::TokenType::FSTRING_END, position, m_position);
+			m_mode.pop();
+			m_quote.pop();
+			m_fstring_paren_level.pop();
+			return true;
+		} else if (peek(0) == '{') {
+			if (peek(1) != '{') {
+				push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
+				advance(1);
+				push_token(Token::TokenType::LBRACE, position, m_position);
+				m_mode.push(Mode::NORMAL);
+				return true;
+			} else {
+				advance(2);
+				return false;
+			}
+		}
+		return false;
+	};
+
+	while (!reached_end()) {
+		ASSERT(!peek("\n"));
+		increment_column_position(1);
+		idx++;
+	}
+
+	return true;
+}
+
 
 std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 {
@@ -766,6 +851,7 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 		return Token::TokenType::LPAREN;
 	}
 	if (peek(0) == ')') {
+		ASSERT(m_parenthesis_level > 0);
 		m_parenthesis_level--;
 		return Token::TokenType::RPAREN;
 	}
@@ -774,6 +860,7 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 		return Token::TokenType::LSQB;
 	}
 	if (peek(0) == ']') {
+		ASSERT(m_parenthesis_level > 0);
 		m_parenthesis_level--;
 		return Token::TokenType::RSQB;
 	}
@@ -782,10 +869,24 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 		return Token::TokenType::LBRACE;
 	}
 	if (peek(0) == '}') {
-		m_parenthesis_level--;
+		if (m_mode.size() > 1) {
+			ASSERT(m_mode.top() == Mode::NORMAL);
+			m_mode.pop();
+			ASSERT(m_mode.top() == Mode::FSTRING);
+		} else {
+			ASSERT(m_parenthesis_level > 0);
+			m_parenthesis_level--;
+		}
 		return Token::TokenType::RBRACE;
 	}
-	if (peek(0) == ':') return Token::TokenType::COLON;
+	if (peek(0) == ':') {
+		if (m_mode.size() > 1 && m_parenthesis_level == m_fstring_paren_level.top()) {
+			ASSERT(m_mode.top() == Mode::NORMAL);
+			m_mode.pop();
+			ASSERT(m_mode.top() == Mode::FSTRING);
+		}
+		return Token::TokenType::COLON;
+	}
 	if (peek(0) == ',') return Token::TokenType::COMMA;
 	if (peek(0) == ';') return Token::TokenType::SEMI;
 	if (peek(0) == '+') return Token::TokenType::PLUS;

@@ -1540,96 +1540,45 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 	}
 };
 
-std::shared_ptr<Constant> parse_bytes(std::vector<TokenResult<Token::TokenType::STRING>> strings)
+std::shared_ptr<Constant> parse_bytes(Token string)
 {
 	Bytes byte_collection;
-	auto start_token = strings.front().token;
-	auto end_token = strings.back().token;
-	for (const auto &t : strings) {
-		const auto &token = t.token;
-		auto *start = token.start().pointer_to_program;
-		const auto *end = token.end().pointer_to_program;
+	auto *start = string.start().pointer_to_program;
+	const auto *end = string.end().pointer_to_program;
 
-		if (start[0] != 'b' && start[0] != 'B') {
-			// FIXME: should be a SyntaxError
-			spdlog::error("cannot mix bytes and nonbytes literals");
-			std::abort();
-		}
-		start++;
+	if (start[0] != 'b' && start[0] != 'B') { return nullptr; }
+	start++;
 
-		const bool is_triple_quote = (start[0] == '\"' || start[0] == '\'')
-									 && (start[1] == '\"' || start[1] == '\'')
-									 && (start[2] == '\"' || start[2] == '\'');
+	const bool is_triple_quote = (end - start) >= 3 && (start[0] == '\"' || start[0] == '\'')
+								 && (start[1] == '\"' || start[1] == '\'')
+								 && (start[2] == '\"' || start[2] == '\'');
 
-		const auto value = [is_triple_quote, start, end]() {
-			if (is_triple_quote) {
-				return std::string{ start + 3, end - 3 };
-			} else {
-				return std::string{ start + 1, end - 1 };
-			}
-		}();
-		const auto bytes = Bytes::from_unescaped_string(value);
-		byte_collection.b.insert(byte_collection.b.begin(), bytes.b.begin(), bytes.b.end());
-		end_token = token;
-	}
-	Bytes transformed;
-	transformed.b.reserve(byte_collection.b.size());
-	for (size_t i = 0; i < byte_collection.b.size();) {
-		if (i < (byte_collection.b.size() - 1) && static_cast<char>(byte_collection.b[i]) == '\\'
-			&& static_cast<char>(byte_collection.b[i + 1]) == '\n') {
-			i += 2;
+	const auto value = [is_triple_quote, start, end]() {
+		if (is_triple_quote) {
+			return std::string{ start + 3, end - 3 };
 		} else {
-			transformed.b.push_back(byte_collection.b[i++]);
+			return std::string{ start + 1, end - 1 };
 		}
-	}
-	transformed.b.shrink_to_fit();
+	}();
 	return std::make_shared<Constant>(
-		transformed, SourceLocation{ start_token.start(), end_token.end() });
+		Bytes::from_unescaped_string(value), SourceLocation{ string.start(), string.end() });
 }
 
-template<> struct traits<struct LiteralCharPattern>
+template<> struct traits<struct FStringReplacementFieldPattern>
 {
-	using result_type = std::shared_ptr<Constant>;
+	using result_type = std::pair<std::shared_ptr<FormattedValue>, std::shared_ptr<Constant>>;
 };
 
-struct LiteralCharPattern : PatternV2<LiteralCharPattern>
+template<> struct traits<struct FStringFormatSpecPattern>
 {
-	using ResultType = typename traits<LiteralCharPattern>::result_type;
-
-	// literal_char      ::=  <any code point except "{", "}" or NULL>
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		using pattern1 = PatternMatchV2<
-			OneOrMorePatternV2<NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::LBRACE>>,
-				NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::RBRACE>>,
-				NegativeLookAheadV2<SingleTokenPatternV2<Token::TokenType::ENDMARKER>>,
-				AnyToken>>;
-		if (auto result = pattern1::match(p)) {
-			auto [literal_char] = *result;
-			const auto &start = std::get<3>(literal_char.front()).start();
-			const auto end_token = p.lexer().peek_token(p.token_position());
-			if (end_token.has_value()) {
-				const auto &end = end_token->start();
-				return std::make_shared<Constant>(
-					std::string{ start.pointer_to_program, end.pointer_to_program },
-					SourceLocation{ start, end });
-			} else {
-				const auto &end = std::get<3>(literal_char.front()).end();
-				return std::make_shared<Constant>(
-					std::string{ start.pointer_to_program, end.pointer_to_program },
-					SourceLocation{ start, end });
-			}
-		}
-		return {};
-	}
+	using result_type = std::variant<typename traits<FStringReplacementFieldPattern>::result_type,
+		std::shared_ptr<Constant>>;
 };
-
 
 template<> struct traits<struct FExpressionPattern>
 {
 	using result_type = std::shared_ptr<ASTNode>;
 };
-
 
 template<> struct traits<struct YieldExpressionPattern>
 {
@@ -1645,7 +1594,8 @@ struct FExpressionPattern : PatternV2<FExpressionPattern>
 {
 	using ResultType = typename traits<FExpressionPattern>::result_type;
 
-	// f_expression      ::=  (yield_expr | star_expressions)
+	// f_expression
+	//     | (yield_expr | star_expressions)
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		using pattern1 =
@@ -1658,18 +1608,17 @@ struct FExpressionPattern : PatternV2<FExpressionPattern>
 	}
 };
 
-
 template<> struct traits<struct ConversionPattern>
 {
 	using result_type = FormattedValue::Conversion;
 };
 
-
 struct ConversionPattern : PatternV2<ConversionPattern>
 {
 	using ResultType = typename traits<ConversionPattern>::result_type;
 
-	// conversion        ::=  ("s" | "r" | "a")
+	// conversion
+	//     | ("s" | "r" | "a")
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::NAME>>;
@@ -1700,16 +1649,13 @@ struct ConversionPattern : PatternV2<ConversionPattern>
 	}
 };
 
-template<> struct traits<struct ReplacementFieldPattern>
-{
-	using result_type = std::pair<std::shared_ptr<FormattedValue>, std::shared_ptr<Constant>>;
-};
 
-struct ReplacementFieldPattern : PatternV2<ReplacementFieldPattern>
+struct FStringReplacementFieldPattern : PatternV2<FStringReplacementFieldPattern>
 {
-	using ResultType = typename traits<ReplacementFieldPattern>::result_type;
+	using ResultType = typename traits<FStringReplacementFieldPattern>::result_type;
 
-	// replacement_field ::=  "{" f_expression ["="] ["!" conversion] [":" format_spec] "}"
+	// fstring_replacement_field
+	//     | '{' f_expression "="? [ "!" conversion ] [ ':' fstring_format_spec* ] '}'
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LBRACE>,
@@ -1717,10 +1663,11 @@ struct ReplacementFieldPattern : PatternV2<ReplacementFieldPattern>
 			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::EQUAL>>,
 			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::EXCLAMATION>,
 				ConversionPattern>,
-			// ZeroOrOnePattern<SingleTokenPatternV2<Token::TokenType::COLON>, FormatSpecType>,
+			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::COLON>,
+				ZeroOrMorePatternV2<FStringFormatSpecPattern>>,
 			SingleTokenPatternV2<Token::TokenType::RBRACE>>;
 		if (auto result = pattern1::match(p)) {
-			auto [l, expression, display, conversion, /*format_spec,*/ r] = *result;
+			auto [l, expression, display, conversion, format_spec, r] = *result;
 			auto c = [conversion = std::move(conversion)]() {
 				if (conversion.has_value()) { return std::get<1>(*conversion); }
 				return FormattedValue::Conversion::NONE;
@@ -1748,111 +1695,106 @@ struct ReplacementFieldPattern : PatternV2<ReplacementFieldPattern>
 	}
 };
 
-template<> struct traits<struct FStringLBrace>
+template<> struct traits<struct FStringMiddlePattern>
 {
-	using result_type = std::shared_ptr<Constant>;
+	using result_type = std::variant<typename traits<FStringReplacementFieldPattern>::result_type,
+		std::shared_ptr<Constant>>;
 };
 
-struct FStringLBrace : PatternV2<FStringLBrace>
+struct FStringMiddlePattern : PatternV2<FStringMiddlePattern>
 {
-	using ResultType = typename traits<FStringLBrace>::result_type;
+	// fstring_middle
+	//     | fstring_replacement_field
+	//     | FSTRING_MIDDLE
+	using ResultType = typename traits<FStringMiddlePattern>::result_type;
 
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LBRACE>,
-			SingleTokenPatternV2<Token::TokenType::LBRACE>>;
+		using pattern1 = PatternMatchV2<FStringReplacementFieldPattern>;
 		if (auto result = pattern1::match(p)) {
-			auto [l, r] = *result;
-			auto next = p.lexer().peek_token(p.token_position());
-			if (next.has_value()) {
-				std::string value{ r.token.start().pointer_to_program,
-					next->start().pointer_to_program };
-				return std::make_shared<Constant>(value, SourceLocation{});
-			} else {
-				return std::make_shared<Constant>("{", SourceLocation{});
-			}
+			auto [fstring_replacement_field] = *result;
+			return fstring_replacement_field;
 		}
+
+		using pattern2 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::FSTRING_MIDDLE>>;
+		if (auto result = pattern2::match(p)) {
+			auto [middle] = *result;
+			std::string_view middle_str{ middle.token.start().pointer_to_program,
+				middle.token.end().pointer_to_program };
+			std::string str;
+			str.reserve(middle_str.size());
+			for (size_t i = 0; i < middle_str.size(); ++i) {
+				if ((i + 1) < middle_str.size() && middle_str[i] == '{'
+					&& middle_str[i + 1] == '{') {
+					str.push_back('{');
+					i++;
+				} else if ((i + 1) < middle_str.size() && middle_str[i] == '}'
+						   && middle_str[i + 1] == '}') {
+					str.push_back('}');
+					i++;
+				} else {
+					str.push_back(middle_str[i]);
+				}
+			}
+			return std::make_shared<Constant>(
+				std::move(str), SourceLocation{ middle.token.start(), middle.token.end() });
+		}
+
 		return {};
 	}
 };
 
-template<> struct traits<struct FStringRBrace>
+struct FStringFormatSpecPattern : PatternV2<FStringFormatSpecPattern>
 {
-	using result_type = std::shared_ptr<Constant>;
-};
+	using ResultType = typename traits<FStringFormatSpecPattern>::result_type;
 
-struct FStringRBrace : PatternV2<FStringRBrace>
-{
-	using ResultType = typename traits<FStringRBrace>::result_type;
-
+	// fstring_format_spec:
+	//     | FSTRING_MIDDLE
+	//     | fstring_replacement_field
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::RBRACE>,
-			SingleTokenPatternV2<Token::TokenType::RBRACE>>;
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::FSTRING_MIDDLE>>;
 		if (auto result = pattern1::match(p)) {
-			auto [l, r] = *result;
-			auto next = p.lexer().peek_token(p.token_position());
-			if (next.has_value()) {
-				std::string value{ r.token.start().pointer_to_program,
-					next->start().pointer_to_program };
-				return std::make_shared<Constant>(value, SourceLocation{});
-			} else {
-				return std::make_shared<Constant>("}", SourceLocation{});
-			}
+			auto [middle] = *result;
+			std::string middle_str{ middle.token.start().pointer_to_program,
+				middle.token.end().pointer_to_program };
+			return std::make_shared<Constant>(
+				std::move(middle_str), SourceLocation{ middle.token.start(), middle.token.end() });
 		}
+
+		using pattern2 = PatternMatchV2<FStringReplacementFieldPattern>;
+		if (auto result = pattern2::match(p)) {
+			auto [fstring_replacement_field] = *result;
+			return fstring_replacement_field;
+		}
+
 		return {};
 	}
 };
 
-std::shared_ptr<JoinedStr> parse_fstring(Lexer &l,
-	std::vector<TokenResult<Token::TokenType::STRING>> strings)
+template<> struct traits<struct FStringPattern>
 {
-	// f_string          ::=  (literal_char | "{{" | "}}" | replacement_field)*
-	// replacement_field ::=  "{" f_expression ["="] ["!" conversion] [":" format_spec] "}"
-	// f_expression      ::=  (conditional_expression | "*" or_expr)
-	//                          ("," conditional_expression | "," "*" or_expr)* [","]
-	//                        | yield_expression
-	// conversion        ::=  "s" | "r" | "a"
-	// format_spec       ::=  (literal_char | NULL | replacement_field)*
-	// literal_char      ::=  <any code point except "{", "}" or NULL>
-	std::vector<std::shared_ptr<ASTNode>> string_nodes;
+	using result_type = std::shared_ptr<JoinedStr>;
+};
 
-	for (const auto &t : strings) {
-		const auto &token = t.token;
-		auto *start = token.start().pointer_to_program;
-		const auto *end = token.end().pointer_to_program;
+struct FStringPattern : PatternV2<FStringPattern>
+{
+	// fstring
+	//     | FSTRING_START fstring_middle* FSTRING_END
+	using ResultType = typename traits<FStringPattern>::result_type;
 
-		if (start[0] == 'b' || start[0] == 'B') {
-			// FIXME: should be a SyntaxError
-			spdlog::error("cannot mix bytes and nonbytes literals");
-			std::abort();
-		}
-		if (start[0] == 'f' || start[0] == 'F') { start++; }
-
-		const bool is_triple_quote = (start[0] == '\"' || start[0] == '\'')
-									 && (start[1] == '\"' || start[1] == '\'')
-									 && (start[2] == '\"' || start[2] == '\'');
-
-		auto value = [is_triple_quote, start, end]() {
-			if (is_triple_quote) {
-				return std::string_view{ start + 3, end - 3 };
-			} else {
-				return std::string_view{ start + 1, end - 1 };
-			}
-		}();
-
-		auto lexer = Lexer::create(std::string{ value }, l.filename());
-		Parser p{ lexer };
-
-		// (literal_char | "{{" | "}}" | replacement_field)*
-		using pattern1 = PatternMatchV2<ZeroOrMorePatternV2<OrPatternV2<LiteralCharPattern,
-											FStringLBrace,
-											FStringRBrace,
-											ReplacementFieldPattern>>,
-			SingleTokenPatternV2<Token::TokenType::ENDMARKER>>;
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		// FSTRING_START fstring_middle* FSTRING_END
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::FSTRING_START>,
+			ZeroOrMorePatternV2<FStringMiddlePattern>,
+			SingleTokenPatternV2<Token::TokenType::FSTRING_END>>;
 		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("(literal_char | \"{{\" | \"}}\" | replacement_field)*");
-			for (const auto &n : std::get<0>(*result)) {
+			DEBUG_LOG("FSTRING_START fstring_middle* FSTRING_END");
+			auto [start, middle, end] = *result;
+			std::vector<std::shared_ptr<ASTNode>> string_nodes;
+			string_nodes.reserve(middle.size());
+			for (const auto &n : middle) {
 				std::visit(overloaded{
 							   [&string_nodes](const std::shared_ptr<Constant> &c) {
 								   string_nodes.push_back(c);
@@ -1866,101 +1808,120 @@ std::shared_ptr<JoinedStr> parse_fstring(Lexer &l,
 						   },
 					n);
 			}
-		} else {
-			TODO();
-		}
-	}
-
-
-	return std::make_shared<JoinedStr>(std::move(string_nodes),
-		SourceLocation{ .start = string_nodes.front()->source_location().start,
-			.end = string_nodes.back()->source_location().end });
-}
-
-std::shared_ptr<ASTNode> parse_strings(Lexer &l,
-	std::vector<TokenResult<Token::TokenType::STRING>> strings)
-{
-	auto start_token = strings.front().token;
-	auto end_token = strings.back().token;
-	const bool is_bytes = [start_token] {
-		if (start_token.start().pointer_to_program[0] == 'b'
-			|| start_token.start().pointer_to_program[0] == 'B') {
-			return true;
-		}
-		return false;
-	}();
-	if (is_bytes) { return parse_bytes(std::move(strings)); }
-
-	const bool is_fstring = [start_token] {
-		if (start_token.start().pointer_to_program[0] == 'f'
-			|| start_token.start().pointer_to_program[0] == 'F') {
-			return true;
-		}
-		return false;
-	}();
-	if (is_fstring) { return parse_fstring(l, std::move(strings)); }
-
-	std::string str;
-	for (const auto &t : strings) {
-		const auto &token = t.token;
-		auto *start = token.start().pointer_to_program;
-		const auto *end = token.end().pointer_to_program;
-
-		if (start[0] == 'b' || start[0] == 'B') {
-			if (!is_bytes) {
-				// FIXME: should be a SyntaxError
-				spdlog::error("cannot mix bytes and nonbytes literals");
-				std::abort();
+			if (string_nodes.empty()) {
+				string_nodes.push_back(std::make_shared<Constant>(
+					std::string{}, SourceLocation{ start.token.end(), end.token.start() }));
 			}
-			start++;
+			return std::make_shared<JoinedStr>(
+				std::move(string_nodes), SourceLocation{ start.token.start(), end.token.end() });
 		}
-
-		const bool is_triple_quote = [start]() {
-			return (start[0] == '\"' || start[0] == '\'') && (start[1] == '\"' || start[1] == '\'')
-				   && (start[2] == '\"' || start[2] == '\'');
-		}();
-
-		const auto value = [is_triple_quote, start, end]() {
-			if (is_triple_quote) {
-				return std::string{ start + 3, end - 3 };
-			} else {
-				return std::string{ start + 1, end - 1 };
-			}
-		}();
-		str.append(String::from_unescaped_string(value).s);
-		end_token = token;
+		return {};
 	}
-	std::string transformed;
-	transformed.reserve(str.size());
-	for (size_t i = 0; i < str.size();) {
-		if (i < (str.size() - 1) && str[i] == '\\' && str[i + 1] == '\n') {
-			i += 2;
-		} else {
-			transformed.push_back(str[i++]);
-		}
-	}
-	transformed.shrink_to_fit();
-	return std::make_shared<Constant>(
-		transformed, SourceLocation{ start_token.start(), end_token.end() });
-}
+};
 
 template<> struct traits<struct StringPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = std::shared_ptr<Constant>;
 };
 
 struct StringPattern : PatternV2<StringPattern>
 {
-	using ResultType = traits<StringPattern>::result_type;
-	// strings: STRING+
+	// STRING
+	using ResultType = typename traits<StringPattern>::result_type;
+
+	static std::optional<ResultType> matches_impl(Parser &p)
+	{
+		using pattern1 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::STRING>>;
+
+		if (auto result = pattern1::match(p)) {
+			auto [str] = *result;
+			if (auto c = parse_bytes(str.token)) { return c; }
+
+			std::string_view value{ str.token.start().pointer_to_program,
+				str.token.end().pointer_to_program };
+
+			const bool is_triple_quote = [value]() {
+				if (value.size() < 3) { return false; }
+				return (value[0] == '\"' || value[0] == '\'')
+					   && (value[1] == '\"' || value[1] == '\'')
+					   && (value[2] == '\"' || value[2] == '\'');
+			}();
+
+			if (is_triple_quote) {
+				value = value.substr(3, value.size() - 6);
+			} else {
+				value = value.substr(1, value.size() - 2);
+			}
+			return std::make_shared<Constant>(String::from_unescaped_string(std::string{ value }),
+				SourceLocation{ str.token.start(), str.token.end() });
+		}
+		return {};
+	}
+};
+
+template<> struct traits<struct StringsPattern>
+{
+	using result_type = std::shared_ptr<ASTNode>;
+};
+
+struct StringsPattern : PatternV2<StringsPattern>
+{
+	using ResultType = traits<StringsPattern>::result_type;
+	// strings: (fstring|string)+
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		using pattern1 =
-			PatternMatchV2<OneOrMorePatternV2<SingleTokenPatternV2<Token::TokenType::STRING>>>;
+			PatternMatchV2<OneOrMorePatternV2<OrPatternV2<FStringPattern, StringPattern>>>;
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("strings: STRING+");
 			auto [strings] = *result;
-			return parse_strings(p.lexer(), std::move(strings));
+			std::vector<std::shared_ptr<ASTNode>> string_nodes;
+			string_nodes.reserve(strings.size());
+			for (const auto &el : strings) {
+				if (auto joined_str = as<JoinedStr>(el)) {
+					string_nodes.insert(string_nodes.end(),
+						joined_str->values().begin(),
+						joined_str->values().end());
+				} else if (auto c = as<Constant>(el)) {
+					string_nodes.push_back(c);
+				} else {
+					TODO();
+				}
+			}
+			SourceLocation sl{ string_nodes.front()->source_location().start,
+				string_nodes.back()->source_location().end };
+
+			bool all_constant = std::all_of(string_nodes.begin(),
+				string_nodes.end(),
+				[](const auto &el) -> bool { return static_cast<bool>(as<Constant>(el)); });
+			if (all_constant) {
+				if (std::holds_alternative<Bytes>(*as<Constant>(string_nodes.front())->value())) {
+					Bytes bytes;
+					for (const auto &el : string_nodes) {
+						ASSERT(as<Constant>(el));
+						auto c = as<Constant>(el);
+						if (!std::holds_alternative<Bytes>(*c->value())) {
+							std::cerr << "SyntaxError: cannot mix bytes and nonbytes literals\n";
+							std::abort();
+						}
+						const auto &byte = std::get<Bytes>(*c->value());
+						bytes.b.insert(bytes.b.end(), byte.b.begin(), byte.b.end());
+					}
+					return std::make_shared<Constant>(bytes, sl);
+				} else {
+					auto str = std::accumulate(string_nodes.begin(),
+						string_nodes.end(),
+						std::string{},
+						[](std::string acc, const auto &el) {
+							ASSERT(as<Constant>(el));
+							auto c = as<Constant>(el);
+							ASSERT(std::holds_alternative<String>(*c->value()));
+							return acc + std::get<String>(*c->value()).s;
+						});
+					return std::make_shared<Constant>(std::move(str), sl);
+				}
+			}
+			return std::make_shared<JoinedStr>(std::move(string_nodes), sl);
 		}
 		return {};
 	}
@@ -2568,12 +2529,11 @@ struct AtomPattern : PatternV2<AtomPattern>
 			}
 		}
 		// strings
-		using pattern6 = PatternMatchV2<OneOrMorePatternV2<StringPattern>>;
+		using pattern6 = PatternMatchV2<StringsPattern>;
 		if (auto result = pattern6::match(p)) {
 			DEBUG_LOG("strings");
 			auto [strings] = *result;
-			ASSERT(strings.size() == 1);
-			return strings.back();
+			return strings;
 		}
 
 		// NUMBER
