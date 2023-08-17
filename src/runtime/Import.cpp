@@ -153,8 +153,9 @@ namespace {
 				if (_lock_unlock_module.is_err()) return Err(_lock_unlock_module.unwrap_err());
 				auto args = PyTuple::create(_lock_unlock_module.unwrap(), name);
 				if (args.is_err()) return Err(args.unwrap_err());
-				value =
-					VirtualMachine::the().interpreter().importlib()->call(args.unwrap(), nullptr);
+				auto *importlib = VirtualMachine::the().interpreter().importlib();
+				if (!importlib) { return Err(import_error("importlib not imported")); }
+				value = importlib->call(args.unwrap(), nullptr);
 				if (value.is_err()) return Err(value.unwrap_err());
 				return Ok(std::monostate{});
 			}
@@ -166,8 +167,9 @@ namespace {
 	{
 		auto find_and_load = PyString::create("_find_and_load");
 		if (find_and_load.is_err()) return Err(find_and_load.unwrap_err());
-		auto import_find_and_load =
-			VirtualMachine::the().interpreter().importlib()->get_method(find_and_load.unwrap());
+		auto *importlib = VirtualMachine::the().interpreter().importlib();
+		if (!importlib) { return Err(import_error("importlib not imported")); }
+		auto import_find_and_load = importlib->get_method(find_and_load.unwrap());
 		if (import_find_and_load.is_err()) return Err(import_find_and_load.unwrap_err());
 
 		auto args = PyTuple::create(name, VirtualMachine::the().interpreter().importfunc());

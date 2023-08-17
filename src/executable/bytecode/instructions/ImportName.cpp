@@ -32,7 +32,12 @@ PyResult<Value> ImportName::execute(VirtualMachine &vm, Interpreter &interpreter
 
 	const auto &import_func = builtins->symbol_table()->map().at(import_str.unwrap());
 
-	if (!std::holds_alternative<PyObject *>(import_func)) { return Err(type_error("")); }
+	if (!std::holds_alternative<PyObject *>(import_func)) {
+		return Err(type_error("__import__ is not callable"));
+	}
+	if (!std::get<PyObject *>(import_func)) {
+		return Err(import_error("__import__ not available"));
+	}
 
 	auto arg0 = PyString::create(name);
 	if (arg0.is_err()) return arg0;
