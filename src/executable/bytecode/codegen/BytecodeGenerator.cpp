@@ -53,6 +53,8 @@
 #include "executable/bytecode/instructions/MakeFunction.hpp"
 #include "executable/bytecode/instructions/MethodCall.hpp"
 #include "executable/bytecode/instructions/Move.hpp"
+#include "executable/bytecode/instructions/Pop.hpp"
+#include "executable/bytecode/instructions/Push.hpp"
 #include "executable/bytecode/instructions/RaiseVarargs.hpp"
 #include "executable/bytecode/instructions/ReRaise.hpp"
 #include "executable/bytecode/instructions/ReturnValue.hpp"
@@ -119,29 +121,15 @@ BytecodeValue *BytecodeGenerator::build_dict_simple(
 	// layed out on the stack. Ideally this would be done immediately when generating the
 	// keys/values
 	if (!key_registers.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &key : key_registers) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), *key);
-		}
+		ASSERT(key_registers.size() == value_registers.size());
+		for (const auto &key : key_registers) { emit<Push>(*key); }
+		for (const auto &value : value_registers) { emit<Push>(value); }
 
-		for (const auto &value : value_registers) {
-			auto *dst = create_value();
-			emit<Move>(dst->get_register(), value);
-		}
-
-		ASSERT(offset.has_value())
-		ASSERT(key_registers.size() == value_registers.size())
-
-		size_t size = key_registers.size();
-		emit<BuildDict>(result->get_register(), size, *offset);
+		const size_t size = key_registers.size();
+		emit<BuildDict>(result->get_register(), size);
+		for (size_t i = 0; i < value_registers.size() + key_registers.size(); ++i) { emit<Pop>(); }
 	} else {
-		emit<BuildDict>(result->get_register(), 0, 0);
+		emit<BuildDict>(result->get_register(), 0);
 	}
 
 	return result;
@@ -188,20 +176,11 @@ BytecodeValue *BytecodeGenerator::build_list(const std::vector<Register> &elemen
 {
 	auto *result = create_value();
 	if (!element_registers.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &el : element_registers) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), el);
-		}
-		ASSERT(offset.has_value());
-		emit<BuildList>(result->get_register(), element_registers.size(), *offset);
+		for (const auto &el : element_registers) { emit<Push>(el); }
+		emit<BuildList>(result->get_register(), element_registers.size());
+		for (size_t i = 0; i < element_registers.size(); ++i) { emit<Pop>(); }
 	} else {
-		emit<BuildList>(result->get_register(), 0, 0);
+		emit<BuildList>(result->get_register(), 0);
 	}
 	return result;
 }
@@ -210,20 +189,11 @@ BytecodeValue *BytecodeGenerator::build_set(const std::vector<Register> &element
 {
 	auto *result = create_value();
 	if (!element_registers.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &el : element_registers) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), el);
-		}
-		ASSERT(offset.has_value())
-		emit<BuildSet>(result->get_register(), element_registers.size(), *offset);
+		for (const auto &el : element_registers) { emit<Push>(el); }
+		emit<BuildSet>(result->get_register(), element_registers.size());
+		for (size_t i = 0; i < element_registers.size(); ++i) { emit<Pop>(); }
 	} else {
-		emit<BuildSet>(result->get_register(), 0, 0);
+		emit<BuildSet>(result->get_register(), 0);
 	}
 	return result;
 }
@@ -232,20 +202,11 @@ BytecodeValue *BytecodeGenerator::build_tuple(const std::vector<Register> &eleme
 {
 	auto *result = create_value();
 	if (!element_registers.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &el : element_registers) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), el);
-		}
-		ASSERT(offset.has_value())
-		emit<BuildTuple>(result->get_register(), element_registers.size(), *offset);
+		for (const auto &el : element_registers) { emit<Push>(el); }
+		emit<BuildTuple>(result->get_register(), element_registers.size());
+		for (size_t i = 0; i < element_registers.size(); ++i) { emit<Pop>(); }
 	} else {
-		emit<BuildTuple>(result->get_register(), 0, 0);
+		emit<BuildTuple>(result->get_register(), 0);
 	}
 	return result;
 }
@@ -254,46 +215,21 @@ BytecodeValue *BytecodeGenerator::build_string(const std::vector<Register> &elem
 {
 	auto *result = create_value();
 	if (!element_registers.empty()) {
-		std::optional<size_t> offset;
-		bool first = true;
-		for (const auto &el : element_registers) {
-			auto *dst = create_value();
-			if (first) {
-				offset = dst->get_register();
-				first = false;
-			}
-			emit<Move>(dst->get_register(), el);
-		}
-		ASSERT(offset.has_value())
-		emit<BuildString>(result->get_register(), element_registers.size(), *offset);
+		for (const auto &el : element_registers) { emit<Push>(el); }
+		emit<BuildString>(result->get_register(), element_registers.size());
+		for (size_t i = 0; i < element_registers.size(); ++i) { emit<Pop>(); }
 	} else {
-		emit<BuildString>(result->get_register(), 0, 0);
+		emit<BuildString>(result->get_register(), 0);
 	}
 	return result;
-}
-
-std::tuple<size_t, size_t> BytecodeGenerator::move_to_stack(const std::vector<Register> &args)
-{
-	if (args.empty()) { return { 0, 0 }; }
-	std::optional<size_t> offset;
-	bool first = true;
-	for (const auto &arg : args) {
-		auto *dst = create_value();
-		if (first) {
-			offset = dst->get_register();
-			first = false;
-		}
-		emit<Move>(dst->get_register(), arg);
-	}
-	ASSERT(offset.has_value())
-	return { args.size(), *offset };
 }
 
 void BytecodeGenerator::emit_call(Register func, const std::vector<Register> &args)
 {
 	if (!args.empty()) {
-		const auto [args_size, stack_offset] = move_to_stack(args);
-		emit<FunctionCall>(func, args_size, stack_offset);
+		for (const auto &arg : args) { emit<Push>(arg); }
+		emit<FunctionCall>(func, args.size(), 0);
+		for (size_t i = 0; i < args.size(); ++i) { emit<Pop>(); }
 	} else {
 		emit<FunctionCall>(func, 0, 0);
 	}
@@ -309,16 +245,16 @@ void BytecodeGenerator::make_function(Register dst,
 	auto *name_value = create_value();
 	emit<LoadConst>(name_value->get_register(), name_value_const->get_index());
 
-	const auto [defaults_size, defaults_stack_offset] = move_to_stack(defaults);
-	const auto [kw_defaults_size, kw_defaults_stack_offset] = move_to_stack(kw_defaults);
+	for (const auto &default_ : defaults) { emit<Push>(default_); }
+	for (const auto &default_ : kw_defaults) { emit<Push>(default_); }
 
-	emit<MakeFunction>(dst,
-		name_value->get_register(),
-		defaults_size,
-		defaults_stack_offset,
-		kw_defaults_size,
-		kw_defaults_stack_offset,
-		captures_tuple);
+	const size_t defaults_size = defaults.size();
+	const size_t kw_defaults_size = kw_defaults.size();
+
+	emit<MakeFunction>(
+		dst, name_value->get_register(), defaults_size, kw_defaults_size, captures_tuple);
+
+	for (size_t i = 0; i < defaults_size + kw_defaults_size; ++i) { emit<Pop>(); }
 }
 
 void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
@@ -1425,7 +1361,9 @@ Value *BytecodeGenerator::visit(const Call *node)
 		}
 	}
 
-	return create_return_value();
+	auto return_value = create_value();
+	emit<Move>(return_value->get_register(), create_return_value()->get_register());
+	return return_value;
 }
 
 Value *BytecodeGenerator::visit(const If *node)

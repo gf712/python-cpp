@@ -77,8 +77,6 @@ class Interpreter
 
 	py::PyModule *module() const { return m_module; }
 
-	void unwind();
-
 	void setup(std::shared_ptr<BytecodeProgram> &&program);
 	void setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program);
 

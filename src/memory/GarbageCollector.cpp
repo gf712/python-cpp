@@ -100,7 +100,7 @@ void GarbageCollector::remove_weakref(Heap &heap, uint8_t *obj) const
 
 std::stack<Cell *> MarkSweepGC::collect_roots(const Heap &heap) const
 {
-	if (!m_stack_bottom) { m_stack_bottom = bit_cast<uint8_t *>(heap.start_stack_pointer()); }
+	if (!m_stack_bottom) { m_stack_bottom = bit_cast<uint8_t *>(heap.start_sp()); }
 
 	auto roots = collect_roots_on_the_stack(heap, m_stack_bottom);
 

@@ -9,9 +9,10 @@ PyResult<Value> BuildString::execute(VirtualMachine &vm, Interpreter &) const
 	std::vector<Value> elements;
 	elements.reserve(m_size);
 	if (m_size > 0) {
-		auto *end = vm.stack_pointer() + m_stack_offset + m_size;
-		for (auto *sp = vm.stack_pointer() + m_stack_offset; sp < end; ++sp) {
-			elements.push_back(*sp);
+		auto *start = vm.sp() - m_size;
+		while (start != vm.sp()) {
+			elements.push_back(*start);
+			start = std::next(start);
 		}
 	}
 	std::string result_string;
@@ -33,13 +34,11 @@ PyResult<Value> BuildString::execute(VirtualMachine &vm, Interpreter &) const
 
 std::vector<uint8_t> BuildString::serialize() const
 {
-	ASSERT(m_size < std::numeric_limits<uint8_t>::max())
-	ASSERT(m_stack_offset < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_size < std::numeric_limits<uint8_t>::max());
 
 	return {
 		BUILD_STRING,
 		m_dst,
-		static_cast<uint8_t>(m_size),
-		static_cast<uint8_t>(m_stack_offset),
+		static_cast<uint8_t>(m_size)
 	};
 }

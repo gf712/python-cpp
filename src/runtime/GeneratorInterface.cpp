@@ -121,7 +121,7 @@ template<typename T> void GeneratorInterface<T>::visit_graph(Visitor &visitor)
 			}
 		}
 
-		for (const auto &el : m_stack_frame->locals) {
+		for (const auto &el : m_stack_frame->locals_storage) {
 			if (std::holds_alternative<PyObject *>(el)) {
 				auto *obj = std::get<PyObject *>(el);
 				if (obj) { visitor.visit(*obj); }

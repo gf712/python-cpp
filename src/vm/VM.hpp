@@ -6,6 +6,7 @@
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
 
+#include <span>
 #include <stack>
 
 class VirtualMachine;
@@ -42,7 +43,8 @@ struct StackFrame : NonCopyable
 	}
 
 	Registers registers;
-	Registers locals;
+	std::vector<py::Value> locals_storage; 
+	std::span<py::Value> locals;
 	InstructionVector::const_iterator return_address;
 	InstructionVector::const_iterator last_instruction_pointer;
 	VirtualMachine *vm{ nullptr };
@@ -60,10 +62,13 @@ class VirtualMachine
 	: NonCopyable
 	, NonMoveable
 {
-	std::stack<std::reference_wrapper<StackFrame>> m_stack;
+	std::vector<py::Value> m_stack;
+	std::stack<std::reference_wrapper<StackFrame>> m_stack_frames;
 	std::deque<std::vector<const py::Value *>> m_stack_objects;
 
 	InstructionVector::const_iterator m_instruction_pointer;
+	std::vector<py::Value>::iterator m_stack_pointer;
+	std::vector<py::Value>::const_iterator m_base_pointer;
 	std::unique_ptr<Interpreter> m_interpreter;
 	std::unique_ptr<Heap> m_heap;
 	State *m_state{ nullptr };
@@ -98,43 +103,43 @@ class VirtualMachine
 	py::Value &stack_local(size_t idx)
 	{
 		auto local = stack_locals();
-		ASSERT(local.has_value())
-		ASSERT(idx < local->get().size())
-		return local->get()[idx];
+		ASSERT(!local.empty());
+		ASSERT(idx < local.size());
+		return local[idx];
 	}
 
 	const py::Value &stack_local(size_t idx) const
 	{
 		auto local = stack_locals();
-		ASSERT(local.has_value())
-		ASSERT(idx < local->get().size())
-		return local->get()[idx];
+		ASSERT(!local.empty());
+		ASSERT(idx < local.size());
+		return local[idx];
 	}
 
 	std::optional<std::reference_wrapper<Registers>> registers()
 	{
-		if (!m_stack.empty()) { return m_stack.top().get().registers; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().registers; }
 		return {};
 	}
 	std::optional<std::reference_wrapper<const Registers>> registers() const
 	{
-		if (!m_stack.empty()) { return m_stack.top().get().registers; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().registers; }
 		return {};
 	}
 
-	std::optional<std::reference_wrapper<Registers>> stack_locals()
+	std::span<py::Value> stack_locals()
 	{
-		if (!m_stack.empty()) { return m_stack.top().get().locals; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().locals; }
 		return {};
 	}
 
-	std::optional<std::reference_wrapper<const Registers>> stack_locals() const
+	std::span<py::Value> stack_locals() const
 	{
-		if (!m_stack.empty()) { return m_stack.top().get().locals; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().locals; }
 		return {};
 	}
 
-	const std::stack<std::reference_wrapper<StackFrame>> &stack() const { return m_stack; }
+	const std::stack<std::reference_wrapper<StackFrame>> &stack() const { return m_stack_frames; }
 	const State &state() const { return *m_state; }
 	State &state() { return *m_state; }
 
@@ -148,7 +153,7 @@ class VirtualMachine
 	void set_instruction_pointer(InstructionVector::const_iterator pos)
 	{
 		m_instruction_pointer = pos;
-		m_stack.top().get().last_instruction_pointer = m_instruction_pointer;
+		m_stack_frames.top().get().last_instruction_pointer = m_instruction_pointer;
 	}
 
 	const InstructionVector::const_iterator &instruction_pointer() const
@@ -156,12 +161,8 @@ class VirtualMachine
 		return m_instruction_pointer;
 	}
 
-	const py::Value *stack_pointer() const
-	{
-		ASSERT(!m_stack.empty())
-		ASSERT(!m_stack.top().get().registers.empty())
-		return &m_stack.top().get().registers.front();
-	}
+	const py::Value *sp() const { return &*m_stack_pointer; }
+	const py::Value *bp() const { return &*m_base_pointer; }
 
 	void clear();
 
@@ -169,7 +170,7 @@ class VirtualMachine
 
 	[[nodiscard]] std::unique_ptr<StackFrame> setup_call_stack(size_t register_count,
 		size_t stack_size);
-	int call(const std::unique_ptr<Function> &);
+
 	void ret();
 	void set_cleanup(State::CleanupLogic cleanup_type,
 		InstructionVector::const_iterator exit_instruction);
@@ -180,10 +181,11 @@ class VirtualMachine
 
 	void pop_frame();
 
-	const std::deque<std::vector<const py::Value *>> &stack_objects() const
-	{
-		return m_stack_objects;
-	}
+	void push(py::Value value) { *m_stack_pointer++ = value; }
+
+	py::Value pop() { return *m_stack_pointer--; }
+
+	std::deque<std::vector<const py::Value *>> stack_objects() const;
 
 	py::PyModule *import(py::PyString *path);
 

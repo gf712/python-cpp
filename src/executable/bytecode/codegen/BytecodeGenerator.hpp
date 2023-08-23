@@ -349,8 +349,6 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeNameValue *load_name(const std::string &, size_t);
 
 	BytecodeValue *build_slice(const ast::Subscript::SliceType &);
-
-	std::tuple<size_t, size_t> move_to_stack(const std::vector<Register> &args);
 	BytecodeValue *build_dict(const std::vector<std::optional<Register>> &,
 		const std::vector<Register> &);
 	BytecodeValue *build_dict_simple(const std::vector<std::optional<Register>> &,
@@ -359,6 +357,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeValue *build_tuple(const std::vector<Register> &);
 	BytecodeValue *build_set(const std::vector<Register> &);
 	BytecodeValue *build_string(const std::vector<Register> &);
+	
 	void emit_call(Register func, const std::vector<Register> &);
 	void make_function(Register,
 		const std::string &,

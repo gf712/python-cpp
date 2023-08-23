@@ -190,9 +190,12 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	}
 
 	const size_t total_named_arguments_count = m_arg_count + m_kwonly_arg_count;
-	const size_t total_arguments_count = m_arg_count + m_kwonly_arg_count
+	const size_t total_arguments_count = total_named_arguments_count
 										 + m_flags.is_set(CodeFlags::Flag::VARARGS)
 										 + m_flags.is_set(CodeFlags::Flag::VARKEYWORDS);
+	for (size_t i = 0; i < total_arguments_count; ++i) {
+		VirtualMachine::the().stack_local(i) = nullptr;
+	}
 	const size_t arg_cells_count = std::count_if(m_cell2arg.begin(),
 		m_cell2arg.end(),
 		[total_arguments_count](size_t arg_idx) { return total_arguments_count != arg_idx; });
@@ -329,9 +332,6 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 			const size_t local_index = total_named_arguments_count
 									   + m_flags.is_set(CodeFlags::Flag::VARARGS) - arg_cells_count
 									   - 1;
-			ASSERT(
-				std::holds_alternative<PyObject *>(VirtualMachine::the().stack_local(local_index)));
-			ASSERT(!std::get<PyObject *>(VirtualMachine::the().stack_local(local_index)));
 			VirtualMachine::the().stack_local(local_index) = args_.unwrap();
 		}
 	} else if (args_count < args->size()) {
@@ -376,9 +376,6 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		} else {
 			const size_t local_index =
 				kwargs_index + m_flags.is_set(CodeFlags::Flag::VARKEYWORDS) - arg_cells_count - 1;
-			ASSERT(
-				std::holds_alternative<PyObject *>(VirtualMachine::the().stack_local(local_index)));
-			ASSERT(!std::get<PyObject *>(VirtualMachine::the().stack_local(local_index)));
 			VirtualMachine::the().stack_local(local_index) = remaining_kwargs;
 		}
 	}

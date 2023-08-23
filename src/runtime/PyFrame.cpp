@@ -90,8 +90,6 @@ PyFrame *PyFrame::create(PyFrame *parent,
 	return new_frame;
 }
 
-void PyFrame::set_exception_to_catch(BaseException *exception) { m_exception_to_catch = exception; }
-
 void PyFrame::push_exception(BaseException *exception)
 {
 	ASSERT(exception)
@@ -115,14 +113,6 @@ BaseException *PyFrame::pop_exception()
 	spdlog::debug(
 		"PyFrame::pop_exception: cleared exception, {} exceptions left", m_exception_stack->size());
 	return exception;
-}
-
-bool PyFrame::catch_exception(PyObject *exception) const
-{
-	if (m_exception_to_catch)
-		return exception->type()->issubclass(m_exception_to_catch->type());
-	else
-		return false;
 }
 
 PyResult<std::monostate> PyFrame::put_local(const std::string &name, const Value &value)
@@ -165,8 +155,8 @@ PyObject *PyFrame::locals() const
 	};
 	const auto &fast_locals = VirtualMachine::the().stack_locals();
 	for (size_t i = 0; const auto &varname : m_f_code->m_varnames) {
-		ASSERT(fast_locals.has_value());
-		const auto &value = fast_locals.value().get()[i++];
+		ASSERT(i < fast_locals.size());
+		const auto &value = fast_locals[i++];
 		if (std::holds_alternative<PyObject *>(value) && !std::get<PyObject *>(value)) {
 			remove(String{ varname });
 		} else {
@@ -235,7 +225,6 @@ void PyFrame::visit_graph(Visitor &visitor)
 	if (m_globals) visitor.visit(*m_globals);
 	if (m_builtins) visitor.visit(*m_builtins);
 	if (m_f_code) visitor.visit(*m_f_code);
-	if (m_exception_to_catch) visitor.visit(*m_exception_to_catch);
 	for (const auto &exception_stack_item : *m_exception_stack) {
 		if (exception_stack_item.exception) { visitor.visit(*exception_stack_item.exception); }
 		if (exception_stack_item.exception_type) {

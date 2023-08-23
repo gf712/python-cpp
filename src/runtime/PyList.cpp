@@ -40,7 +40,17 @@ PyList::PyList(std::vector<Value> elements) : PyList() { m_elements = std::move(
 
 PyResult<PyList *> PyList::create(std::vector<Value> elements)
 {
-	auto *result = VirtualMachine::the().heap().allocate<PyList>(elements);
+	auto *result = VirtualMachine::the().heap().allocate<PyList>(std::move(elements));
+	if (!result) { return Err(memory_error(sizeof(PyList))); }
+	return Ok(result);
+}
+
+PyResult<PyList *> PyList::create(std::span<const Value> s)
+{
+	std::vector<Value> elements{ s.size(), nullptr };
+	for (size_t idx = 0; auto el : s) { elements[idx++] = el; }
+
+	auto *result = VirtualMachine::the().heap().allocate<PyList>(std::move(elements));
 	if (!result) { return Err(memory_error(sizeof(PyList))); }
 	return Ok(result);
 }

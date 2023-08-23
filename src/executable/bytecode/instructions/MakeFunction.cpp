@@ -13,20 +13,18 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 {
 	std::vector<Value> default_values;
 	default_values.reserve(m_defaults_size);
-	if (m_defaults_size > 0) {
-		auto *end = vm.stack_pointer() + m_defaults_stack_offset + m_defaults_size;
-		for (auto *sp = vm.stack_pointer() + m_defaults_stack_offset; sp < end; ++sp) {
-			default_values.push_back(*sp);
-		}
+	auto *start = vm.sp() - m_defaults_size - m_kw_defaults_size;
+	while (start != (vm.sp()- m_kw_defaults_size)) {
+		default_values.push_back(*start);
+		start = std::next(start);
 	}
 
 	std::vector<Value> kw_default_values;
 	kw_default_values.reserve(m_kw_defaults_size);
-	if (m_kw_defaults_size > 0) {
-		auto *end = vm.stack_pointer() + m_kw_defaults_stack_offset + m_kw_defaults_size;
-		for (auto *sp = vm.stack_pointer() + m_kw_defaults_stack_offset; sp < end; ++sp) {
-			kw_default_values.push_back(*sp);
-		}
+	start = vm.sp() - m_kw_defaults_size;
+	while (start != vm.sp()) {
+		kw_default_values.push_back(*start);
+		start = std::next(start);
 	}
 
 	auto closure = [&]() -> PyResult<PyTuple *> {
@@ -58,18 +56,14 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 std::vector<uint8_t> MakeFunction::serialize() const
 {
 	ASSERT(m_defaults_size < std::numeric_limits<uint8_t>::max());
-	ASSERT(m_defaults_stack_offset < std::numeric_limits<uint8_t>::max());
 	ASSERT(m_kw_defaults_size < std::numeric_limits<uint8_t>::max());
-	ASSERT(m_kw_defaults_stack_offset < std::numeric_limits<uint8_t>::max());
 
 	return {
 		MAKE_FUNCTION,
 		m_dst,
 		m_name,
 		static_cast<uint8_t>(m_defaults_size),
-		static_cast<uint8_t>(m_defaults_stack_offset),
 		static_cast<uint8_t>(m_kw_defaults_size),
-		static_cast<uint8_t>(m_kw_defaults_stack_offset),
 		static_cast<uint8_t>(m_captures_tuple.has_value()),
 		m_captures_tuple.value_or(0),
 	};

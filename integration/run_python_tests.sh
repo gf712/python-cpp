@@ -27,7 +27,6 @@ for file in $(find $SCRIPT_DIR/tests/ -maxdepth 1 -type f -name "*.py"); do
     else
         echo $file "... FAILED! (${result})"
         exit_code=1
-        exit 1
     fi
 done
 

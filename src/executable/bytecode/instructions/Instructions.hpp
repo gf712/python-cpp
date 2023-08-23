@@ -88,5 +88,7 @@ static constexpr uint8_t IMPORT_STAR = 70;
 static constexpr uint8_t GET_AWAITABLE = 71;
 static constexpr uint8_t BUILD_STRING = 72;
 static constexpr uint8_t FORMAT_VALUE = 73;
+static constexpr uint8_t PUSH = 74;
+static constexpr uint8_t POP = 75;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

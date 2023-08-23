@@ -356,7 +356,7 @@ class Heap
 
 	void set_start_stack_pointer(uintptr_t *address) { m_bottom_stack_pointer = address; }
 
-	uintptr_t *start_stack_pointer() const { return m_bottom_stack_pointer; }
+	uintptr_t *start_sp() const { return m_bottom_stack_pointer; }
 
 	template<typename T, typename... Args> T *__attribute__((noinline)) allocate(Args &&...args)
 	{

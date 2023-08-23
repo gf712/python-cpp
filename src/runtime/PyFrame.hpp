@@ -47,7 +47,6 @@ class PyFrame : public PyBaseObject
 	const std::vector<std::string> m_names;
 	const PyTuple *m_consts;
 	std::vector<PyCell *> m_freevars;
-	BaseException *m_exception_to_catch{ nullptr };
 	std::shared_ptr<std::vector<ExceptionStackItem>> m_exception_stack;
 
   public:
@@ -74,10 +73,6 @@ class PyFrame : public PyBaseObject
 		if (m_exception_stack->empty()) return {};
 		return m_exception_stack->back();
 	}
-
-	bool catch_exception(PyObject *) const;
-
-	void set_exception_to_catch(BaseException *exception);
 
 	PyFrame *exit();
 

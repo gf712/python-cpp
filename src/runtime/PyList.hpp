@@ -14,6 +14,7 @@ class PyList : public PyBaseObject
 
   public:
 	static PyResult<PyList *> create(std::vector<Value> elements);
+	static PyResult<PyList *> create(std::span<const Value> elements);
 	static PyResult<PyList *> create();
 
 	std::string to_string() const override;

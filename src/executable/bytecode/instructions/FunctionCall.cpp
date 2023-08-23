@@ -15,10 +15,8 @@ PyResult<Value> FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 	std::vector<Value> args;
 	args.reserve(m_size);
 	if (m_size > 0) {
-		auto *end = vm.stack_pointer() + m_stack_offset + m_size;
-		for (auto *sp = vm.stack_pointer() + m_stack_offset; sp < end; ++sp) {
-			args.push_back(*sp);
-		}
+		auto *el = vm.sp() - m_size;
+		for (; el < vm.sp(); ++el) { args.push_back(*el); }
 	}
 
 	auto args_tuple = PyTuple::create(args);

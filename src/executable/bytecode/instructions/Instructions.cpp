@@ -46,6 +46,8 @@
 #include "MakeFunction.hpp"
 #include "MethodCall.hpp"
 #include "Move.hpp"
+#include "Pop.hpp"
+#include "Push.hpp"
 #include "RaiseVarargs.hpp"
 #include "ReRaise.hpp"
 #include "ReturnValue.hpp"
@@ -102,9 +104,7 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto name = deserialize<uint8_t>(instruction_buffer);
 		const auto default_size = deserialize<uint8_t>(instruction_buffer);
-		const auto default_stack_offset = deserialize<uint8_t>(instruction_buffer);
 		const auto kw_default_size = deserialize<uint8_t>(instruction_buffer);
-		const auto kw_default_stack_offset = deserialize<uint8_t>(instruction_buffer);
 		const auto has_captures_tuple = deserialize<uint8_t>(instruction_buffer);
 		const auto captures_tuple = [&]() -> std::optional<Register> {
 			const auto value = deserialize<uint8_t>(instruction_buffer);
@@ -114,13 +114,8 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 				return std::nullopt;
 			}
 		}();
-		return std::make_unique<MakeFunction>(dst,
-			name,
-			default_size,
-			default_stack_offset,
-			kw_default_size,
-			kw_default_stack_offset,
-			captures_tuple);
+		return std::make_unique<MakeFunction>(
+			dst, name, default_size, kw_default_size, captures_tuple);
 	} break;
 	case STORE_NAME: {
 		const auto src = deserialize<uint8_t>(instruction_buffer);
@@ -250,8 +245,7 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case BUILD_DICT: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
-		const auto offset = deserialize<uint8_t>(instruction_buffer);
-		return std::make_unique<BuildDict>(dst, size, offset);
+		return std::make_unique<BuildDict>(dst, size);
 	}
 	case BUILD_SLICE: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
@@ -299,14 +293,12 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case BUILD_TUPLE: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
-		const auto offset = deserialize<uint8_t>(instruction_buffer);
-		return std::make_unique<BuildTuple>(dst, size, offset);
+		return std::make_unique<BuildTuple>(dst, size);
 	}
 	case BUILD_LIST: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
-		const auto offset = deserialize<uint8_t>(instruction_buffer);
-		return std::make_unique<BuildList>(dst, size, offset);
+		return std::make_unique<BuildList>(dst, size);
 	}
 	case SETUP_EXCEPTION_HANDLING: {
 		const auto offset = deserialize<uint32_t>(instruction_buffer);
@@ -423,8 +415,7 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case BUILD_SET: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
-		const auto offset = deserialize<uint8_t>(instruction_buffer);
-		return std::make_unique<BuildSet>(dst, size, offset);
+		return std::make_unique<BuildSet>(dst, size);
 	}
 	case STORE_DEREF: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
@@ -438,14 +429,20 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case BUILD_STRING: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
-		const auto stack_size = deserialize<uint8_t>(instruction_buffer);
-		return std::make_unique<BuildString>(dst, size, stack_size);
+		return std::make_unique<BuildString>(dst, size);
 	}
 	case FORMAT_VALUE: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		const auto conversion = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<FormatValue>(dst, src, conversion);
+	}
+	case PUSH: {
+		const auto src = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<Push>(src);
+	}
+	case POP: {
+		return std::make_unique<Pop>();
 	}
 	}
 	spdlog::error("Missing opcode: {}", instruction_code);

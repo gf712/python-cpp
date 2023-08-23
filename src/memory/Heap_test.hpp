@@ -15,7 +15,7 @@ struct TestHeap : ::testing::Test
 		if (!m_start_stack_pointer) {
 			// VirtualMachine is initialized in PythonVMEnvironment (testing/main.cpp)
 			// which knows the address of the initial stack
-			m_start_stack_pointer = VirtualMachine::the().heap().start_stack_pointer();
+			m_start_stack_pointer = VirtualMachine::the().heap().start_sp();
 		}
 		m_heap = Heap::create();
 		m_heap->set_start_stack_pointer(m_start_stack_pointer);

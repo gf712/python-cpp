@@ -218,24 +218,6 @@ void Interpreter::raise_exception(py::BaseException *exception)
 	m_current_frame->push_exception(exception);
 }
 
-
-void Interpreter::unwind()
-{
-	ASSERT(m_current_frame->exception_info().has_value())
-	auto *raised_exception = m_current_frame->exception_info()->exception;
-	while (!m_current_frame->catch_exception(raised_exception)) {
-		// don't unwind beyond the main frame
-		if (!m_current_frame->parent()) {
-			// uncaught exception
-			std::cout << static_cast<const BaseException *>(raised_exception)->format_traceback()
-					  << '\n';
-			break;
-		}
-		m_current_frame = m_current_frame->exit();
-	}
-	m_current_frame->pop_exception();
-}
-
 PyModule *Interpreter::get_imported_module(PyString *name) const
 {
 	if (auto it = m_modules->map().find(name); it != m_modules->map().end()) {
@@ -257,7 +239,7 @@ std::unique_ptr<StackFrame> ScopedStack::release()
 	ASSERT(top_frame);
 	auto &vm = VirtualMachine::the();
 	vm.pop_frame();
-	return std::move(top_frame);
+	return StackFrame::create(top_frame->clone());
 }
 
 ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,

@@ -60,6 +60,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/MakeFunction.cpp
     executable/bytecode/instructions/MethodCall.cpp
     executable/bytecode/instructions/Move.cpp
+    executable/bytecode/instructions/Pop.cpp
+    executable/bytecode/instructions/Push.cpp
     executable/bytecode/instructions/RaiseVarargs.cpp
     executable/bytecode/instructions/ReRaise.cpp
     executable/bytecode/instructions/ReturnValue.cpp
