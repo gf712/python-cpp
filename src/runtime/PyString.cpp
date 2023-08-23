@@ -1068,25 +1068,30 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	std::string new_value;
 	new_value.reserve(static_cast<size_t>(static_cast<double>(m_value.size()) * 1.5));
 
-	if (auto tuple = as<PyTuple>(values)) {
-		if (tuple->size() != conversions.size()) {
-			return Err(type_error("not enough arguments for format string"));
-		}
-		size_t start = 0;
-		for (size_t index = 0; const auto &el : tuple->elements()) {
-			const size_t end = conversions[index].start;
-			ASSERT(end >= start);
-			new_value.append(m_value.substr(start, end - start));
-			auto obj_ = PyObject::from(el);
-			if (obj_.is_err()) { return Err(obj_.unwrap_err()); }
-			const auto conversion = conversions[index].apply(obj_.unwrap());
-			if (conversion.is_err()) { return Err(conversion.unwrap_err()); }
-			new_value.append(conversion.unwrap());
-			start = conversions[index].end;
-			index++;
-		}
-		new_value.append(m_value.substr(start));
+	if (!as<PyTuple>(values)) {
+		auto values_ = PyTuple::create(const_cast<PyObject *>(values));
+		if (values_.is_err()) { return Err(values_.unwrap_err()); }
+		values = values_.unwrap();
 	}
+
+	auto tuple = as<PyTuple>(values);
+	if (tuple->size() != conversions.size()) {
+		return Err(type_error("not enough arguments for format string"));
+	}
+	size_t start = 0;
+	for (size_t index = 0; const auto &el : tuple->elements()) {
+		const size_t end = conversions[index].start;
+		ASSERT(end >= start);
+		new_value.append(m_value.substr(start, end - start));
+		auto obj_ = PyObject::from(el);
+		if (obj_.is_err()) { return Err(obj_.unwrap_err()); }
+		const auto conversion = conversions[index].apply(obj_.unwrap());
+		if (conversion.is_err()) { return Err(conversion.unwrap_err()); }
+		new_value.append(conversion.unwrap());
+		start = conversions[index].end;
+		index++;
+	}
+	new_value.append(m_value.substr(start));
 	new_value.shrink_to_fit();
 	return PyString::create(new_value);
 }
