@@ -101,6 +101,28 @@ template<typename T> auto to_object(T &&value)
 	}
 }
 
+template<typename SlotFunctionType, typename ResultType = typename SlotFunctionType::result_type>
+ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+	PyObject *self,
+	PyTuple *args,
+	PyDict *kwargs)
+	requires std::is_same_v<typename ResultType::OkType, PyObject *>
+{
+	if (std::holds_alternative<SlotFunctionType>(slot)) {
+		return std::get<SlotFunctionType>(slot)(self, args, kwargs);
+	} else if (std::holds_alternative<PyObject *>(slot)) {
+		std::vector<Value> args_;
+		args_.reserve(args->size() + 1);
+		args_.push_back(self);
+		args_.insert(args_.end(), args->elements().begin(), args->elements().end());
+		return PyTuple::create(args_).and_then([&slot, kwargs](PyTuple *args) -> ResultType {
+			return std::get<PyObject *>(slot)->call(args, kwargs);
+		});
+	} else {
+		TODO();
+	}
+}
+
 template<typename SlotFunctionType,
 	typename ResultType = typename SlotFunctionType::result_type,
 	typename... Args>
