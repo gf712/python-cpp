@@ -375,16 +375,7 @@ PyObject::PyObject(const TypePrototype &type) : Cell(), m_type(type) {}
 
 PyObject::PyObject(PyType *type) : Cell(), m_type(type) { ASSERT(type); }
 
-const TypePrototype &PyObject::type_prototype() const
-{
-	if (std::holds_alternative<std::reference_wrapper<const TypePrototype>>(m_type)) {
-		return std::get<std::reference_wrapper<const TypePrototype>>(m_type).get();
-	} else {
-		auto *type = std::get<PyType *>(m_type);
-		ASSERT(type);
-		return type->underlying_type();
-	}
-}
+const TypePrototype &PyObject::type_prototype() const { return type()->underlying_type(); }
 
 void PyObject::visit_graph(Visitor &visitor)
 {
