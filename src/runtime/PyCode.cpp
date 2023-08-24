@@ -193,12 +193,29 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	const size_t total_arguments_count = total_named_arguments_count
 										 + m_flags.is_set(CodeFlags::Flag::VARARGS)
 										 + m_flags.is_set(CodeFlags::Flag::VARKEYWORDS);
-	for (size_t i = 0; i < total_arguments_count; ++i) {
-		VirtualMachine::the().stack_local(i) = nullptr;
-	}
 	const size_t arg_cells_count = std::count_if(m_cell2arg.begin(),
 		m_cell2arg.end(),
 		[total_arguments_count](size_t arg_idx) { return total_arguments_count != arg_idx; });
+
+	ASSERT(total_arguments_count >= arg_cells_count);
+	for (size_t i = 0; i < total_arguments_count - arg_cells_count; ++i) {
+		VirtualMachine::the().stack_local(i) = nullptr;
+	}
+	// keeps track of the offset of the arg given that the Cell objects are not put on the stack
+	std::vector<size_t> arg_stack_offset(total_arguments_count, 0);
+	for (size_t i = 0; i < total_arguments_count; ++i) {
+		const bool arg_is_cell =
+			std::find(m_cell2arg.begin(), m_cell2arg.end(), i) == m_cell2arg.end();
+		if (arg_is_cell) {
+			if (i > 0) { arg_stack_offset[i] = arg_stack_offset[i - 1]; }
+		} else {
+			if (i > 0) {
+				arg_stack_offset[i] = arg_stack_offset[i - 1] + 1;
+			} else {
+				arg_stack_offset[i]++;
+			}
+		}
+	}
 
 	std::vector<std::string> positional_args{ m_varnames.begin(),
 		m_varnames.begin() + m_arg_count };
@@ -215,9 +232,8 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), idx);
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-				auto cell = PyCell::create(obj);
-				if (cell.is_err()) return cell;
-				function_frame->freevars()[free_var_idx] = cell.unwrap();
+				ASSERT(function_frame->freevars()[free_var_idx]);
+				function_frame->freevars()[free_var_idx]->set_cell(obj);
 			} else {
 				VirtualMachine::the().stack_local(stack_local_index++) = obj;
 			}
@@ -250,16 +266,15 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 			if (auto it = std::find(m_cell2arg.begin(), m_cell2arg.end(), kwargs_count);
 				it != m_cell2arg.end()) {
 				const auto free_var_idx = std::distance(m_cell2arg.begin(), it);
-				auto cell = PyCell::create(value);
-				if (cell.is_err()) return cell;
-				function_frame->freevars()[free_var_idx] = cell.unwrap();
+				ASSERT(function_frame->freevars()[free_var_idx]);
+				function_frame->freevars()[free_var_idx]->set_cell(value);
 			}
 			arg = value;
 			kwargs_count++;
 		}
 	}
 
-	{
+	if (m_arg_count > 0 && !defaults.empty()) {
 		auto default_iter = defaults.rbegin();
 		int64_t i = m_arg_count - 1;
 		while (default_iter != defaults.rend()) {
@@ -274,16 +289,17 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 					cell->set_cell(*default_iter);
 				}
 			} else {
-				auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
+				const size_t index = i - arg_stack_offset[i];
+				const auto &arg = VirtualMachine::the().stack_local(index);
 				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-					VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *default_iter;
+					VirtualMachine::the().stack_local(index) = *default_iter;
 				}
 			}
 			default_iter = std::next(default_iter);
 			i--;
 		}
 	}
-	{
+	if (m_kwonly_arg_count + m_arg_count > 0 && !kw_defaults.empty()) {
 		auto kw_default_iter = kw_defaults.rbegin();
 		int64_t i = m_kwonly_arg_count + m_arg_count - 1;
 		while (kw_default_iter != kw_defaults.rend()) {
@@ -298,9 +314,10 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 					cell->set_cell(*kw_default_iter);
 				}
 			} else {
-				auto &arg = VirtualMachine::the().stack_local(static_cast<size_t>(i));
+				const size_t index = i - arg_stack_offset[i];
+				const auto &arg = VirtualMachine::the().stack_local(index);
 				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-					VirtualMachine::the().stack_local(static_cast<size_t>(i)) = *kw_default_iter;
+					VirtualMachine::the().stack_local(index) = *kw_default_iter;
 				}
 			}
 			kw_default_iter = std::next(kw_default_iter);
