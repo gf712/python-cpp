@@ -1068,13 +1068,13 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	std::string new_value;
 	new_value.reserve(static_cast<size_t>(static_cast<double>(m_value.size()) * 1.5));
 
-	if (!as<PyTuple>(values)) {
+	if (!values->type()->issubclass(tuple())) {
 		auto values_ = PyTuple::create(const_cast<PyObject *>(values));
 		if (values_.is_err()) { return Err(values_.unwrap_err()); }
 		values = values_.unwrap();
 	}
 
-	auto tuple = as<PyTuple>(values);
+	const auto *tuple = static_cast<const PyTuple*>(values);
 	if (tuple->size() != conversions.size()) {
 		return Err(type_error("not enough arguments for format string"));
 	}
