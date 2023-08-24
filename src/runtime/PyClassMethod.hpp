@@ -8,8 +8,10 @@ class PyClassMethod : public PyBaseObject
 {
 	friend class ::Heap;
 
+  public:
 	PyObject *m_callable;
 
+  private:
 	PyClassMethod(PyType *);
 	PyClassMethod();
 

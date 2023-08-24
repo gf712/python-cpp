@@ -88,7 +88,9 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_classmethod()
 	{
-		return std::move(klass<PyClassMethod>("classmethod").type);
+		return std::move(klass<PyClassMethod>("classmethod")
+							 .attribute_readonly("__func__", &PyClassMethod::m_callable)
+							 .type);
 	}
 }// namespace
 
