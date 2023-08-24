@@ -15,22 +15,59 @@ using namespace py;
 PyResult<PyObject *> PyProperty::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == property())
-	ASSERT(!kwargs || kwargs->map().empty())
 
 	auto fget = [&]() -> PyResult<PyObject *> {
-		if (args) {
-			ASSERT(args->size() == 1)
+		if (args && args->size() >= 1) {
 			return PyObject::from(args->elements()[0]);
+		} else if (kwargs) {
+			if (auto it = kwargs->map().find(String{ "fget" }); it != kwargs->map().end()) {
+				return PyObject::from(it->second);
+			}
 		}
 		return Ok(py_none());
 	}();
-
 	if (fget.is_err()) { return fget; }
 
-	return PyProperty::create(fget.unwrap(), py_none(), py_none(), py_none());
+	auto fset = [&]() -> PyResult<PyObject *> {
+		if (args && args->size() >= 2) {
+			return PyObject::from(args->elements()[1]);
+		} else if (kwargs) {
+			if (auto it = kwargs->map().find(String{ "fset" }); it != kwargs->map().end()) {
+				return PyObject::from(it->second);
+			}
+		}
+		return Ok(py_none());
+	}();
+	if (fset.is_err()) { return fset; }
+
+	auto fdel = [&]() -> PyResult<PyObject *> {
+		if (args && args->size() >= 3) {
+			return PyObject::from(args->elements()[1]);
+		} else if (kwargs) {
+			if (auto it = kwargs->map().find(String{ "fdel" }); it != kwargs->map().end()) {
+				return PyObject::from(it->second);
+			}
+		}
+		return Ok(py_none());
+	}();
+	if (fdel.is_err()) { return fdel; }
+
+	auto doc = [&]() -> PyResult<PyObject *> {
+		if (args && args->size() >= 3) {
+			return PyObject::from(args->elements()[1]);
+		} else if (kwargs) {
+			if (auto it = kwargs->map().find(String{ "doc" }); it != kwargs->map().end()) {
+				return PyObject::from(it->second);
+			}
+		}
+		return Ok(py_none());
+	}();
+	if (doc.is_err()) { return doc; }
+
+	return PyProperty::create(fget.unwrap(), fset.unwrap(), fdel.unwrap(), doc.unwrap());
 }
 
-PyProperty::PyProperty(PyType* type): PyBaseObject(type) {}
+PyProperty::PyProperty(PyType *type) : PyBaseObject(type) {}
 
 PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
 	: PyBaseObject(BuiltinTypes::the().property()), m_getter(fget), m_setter(fset), m_deleter(fdel),
