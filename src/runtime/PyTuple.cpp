@@ -139,11 +139,12 @@ PyResult<PyObject *> PyTuple::__new__(const PyType *type, PyTuple *args, PyDict 
 		"tuple",
 		std::integral_constant<size_t, 0>{},
 		std::integral_constant<size_t, 1>{},
-		nullptr /* iterrable */);
+		nullptr /* iterable */);
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [iterable] = result.unwrap();
+	if (!iterable) { return PyTuple::create(); }
 
 	auto iterator_ = iterable->iter();
 	if (iterator_.is_err()) { return iterator_; }

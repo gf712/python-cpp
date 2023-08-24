@@ -62,6 +62,44 @@ PyResult<PyList *> PyList::create()
 	return Ok(result);
 }
 
+PyResult<PyObject *> PyList::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	if (!type->issubclass(list())) {
+		return Err(type_error(
+			"list.__new__({}): {} is not a subtype of list", type->name(), type->name()));
+	}
+
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"list",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr /* iterable */);
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+
+	auto [iterable] = result.unwrap();
+	if (!iterable) { return PyList::create(); }
+
+	auto iterator_ = iterable->iter();
+	if (iterator_.is_err()) { return iterator_; }
+	auto iterator = iterator_.unwrap();
+
+	auto els_ = PyList::create();
+	if (els_.is_err()) { return Err(els_.unwrap_err()); }
+	auto els = els_.unwrap();
+
+	auto value = iterator->next();
+	while (value.is_ok()) {
+		els->elements().push_back(value.unwrap());
+		value = iterator->next();
+	}
+
+	if (!value.unwrap_err()->type()->issubclass(stop_iteration()->type())) { return value; }
+
+	return Ok(els);
+}
+
 PyResult<PyObject *> PyList::append(PyObject *element)
 {
 	m_elements.push_back(element);
