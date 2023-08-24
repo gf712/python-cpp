@@ -18,15 +18,20 @@ class PyTuple
 
 	PyTuple();
 	PyTuple(std::vector<Value> &&elements);
+	PyTuple(PyType *, const std::vector<Value> elements);
 	PyTuple(const std::vector<PyObject *> &elements);
+	PyTuple(PyType *, const std::vector<PyObject *> &elements);
 
 	void visit_graph(Visitor &) override;
 
   public:
 	static PyResult<PyTuple *> create();
 	static PyResult<PyTuple *> create(std::vector<Value> &&elements);
+	static PyResult<PyTuple *> create(PyType *type, std::vector<Value> elements);
 	static PyResult<PyTuple *> create(std::vector<PyObject *> &&elements);
 	static PyResult<PyTuple *> create(const std::vector<PyObject *> &elements);
+	static PyResult<PyTuple *> create(PyType *type, const std::vector<PyObject *> &elements);
+
 	template<typename... Args> static PyResult<PyTuple *> create(Args &&...args)
 	{
 		return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... });

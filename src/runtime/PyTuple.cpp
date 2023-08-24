@@ -52,6 +52,15 @@ namespace {
 
 PyTuple::PyTuple(PyType *type) : PyBaseObject(type) {}
 
+PyTuple::PyTuple(PyType *type, std::vector<Value> elements)
+	: PyBaseObject(type), m_elements(std::move(elements))
+{
+	ASSERT(std::all_of(m_elements.begin(), m_elements.end(), [](const auto &el) {
+		if (std::holds_alternative<PyObject *>(el)) return std::get<PyObject *>(el) != nullptr;
+		return true;
+	}));
+}
+
 PyTuple::PyTuple(std::vector<Value> &&elements)
 	: PyBaseObject(BuiltinTypes::the().tuple()), m_elements(std::move(elements))
 {
@@ -65,6 +74,10 @@ PyTuple::PyTuple() : PyTuple(std::vector<Value>{}) {}
 
 PyTuple::PyTuple(const std::vector<PyObject *> &elements) : PyTuple(make_value_vector(elements)) {}
 
+PyTuple::PyTuple(PyType *type, const std::vector<PyObject *> &elements)
+	: PyTuple(type, make_value_vector(elements))
+{}
+
 PyResult<PyTuple *> PyTuple::create()
 {
 	auto &heap = VirtualMachine::the().heap();
@@ -76,6 +89,20 @@ PyResult<PyTuple *> PyTuple::create(std::vector<Value> &&elements)
 {
 	auto &heap = VirtualMachine::the().heap();
 	if (auto *obj = heap.allocate<PyTuple>(std::move(elements))) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
+}
+
+PyResult<PyTuple *> PyTuple::create(PyType *type, std::vector<Value> elements)
+{
+	auto &heap = VirtualMachine::the().heap();
+	if (auto *obj = heap.allocate<PyTuple>(type, std::move(elements))) { return Ok(obj); }
+	return Err(memory_error(sizeof(PyTuple)));
+}
+
+PyResult<PyTuple *> PyTuple::create(PyType *type, const std::vector<PyObject *> &elements)
+{
+	auto &heap = VirtualMachine::the().heap();
+	if (auto *obj = heap.allocate<PyTuple>(type, elements)) { return Ok(obj); }
 	return Err(memory_error(sizeof(PyTuple)));
 }
 
@@ -144,13 +171,16 @@ PyResult<PyObject *> PyTuple::__new__(const PyType *type, PyTuple *args, PyDict 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [iterable] = result.unwrap();
-	if (!iterable) { return PyTuple::create(); }
+	if (!iterable) {
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<PyTuple>(const_cast<PyType *>(type))) { return Ok(obj); }
+		return Err(memory_error(sizeof(PyTuple)));
+	}
 
 	auto iterator_ = iterable->iter();
 	if (iterator_.is_err()) { return iterator_; }
 	auto iterator = iterator_.unwrap();
 
-	ASSERT(type == tuple());
 	auto els_ = PyList::create();
 	if (els_.is_err()) { return Err(els_.unwrap_err()); }
 	auto els = els_.unwrap();
@@ -163,7 +193,7 @@ PyResult<PyObject *> PyTuple::__new__(const PyType *type, PyTuple *args, PyDict 
 
 	if (!value.unwrap_err()->type()->issubclass(stop_iteration()->type())) { return value; }
 
-	return PyTuple::create(els->elements());
+	return PyTuple::create(const_cast<PyType *>(type), els->elements());
 }
 
 PyResult<PyObject *> PyTuple::__repr__() const { return PyString::create(to_string()); }
