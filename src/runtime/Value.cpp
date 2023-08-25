@@ -341,6 +341,15 @@ String String::from_unescaped_string(const std::string &str)
 		case 'x': {
 			TODO();
 		} break;
+		case 'u': {
+			TODO();
+		} break;
+		case 'U': {
+			TODO();
+		} break;
+		case 'N': {
+			TODO();
+		} break;
 		default: {
 			output.push_back('\\');
 			output.push_back(static_cast<unsigned char>(*(it - 1)));
@@ -439,12 +448,13 @@ Bytes Bytes::from_unescaped_string(const std::string &str)
 			TODO();
 		} break;
 		default: {
-			TODO();
+			bytes.push_back(std::byte{'\\'});
+			--it;
 		} break;
 		}
 	}
 
-	return Bytes{ bytes };
+	return Bytes{ std::move(bytes) };
 }
 
 
