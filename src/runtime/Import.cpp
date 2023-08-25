@@ -151,11 +151,13 @@ namespace {
 			if (initializing.unwrap()) {
 				auto _lock_unlock_module = PyString::create("_lock_unlock_module");
 				if (_lock_unlock_module.is_err()) return Err(_lock_unlock_module.unwrap_err());
-				auto args = PyTuple::create(_lock_unlock_module.unwrap(), name);
+				auto args = PyTuple::create(name);
 				if (args.is_err()) return Err(args.unwrap_err());
 				auto *importlib = VirtualMachine::the().interpreter().importlib();
 				if (!importlib) { return Err(import_error("importlib not imported")); }
-				value = importlib->call(args.unwrap(), nullptr);
+				value = importlib->get_method(_lock_unlock_module.unwrap()).and_then([args](PyObject* lock_unlock_module) {
+					return lock_unlock_module->call(args.unwrap(), nullptr);
+				});
 				if (value.is_err()) return Err(value.unwrap_err());
 				return Ok(std::monostate{});
 			}
