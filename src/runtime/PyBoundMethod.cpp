@@ -5,12 +5,12 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 PyBoundMethod::PyBoundMethod(PyType *type) : PyBaseObject(type) {}
 
 PyBoundMethod::PyBoundMethod(PyObject *self, PyFunction *method)
-	: PyBaseObject(BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
+	: PyBaseObject(types::BuiltinTypes::the().bound_method()), m_self(self), m_method(method)
 {}
 
 PyResult<PyBoundMethod *> PyBoundMethod::create(PyObject *self, PyFunction *method)
@@ -51,35 +51,37 @@ PyResult<PyObject *> PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
 	return m_method->call(args_.unwrap(), kwargs);
 }
 
-PyType *PyBoundMethod::static_type() const { return bound_method(); }
+PyType *PyBoundMethod::static_type() const { return types::bound_method(); }
 
 namespace {
 
-std::once_flag bound_method_flag;
+	std::once_flag bound_method_flag;
 
-std::unique_ptr<TypePrototype> register_bound_method()
-{
-	return std::move(klass<PyBoundMethod>("bound_method").type);
-}
+	std::unique_ptr<TypePrototype> register_bound_method()
+	{
+		return std::move(klass<PyBoundMethod>("bound_method").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyBoundMethod::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(bound_method_flag, []() { type = ::register_bound_method(); });
+		std::call_once(bound_method_flag, []() { type = register_bound_method(); });
 		return std::move(type);
 	};
 }
 
-template<> PyBoundMethod *py::as(PyObject *node)
+template<> PyBoundMethod *as(PyObject *node)
 {
-	if (node->type() == bound_method()) { return static_cast<PyBoundMethod *>(node); }
+	if (node->type() == types::bound_method()) { return static_cast<PyBoundMethod *>(node); }
 	return nullptr;
 }
 
-template<> const PyBoundMethod *py::as(const PyObject *node)
+template<> const PyBoundMethod *as(const PyObject *node)
 {
-	if (node->type() == bound_method()) { return static_cast<const PyBoundMethod *>(node); }
+	if (node->type() == types::bound_method()) { return static_cast<const PyBoundMethod *>(node); }
 	return nullptr;
 }
+
+}// namespace py

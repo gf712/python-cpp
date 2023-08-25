@@ -12,13 +12,13 @@ namespace py {
 
 template<> PyMemberDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == member_descriptor()) { return static_cast<PyMemberDescriptor *>(obj); }
+	if (obj->type() == types::member_descriptor()) { return static_cast<PyMemberDescriptor *>(obj); }
 	return nullptr;
 }
 
 template<> const PyMemberDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == member_descriptor()) { return static_cast<const PyMemberDescriptor *>(obj); }
+	if (obj->type() == types::member_descriptor()) { return static_cast<const PyMemberDescriptor *>(obj); }
 	return nullptr;
 }
 
@@ -28,7 +28,7 @@ PyMemberDescriptor::PyMemberDescriptor(PyString *name,
 	PyType *underlying_type,
 	std::function<PyResult<PyObject *>(PyObject *)> member,
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *)> setter)
-	: PyBaseObject(BuiltinTypes::the().member_descriptor()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().member_descriptor()), m_name(std::move(name)),
 	  m_underlying_type(underlying_type), m_member_accessor(std::move(member)),
 	  m_member_setter(std::move(setter))
 {}
@@ -88,7 +88,7 @@ PyResult<std::monostate> PyMemberDescriptor::__set__(PyObject *obj, PyObject *va
 }
 
 
-PyType *PyMemberDescriptor::static_type() const { return member_descriptor(); }
+PyType *PyMemberDescriptor::static_type() const { return types::member_descriptor(); }
 
 namespace {
 

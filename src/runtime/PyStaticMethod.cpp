@@ -8,7 +8,7 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 PyStaticMethod::PyStaticMethod(PyType *type) : PyBaseObject(type) {}
 
@@ -36,7 +36,7 @@ PyResult<PyObject *> PyStaticMethod::call_static_method(PyTuple *args, PyDict *k
 }
 
 PyStaticMethod::PyStaticMethod(PyType *underlying_type, PyObject *function)
-	: PyBaseObject(BuiltinTypes::the().static_method()), m_underlying_type(underlying_type),
+	: PyBaseObject(types::BuiltinTypes::the().static_method()), m_underlying_type(underlying_type),
 	  m_static_method(function)
 {}
 
@@ -54,35 +54,36 @@ PyResult<PyObject *> PyStaticMethod::__get__(PyObject * /*instance*/, PyObject *
 	return Ok(m_static_method);
 }
 
-PyType *PyStaticMethod::static_type() const { return ::static_method(); }
+PyType *PyStaticMethod::static_type() const { return types::static_method(); }
 
 namespace {
 
-std::once_flag static_method_flag;
+	std::once_flag static_method_flag;
 
-std::unique_ptr<TypePrototype> register_static_method()
-{
-	return std::move(klass<PyStaticMethod>("staticmethod").type);
-}
+	std::unique_ptr<TypePrototype> register_static_method()
+	{
+		return std::move(klass<PyStaticMethod>("staticmethod").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyStaticMethod::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(static_method_flag, []() { type = ::register_static_method(); });
+		std::call_once(static_method_flag, []() { type = register_static_method(); });
 		return std::move(type);
 	};
 }
 
-template<> PyStaticMethod *py::as(PyObject *obj)
+template<> PyStaticMethod *as(PyObject *obj)
 {
-	if (obj->type() == static_method()) { return static_cast<PyStaticMethod *>(obj); }
+	if (obj->type() == types::static_method()) { return static_cast<PyStaticMethod *>(obj); }
 	return nullptr;
 }
 
-template<> const PyStaticMethod *py::as(const PyObject *obj)
+template<> const PyStaticMethod *as(const PyObject *obj)
 {
-	if (obj->type() == static_method()) { return static_cast<const PyStaticMethod *>(obj); }
+	if (obj->type() == types::static_method()) { return static_cast<const PyStaticMethod *>(obj); }
 	return nullptr;
 }
+}// namespace py

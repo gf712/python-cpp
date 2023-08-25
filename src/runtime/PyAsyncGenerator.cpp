@@ -9,13 +9,13 @@ namespace py {
 
 template<> PyAsyncGenerator *as(PyObject *obj)
 {
-	if (obj->type() == async_generator()) { return static_cast<PyAsyncGenerator *>(obj); }
+	if (obj->type() == types::async_generator()) { return static_cast<PyAsyncGenerator *>(obj); }
 	return nullptr;
 }
 
 template<> const PyAsyncGenerator *as(const PyObject *obj)
 {
-	if (obj->type() == async_generator()) { return static_cast<const PyAsyncGenerator *>(obj); }
+	if (obj->type() == types::async_generator()) { return static_cast<const PyAsyncGenerator *>(obj); }
 	return nullptr;
 }
 
@@ -27,7 +27,7 @@ PyAsyncGenerator::PyAsyncGenerator(PyFrame *frame,
 	PyObject *code,
 	PyString *name,
 	PyString *qualname)
-	: GeneratorInterface(BuiltinTypes::the().async_generator(),
+	: GeneratorInterface(types::BuiltinTypes::the().async_generator(),
 		frame,
 		std::move(stack_frame),
 		is_running,
@@ -69,7 +69,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyAsyncGenerator::type_factory()
 	};
 }
 
-PyType *PyAsyncGenerator::static_type() const { return async_generator(); }
+PyType *PyAsyncGenerator::static_type() const { return types::async_generator(); }
 
 void PyAsyncGenerator::visit_graph(Visitor &visitor)
 {

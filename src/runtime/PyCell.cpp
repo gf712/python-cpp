@@ -8,19 +8,19 @@ namespace py {
 
 template<> PyCell *as(PyObject *obj)
 {
-	if (obj->type() == cell()) { return static_cast<PyCell *>(obj); }
+	if (obj->type() == types::cell()) { return static_cast<PyCell *>(obj); }
 	return nullptr;
 }
 
 template<> const PyCell *as(const PyObject *obj)
 {
-	if (obj->type() == cell()) { return static_cast<const PyCell *>(obj); }
+	if (obj->type() == types::cell()) { return static_cast<const PyCell *>(obj); }
 	return nullptr;
 }
 
 PyCell::PyCell(PyType *type) : PyBaseObject(type) {}
 
-PyCell::PyCell(const Value &content) : PyBaseObject(BuiltinTypes::the().cell()), m_content(content)
+PyCell::PyCell(const Value &content) : PyBaseObject(types::BuiltinTypes::the().cell()), m_content(content)
 {}
 
 PyResult<PyCell *> PyCell::create()
@@ -65,7 +65,7 @@ void PyCell::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyCell::static_type() const { return cell(); }
+PyType *PyCell::static_type() const { return types::cell(); }
 
 const Value &PyCell::content() const { return m_content; }
 

@@ -10,19 +10,20 @@ namespace py {
 
 template<> PyBytes *as(PyObject *obj)
 {
-	if (obj->type() == bytes()) { return static_cast<PyBytes *>(obj); }
+	if (obj->type() == types::bytes()) { return static_cast<PyBytes *>(obj); }
 	return nullptr;
 }
 
 template<> const PyBytes *as(const PyObject *obj)
 {
-	if (obj->type() == bytes()) { return static_cast<const PyBytes *>(obj); }
+	if (obj->type() == types::bytes()) { return static_cast<const PyBytes *>(obj); }
 	return nullptr;
 }
 
 PyBytes::PyBytes(PyType *type) : PyBaseObject(type) {}
 
-PyBytes::PyBytes(const Bytes &number) : PyBaseObject(BuiltinTypes::the().bytes()), m_value(number)
+PyBytes::PyBytes(const Bytes &number)
+	: PyBaseObject(types::BuiltinTypes::the().bytes()), m_value(number)
 {}
 
 PyBytes::PyBytes() : PyBytes(Bytes{}) {}
@@ -77,7 +78,7 @@ PyResult<PyObject *> PyBytes::__iter__() const
 
 PyResult<PyObject *> PyBytes::__repr__() const { return PyString::create(to_string()); }
 
-PyType *PyBytes::static_type() const { return bytes(); }
+PyType *PyBytes::static_type() const { return types::bytes(); }
 
 namespace {
 
@@ -101,7 +102,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyBytes::type_factory()
 PyBytesIterator::PyBytesIterator(PyType *type) : PyBaseObject(type) {}
 
 PyBytesIterator::PyBytesIterator(PyBytes *bytes, size_t index)
-	: PyBaseObject(BuiltinTypes::the().bytes_iterator()), m_bytes(bytes), m_index(index)
+	: PyBaseObject(types::BuiltinTypes::the().bytes_iterator()), m_bytes(bytes), m_index(index)
 {}
 
 PyResult<PyBytesIterator *> PyBytesIterator::create(PyBytes *bytes)
@@ -126,7 +127,7 @@ PyResult<PyObject *> PyBytesIterator::__next__()
 	return PyInteger::create(static_cast<int64_t>(next_value));
 }
 
-PyType *PyBytesIterator::static_type() const { return bytes_iterator(); }
+PyType *PyBytesIterator::static_type() const { return types::bytes_iterator(); }
 
 void PyBytesIterator::visit_graph(Visitor &visitor)
 {

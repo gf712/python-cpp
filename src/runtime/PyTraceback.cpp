@@ -24,7 +24,7 @@ void PyTraceback::visit_graph(Visitor &visitor)
 PyResult<PyObject *> PyTraceback::__repr__() const { return PyString::create(to_string()); }
 
 PyTraceback::PyTraceback(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next)
-	: PyBaseObject(BuiltinTypes::the().traceback()), m_tb_frame(tb_frame), m_tb_lasti(tb_lasti),
+	: PyBaseObject(types::BuiltinTypes::the().traceback()), m_tb_frame(tb_frame), m_tb_lasti(tb_lasti),
 	  m_tb_lineno(tb_lineno), m_tb_next(tb_next)
 {}
 
@@ -37,7 +37,7 @@ PyResult<PyTraceback *>
 	return Ok(obj);
 }
 
-PyType *PyTraceback::static_type() const { return traceback(); }
+PyType *PyTraceback::static_type() const { return types::traceback(); }
 
 namespace {
 
@@ -63,13 +63,13 @@ std::function<std::unique_ptr<TypePrototype>()> PyTraceback::type_factory()
 
 template<> PyTraceback *as(PyObject *obj)
 {
-	if (obj->type() == traceback()) { return static_cast<PyTraceback *>(obj); }
+	if (obj->type() == types::traceback()) { return static_cast<PyTraceback *>(obj); }
 	return nullptr;
 }
 
 template<> const PyTraceback *as(const PyObject *obj)
 {
-	if (obj->type() == traceback()) { return static_cast<const PyTraceback *>(obj); }
+	if (obj->type() == types::traceback()) { return static_cast<const PyTraceback *>(obj); }
 	return nullptr;
 }
 }// namespace py

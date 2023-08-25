@@ -1,11 +1,11 @@
 #include "JumpIfNotExceptionMatch.hpp"
 #include "executable/Label.hpp"
 #include "interpreter/Interpreter.hpp"
-#include "runtime/BaseException.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/types/builtin.hpp"
 #include "vm/VM.hpp"
 
 #include "../serialization/serialize.hpp"
@@ -33,9 +33,7 @@ PyResult<Value> JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter
 			auto obj = PyObject::from(type);
 			if (obj.is_err()) { return Err(obj.unwrap_err()); }
 			auto *t = as<PyType>(obj.unwrap());
-			if (!t
-				|| !t->issubclass(
-					BaseException::create(PyTuple::create().unwrap()).unwrap()->type())) {
+			if (!t || !t->issubclass(types::base_exception())) {
 				return Err(type_error(
 					"catching classes that do not inherit from BaseException is not allowed"));
 			}

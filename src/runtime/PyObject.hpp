@@ -222,7 +222,7 @@ struct TypePrototype
 	size_t basicsize;
 
 	PyType *__base__{ nullptr };
-	PyTuple *__bases__{ nullptr };
+	std::vector<PyType *> __bases__{ nullptr };
 
 	std::function<PyResult<PyObject *>(PyType *)> __alloc__;
 	std::optional<std::variant<NewSlotFunctionType, PyObject *>> __new__;
@@ -286,7 +286,8 @@ struct TypePrototype
 	bool is_heaptype{ false };
 	bool is_type{ false };
 
-	template<typename Type> static std::unique_ptr<TypePrototype> create(std::string_view name);
+	template<typename Type, typename... Args>
+	static std::unique_ptr<TypePrototype> create(std::string_view name, Args &&...);
 
 	void add_member(MemberDefinition &&member) { __members__.push_back(std::move(member)); }
 	void add_property(PropertyDefinition &&property) { __getset__.push_back(std::move(property)); }
@@ -295,21 +296,19 @@ struct TypePrototype
 	void visit_graph(::Cell::Visitor &visitor);
 };
 
-namespace {
-	template<typename T, typename... U>
-	size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
-	{
-		// adapted from https://stackoverflow.com/a/35920804
-		if (std::holds_alternative<std::function<T(U...)>>(f)) {
-			using FunctionType = T (*)(U...);
-			auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
-			return bit_cast<size_t>(*fn_ptr);
-		} else {
-			// FIXME: is it valid to take this path? Is there use case?
-			return bit_cast<size_t>(std::get<PyObject *>(f));
-		}
+template<typename T, typename... U>
+size_t get_address(const std::variant<std::function<T(U...)>, PyObject *> &f)
+{
+	// adapted from https://stackoverflow.com/a/35920804
+	if (std::holds_alternative<std::function<T(U...)>>(f)) {
+		using FunctionType = T (*)(U...);
+		auto fn_ptr = std::get<std::function<T(U...)>>(f).template target<FunctionType>();
+		return bit_cast<size_t>(*fn_ptr);
+	} else {
+		// FIXME: is it valid to take this path? Is there use case?
+		return bit_cast<size_t>(std::get<PyObject *>(f));
 	}
-}// namespace
+}
 
 enum class LookupAttrResult { NOT_FOUND = 0, FOUND = 1 };
 
@@ -465,12 +464,14 @@ namespace detail {
 	size_t slot_count(PyType *);
 }
 
-template<typename Type> std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name)
+template<typename Type, typename... Args>
+std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args &&...args)
 {
 	using namespace concepts;
 
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
+	type_prototype->__bases__ = std::vector<PyType *>{ args... };
 	type_prototype->basicsize = sizeof(Type);
 	type_prototype->__alloc__ = [](PyType *t) -> PyResult<PyObject *> {
 		auto *obj = [t]() -> Type * {

@@ -19,7 +19,7 @@ std::string PyMap::to_string() const
 
 PyResult<PyObject *> PyMap::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	if (type == map() && kwargs && !kwargs->map().empty()) {
+	if (type == types::map() && kwargs && !kwargs->map().empty()) {
 		return Err(type_error("map() takes no keyword arguments"));
 	}
 
@@ -95,7 +95,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyMap::type_factory()
 	};
 }
 
-PyType *PyMap::static_type() const { return map(); }
+PyType *PyMap::static_type() const { return types::map(); }
 
 void PyMap::visit_graph(Visitor &visitor)
 {

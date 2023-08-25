@@ -11,10 +11,10 @@ using namespace py;
 TEST(PyType, ObjectClassParent)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	auto *bases = object()->underlying_type().__bases__;
-	EXPECT_TRUE(bases->elements().empty());
+	const auto &bases = types::object()->underlying_type().__bases__;
+	EXPECT_TRUE(bases.empty());
 
-	auto mro_ = object()->mro();
+	auto mro_ = types::object()->mro();
 	ASSERT_TRUE(mro_.is_ok());
 	auto *mro = mro_.unwrap();
 	ASSERT_TRUE(mro);
@@ -22,17 +22,15 @@ TEST(PyType, ObjectClassParent)
 
 	EXPECT_TRUE(std::holds_alternative<PyObject *>(mro->elements()[0]));
 	auto *mro_0 = std::get<PyObject *>(mro->elements()[0]);
-	EXPECT_EQ(mro_0, object());
+	EXPECT_EQ(mro_0, types::object());
 }
 
 namespace {
-TypePrototype *new_type(const std::string &name, std::vector<PyObject *> bases)
+TypePrototype *new_type(const std::string &name, std::vector<PyType *> bases)
 {
 	auto *new_type = new TypePrototype{};
 	new_type->__name__ = name;
-	auto bases_ = PyTuple::create(std::move(bases));
-	EXPECT_TRUE(bases_.is_ok());
-	new_type->__bases__ = bases_.unwrap();
+	new_type->__bases__ = std::move(bases);
 	return new_type;
 }
 }// namespace
@@ -40,8 +38,10 @@ TypePrototype *new_type(const std::string &name, std::vector<PyObject *> bases)
 TEST(PyType, InheritanceTriangle)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B1", { object() })));
-	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B2", { object() })));
+	PyType *B1 =
+		PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B1", { types::object() })));
+	PyType *B2 =
+		PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B2", { types::object() })));
 
 	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("C", { B1, B2 })));
 
@@ -53,13 +53,14 @@ TEST(PyType, InheritanceTriangle)
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[0]), C);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[1]), B1);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[2]), B2);
-	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[3]), object());
+	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[3]), types::object());
 }
 
 TEST(PyType, InheritanceDiamond)
 {
 	[[maybe_unused]] auto scope = VirtualMachine::the().heap().scoped_gc_pause();
-	PyType *A = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("A", { object() })));
+	PyType *A =
+		PyType::initialize(std::unique_ptr<TypePrototype>(new_type("A", { types::object() })));
 	PyType *B1 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B1", { A })));
 	PyType *B2 = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("B2", { A })));
 	PyType *C = PyType::initialize(std::unique_ptr<TypePrototype>(new_type("C", { B1, B2 })));
@@ -73,5 +74,5 @@ TEST(PyType, InheritanceDiamond)
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[1]), B1);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[2]), B2);
 	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[3]), A);
-	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[4]), object());
+	EXPECT_EQ(std::get<PyObject *>(C_mro->elements()[4]), types::object());
 }

@@ -11,7 +11,7 @@ namespace py {
 PyByteArray::PyByteArray(PyType *type) : PyBaseObject(type) {}
 
 PyByteArray::PyByteArray(const Bytes &value)
-	: PyBaseObject(BuiltinTypes::the().bytearray()), m_value(value)
+	: PyBaseObject(types::BuiltinTypes::the().bytearray()), m_value(value)
 {}
 
 PyResult<PyByteArray *> PyByteArray::create(const Bytes &bytes)
@@ -26,7 +26,7 @@ PyResult<PyByteArray *> PyByteArray::create() { return PyByteArray::create({}); 
 
 PyResult<PyObject *> PyByteArray::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == bytearray());
+	ASSERT(type == types::bytearray());
 	return PyByteArray::create();
 }
 
@@ -125,12 +125,12 @@ std::function<std::unique_ptr<TypePrototype>()> PyByteArray::type_factory()
 	};
 }
 
-PyType *PyByteArray::static_type() const { return bytearray(); }
+PyType *PyByteArray::static_type() const { return types::bytearray(); }
 
 PyByteArrayIterator::PyByteArrayIterator(PyType *type) : PyBaseObject(type) {}
 
 PyByteArrayIterator::PyByteArrayIterator(PyByteArray *bytes, size_t index)
-	: PyBaseObject(BuiltinTypes::the().bytearray_iterator()), m_bytes(bytes), m_index(index)
+	: PyBaseObject(types::BuiltinTypes::the().bytearray_iterator()), m_bytes(bytes), m_index(index)
 {}
 
 PyResult<PyByteArrayIterator *> PyByteArrayIterator::create(PyByteArray *bytes_array)
@@ -174,7 +174,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyByteArrayIterator::type_factor
 	};
 }
 
-PyType *PyByteArrayIterator::static_type() const { return bytearray_iterator(); }
+PyType *PyByteArrayIterator::static_type() const { return types::bytearray_iterator(); }
 
 void PyByteArrayIterator::visit_graph(Visitor &visitor)
 {

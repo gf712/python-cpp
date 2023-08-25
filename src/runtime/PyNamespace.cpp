@@ -10,14 +10,14 @@ namespace py {
 
 template<> PyNamespace *as(PyObject *obj)
 {
-	if (obj->type() == namespace_()) { return static_cast<PyNamespace *>(obj); }
+	if (obj->type() == types::namespace_()) { return static_cast<PyNamespace *>(obj); }
 	return nullptr;
 }
 
 
 template<> const PyNamespace *as(const PyObject *obj)
 {
-	if (obj->type() == namespace_()) { return static_cast<const PyNamespace *>(obj); }
+	if (obj->type() == types::namespace_()) { return static_cast<const PyNamespace *>(obj); }
 	return nullptr;
 }
 
@@ -25,7 +25,7 @@ template<> const PyNamespace *as(const PyObject *obj)
 PyNamespace::PyNamespace(PyType *type) : PyBaseObject(type) {}
 
 PyNamespace::PyNamespace(PyDict *dict)
-	: PyBaseObject(BuiltinTypes::the().namespace_()), m_dict(dict)
+	: PyBaseObject(types::BuiltinTypes::the().namespace_()), m_dict(dict)
 {
 	m_attributes = m_dict;
 }
@@ -46,7 +46,7 @@ PyResult<PyNamespace *> PyNamespace::create(PyDict *dict)
 
 PyResult<PyObject *> PyNamespace::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == namespace_());
+	ASSERT(type == types::namespace_());
 	return PyNamespace::create();
 }
 
@@ -110,7 +110,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyNamespace::type_factory()
 	};
 }
 
-PyType *PyNamespace::static_type() const { return namespace_(); }
+PyType *PyNamespace::static_type() const { return types::namespace_(); }
 
 std::string PyNamespace::to_string() const
 {

@@ -27,7 +27,7 @@ class IndexError : public LookupError
 	}
 
   public:
-	static PyType *register_type(PyModule *);
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 

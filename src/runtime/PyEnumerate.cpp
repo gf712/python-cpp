@@ -7,7 +7,7 @@ namespace py {
 PyEnumerate::PyEnumerate(PyType *type) : PyBaseObject(type) {}
 
 PyEnumerate::PyEnumerate(int64_t current_index, PyObject *iterator)
-	: PyBaseObject(BuiltinTypes::the().enumerate()), m_current_index(current_index),
+	: PyBaseObject(types::BuiltinTypes::the().enumerate()), m_current_index(current_index),
 	  m_iterator(iterator)
 {}
 
@@ -25,7 +25,7 @@ PyResult<PyObject *> PyEnumerate::create(int64_t current_index, PyObject *iterab
 
 PyResult<PyObject *> PyEnumerate::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == enumerate());
+	ASSERT(type == types::enumerate());
 	auto result = PyArgsParser<PyObject *, int64_t>::unpack_tuple(args,
 		kwargs,
 		"enumerate",
@@ -48,7 +48,7 @@ PyResult<PyObject *> PyEnumerate::__next__()
 	return PyTuple::create(Number{ m_current_index++ }, value.unwrap());
 }
 
-PyType *PyEnumerate::static_type() const { return enumerate(); }
+PyType *PyEnumerate::static_type() const { return types::enumerate(); }
 
 void PyEnumerate::visit_graph(Visitor &visitor)
 {

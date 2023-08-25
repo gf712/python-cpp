@@ -6,7 +6,7 @@ namespace py {
 PyReversed::PyReversed(PyType *type) : PyBaseObject(type) {}
 
 PyReversed::PyReversed(PyObject *sequence)
-	: PyBaseObject(BuiltinTypes::the().reversed()), m_sequence(sequence)
+	: PyBaseObject(types::BuiltinTypes::the().reversed()), m_sequence(sequence)
 {}
 
 PyResult<PyObject *> PyReversed::create(PyObject *sequence)
@@ -25,7 +25,7 @@ PyResult<PyObject *> PyReversed::create(PyObject *sequence)
 
 PyResult<PyObject *> PyReversed::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == reversed());
+	ASSERT(type == types::reversed());
 	ASSERT(!kwargs || kwargs->map().empty());
 	ASSERT(args && args->size() == 1);
 	auto sequence = PyObject::from(args->elements()[0]);
@@ -36,7 +36,7 @@ PyResult<PyObject *> PyReversed::__new__(const PyType *type, PyTuple *args, PyDi
 PyResult<PyObject *> PyReversed::__iter__() const { TODO(); }
 PyResult<PyObject *> PyReversed::__next__() { TODO(); }
 
-PyType *PyReversed::static_type() const { return reversed(); }
+PyType *PyReversed::static_type() const { return types::reversed(); }
 
 void PyReversed::visit_graph(Visitor &visitor)
 {

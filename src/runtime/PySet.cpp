@@ -21,17 +21,17 @@ namespace py {
 
 template<> PySet *as(PyObject *obj)
 {
-	if (obj->type() == set()) { return static_cast<PySet *>(obj); }
+	if (obj->type() == types::set()) { return static_cast<PySet *>(obj); }
 	return nullptr;
 }
 
 template<> const PySet *as(const PyObject *obj)
 {
-	if (obj->type() == set()) { return static_cast<const PySet *>(obj); }
+	if (obj->type() == types::set()) { return static_cast<const PySet *>(obj); }
 	return nullptr;
 }
 
-PySet::PySet() : PyBaseObject(BuiltinTypes::the().set()) {}
+PySet::PySet() : PyBaseObject(types::BuiltinTypes::the().set()) {}
 
 PySet::PySet(PyType *type) : PyBaseObject(type) {}
 
@@ -138,7 +138,7 @@ std::string PySet::to_string() const
 
 PyResult<PyObject *> PySet::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == set());
+	ASSERT(type == types::set());
 
 	return PySet::create();
 }
@@ -187,7 +187,7 @@ PyResult<bool> PySet::__contains__(const PyObject *value) const
 
 PyResult<PyObject *> PySet::__and__(PyObject *other)
 {
-	if (!other->type()->issubclass(set())) {
+	if (!other->type()->issubclass(types::set())) {
 		return Err(
 			type_error("unsupported operand type(s) for &: 'set' and '{}'", other->type()->name()));
 	}
@@ -212,7 +212,7 @@ void PySet::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PySet::static_type() const { return set(); }
+PyType *PySet::static_type() const { return types::set(); }
 
 namespace {
 
@@ -242,11 +242,11 @@ std::function<std::unique_ptr<TypePrototype>()> PySet::type_factory()
 PySetIterator::PySetIterator(PyType *type) : PyBaseObject(type) {}
 
 PySetIterator::PySetIterator(const PySet &pyset)
-	: PyBaseObject(BuiltinTypes::the().set_iterator()), m_pyset(pyset)
+	: PyBaseObject(types::BuiltinTypes::the().set_iterator()), m_pyset(pyset)
 {}
 
 PySetIterator::PySetIterator(const PyFrozenSet &pyset)
-	: PyBaseObject(BuiltinTypes::the().set_iterator()), m_pyset(pyset)
+	: PyBaseObject(types::BuiltinTypes::the().set_iterator()), m_pyset(pyset)
 {}
 
 std::string PySetIterator::to_string() const
@@ -288,7 +288,7 @@ PyResult<PyObject *> PySetIterator::__next__()
 		m_pyset);
 }
 
-PyType *PySetIterator::static_type() const { return set_iterator(); }
+PyType *PySetIterator::static_type() const { return types::set_iterator(); }
 
 namespace {
 

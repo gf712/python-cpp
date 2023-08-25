@@ -7,7 +7,7 @@ namespace py {
 
 NotImplemented::NotImplemented(PyType *type) : PyBaseObject(type) {}
 
-NotImplemented::NotImplemented() : PyBaseObject(BuiltinTypes::the().not_implemented_()) {}
+NotImplemented::NotImplemented() : PyBaseObject(types::BuiltinTypes::the().not_implemented()) {}
 
 PyResult<NotImplemented *> NotImplemented::create()
 {
@@ -17,7 +17,7 @@ PyResult<NotImplemented *> NotImplemented::create()
 	return Ok(result);
 }
 
-PyType *NotImplemented::static_type() const { return not_implemented_(); }
+PyType *NotImplemented::static_type() const { return types::not_implemented(); }
 
 std::string NotImplemented::to_string() const { return "NotImplemented"; }
 

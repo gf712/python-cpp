@@ -25,7 +25,7 @@ class NameError : public Exception
 	}
 
   public:
-	static PyType *register_type(PyModule *);
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *static_type() const override;
 };

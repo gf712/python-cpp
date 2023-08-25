@@ -10,17 +10,17 @@ namespace py {
 
 template<> PyFrozenSet *as(PyObject *obj)
 {
-	if (obj->type() == frozenset()) { return static_cast<PyFrozenSet *>(obj); }
+	if (obj->type() == types::frozenset()) { return static_cast<PyFrozenSet *>(obj); }
 	return nullptr;
 }
 
 template<> const PyFrozenSet *as(const PyObject *obj)
 {
-	if (obj->type() == frozenset()) { return static_cast<const PyFrozenSet *>(obj); }
+	if (obj->type() == types::frozenset()) { return static_cast<const PyFrozenSet *>(obj); }
 	return nullptr;
 }
 
-PyFrozenSet::PyFrozenSet() : PyBaseObject(BuiltinTypes::the().frozenset()) {}
+PyFrozenSet::PyFrozenSet() : PyBaseObject(types::BuiltinTypes::the().frozenset()) {}
 
 PyFrozenSet::PyFrozenSet(PyType *type) : PyBaseObject(type) {}
 
@@ -75,7 +75,7 @@ std::string PyFrozenSet::to_string() const
 
 PyResult<PyObject *> PyFrozenSet::__new__(const PyType *type, PyTuple *args, PyDict *)
 {
-	ASSERT(type == frozenset());
+	ASSERT(type == types::frozenset());
 
 	ASSERT(args);
 	if (args->size() == 0) {
@@ -171,7 +171,7 @@ void PyFrozenSet::visit_graph(Visitor &visitor)
 	}
 }
 
-PyType *PyFrozenSet::static_type() const { return frozenset(); }
+PyType *PyFrozenSet::static_type() const { return types::frozenset(); }
 
 namespace {
 

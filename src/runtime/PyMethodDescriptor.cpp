@@ -11,13 +11,13 @@ namespace py {
 
 template<> PyMethodDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == method_wrapper()) { return static_cast<PyMethodDescriptor *>(obj); }
+	if (obj->type() == types::method_wrapper()) { return static_cast<PyMethodDescriptor *>(obj); }
 	return nullptr;
 }
 
 template<> const PyMethodDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == method_wrapper()) { return static_cast<const PyMethodDescriptor *>(obj); }
+	if (obj->type() == types::method_wrapper()) { return static_cast<const PyMethodDescriptor *>(obj); }
 	return nullptr;
 }
 
@@ -27,7 +27,7 @@ PyMethodDescriptor::PyMethodDescriptor(PyString *name,
 	PyType *underlying_type,
 	MethodDefinition &method_definition,
 	std::vector<PyObject *> &&captures)
-	: PyBaseObject(BuiltinTypes::the().method_wrapper()), m_name(std::move(name)),
+	: PyBaseObject(types::BuiltinTypes::the().method_wrapper()), m_name(std::move(name)),
 	  m_underlying_type(underlying_type), m_method(method_definition),
 	  m_captures(std::move(captures))
 {}
@@ -109,7 +109,7 @@ PyResult<PyObject *> PyMethodDescriptor::__get__(PyObject *instance, PyObject * 
 }
 
 
-PyType *PyMethodDescriptor::static_type() const { return method_wrapper(); }
+PyType *PyMethodDescriptor::static_type() const { return types::method_wrapper(); }
 
 namespace {
 

@@ -30,22 +30,23 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 namespace {
-bool is_method_descriptor(PyType *obj_type)
-{
-	return obj_type == method_wrapper() || obj_type == function()
-		   || obj_type == classmethod_descriptor();
-}
+	bool is_method_descriptor(PyType *obj_type)
+	{
+		return obj_type == types::method_wrapper() || obj_type == types::function()
+			   || obj_type == types::classmethod_descriptor();
+	}
 
-bool descriptor_is_data(const PyObject *obj)
-{
-	// FIXME: temporary hack to get object.__new__ working, but requires __set__ to be implemented
-	//        should be:
-	//        obj->type()->underlying_type().__set__.has_value()
-	return !as<PyStaticMethod>(obj) && !as<PySlotWrapper>(obj);
-}
+	bool descriptor_is_data(const PyObject *obj)
+	{
+		// FIXME: temporary hack to get object.__new__ working, but requires __set__ to be
+		// implemented
+		//        should be:
+		//        obj->type()->underlying_type().__set__.has_value()
+		return !as<PyStaticMethod>(obj) && !as<PySlotWrapper>(obj);
+	}
 }// namespace
 
 void TypePrototype::visit_graph(::Cell::Visitor &visitor)
@@ -53,7 +54,9 @@ void TypePrototype::visit_graph(::Cell::Visitor &visitor)
 	if (__class__) { visitor.visit(*__class__); }
 	if (__dict__) { visitor.visit(*__dict__); }
 	if (__base__) { visitor.visit(*__base__); }
-	if (__bases__) { visitor.visit(*__bases__); }
+	for (auto *b : __bases__) {
+		if (b) visitor.visit(*b);
+	}
 }
 
 size_t ValueHash::operator()(const Value &value) const
@@ -91,112 +94,112 @@ size_t ValueHash::operator()(const Value &value) const
 
 namespace {
 
-template<typename T> auto to_object(T &&value)
-{
-	if constexpr (std::is_base_of_v<PyObject,
-					  typename std::remove_pointer_t<typename std::remove_cvref_t<T>>>) {
-		return value;
-	} else {
-		return PyObject::from(value).unwrap();
+	template<typename T> auto to_object(T &&value)
+	{
+		if constexpr (std::is_base_of_v<PyObject,
+						  typename std::remove_pointer_t<typename std::remove_cvref_t<T>>>) {
+			return value;
+		} else {
+			return PyObject::from(value).unwrap();
+		}
 	}
-}
 
-template<typename SlotFunctionType, typename ResultType = typename SlotFunctionType::result_type>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-	PyObject *self,
-	PyTuple *args,
-	PyDict *kwargs)
-	requires std::is_same_v<typename ResultType::OkType, PyObject *>
-{
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		return std::get<SlotFunctionType>(slot)(self, args, kwargs);
-	} else if (std::holds_alternative<PyObject *>(slot)) {
-		std::vector<Value> args_;
-		args_.reserve(args->size() + 1);
-		args_.push_back(self);
-		args_.insert(args_.end(), args->elements().begin(), args->elements().end());
-		return PyTuple::create(args_).and_then([&slot, kwargs](PyTuple *args) -> ResultType {
-			return std::get<PyObject *>(slot)->call(args, kwargs);
-		});
-	} else {
-		TODO();
+	template<typename SlotFunctionType,
+		typename ResultType = typename SlotFunctionType::result_type>
+	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+		PyObject *self,
+		PyTuple *args,
+		PyDict *kwargs)
+		requires std::is_same_v<typename ResultType::OkType, PyObject *>
+	{
+		if (std::holds_alternative<SlotFunctionType>(slot)) {
+			return std::get<SlotFunctionType>(slot)(self, args, kwargs);
+		} else if (std::holds_alternative<PyObject *>(slot)) {
+			std::vector<Value> args_;
+			args_.reserve(args->size() + 1);
+			args_.push_back(self);
+			args_.insert(args_.end(), args->elements().begin(), args->elements().end());
+			return PyTuple::create(args_).and_then([&slot, kwargs](PyTuple *args) -> ResultType {
+				return std::get<PyObject *>(slot)->call(args, kwargs);
+			});
+		} else {
+			TODO();
+		}
 	}
-}
 
-template<typename SlotFunctionType,
-	typename ResultType = typename SlotFunctionType::result_type,
-	typename... Args>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
-	requires std::is_same_v<typename ResultType::OkType, PyObject *>
-{
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
-	} else if (std::holds_alternative<PyObject *>(slot)) {
-		// FIXME: this const_cast is needed since in Python land there is no concept of
-		//		  PyObject constness (right?). But for the internal calls handled above
-		//		  which are resolved in the C++ runtime, we want to enforce constness
-		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(const_cast<PyObject *>(
-			static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
-		if (args.is_err()) { return Err(args.unwrap_err()); }
-		PyDict *kwargs = nullptr;
-		return std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
-	} else {
-		TODO();
+	template<typename SlotFunctionType,
+		typename ResultType = typename SlotFunctionType::result_type,
+		typename... Args>
+	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot, Args &&...args_)
+		requires std::is_same_v<typename ResultType::OkType, PyObject *>
+	{
+		if (std::holds_alternative<SlotFunctionType>(slot)) {
+			return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
+		} else if (std::holds_alternative<PyObject *>(slot)) {
+			// FIXME: this const_cast is needed since in Python land there is no concept of
+			//		  PyObject constness (right?). But for the internal calls handled above
+			//		  which are resolved in the C++ runtime, we want to enforce constness
+			//		  so we end up with the awkward line below. But how could we do better?
+			auto args = PyTuple::create(const_cast<PyObject *>(
+				static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
+			if (args.is_err()) { return Err(args.unwrap_err()); }
+			PyDict *kwargs = nullptr;
+			return std::get<PyObject *>(slot)->call(args.unwrap(), kwargs);
+		} else {
+			TODO();
+		}
 	}
-}
 
-template<typename SlotFunctionType,
-	typename ResultType = typename SlotFunctionType::result_type,
-	typename... Args>
-ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
-	std::string_view conversion_error_message,
-	Args &&...args_)
-	requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
-{
-	if (std::holds_alternative<SlotFunctionType>(slot)) {
-		return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
-	} else if (std::holds_alternative<PyObject *>(slot)) {
-		auto *callable = std::get<PyObject *>(slot);
-		ASSERT(callable);
-		// FIXME: this const_cast is needed since in Python land there is no concept of
-		//		  PyObject constness (right?). But for the internal calls handled above
-		//		  which are resolved in the C++ runtime, we want to enforce constness
-		//		  so we end up with the awkward line below. But how could we do better?
-		auto args = PyTuple::create(const_cast<PyObject *>(
-			static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
-		if (args.is_err()) { return Err(args.unwrap_err()); }
-		PyDict *kwargs = nullptr;
-		if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
-			auto result = callable->call(args.unwrap(), kwargs);
-			if (result.is_err()) return Err(result.unwrap_err());
-			if (!as<PyBool>(result.unwrap())) {
-				return Err(type_error(std::string(conversion_error_message)));
-			}
-			return Ok(as<PyBool>(result.unwrap())->value());
-		} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
-			auto result = callable->call(args.unwrap(), kwargs);
-			if (result.is_err()) return Err(result.unwrap_err());
-			if (!as<PyInteger>(result.unwrap())) {
-				return Err(type_error(std::string(conversion_error_message)));
-			}
-			return Ok(as<PyInteger>(result.unwrap())->as_i64());
-		} else if constexpr (std::is_same_v<typename ResultType::OkType, std::monostate>) {
-			auto result = callable->call(args.unwrap(), kwargs);
-			if (result.is_err()) {
-				return Err(result.unwrap_err());
+	template<typename SlotFunctionType,
+		typename ResultType = typename SlotFunctionType::result_type,
+		typename... Args>
+	ResultType call_slot(const std::variant<SlotFunctionType, PyObject *> &slot,
+		std::string_view conversion_error_message,
+		Args &&...args_)
+		requires(!std::is_same_v<typename ResultType::OkType, PyObject *>)
+	{
+		if (std::holds_alternative<SlotFunctionType>(slot)) {
+			return std::get<SlotFunctionType>(slot)(std::forward<Args>(args_)...);
+		} else if (std::holds_alternative<PyObject *>(slot)) {
+			auto *callable = std::get<PyObject *>(slot);
+			ASSERT(callable);
+			// FIXME: this const_cast is needed since in Python land there is no concept of
+			//		  PyObject constness (right?). But for the internal calls handled above
+			//		  which are resolved in the C++ runtime, we want to enforce constness
+			//		  so we end up with the awkward line below. But how could we do better?
+			auto args = PyTuple::create(const_cast<PyObject *>(
+				static_cast<const PyObject *>(to_object(std::forward<Args>(args_))))...);
+			if (args.is_err()) { return Err(args.unwrap_err()); }
+			PyDict *kwargs = nullptr;
+			if constexpr (std::is_same_v<typename ResultType::OkType, bool>) {
+				auto result = callable->call(args.unwrap(), kwargs);
+				if (result.is_err()) return Err(result.unwrap_err());
+				if (!as<PyBool>(result.unwrap())) {
+					return Err(type_error(std::string(conversion_error_message)));
+				}
+				return Ok(as<PyBool>(result.unwrap())->value());
+			} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
+				auto result = callable->call(args.unwrap(), kwargs);
+				if (result.is_err()) return Err(result.unwrap_err());
+				if (!as<PyInteger>(result.unwrap())) {
+					return Err(type_error(std::string(conversion_error_message)));
+				}
+				return Ok(as<PyInteger>(result.unwrap())->as_i64());
+			} else if constexpr (std::is_same_v<typename ResultType::OkType, std::monostate>) {
+				auto result = callable->call(args.unwrap(), kwargs);
+				if (result.is_err()) {
+					return Err(result.unwrap_err());
+				} else {
+					return Ok(std::monostate{});
+				}
 			} else {
-				return Ok(std::monostate{});
+				[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
+				();
 			}
 		} else {
-			[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
-			();
+			TODO();
 		}
-	} else {
-		TODO();
 	}
-}
-
 }// namespace
 
 
@@ -995,7 +998,7 @@ PyResult<PyObject *> PyObject::getitem(PyObject *key)
 	}
 	// TODO: could getitem be virtual and we override the logic below in PyType?
 	if (as<PyType>(this)) {
-		if (this == py::type()) { return PyGenericAlias::create(this, key); }
+		if (this == types::type()) { return PyGenericAlias::create(this, key); }
 		auto method = get_method(PyString::create("__class_getitem__").unwrap());
 		if (method.is_ok()) {
 			return method.unwrap()->call(PyTuple::create(key).unwrap(), PyDict::create().unwrap());
@@ -1119,7 +1122,7 @@ std::tuple<PyResult<PyObject *>, LookupAttrResult> PyObject::lookup_attribute(Py
 		const auto &getattribute_ = type()->underlying_type().__getattribute__;
 		if (getattribute_.has_value()
 			&& get_address(*getattribute_)
-				   != get_address(*object()->underlying_type().__getattribute__)) {
+				   != get_address(*types::object()->underlying_type().__getattribute__)) {
 			return { get_attribute(name), LookupAttrResult::FOUND };
 		}
 		// TODO: check tp_getattr? This field is deprecated in [c]python so maybe should not
@@ -1149,7 +1152,7 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 		const auto &getattribute_ = type()->underlying_type().__getattribute__;
 		if (getattribute_.has_value()
 			&& get_address(*getattribute_)
-				   != get_address(*object()->underlying_type().__getattribute__)) {
+				   != get_address(*types::object()->underlying_type().__getattribute__)) {
 			return get_attribute(name);
 		}
 	}
@@ -1231,9 +1234,9 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 			const auto new_fn = get_address(*type->underlying_type().__new__);
 			ASSERT(new_fn);
 
-			ASSERT(object()->underlying_type().__new__);
-			const auto custom_new_fn = get_address(*object()->underlying_type().__new__);
-			ASSERT(custom_new_fn);
+			ASSERT(types::object()->underlying_type().__new__)
+			const auto custom_new_fn = get_address(*types::object()->underlying_type().__new__);
+			ASSERT(custom_new_fn)
 
 			if (new_fn != custom_new_fn) {
 				return Err(type_error(
@@ -1246,8 +1249,8 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 			const auto init_fn = get_address(*type->underlying_type().__init__);
 			ASSERT(init_fn);
 
-			ASSERT(object()->underlying_type().__init__);
-			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
+			ASSERT(types::object()->underlying_type().__init__)
+			const auto custom_init_fn = get_address(*types::object()->underlying_type().__init__);
 			if (init_fn == custom_init_fn) {
 				return Err(type_error("object() takes no arguments"));
 			}
@@ -1264,8 +1267,8 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 			const auto new_fn = get_address(*type()->underlying_type().__new__);
 			ASSERT(new_fn)
 
-			ASSERT(object()->underlying_type().__new__)
-			const auto custom_new_fn = get_address(*object()->underlying_type().__new__);
+			ASSERT(types::object()->underlying_type().__new__)
+			const auto custom_new_fn = get_address(*types::object()->underlying_type().__new__);
 			ASSERT(custom_new_fn)
 
 			if (new_fn == custom_new_fn) {
@@ -1279,8 +1282,8 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 			const auto init_fn = get_address(*type()->underlying_type().__init__);
 			ASSERT(init_fn)
 
-			ASSERT(object()->underlying_type().__init__)
-			const auto custom_init_fn = get_address(*object()->underlying_type().__init__);
+			ASSERT(types::object()->underlying_type().__init__)
+			const auto custom_init_fn = get_address(*types::object()->underlying_type().__init__);
 			ASSERT(custom_init_fn)
 
 			if (init_fn != custom_init_fn) {
@@ -1298,7 +1301,7 @@ std::string PyObject::to_string() const
 
 PyType *PyObject::type() const
 {
-	if (std::holds_alternative<std::reference_wrapper<const py::TypePrototype>>(m_type)) {
+	if (std::holds_alternative<std::reference_wrapper<const TypePrototype>>(m_type)) {
 		return static_type();
 	} else {
 		ASSERT(std::holds_alternative<PyType *>(m_type));
@@ -1336,11 +1339,12 @@ std::function<std::unique_ptr<TypePrototype>()> PyObject::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(object_type_flag, []() { type = ::register_type(); });
+		std::call_once(object_type_flag, []() { type = register_type(); });
 		return std::move(type);
 	};
 }
 
-namespace py::detail {
+namespace detail {
 size_t slot_count(PyType *t) { return t->__slots__.size(); }
-}// namespace py::detail
+}// namespace detail
+}// namespace py

@@ -8,24 +8,24 @@ namespace py {
 
 template<> PyFloat *as(PyObject *obj)
 {
-	if (obj->type() == float_()) { return static_cast<PyFloat *>(obj); }
+	if (obj->type() == types::float_()) { return static_cast<PyFloat *>(obj); }
 	return nullptr;
 }
 
 template<> const PyFloat *as(const PyObject *obj)
 {
-	if (obj->type() == float_()) { return static_cast<const PyFloat *>(obj); }
+	if (obj->type() == types::float_()) { return static_cast<const PyFloat *>(obj); }
 	return nullptr;
 }
 
 PyFloat::PyFloat(PyType *type) : PyNumber(type) {}
 
-PyFloat::PyFloat(double value) : PyNumber(Number{ value }, BuiltinTypes::the().float_()) {}
+PyFloat::PyFloat(double value) : PyNumber(Number{ value }, types::BuiltinTypes::the().float_()) {}
 
 PyResult<PyObject *> PyFloat::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	// TODO: support inheriting from float
-	ASSERT(type == float_());
+	ASSERT(type == types::float_());
 
 	ASSERT(!kwargs || kwargs->map().empty())
 	PyObject *value = nullptr;
@@ -56,7 +56,7 @@ PyResult<PyFloat *> PyFloat::create(double value)
 	return Ok(obj);
 }
 
-PyType *PyFloat::static_type() const { return float_(); }
+PyType *PyFloat::static_type() const { return types::float_(); }
 
 double PyFloat::as_f64() const
 {

@@ -9,20 +9,23 @@ namespace py {
 
 template<> PyBuiltInMethod *as(PyObject *node)
 {
-	if (node->type() == builtin_method()) { return static_cast<PyBuiltInMethod *>(node); }
+	if (node->type() == types::builtin_method()) { return static_cast<PyBuiltInMethod *>(node); }
 	return nullptr;
 }
 
 template<> const PyBuiltInMethod *as(const PyObject *node)
 {
-	if (node->type() == builtin_method()) { return static_cast<const PyBuiltInMethod *>(node); }
+	if (node->type() == types::builtin_method()) {
+		return static_cast<const PyBuiltInMethod *>(node);
+	}
 	return nullptr;
 }
 
 PyBuiltInMethod::PyBuiltInMethod(PyType *type) : PyBaseObject(type) {}
 
 PyBuiltInMethod::PyBuiltInMethod(MethodDefinition &method_definition, PyObject *self)
-	: PyBaseObject(BuiltinTypes::the().builtin_method()), m_ml(method_definition), m_self(self)
+	: PyBaseObject(types::BuiltinTypes::the().builtin_method()), m_ml(method_definition),
+	  m_self(self)
 {}
 
 void PyBuiltInMethod::visit_graph(Visitor &visitor)
@@ -67,7 +70,7 @@ PyResult<PyBuiltInMethod *> PyBuiltInMethod::create(MethodDefinition &method_def
 	return Ok(obj);
 }
 
-PyType *PyBuiltInMethod::static_type() const { return py::builtin_method(); }
+PyType *PyBuiltInMethod::static_type() const { return types::builtin_method(); }
 
 namespace {
 

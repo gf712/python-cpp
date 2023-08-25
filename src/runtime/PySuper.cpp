@@ -19,13 +19,13 @@ PySuper::PySuper(PyType *type) : PyBaseObject(type) {}
 PySuper::PySuper() : PySuper(nullptr, nullptr, nullptr) {}
 
 PySuper::PySuper(PyType *type, PyObject *object, PyType *object_type)
-	: PyBaseObject(BuiltinTypes::the().super()), m_type(type), m_object(object),
+	: PyBaseObject(types::BuiltinTypes::the().super()), m_type(type), m_object(object),
 	  m_object_type(object_type)
 {}
 
 PyResult<PyObject *> PySuper::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == super())
+	ASSERT(type == types::super())
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<PySuper>();
 	if (!result) { return Err(memory_error(sizeof(PySuper))); }
@@ -130,7 +130,7 @@ PyResult<PyObject *> PySuper::__get__(PyObject *object, PyObject *) const
 	// untested code!
 	TODO();
 
-	if (PySuper::type() != super()) {
+	if (PySuper::type() != types::super()) {
 		return PySuper::type()->call(PyTuple::create(PySuper::type(), object).unwrap(), nullptr);
 	}
 
@@ -138,7 +138,7 @@ PyResult<PyObject *> PySuper::__get__(PyObject *object, PyObject *) const
 	if (object_type_.is_err()) return object_type_;
 	auto *object_type = object_type_.unwrap();
 
-	auto newobj_ = PySuper::__new__(super(), nullptr, nullptr);
+	auto newobj_ = PySuper::__new__(types::super(), nullptr, nullptr);
 	if (newobj_.is_err()) return newobj_;
 	auto *newobj = static_cast<PySuper *>(newobj_.unwrap());
 	newobj->m_type = m_type;
@@ -246,6 +246,6 @@ std::function<std::unique_ptr<TypePrototype>()> PySuper::type_factory()
 	};
 }
 
-PyType *PySuper::static_type() const { return super(); }
+PyType *PySuper::static_type() const { return types::super(); }
 
 }// namespace py

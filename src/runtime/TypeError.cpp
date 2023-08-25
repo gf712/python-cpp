@@ -3,34 +3,42 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
-
-static PyType *s_type_error = nullptr;
+namespace py {
 
 TypeError::TypeError(PyType *type) : Exception(type) {}
 
-TypeError::TypeError(PyTuple *args) : Exception(s_type_error->underlying_type(), args) {}
+TypeError::TypeError(PyTuple *args) : Exception(types::BuiltinTypes::the().type_error(), args) {}
 
 PyResult<PyObject *> TypeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_type_error)
+	ASSERT(type == types::type_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	return Ok(TypeError::create(args));
 }
 
 PyType *TypeError::static_type() const
 {
-	ASSERT(s_type_error)
-	return s_type_error;
+	ASSERT(types::type_error());
+	return types::type_error();
 }
 
-PyType *TypeError::register_type(PyModule *module)
-{
-	if (!s_type_error) {
-		s_type_error =
-			klass<TypeError>(module, "TypeError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("TypeError").unwrap(), s_type_error);
+namespace {
+
+	std::once_flag type_error_flag;
+
+	std::unique_ptr<TypePrototype> register_type_error()
+	{
+		return std::move(klass<TypeError>("TypeError", Exception::class_type()).type);
 	}
-	return s_type_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> TypeError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(type_error_flag, []() { type = register_type_error(); });
+		return std::move(type);
+	};
 }
+
+}// namespace py

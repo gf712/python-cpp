@@ -29,13 +29,13 @@ namespace py {
 
 template<> PyString *as(PyObject *obj)
 {
-	if (obj->type() == str()) { return static_cast<PyString *>(obj); }
+	if (obj->type() == types::str()) { return static_cast<PyString *>(obj); }
 	return nullptr;
 }
 
 template<> const PyString *as(const PyObject *obj)
 {
-	if (obj->type() == str()) { return static_cast<const PyString *>(obj); }
+	if (obj->type() == types::str()) { return static_cast<const PyString *>(obj); }
 	return nullptr;
 }
 
@@ -120,7 +120,7 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 	// FIXME: handle errors argument
 	ASSERT(!kwargs || kwargs->map().size() == 0)
 	ASSERT(args && args->size() == 1)
-	ASSERT(type == py::str())
+	ASSERT(type == types::str())
 
 	const auto &string = args->elements()[0];
 	if (std::holds_alternative<String>(string)) {
@@ -133,7 +133,8 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 	}
 }
 
-PyString::PyString(std::string s) : PyBaseObject(BuiltinTypes::the().str()), m_value(std::move(s))
+PyString::PyString(std::string s)
+	: PyBaseObject(types::BuiltinTypes::the().str()), m_value(std::move(s))
 {}
 
 PyResult<int64_t> PyString::__hash__() const
@@ -911,7 +912,7 @@ std::optional<uint32_t> PyString::codepoint() const
 	}
 }
 
-PyType *PyString::static_type() const { return py::str(); }
+PyType *PyString::static_type() const { return types::str(); }
 
 PyResult<PyObject *> PyString::__iter__() const
 {
@@ -1068,7 +1069,7 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 	std::string new_value;
 	new_value.reserve(static_cast<size_t>(static_cast<double>(m_value.size()) * 1.5));
 
-	if (!values->type()->issubclass(tuple())) {
+	if (!values->type()->issubclass(types::tuple())) {
 		auto values_ = PyTuple::create(const_cast<PyObject *>(values));
 		if (values_.is_err()) { return Err(values_.unwrap_err()); }
 		values = values_.unwrap();
@@ -1260,7 +1261,7 @@ PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 		return Err(
 			not_implemented_error("str.maketrans with two or three arguments is not implemented"));
 	}
-	if (!x->type()->issubclass(dict())) {
+	if (!x->type()->issubclass(types::dict())) {
 		return Err(type_error("if you give only one argument to maketrans it must be a dict"));
 	}
 
@@ -1273,9 +1274,9 @@ PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 		PyObject *value_obj = nullptr;
 		auto key_ = PyObject::from(key);
 		if (key_.is_err()) { return key_; }
-		if (key_.unwrap()->type()->issubclass(integer())) {
+		if (key_.unwrap()->type()->issubclass(types::integer())) {
 			key_obj = key_.unwrap();
-		} else if (key_.unwrap()->type()->issubclass(py::str())) {
+		} else if (key_.unwrap()->type()->issubclass(types::str())) {
 			auto *key_str = static_cast<const PyString *>(key_.unwrap());
 			const auto cp = key_str->codepoint();
 			if (!cp.has_value()) {
@@ -1288,8 +1289,8 @@ PyResult<PyObject *> PyString::maketrans(PyTuple *args, PyDict *kwargs)
 
 		auto value_ = PyObject::from(value);
 		if (value_.is_err()) { return value_; }
-		if (value_.unwrap()->type()->issubclass(integer())
-			|| value_.unwrap()->type()->issubclass(py::str()) || value_.unwrap() == py_none()) {
+		if (value_.unwrap()->type()->issubclass(types::integer())
+			|| value_.unwrap()->type()->issubclass(types::str()) || value_.unwrap() == py_none()) {
 			value_obj = value_.unwrap();
 		} else {
 			return Err(type_error("keys in translate table must be strings or integers"));
@@ -1326,7 +1327,7 @@ PyResult<PyString *> PyString::convert_to_ascii(PyObject *obj)
 		const auto &cps = str->codepoints();
 		auto s = [obj, &cps]() {
 			if (compare_slot_address(obj->type()->underlying_type().__repr__,
-					py::str()->underlying_type().__repr__)) {
+					types::str()->underlying_type().__repr__)) {
 				// if we got the representation with str.__repr__, remove the surrounding single
 				// quotes
 				return std::span{ cps.begin() + 1, cps.size() - 2 };
@@ -1381,13 +1382,13 @@ std::function<std::unique_ptr<TypePrototype>()> PyString::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(str_flag, []() { type = py::register_string(); });
+		std::call_once(str_flag, []() { type = register_string(); });
 		return std::move(type);
 	};
 }
 
 PyStringIterator::PyStringIterator(const PyString &pystring)
-	: PyBaseObject(BuiltinTypes::the().str_iterator()), m_pystring(pystring)
+	: PyBaseObject(types::BuiltinTypes::the().str_iterator()), m_pystring(pystring)
 {}
 
 std::string PyStringIterator::to_string() const
@@ -1416,7 +1417,7 @@ PyResult<PyObject *> PyStringIterator::__next__()
 	return Err(stop_iteration());
 }
 
-PyType *PyStringIterator::static_type() const { return str_iterator(); }
+PyType *PyStringIterator::static_type() const { return types::str_iterator(); }
 
 namespace {
 

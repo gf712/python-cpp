@@ -3,19 +3,17 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-using namespace py;
-
-static PyType *s_assertion_error = nullptr;
+namespace py {
 
 AssertionError::AssertionError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
 
 AssertionError::AssertionError(PyTuple *args)
-	: Exception(s_assertion_error->underlying_type(), args)
+	: Exception(types::BuiltinTypes::the().assertion_error(), args)
 {}
 
 PyResult<PyObject *> AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_assertion_error)
+	ASSERT(type == types::assertion_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = AssertionError::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
@@ -26,25 +24,34 @@ PyResult<PyObject *> AssertionError::__new__(const PyType *type, PyTuple *args, 
 
 PyType *AssertionError::static_type() const
 {
-	ASSERT(s_assertion_error)
-	return s_assertion_error;
+	ASSERT(types::assertion_error());
+	return types::assertion_error();
 }
 
 PyType *AssertionError::this_type()
 {
-	ASSERT(s_assertion_error)
-	return s_assertion_error;
+	ASSERT(types::assertion_error());
+	return types::assertion_error();
 }
 
 std::string AssertionError::to_string() const { return what(); }
 
-PyType *AssertionError::register_type(PyModule *module)
-{
-	if (!s_assertion_error) {
-		s_assertion_error =
-			klass<AssertionError>(module, "AssertionError", Exception::s_exception_type).finalize();
-	} else {
-		module->add_symbol(PyString::create("AssertionError").unwrap(), s_assertion_error);
+namespace {
+
+	std::once_flag assertion_error_flag;
+
+	std::unique_ptr<TypePrototype> register_assertion_error()
+	{
+		return std::move(klass<AssertionError>("AssertionError", Exception::class_type()).type);
 	}
-	return s_assertion_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> AssertionError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(assertion_error_flag, []() { type = register_assertion_error(); });
+		return std::move(type);
+	};
 }
+}// namespace py

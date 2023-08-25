@@ -5,31 +5,28 @@
 
 namespace py {
 
-namespace {
-	static PyType *s_memory_error = nullptr;
-}
-
 template<> MemoryError *as(PyObject *obj)
 {
-	ASSERT(s_memory_error)
-	if (obj->type() == s_memory_error) { return static_cast<MemoryError *>(obj); }
+	ASSERT(types::memory_error());
+	if (obj->type() == types::memory_error()) { return static_cast<MemoryError *>(obj); }
 	return nullptr;
 }
 
 template<> const MemoryError *as(const PyObject *obj)
 {
-	ASSERT(s_memory_error)
-	if (obj->type() == s_memory_error) { return static_cast<const MemoryError *>(obj); }
+	ASSERT(types::memory_error());
+	if (obj->type() == types::memory_error()) { return static_cast<const MemoryError *>(obj); }
 	return nullptr;
 }
 
 MemoryError::MemoryError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
 
-MemoryError::MemoryError(PyTuple *args) : Exception(s_memory_error->underlying_type(), args) {}
+MemoryError::MemoryError(PyTuple *args) : Exception(types::BuiltinTypes::the().memory_error(), args)
+{}
 
 PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_memory_error)
+	ASSERT(type == types::memory_error());
 	ASSERT(!kwargs || kwargs->map().empty())
 	if (auto result = MemoryError::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
@@ -40,25 +37,35 @@ PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyD
 
 PyType *MemoryError::static_type() const
 {
-	ASSERT(s_memory_error)
-	return s_memory_error;
+	ASSERT(types::memory_error());
+	return types::memory_error();
 }
 
 PyType *MemoryError::this_type()
 {
-	ASSERT(s_memory_error)
-	return s_memory_error;
+	ASSERT(types::memory_error());
+	return types::memory_error();
 }
 
 std::string MemoryError::to_string() const { return what(); }
 
-PyType *MemoryError::register_type(PyModule *module)
-{
-	if (!s_memory_error) {
-		s_memory_error =
-			klass<MemoryError>(module, "MemoryError", Exception::s_exception_type).finalize();
+namespace {
+
+	std::once_flag memory_error_flag;
+
+	std::unique_ptr<TypePrototype> register_memory_error()
+	{
+		return std::move(klass<MemoryError>("MemoryError", Exception::class_type()).type);
 	}
-	return s_memory_error;
+}// namespace
+
+std::function<std::unique_ptr<TypePrototype>()> MemoryError::type_factory()
+{
+	return []() {
+		static std::unique_ptr<TypePrototype> type = nullptr;
+		std::call_once(memory_error_flag, []() { type = register_memory_error(); });
+		return std::move(type);
+	};
 }
 
 }// namespace py

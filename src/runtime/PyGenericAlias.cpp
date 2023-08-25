@@ -11,20 +11,20 @@ namespace py {
 
 template<> PyGenericAlias *as(PyObject *obj)
 {
-	if (obj->type() == generic_alias()) { return static_cast<PyGenericAlias *>(obj); }
+	if (obj->type() == types::generic_alias()) { return static_cast<PyGenericAlias *>(obj); }
 	return nullptr;
 }
 
 template<> const PyGenericAlias *as(const PyObject *obj)
 {
-	if (obj->type() == generic_alias()) { return static_cast<const PyGenericAlias *>(obj); }
+	if (obj->type() == types::generic_alias()) { return static_cast<const PyGenericAlias *>(obj); }
 	return nullptr;
 }
 
 PyGenericAlias::PyGenericAlias(PyType *type) : PyBaseObject(type) {}
 
 PyGenericAlias::PyGenericAlias(PyObject *origin, PyTuple *args, PyObject *parameters)
-	: PyBaseObject(BuiltinTypes::the().generic_alias()), m_origin(origin), m_args(args),
+	: PyBaseObject(types::BuiltinTypes::the().generic_alias()), m_origin(origin), m_args(args),
 	  m_parameters(parameters)
 {}
 
@@ -90,7 +90,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyGenericAlias::type_factory()
 	};
 }
 
-PyType *PyGenericAlias::static_type() const { return generic_alias(); }
+PyType *PyGenericAlias::static_type() const { return types::generic_alias(); }
 
 void PyGenericAlias::visit_graph(Visitor &visitor)
 {

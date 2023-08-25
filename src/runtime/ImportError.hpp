@@ -20,6 +20,8 @@ class ImportError : public Exception
 
 	ImportError(PyType *, PyTuple *args);
 
+	ImportError(TypePrototype &, PyTuple *args);
+
   private:
 	ImportError(PyTuple *args);
 
@@ -33,7 +35,7 @@ class ImportError : public Exception
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 
-	static PyType *register_type(PyModule *);
+	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	static PyType *class_type();
 

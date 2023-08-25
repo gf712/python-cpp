@@ -10,11 +10,11 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
-using namespace py;
+namespace py {
 
 PyResult<PyObject *> PyProperty::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == property())
+	ASSERT(type == types::property());
 
 	auto fget = [&]() -> PyResult<PyObject *> {
 		if (args && args->size() >= 1) {
@@ -70,8 +70,8 @@ PyResult<PyObject *> PyProperty::__new__(const PyType *type, PyTuple *args, PyDi
 PyProperty::PyProperty(PyType *type) : PyBaseObject(type) {}
 
 PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
-	: PyBaseObject(BuiltinTypes::the().property()), m_getter(fget), m_setter(fset), m_deleter(fdel),
-	  m_property_name(name)
+	: PyBaseObject(types::BuiltinTypes::the().property()), m_getter(fget), m_setter(fset),
+	  m_deleter(fdel), m_property_name(name)
 {}
 
 std::string PyProperty::to_string() const
@@ -189,42 +189,44 @@ void PyProperty::visit_graph(Visitor &visitor)
 	if (m_property_name) { visitor.visit(*m_property_name); }
 }
 
-PyType *PyProperty::static_type() const { return property(); }
+PyType *PyProperty::static_type() const { return types::property(); }
 
 namespace {
 
-std::once_flag property_flag;
+	std::once_flag property_flag;
 
-std::unique_ptr<TypePrototype> register_property()
-{
-	return std::move(klass<PyProperty>("property")
-						 .def("getter", &PyProperty::getter)
-						 .def("deleter", &PyProperty::deleter)
-						 .def("setter", &PyProperty::setter)
-						 .attr("fget", &PyProperty::m_getter)
-						 .attr("fset", &PyProperty::m_setter)
-						 .attr("fdel", &PyProperty::m_deleter)
-						 .type);
-}
+	std::unique_ptr<TypePrototype> register_property()
+	{
+		return std::move(klass<PyProperty>("property")
+							 .def("getter", &PyProperty::getter)
+							 .def("deleter", &PyProperty::deleter)
+							 .def("setter", &PyProperty::setter)
+							 .attr("fget", &PyProperty::m_getter)
+							 .attr("fset", &PyProperty::m_setter)
+							 .attr("fdel", &PyProperty::m_deleter)
+							 .type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyProperty::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(property_flag, []() { type = ::register_property(); });
+		std::call_once(property_flag, []() { type = register_property(); });
 		return std::move(type);
 	};
 }
 
-template<> PyProperty *py::as(PyObject *obj)
+template<> PyProperty *as(PyObject *obj)
 {
-	if (obj->type() == property()) { return static_cast<PyProperty *>(obj); }
+	if (obj->type() == types::property()) { return static_cast<PyProperty *>(obj); }
 	return nullptr;
 }
 
-template<> const PyProperty *py::as(const PyObject *obj)
+template<> const PyProperty *as(const PyObject *obj)
 {
-	if (obj->type() == property()) { return static_cast<const PyProperty *>(obj); }
+	if (obj->type() == types::property()) { return static_cast<const PyProperty *>(obj); }
 	return nullptr;
 }
+
+}// namespace py

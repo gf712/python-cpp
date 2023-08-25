@@ -10,7 +10,7 @@ namespace py {
 PyZip::PyZip(PyType *type) : PyBaseObject(type) {}
 
 PyZip::PyZip(std::vector<PyObject *> &&iterators)
-	: PyBaseObject(BuiltinTypes::the().zip()), m_iterators(std::move(iterators))
+	: PyBaseObject(types::BuiltinTypes::the().zip()), m_iterators(std::move(iterators))
 {}
 
 PyResult<PyObject *> PyZip::create(PyTuple *iterables)
@@ -32,7 +32,7 @@ PyResult<PyObject *> PyZip::create(PyTuple *iterables)
 
 PyResult<PyObject *> PyZip::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == zip());
+	ASSERT(type == types::zip());
 	ASSERT(!kwargs || kwargs->map().empty());
 	return PyZip::create(args);
 }
@@ -59,7 +59,7 @@ PyResult<PyObject *> PyZip::__next__()
 	}
 }
 
-PyType *PyZip::static_type() const { return zip(); }
+PyType *PyZip::static_type() const { return types::zip(); }
 
 void PyZip::visit_graph(Visitor &visitor)
 {

@@ -21,13 +21,13 @@ namespace py {
 
 template<> PyCode *as(PyObject *obj)
 {
-	if (obj->type() == code()) { return static_cast<PyCode *>(obj); }
+	if (obj->type() == types::code()) { return static_cast<PyCode *>(obj); }
 	return nullptr;
 }
 
 template<> const PyCode *as(const PyObject *obj)
 {
-	if (obj->type() == code()) { return static_cast<const PyCode *>(obj); }
+	if (obj->type() == types::code()) { return static_cast<const PyCode *>(obj); }
 	return nullptr;
 }
 
@@ -53,7 +53,7 @@ PyCode::PyCode(std::unique_ptr<Function> &&function,
 	std::vector<std::string> &&names,
 	size_t nlocals,
 	std::vector<std::string> &&varnames)
-	: PyBaseObject(BuiltinTypes::the().code()), m_function(std::move(function)),
+	: PyBaseObject(types::BuiltinTypes::the().code()), m_function(std::move(function)),
 	  m_register_count(m_function->register_count()), m_cell2arg(std::move(cell2arg)),
 	  m_arg_count(arg_count), m_cellvars(std::move(cellvars)), m_consts(consts),
 	  m_filename(std::move(filename)), m_first_line_number(first_line_number), m_flags(flags),
@@ -138,7 +138,7 @@ size_t PyCode::kwonly_arg_count() const { return m_kwonly_arg_count; }
 
 CodeFlags PyCode::flags() const { return m_flags; }
 
-PyType *PyCode::static_type() const { return code(); }
+PyType *PyCode::static_type() const { return types::code(); }
 
 const PyTuple *PyCode::consts() const { return m_consts; }
 
@@ -153,8 +153,8 @@ void PyCode::visit_graph(Visitor &visitor)
 }
 
 PyObject *PyCode::make_function(const std::string &function_name,
-	const std::vector<py::Value> &default_values,
-	const std::vector<py::Value> &kw_default_values,
+	const std::vector<Value> &default_values,
+	const std::vector<Value> &kw_default_values,
 	PyTuple *closure) const
 {
 	auto *f = m_program->as_pyfunction(function_name, default_values, kw_default_values, closure);
@@ -442,21 +442,21 @@ std::vector<uint8_t> PyCode::serialize() const
 	result.reserve(serialized_function.size());
 	for (const auto &el : serialized_function) { result.push_back(el); }
 
-	::py::serialize(m_cell2arg, result);
-	::py::serialize(m_arg_count, result);
-	::py::serialize(m_cellvars, result);
-	::py::serialize(m_consts, result);
-	::py::serialize(m_filename, result);
-	::py::serialize(m_first_line_number, result);
-	::py::serialize(static_cast<uint8_t>(m_flags.bits().to_ulong()), result);
-	::py::serialize(m_freevars, result);
-	::py::serialize(m_positional_only_arg_count, result);
-	::py::serialize(m_kwonly_arg_count, result);
-	::py::serialize(m_stack_size, result);
-	::py::serialize(m_name, result);
-	::py::serialize(m_names, result);
-	::py::serialize(m_nlocals, result);
-	::py::serialize(m_varnames, result);
+	py::serialize(m_cell2arg, result);
+	py::serialize(m_arg_count, result);
+	py::serialize(m_cellvars, result);
+	py::serialize(m_consts, result);
+	py::serialize(m_filename, result);
+	py::serialize(m_first_line_number, result);
+	py::serialize(static_cast<uint8_t>(m_flags.bits().to_ulong()), result);
+	py::serialize(m_freevars, result);
+	py::serialize(m_positional_only_arg_count, result);
+	py::serialize(m_kwonly_arg_count, result);
+	py::serialize(m_stack_size, result);
+	py::serialize(m_name, result);
+	py::serialize(m_names, result);
+	py::serialize(m_nlocals, result);
+	py::serialize(m_varnames, result);
 
 	return result;
 }
@@ -465,22 +465,22 @@ std::pair<PyResult<PyCode *>, size_t> PyCode::deserialize(std::span<const uint8_
 	std::shared_ptr<Program> program)
 {
 	auto function = Bytecode::deserialize(buffer, program);
-	const auto cell2arg = ::py::deserialize<std::vector<size_t>>(buffer);
-	const auto arg_count = ::py::deserialize<size_t>(buffer);
-	const auto cellvars = ::py::deserialize<std::vector<std::string>>(buffer);
-	const auto consts = ::py::deserialize<PyTuple>(buffer);
+	const auto cell2arg = py::deserialize<std::vector<size_t>>(buffer);
+	const auto arg_count = py::deserialize<size_t>(buffer);
+	const auto cellvars = py::deserialize<std::vector<std::string>>(buffer);
+	const auto consts = py::deserialize<PyTuple>(buffer);
 	if (consts.is_err()) { return { Err(consts.unwrap_err()), 0 }; }
-	const auto filename = ::py::deserialize<std::string>(buffer);
-	const auto first_line_number = ::py::deserialize<size_t>(buffer);
-	const auto flags = ::py::deserialize<uint8_t>(buffer);
-	const auto freevars = ::py::deserialize<std::vector<std::string>>(buffer);
-	const auto positional_only_arg_count = ::py::deserialize<size_t>(buffer);
-	const auto kwonly_arg_count = ::py::deserialize<size_t>(buffer);
-	const auto stack_size = ::py::deserialize<size_t>(buffer);
-	const auto name = ::py::deserialize<std::string>(buffer);
-	const auto names = ::py::deserialize<std::vector<std::string>>(buffer);
-	const auto nlocals = ::py::deserialize<size_t>(buffer);
-	const auto varnames = ::py::deserialize<std::vector<std::string>>(buffer);
+	const auto filename = py::deserialize<std::string>(buffer);
+	const auto first_line_number = py::deserialize<size_t>(buffer);
+	const auto flags = py::deserialize<uint8_t>(buffer);
+	const auto freevars = py::deserialize<std::vector<std::string>>(buffer);
+	const auto positional_only_arg_count = py::deserialize<size_t>(buffer);
+	const auto kwonly_arg_count = py::deserialize<size_t>(buffer);
+	const auto stack_size = py::deserialize<size_t>(buffer);
+	const auto name = py::deserialize<std::string>(buffer);
+	const auto names = py::deserialize<std::vector<std::string>>(buffer);
+	const auto nlocals = py::deserialize<size_t>(buffer);
+	const auto varnames = py::deserialize<std::vector<std::string>>(buffer);
 
 	return { PyCode::create(std::move(function),
 				 cell2arg,

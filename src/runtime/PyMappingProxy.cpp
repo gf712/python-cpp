@@ -7,7 +7,7 @@ namespace py {
 PyMappingProxy::PyMappingProxy(PyType *type) : PyBaseObject(type) {}
 
 PyMappingProxy::PyMappingProxy(PyObject *mapping)
-	: PyBaseObject(BuiltinTypes::the().mappingproxy()), m_mapping(mapping)
+	: PyBaseObject(types::BuiltinTypes::the().mappingproxy()), m_mapping(mapping)
 {}
 
 PyResult<PyObject *> PyMappingProxy::create(PyObject *mapping)
@@ -25,7 +25,7 @@ std::string PyMappingProxy::to_string() const { return "mappingproxy"; }
 
 PyResult<PyObject *> PyMappingProxy::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == mappingproxy());
+	ASSERT(type == types::mappingproxy());
 	ASSERT(args && args->size() == 1);
 	ASSERT(!kwargs || kwargs->map().empty());
 	return PyObject::from(args->elements()[0]).and_then([](PyObject *mapping) {
@@ -84,7 +84,7 @@ PyResult<PyObject *> PyMappingProxy::items() const
 	});
 }
 
-PyType *PyMappingProxy::static_type() const { return mappingproxy(); }
+PyType *PyMappingProxy::static_type() const { return types::mappingproxy(); }
 
 void PyMappingProxy::visit_graph(Visitor &visitor)
 {

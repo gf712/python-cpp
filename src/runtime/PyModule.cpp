@@ -16,12 +16,12 @@
 
 #include <filesystem>
 
-using namespace py;
+namespace py {
 
 PyModule::PyModule(PyType *type) : PyBaseObject(type) {}
 
 PyModule::PyModule(PyDict *symbol_table, PyString *module_name, PyObject *doc)
-	: PyBaseObject(BuiltinTypes::the().module()), m_module_name(module_name), m_doc(doc)
+	: PyBaseObject(types::BuiltinTypes::the().module()), m_module_name(module_name), m_doc(doc)
 {
 	m_package = PyString::create("").unwrap();
 	m_loader = py_none();
@@ -51,7 +51,7 @@ PyResult<PyObject *> PyModule::__repr__() const
 
 PyResult<PyObject *> PyModule::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == module());
+	ASSERT(type == types::module());
 	ASSERT(!kwargs || kwargs->map().empty());
 
 	auto symbol_table = PyDict::create();
@@ -92,16 +92,16 @@ PyResult<int32_t> PyModule::__init__(PyTuple *args, PyDict *kwargs)
 void PyModule::add_symbol(PyString *key, const Value &value) { m_attributes->insert(key, value); }
 
 namespace {
-bool is_initializing(PyObject *spec)
-{
-	auto _initializing_str = PyString::create("_initializing");
-	ASSERT(_initializing_str.is_ok())
-	auto value = spec->get_attribute(_initializing_str.unwrap());
-	if (value.is_err()) { return false; }
-	auto is_true = truthy(value.unwrap(), VirtualMachine::the().interpreter());
-	if (is_true.is_ok()) { return is_true.unwrap(); }
-	return false;
-}
+	bool is_initializing(PyObject *spec)
+	{
+		auto _initializing_str = PyString::create("_initializing");
+		ASSERT(_initializing_str.is_ok())
+		auto value = spec->get_attribute(_initializing_str.unwrap());
+		if (value.is_err()) { return false; }
+		auto is_true = truthy(value.unwrap(), VirtualMachine::the().interpreter());
+		if (is_true.is_ok()) { return is_true.unwrap(); }
+		return false;
+	}
 }// namespace
 
 PyResult<PyObject *> PyModule::__getattribute__(PyObject *attribute) const
@@ -169,7 +169,7 @@ PyResult<PyModule *> PyModule::create(PyDict *symbol_table, PyString *module_nam
 	return Ok(result);
 }
 
-PyType *PyModule::static_type() const { return module(); }
+PyType *PyModule::static_type() const { return types::module(); }
 
 void PyModule::set_program(std::shared_ptr<Program> program) { m_program = std::move(program); }
 
@@ -177,32 +177,33 @@ const std::shared_ptr<Program> &PyModule::program() const { return m_program; }
 
 namespace {
 
-std::once_flag module_flag;
+	std::once_flag module_flag;
 
-std::unique_ptr<TypePrototype> register_module()
-{
-	return std::move(klass<PyModule>("module").attr("__dict__", &PyModule::m_dict).type);
-}
+	std::unique_ptr<TypePrototype> register_module()
+	{
+		return std::move(klass<PyModule>("module").attr("__dict__", &PyModule::m_dict).type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyModule::type_factory()
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(module_flag, []() { type = ::register_module(); });
+		std::call_once(module_flag, []() { type = register_module(); });
 		return std::move(type);
 	};
 }
 
-template<> PyModule *py::as(PyObject *obj)
+template<> PyModule *as(PyObject *obj)
 {
-	if (obj->type() == module()) { return static_cast<PyModule *>(obj); }
+	if (obj->type() == types::module()) { return static_cast<PyModule *>(obj); }
 	return nullptr;
 }
 
 
-template<> const PyModule *py::as(const PyObject *obj)
+template<> const PyModule *as(const PyObject *obj)
 {
-	if (obj->type() == module()) { return static_cast<const PyModule *>(obj); }
+	if (obj->type() == types::module()) { return static_cast<const PyModule *>(obj); }
 	return nullptr;
 }
+}// namespace py

@@ -9,13 +9,13 @@ namespace py {
 
 template<> PyGenerator *as(PyObject *obj)
 {
-	if (obj->type() == generator()) { return static_cast<PyGenerator *>(obj); }
+	if (obj->type() == types::generator()) { return static_cast<PyGenerator *>(obj); }
 	return nullptr;
 }
 
 template<> const PyGenerator *as(const PyObject *obj)
 {
-	if (obj->type() == generator()) { return static_cast<const PyGenerator *>(obj); }
+	if (obj->type() == types::generator()) { return static_cast<const PyGenerator *>(obj); }
 	return nullptr;
 }
 
@@ -27,7 +27,7 @@ PyGenerator::PyGenerator(PyFrame *frame,
 	PyObject *code,
 	PyString *name,
 	PyString *qualname)
-	: GeneratorInterface(BuiltinTypes::the().generator(),
+	: GeneratorInterface(types::BuiltinTypes::the().generator(),
 		frame,
 		std::move(stack_frame),
 		is_running,
@@ -70,7 +70,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyGenerator::type_factory()
 	};
 }
 
-PyType *PyGenerator::static_type() const { return generator(); }
+PyType *PyGenerator::static_type() const { return types::generator(); }
 
 void PyGenerator::visit_graph(Visitor &visitor)
 {
