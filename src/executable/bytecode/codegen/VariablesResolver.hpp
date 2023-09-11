@@ -27,7 +27,7 @@ class VariablesResolver : public ast::CodeGenerator
 
 	struct SymbolMap
 	{
-		std::set<Symbol> symbols;
+		std::vector<Symbol> symbols;
 		bool contains(std::string name) const
 		{
 			return std::find_if(symbols.begin(), symbols.end(), [&name](const auto &s) {
@@ -70,9 +70,15 @@ class VariablesResolver : public ast::CodeGenerator
 			} else {
 				ASSERT(!get_visible_symbol(s.name).has_value());
 			}
-			symbols.insert(std::move(s));
+			symbols.push_back(std::move(s));
 		}
-		void delete_symbol(const Symbol &s) { symbols.erase(s); }
+		void delete_symbol(const Symbol &s)
+		{
+			auto it = std::find_if(symbols.begin(), symbols.end(), [name = s.name](const auto &s) {
+				return s.name == name;
+			});
+			if (it != symbols.end()) { symbols.erase(it); }
+		}
 	};
 
 	struct Scope : NonCopyable

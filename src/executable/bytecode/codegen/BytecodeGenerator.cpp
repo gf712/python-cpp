@@ -785,7 +785,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	f->function_info().function.metadata.kwonly_arg_count = kwonly_arg_count;
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.flags = flags;
@@ -1033,7 +1033,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	f->function_info().function.metadata.cell2arg = std::move(cell2arg);
 	f->function_info().function.metadata.flags = flags;
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 
@@ -2712,7 +2712,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 		}
 	}
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
@@ -2815,7 +2815,7 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 		}
 	}
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
@@ -2917,7 +2917,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 		}
 	}
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;
@@ -3018,7 +3018,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 		}
 	}
 	f->function_info().function.metadata.varnames.insert(
-		f->function_info().function.metadata.varnames.begin(), varnames.begin(), varnames.end());
+		f->function_info().function.metadata.varnames.end(), varnames.begin(), varnames.end());
 	f->function_info().function.metadata.nlocals =
 		f->function_info().function.metadata.varnames.size();
 	f->function_info().function.metadata.arg_count = 1;

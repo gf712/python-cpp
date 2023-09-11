@@ -370,7 +370,7 @@ template<typename FunctionType> void VariablesResolver::visit_function(FunctionT
 		if (default_) { default_->codegen(this); }
 	}
 
-	ASSERT(!m_visibility.contains(function_name))
+	ASSERT(!m_visibility.contains(function_name));
 
 	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE
 		|| caller->get().type == Scope::Type::CLASS) {
