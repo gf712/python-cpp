@@ -114,6 +114,7 @@ namespace types {
 		mutable Type m_syntax_error;
 		mutable Type m_memory_error;
 		mutable Type m_stop_iteration;
+		mutable Type m_unbound_local_error;
 
 		BuiltinTypes();
 
@@ -234,6 +235,7 @@ namespace types {
 		TypePrototype &syntax_error() const { return get_type(m_syntax_error); }
 		TypePrototype &memory_error() const { return get_type(m_memory_error); }
 		TypePrototype &stop_iteration() const { return get_type(m_stop_iteration); }
+		TypePrototype &unbound_local_error() const { return get_type(m_unbound_local_error); }
 	};
 
 	PyType *type();
@@ -319,5 +321,6 @@ namespace types {
 	PyType *syntax_error();
 	PyType *memory_error();
 	PyType *stop_iteration();
+	PyType *unbound_local_error();
 }// namespace types
 }// namespace py

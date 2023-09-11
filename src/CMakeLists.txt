@@ -190,6 +190,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/StopIteration.cpp
     runtime/SyntaxError.cpp
     runtime/TypeError.cpp
+    runtime/UnboundLocalError.cpp
     runtime/Value.cpp
     runtime/ValueError.cpp)
 

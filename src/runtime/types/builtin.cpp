@@ -60,6 +60,7 @@
 #include "runtime/RuntimeError.hpp"
 #include "runtime/StopIteration.hpp"
 #include "runtime/SyntaxError.hpp"
+#include "runtime/UnboundLocalError.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/warnings/ImportWarning.hpp"
 #include "runtime/warnings/Warning.hpp"
@@ -117,7 +118,8 @@ BuiltinTypes::BuiltinTypes()
 	  m_os_error(OSError::type_factory()), m_lookup_error(LookupError::type_factory()),
 	  m_index_error(IndexError::type_factory()), m_warning(Warning::type_factory()),
 	  m_import_warning(ImportWarning::type_factory()), m_syntax_error(SyntaxError::type_factory()),
-	  m_memory_error(MemoryError::type_factory()), m_stop_iteration(StopIteration::type_factory())
+	  m_memory_error(MemoryError::type_factory()), m_stop_iteration(StopIteration::type_factory()),
+	  m_unbound_local_error(UnboundLocalError::type_factory())
 {}
 
 #define INITIALIZE_TYPE(TYPENAME)                                                         \
@@ -232,5 +234,6 @@ INITIALIZE_TYPE(import_warning)
 INITIALIZE_TYPE(syntax_error)
 INITIALIZE_TYPE(memory_error)
 INITIALIZE_TYPE(stop_iteration)
+INITIALIZE_TYPE(unbound_local_error)
 
 }// namespace py::types
