@@ -281,7 +281,8 @@ void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 	}();
 
 	switch (symbol.get().visibility) {
-	case VariablesResolver::Visibility::GLOBAL: {
+	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
+	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		emit<StoreGlobal>(load_name(name, m_function_id)->get_index(), src->get_register());
 	} break;
 	case VariablesResolver::Visibility::NAME: {
@@ -346,18 +347,25 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	}();
 
 	switch (visibility) {
-	case VariablesResolver::Visibility::GLOBAL: {
+	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
+	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		emit<LoadGlobal>(dst->get_register(), load_name(name, m_function_id)->get_index());
 	} break;
 	case VariablesResolver::Visibility::NAME: {
 		emit<LoadName>(dst->get_register(), name);
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
-		ASSERT(m_stack.top().locals.contains(name));
-		const auto &l = m_stack.top().locals.at(name);
-		ASSERT(std::holds_alternative<BytecodeStackValue *>(l));
-		emit<LoadFast>(
-			dst->get_register(), std::get<BytecodeStackValue *>(l)->get_stack_index(), name);
+		auto *value = [&]() -> BytecodeStackValue * {
+			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				return std::get<BytecodeStackValue *>(it->second);
+			} else {
+				auto *value = create_stack_value();
+				m_stack.top().locals.emplace(name, value);
+				return value;
+			}
+		}();
+		emit<LoadFast>(dst->get_register(), value->get_stack_index(), name);
 	} break;
 	case VariablesResolver::Visibility::CELL:
 	case VariablesResolver::Visibility::FREE: {
@@ -1070,7 +1078,8 @@ Value *BytecodeGenerator::visit(const Argument *node)
 	case VariablesResolver::Visibility::LOCAL: {
 		m_stack.top().locals.emplace(node->name(), create_stack_value());
 	} break;
-	case VariablesResolver::Visibility::GLOBAL: {
+	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
+	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		TODO();
 	} break;
 	case VariablesResolver::Visibility::NAME: {
@@ -3150,8 +3159,11 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode
 			case VariablesResolver::Visibility::CELL: {
 				spdlog::debug("  - {}: CELL {}", k, source_location);
 			} break;
-			case VariablesResolver::Visibility::GLOBAL: {
-				spdlog::debug("  - {}: GLOBAL {}", k, source_location);
+			case VariablesResolver::Visibility::EXPLICIT_GLOBAL: {
+				spdlog::debug("  - {}: EXPLICIT GLOBAL {}", k, source_location);
+			} break;
+			case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
+				spdlog::debug("  - {}: IMPLICIT GLOBAL {}", k, source_location);
 			} break;
 			case VariablesResolver::Visibility::HIDDEN: {
 				spdlog::debug("  - {}: HIDDEN {}", k, source_location);

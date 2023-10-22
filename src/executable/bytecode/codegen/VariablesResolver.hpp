@@ -8,12 +8,13 @@ class VariablesResolver : public ast::CodeGenerator
 {
   public:
 	enum class Visibility {
-		GLOBAL = 0,
-		NAME = 1,
-		LOCAL = 2,
-		CELL = 3,
-		FREE = 4,
-		HIDDEN = 5,// assignments in a class scope are hidden, ie. cannot be referred to
+		IMPLICIT_GLOBAL = 0,
+		EXPLICIT_GLOBAL = 1,
+		NAME = 2,
+		LOCAL = 3,
+		CELL = 4,
+		FREE = 5,
+		HIDDEN = 6,// assignments in a class scope are hidden, ie. cannot be referred to
 	};
 
 	struct Symbol
@@ -112,6 +113,7 @@ class VariablesResolver : public ast::CodeGenerator
 
 	void store(const std::string &name, SourceLocation source_location, Scope::Type type);
 	void load(const std::string &name, SourceLocation source_location, Scope::Type type);
+	void delete_(const std::string &name, SourceLocation source_location, Scope::Type type);
 	void annotate_free_and_cell_variables(const std::string &name);
 	Scope *top_level_node(const std::string &name) const;
 	Scope *find_outer_scope_of_type(Scope::Type) const;

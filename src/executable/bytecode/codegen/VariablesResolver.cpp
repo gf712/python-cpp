@@ -38,7 +38,8 @@ void VariablesResolver::annotate_free_and_cell_variables(const std::string &name
 	ASSERT(child);
 
 	if (!top_node) {
-		child->symbol_map.add_symbol(Symbol{ .name = name, .visibility = Visibility::GLOBAL });
+		child->symbol_map.add_symbol(
+			Symbol{ .name = name, .visibility = Visibility::IMPLICIT_GLOBAL });
 		return;
 	}
 	auto *parent = child->parent;
@@ -71,16 +72,26 @@ void VariablesResolver::store(const std::string &name,
 	(void)mangled_name;
 	auto &current_scope_vars = m_current_scope->get().symbol_map;
 
-	if (current_scope_vars.contains(name)) { return; }
 	if (type == Scope::Type::MODULE) {
+		if (current_scope_vars.contains(name)) { return; }
 		current_scope_vars.add_symbol(Symbol{ .name = name,
-			.visibility = Visibility::NAME,
+			.visibility = Visibility::IMPLICIT_GLOBAL,
 			.source_location = std::move(source_location) });
 	} else if (type == Scope::Type::FUNCTION) {
-		current_scope_vars.add_symbol(Symbol{ .name = name,
-			.visibility = Visibility::LOCAL,
-			.source_location = std::move(source_location) });
+		if (auto s = current_scope_vars.get_symbol(name); s.has_value()) {
+			if (s->get().visibility == Visibility::IMPLICIT_GLOBAL) {
+				current_scope_vars.delete_symbol(*s);
+				current_scope_vars.add_symbol(Symbol{ .name = name,
+					.visibility = Visibility::LOCAL,
+					.source_location = std::move(source_location) });
+			}
+		} else {
+			current_scope_vars.add_symbol(Symbol{ .name = name,
+				.visibility = Visibility::LOCAL,
+				.source_location = std::move(source_location) });
+		}
 	} else if (type == Scope::Type::CLOSURE) {
+		if (current_scope_vars.contains(name)) { return; }
 		// look around the parent functions to see if variable is defined there
 		auto *parent = m_current_scope->get().parent;
 		bool found = false;
@@ -90,7 +101,8 @@ void VariablesResolver::store(const std::string &name,
 				if (it->get().visibility == Visibility::CELL) {
 					annotate_free_and_cell_variables(name);
 					found = true;
-				} else if (it->get().visibility == Visibility::GLOBAL
+				} else if (it->get().visibility == Visibility::IMPLICIT_GLOBAL
+						   || it->get().visibility == Visibility::EXPLICIT_GLOBAL
 						   || it->get().visibility == Visibility::FREE) {
 					found = true;
 				}
@@ -104,6 +116,68 @@ void VariablesResolver::store(const std::string &name,
 				.source_location = std::move(source_location) });
 		}
 	} else if (type == Scope::Type::CLASS) {
+		if (current_scope_vars.contains(name)) { return; }
+		current_scope_vars.add_symbol(Symbol{ .name = name,
+			.visibility = Visibility::HIDDEN,
+			.source_location = std::move(source_location) });
+	} else {
+		TODO();
+	}
+}
+
+
+void VariablesResolver::delete_(const std::string &name,
+	SourceLocation source_location,
+	Scope::Type type)
+{
+	auto &current_scope_vars = m_current_scope->get().symbol_map;
+
+	if (type == Scope::Type::MODULE) {
+		if (!current_scope_vars.contains(name)) {
+			current_scope_vars.add_symbol(Symbol{ .name = name,
+				.visibility = Visibility::IMPLICIT_GLOBAL,
+				.source_location = std::move(source_location) });
+		}
+	} else if (type == Scope::Type::FUNCTION) {
+		if (auto s = current_scope_vars.get_symbol(name); s.has_value()) {
+			if (s->get().visibility == Visibility::IMPLICIT_GLOBAL) {
+				current_scope_vars.delete_symbol(*s);
+				current_scope_vars.add_symbol(Symbol{ .name = name,
+					.visibility = Visibility::LOCAL,
+					.source_location = std::move(source_location) });
+			}
+		} else {
+			current_scope_vars.add_symbol(Symbol{ .name = name,
+				.visibility = Visibility::LOCAL,
+				.source_location = std::move(source_location) });
+		}
+	} else if (type == Scope::Type::CLOSURE) {
+		if (current_scope_vars.contains(name)) { return; }
+		// look around the parent functions to see if variable is defined there
+		auto *parent = m_current_scope->get().parent;
+		bool found = false;
+		while (parent) {
+			auto &visibility = parent->symbol_map;
+			if (auto it = visibility.get_visible_symbol(name); it.has_value()) {
+				if (it->get().visibility == Visibility::CELL) {
+					annotate_free_and_cell_variables(name);
+					found = true;
+				} else if (it->get().visibility == Visibility::IMPLICIT_GLOBAL
+						   || it->get().visibility == Visibility::EXPLICIT_GLOBAL
+						   || it->get().visibility == Visibility::FREE) {
+					found = true;
+				}
+				break;
+			}
+			parent = parent->parent;
+		}
+		if (!found) {
+			current_scope_vars.add_symbol(Symbol{ .name = name,
+				.visibility = Visibility::LOCAL,
+				.source_location = std::move(source_location) });
+		}
+	} else if (type == Scope::Type::CLASS) {
+		if (current_scope_vars.contains(name)) { return; }
 		current_scope_vars.add_symbol(Symbol{ .name = name,
 			.visibility = Visibility::HIDDEN,
 			.source_location = std::move(source_location) });
@@ -151,7 +225,7 @@ void VariablesResolver::load(const std::string &name,
 			.source_location = std::move(source_location) });
 	} else if (type == Scope::Type::FUNCTION) {
 		current_scope_vars.add_symbol(Symbol{ .name = name,
-			.visibility = Visibility::GLOBAL,
+			.visibility = Visibility::IMPLICIT_GLOBAL,
 			.source_location = std::move(source_location) });
 	} else if (type == Scope::Type::CLOSURE || type == Scope::Type::CLASS) {
 		auto *parent = m_current_scope->get().parent;
@@ -159,9 +233,10 @@ void VariablesResolver::load(const std::string &name,
 		while (parent) {
 			auto &visibility = parent->symbol_map;
 			if (auto it = visibility.get_visible_symbol(name); it.has_value()) {
-				if (it->get().visibility == Visibility::GLOBAL) {
+				if (it->get().visibility == Visibility::EXPLICIT_GLOBAL
+					|| it->get().visibility == Visibility::IMPLICIT_GLOBAL) {
 					current_scope_vars.add_symbol(Symbol{ .name = name,
-						.visibility = Visibility::GLOBAL,
+						.visibility = it->get().visibility,
 						.source_location = std::move(source_location) });
 					found = true;
 					break;
@@ -176,7 +251,7 @@ void VariablesResolver::load(const std::string &name,
 		}
 		if (!found) {
 			current_scope_vars.add_symbol(Symbol{ .name = name,
-				.visibility = Visibility::GLOBAL,
+				.visibility = Visibility::IMPLICIT_GLOBAL,
 				.source_location = std::move(source_location) });
 		}
 	} else {
@@ -300,7 +375,7 @@ Value *VariablesResolver::visit(const Constant *) { return nullptr; }
 
 Value *VariablesResolver::visit(const Delete *node)
 {
-	(void)node;
+	for (const auto &target : node->targets()) { target->codegen(this); }
 	return nullptr;
 }
 
@@ -463,7 +538,7 @@ Value *VariablesResolver::visit(const Global *node)
 			}
 		}
 		m_current_scope->get().symbol_map.add_symbol(Symbol{ .name = name,
-			.visibility = Visibility::GLOBAL,
+			.visibility = Visibility::EXPLICIT_GLOBAL,
 			.source_location = node->source_location() });
 	}
 	return nullptr;
@@ -475,8 +550,12 @@ Value *VariablesResolver::visit(const NonLocal *node)
 
 	for (const auto &name : node->names()) {
 		if (auto it = visibility.get_visible_symbol(name); it.has_value()) {
-			if (it->get().visibility == Visibility::NAME
-				|| it->get().visibility == Visibility::LOCAL) {
+			if (it->get().visibility == Visibility::EXPLICIT_GLOBAL) {
+				// TODO: raise SyntaxError
+				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+				std::abort();
+			} else if (it->get().visibility == Visibility::NAME
+					   || it->get().visibility == Visibility::LOCAL) {
 				// TODO: raise SyntaxError
 				spdlog::error(
 					"SyntaxError: name '{}' is assigned to before nonlocal declaration", name);
@@ -617,8 +696,10 @@ Value *VariablesResolver::visit(const Name *node)
 		for (const auto &name : node->ids()) {
 			store(name, node->source_location(), m_current_scope->get().type);
 		}
-	} else {
-		TODO();
+	} else if (node->context_type() == ContextType::DELETE) {
+		for (const auto &name : node->ids()) {
+			delete_(name, node->source_location(), m_current_scope->get().type);
+		}
 	}
 	return nullptr;
 }
