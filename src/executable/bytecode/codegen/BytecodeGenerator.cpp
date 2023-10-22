@@ -11,6 +11,8 @@
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/ClearTopCleanup.hpp"
 #include "executable/bytecode/instructions/CompareOperation.hpp"
+#include "executable/bytecode/instructions/DeleteFast.hpp"
+#include "executable/bytecode/instructions/DeleteGlobal.hpp"
 #include "executable/bytecode/instructions/DeleteName.hpp"
 #include "executable/bytecode/instructions/DeleteSubscript.hpp"
 #include "executable/bytecode/instructions/DictAdd.hpp"
@@ -407,15 +409,25 @@ void BytecodeGenerator::delete_var(const std::string &name)
 	}();
 
 	switch (symbol.get().visibility) {
-	case VariablesResolver::Visibility::GLOBAL: {
-		TODO();
+	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
+	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
+		emit<DeleteGlobal>(load_const(py::String{ name }, m_function_id)->get_index());
 	} break;
 	case VariablesResolver::Visibility::NAME: {
 		emit<DeleteName>(load_const(py::String{ name }, m_function_id)->get_index());
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
-		TODO();
-		// emit<DeleteFast>();
+		auto *value = [&]() -> BytecodeStackValue * {
+			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				return std::get<BytecodeStackValue *>(it->second);
+			} else {
+				auto *value = create_stack_value();
+				m_stack.top().locals.emplace(name, value);
+				return value;
+			}
+		}();
+		emit<DeleteFast>(value->get_stack_index());
 	} break;
 	case VariablesResolver::Visibility::CELL:
 	case VariablesResolver::Visibility::FREE: {

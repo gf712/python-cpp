@@ -21,6 +21,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/DictAdd.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/DictUpdate.cpp
+    executable/bytecode/instructions/DeleteFast.cpp
+    executable/bytecode/instructions/DeleteGlobal.cpp
     executable/bytecode/instructions/DeleteName.cpp
     executable/bytecode/instructions/DeleteSubscript.cpp
     executable/bytecode/instructions/ForIter.cpp

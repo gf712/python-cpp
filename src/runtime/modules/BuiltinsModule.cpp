@@ -32,6 +32,7 @@
 #include "runtime/StopIteration.hpp"
 #include "runtime/SyntaxError.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/UnboundLocalError.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/types/builtin.hpp"
 #include "runtime/warnings/ImportWarning.hpp"
@@ -1088,6 +1089,7 @@ auto builtin_exceptions()
 		types::syntax_error(),
 		types::memory_error(),
 		types::stop_iteration(),
+		types::unbound_local_error(),
 	};
 }
 

@@ -90,5 +90,7 @@ static constexpr uint8_t BUILD_STRING = 72;
 static constexpr uint8_t FORMAT_VALUE = 73;
 static constexpr uint8_t PUSH = 74;
 static constexpr uint8_t POP = 75;
+static constexpr uint8_t DELETE_FAST = 76;
+static constexpr uint8_t DELETE_GLOBAL = 77;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);
