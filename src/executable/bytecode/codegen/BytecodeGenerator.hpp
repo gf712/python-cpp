@@ -357,7 +357,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	BytecodeValue *build_tuple(const std::vector<Register> &);
 	BytecodeValue *build_set(const std::vector<Register> &);
 	BytecodeValue *build_string(const std::vector<Register> &);
-	
+
 	void emit_call(Register func, const std::vector<Register> &);
 	void make_function(Register,
 		const std::string &,
@@ -431,11 +431,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::string mangle_namespace(std::stack<BytecodeGenerator::Scope> s) const;
 
 	void create_nested_scope(const std::string &name, const std::string &mangled_name);
-	std::tuple<std::vector<std::shared_ptr<Label>>,
-		std::vector<std::shared_ptr<Label>>,
-		BytecodeValue *>
-		visit_comprehension(const std::vector<std::shared_ptr<ast::Comprehension>> &comprehensions,
-			std::function<BytecodeValue *()> container_builder);
+	std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>>
+		visit_comprehension(const std::vector<std::shared_ptr<ast::Comprehension>> &comprehensions);
 
 	template<typename FunctionType> ast::Value *generate_function(const FunctionType *);
 };

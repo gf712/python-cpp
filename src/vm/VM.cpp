@@ -39,6 +39,7 @@ StackFrame::StackFrame(StackFrame &&other)
 {
 	if (!locals_storage.empty()) {
 		locals = std::span{ locals_storage.begin(), locals_storage.end() };
+		other.locals = std::span<py::Value>{};
 	} else if (!locals.empty()) {
 		locals = std::move(other.locals);
 	}

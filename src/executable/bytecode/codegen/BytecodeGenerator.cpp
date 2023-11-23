@@ -2570,18 +2570,14 @@ Value *BytecodeGenerator::visit(const FormattedValue *node)
 
 Value *BytecodeGenerator::visit(const Comprehension *) { TODO(); }
 
-std::
-	tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>, BytecodeValue *>
+std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>>
 	BytecodeGenerator::visit_comprehension(
-		const std::vector<std::shared_ptr<Comprehension>> &comprehensions,
-		std::function<BytecodeValue *()> container_builder)
+		const std::vector<std::shared_ptr<Comprehension>> &comprehensions)
 {
 	static size_t comprehension_count = 0;
 
 	std::vector<std::shared_ptr<Label>> start_labels;
 	std::vector<std::shared_ptr<Label>> end_labels;
-
-	auto *container = container_builder();
 
 	auto *src = create_stack_value();
 	auto *it = create_value();
@@ -2645,7 +2641,7 @@ std::
 		first = false;
 	}
 
-	return { start_labels, end_labels, container };
+	return { start_labels, end_labels };
 }
 
 Value *BytecodeGenerator::visit(const ListComp *node)
@@ -2668,8 +2664,8 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	auto [start_labels, end_labels, list] =
-		visit_comprehension(node->generators(), [this]() { return build_list({}); });
+	auto *list = build_list({});
+	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *element = generate(node->elt().get(), m_function_id);
 	ASSERT(element)
 	emit<ListAppend>(list->get_register(), element->get_register());
@@ -2769,8 +2765,8 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	auto [start_labels, end_labels, dict] =
-		visit_comprehension(node->generators(), [this]() { return build_dict({}, {}); });
+	auto *dict = build_dict({}, {});
+	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *key = generate(node->key().get(), m_function_id);
 	ASSERT(key);
 	auto *value = generate(node->value().get(), m_function_id);
@@ -2873,11 +2869,10 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	auto [start_labels, end_labels, list] =
-		visit_comprehension(node->generators(), [this]() { return build_list({}); });
+	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *element = generate(node->elt().get(), m_function_id);
-	ASSERT(element)
-	emit<ListAppend>(list->get_register(), element->get_register());
+	ASSERT(element);
+	emit<YieldValue>(element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
 	while (!start_labels.empty()) {
 		auto start_label = start_labels.back();
@@ -2887,7 +2882,11 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
-	emit<ReturnValue>(list->get_register());
+
+	auto none_value_register = allocate_register();
+	auto *value = load_const(py::NameConstant{ py::NoneType{} }, f->function_info().function_id);
+	emit<LoadConst>(none_value_register, value->get_index());
+	emit<ReturnValue>(none_value_register);
 
 	m_stack.pop();
 	exit_function(f->function_info().function_id);
@@ -2944,7 +2943,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	f->function_info().function.metadata.arg_count = 1;
 	f->function_info().function.metadata.kwonly_arg_count = 0;
 	f->function_info().function.metadata.cell2arg = {};
-	f->function_info().function.metadata.flags = CodeFlags::create();
+	f->function_info().function.metadata.flags = CodeFlags::create(CodeFlags::Flag::GENERATOR);
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
 	auto *generator = node->generators()[0].get();
 	auto *iterable = generate(generator->iter().get(), m_function_id);
@@ -2974,11 +2973,11 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	auto *block = allocate_block(m_function_id);
 	auto *old_block = m_current_block;
 	set_insert_point(block);
-	auto [start_labels, end_labels, list] =
-		visit_comprehension(node->generators(), [this]() { return build_set({}); });
+	auto *set = build_set({});
+	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *element = generate(node->elt().get(), m_function_id);
 	ASSERT(element)
-	emit<SetAdd>(list->get_register(), element->get_register());
+	emit<SetAdd>(set->get_register(), element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
 	while (!start_labels.empty()) {
 		auto start_label = start_labels.back();
@@ -2988,7 +2987,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 		start_labels.pop_back();
 		end_labels.pop_back();
 	}
-	emit<ReturnValue>(list->get_register());
+	emit<ReturnValue>(set->get_register());
 
 	m_stack.pop();
 	exit_function(f->function_info().function_id);
