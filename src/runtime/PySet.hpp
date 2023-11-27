@@ -42,6 +42,7 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> add(PyObject *element);
 	PyResult<PyObject *> discard(PyObject *element);
 	PyResult<PyObject *> remove(PyObject *element);
+	PyResult<PySet *> update(PyObject* iterable);
 	PyResult<PySet *> intersection(PyTuple* args, PyDict* kwargs) const;
 	PyResult<PyObject *> pop();
 

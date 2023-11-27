@@ -74,6 +74,24 @@ PyResult<PyObject *> PySet::remove(PyObject *element)
 	}
 }
 
+PyResult<PySet *> PySet::update(PyObject *others)
+{
+	auto others_iterator = others->iter();
+	if (others_iterator.is_err()) { return Err(others_iterator.unwrap_err()); }
+
+	auto others_value = others_iterator.unwrap()->next();
+	while (others_value.is_ok()) {
+		m_elements.insert(others_value.unwrap());
+		others_value = others_iterator.unwrap()->next();
+	}
+
+	if (!others_value.unwrap_err()->type()->issubclass(py::types::stop_iteration())) {
+		return Err(others_value.unwrap_err());
+	}
+
+	return Ok(this);
+}
+
 PyResult<PySet *> PySet::intersection(PyTuple *args, PyDict *kwargs) const
 {
 	if (kwargs && kwargs->map().size() > 0) {
@@ -225,6 +243,7 @@ namespace {
 							 .def("discard", &PySet::discard)
 							 .def("remove", &PySet::remove)
 							 .def("intersection", &PySet::intersection)
+							 .def("update", &PySet::update)
 							 .def("pop", &PySet::pop)
 							 .type);
 	}

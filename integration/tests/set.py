@@ -24,3 +24,7 @@ except KeyError:
     raises_key_error = True
 finally:
     assert raises_key_error, "set.remove should raise a KeyError when given a non-existent element"
+
+a = {1, 2, 3}
+a.update([4, 5, 6, 1, 2, 3])
+assert len(a) == 6, "set.update should add new elements to the original set"
