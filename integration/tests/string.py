@@ -141,3 +141,10 @@ def test_rstrip():
     assert b == "mississ"
 
 test_rstrip()
+
+def test_literal_hex_string():
+    a = '\xff'
+    assert ord(a) == 255
+    assert len(a) == 1
+
+test_literal_hex_string()

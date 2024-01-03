@@ -335,11 +335,25 @@ String String::from_unescaped_string(const std::string &str)
 				c = (c << 3) + *it++ - '0';
 				if (it != end && '0' <= *it && *it <= '7') { c = (c << 3) + *it++ - '0'; }
 			}
-			ASSERT(c < static_cast<int>(std::numeric_limits<unsigned char>::max()));
+			ASSERT(c <= static_cast<int>(std::numeric_limits<unsigned char>::max()));
 			output.push_back(static_cast<unsigned char>(c));
 		} break;
 		case 'x': {
-			TODO();
+			auto start = it;
+			if (start == end || std::next(start) == end) { TODO(); }
+			it++;
+			it++;
+			std::string v{ start, it };
+			int c;
+			std::istringstream(v) >> std::hex >> c;
+			ASSERT(c <= static_cast<int>(std::numeric_limits<unsigned char>::max()));
+			const auto l = c <= 0x7F ? 1 : 2;
+			if (l == 1) {
+				output.push_back(static_cast<unsigned char>(c));
+			} else {
+				output.push_back(0xC0 | (static_cast<unsigned char>(c) >> 6));
+				output.push_back(0x80 | (static_cast<unsigned char>(c) & 0x3F));
+			}
 		} break;
 		case 'u': {
 			TODO();
@@ -442,13 +456,13 @@ Bytes Bytes::from_unescaped_string(const std::string &str)
 				if (it != end && '0' <= *it && *it <= '7') { c = (c << 3) + *it++ - '0'; }
 			}
 			ASSERT(c < static_cast<int>(std::numeric_limits<unsigned char>::max()));
-			bytes.push_back(std::byte{static_cast<unsigned char>(c)});
+			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
 		} break;
 		case 'x': {
 			TODO();
 		} break;
 		default: {
-			bytes.push_back(std::byte{'\\'});
+			bytes.push_back(std::byte{ '\\' });
 			--it;
 		} break;
 		}
