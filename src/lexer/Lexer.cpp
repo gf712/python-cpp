@@ -788,15 +788,19 @@ bool Lexer::try_read_string()
 bool Lexer::try_fstring()
 {
 	const auto original_position = m_position;
-	size_t idx = 0;
 
 	auto reached_end = [this, original_position]() {
 		auto position = m_position;
-		if ((m_cursor + 1) < m_program.size() && peek(0) == '}' && peek(1) != '}') {
-			push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
-			advance(1);
-			push_token(Token::TokenType::RBRACE, position, m_position);
-			return true;
+		if ((m_cursor + 1) < m_program.size() && peek(0) == '}') {
+			if (peek(1) != '}') {
+				push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
+				advance(1);
+				push_token(Token::TokenType::RBRACE, position, m_position);
+				return true;
+			} else {
+				advance(2);
+				return false;
+			}
 		} else if ((peek(0) == '\'' && m_quote.top() == Quote::SINGLE_SINGLE_QUOTE)
 				   || (peek(0) == '"' && m_quote.top() == Quote::SINGLE_DOUBLE_QUOTE)) {
 			push_token(Token::TokenType::FSTRING_MIDDLE, original_position, position);
@@ -828,14 +832,14 @@ bool Lexer::try_fstring()
 				advance(2);
 				return false;
 			}
+		} else {
+			advance(1);
 		}
 		return false;
 	};
 
 	while (!reached_end()) {
 		ASSERT(!peek("\n"));
-		increment_column_position(1);
-		idx++;
 	}
 
 	return true;
