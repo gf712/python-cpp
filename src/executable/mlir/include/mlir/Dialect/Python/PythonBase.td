@@ -38,3 +38,34 @@ def Python_LoopOpKindAttr : I64EnumAttr<
     ]> {
   let cppNamespace = "::mlir::py";
 }
+
+def Python_FormatValueConversionAttr : I64EnumAttr<
+    "FormatValueConversion", "",
+    [
+      I64EnumAttrCase<"none", 0>,
+      I64EnumAttrCase<"repr", 1>,
+      I64EnumAttrCase<"string", 2>,
+      I64EnumAttrCase<"ascii", 3>,
+    ]> {
+  let cppNamespace = "::mlir::py";
+}
+
+def Python_InplaceOpKindAttr : I64EnumAttr<
+    "InplaceOpKind", "",
+    [
+      I64EnumAttrCase<"add", 0>,
+      I64EnumAttrCase<"sub", 1>,
+      I64EnumAttrCase<"mod", 2>,
+      I64EnumAttrCase<"mul", 3>,
+      I64EnumAttrCase<"exp", 4>,
+      I64EnumAttrCase<"div", 5>,
+      I64EnumAttrCase<"fldiv", 6>,
+      I64EnumAttrCase<"mmul", 7>,
+      I64EnumAttrCase<"lshift", 8>,
+      I64EnumAttrCase<"rshift", 9>,
+      I64EnumAttrCase<"and_", 10>,
+      I64EnumAttrCase<"or_", 11>,
+      I64EnumAttrCase<"xor_", 12>,
+    ]> {
+  let cppNamespace = "::mlir::py";
+}

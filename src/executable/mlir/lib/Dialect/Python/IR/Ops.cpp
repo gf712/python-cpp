@@ -111,22 +111,22 @@ namespace py {
 	void ForLoopOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
-		// Branching to first region: go to condition.
+		// Branching to first region: go to step.
 		if (point.isParent()) {
-			regions.emplace_back(&getCondition(), getCondition().getArguments());
+			regions.emplace_back(&getStep(), getStep().getArguments());
 		}
 		// Branching from condition: go to body or, exit or orelse if non-empty.
-		else if (point.getRegionOrNull() == &getCondition()) {
+		else if (point.getRegionOrNull() == &getStep()) {
 			if (getOrelse().empty()) {
-				regions.emplace_back(RegionSuccessor(getOperation()->getResults()));
+				regions.emplace_back(getOperation()->getResults());
 			} else {
 				regions.emplace_back(&getOrelse(), getOrelse().getArguments());
 			}
 			regions.emplace_back(&getBody(), getBody().getArguments());
 		}
-		// Branching from body: go to condition.
+		// Branching from body: go to step.
 		else if (point.getRegionOrNull() == &getBody()) {
-			regions.emplace_back(&getCondition(), getCondition().getArguments());
+			regions.emplace_back(&getStep(), getStep().getArguments());
 		}
 		// Branching from orelse: go to parent.
 		else if (point.getRegionOrNull() == &getOrelse()) {
@@ -203,10 +203,10 @@ namespace py {
 					return failure();
 				})
 				.Case<ForLoopOp>([this, &regions](ForLoopOp op) -> LogicalResult {
-					if (getOperation()->getParentRegion() == &op.getCondition()) {
+					if (getOperation()->getParentRegion() == &op.getStep()) {
 						regions.emplace_back(&op.getBody());
 					} else if (getOperation()->getParentRegion() == &op.getBody()) {
-						regions.emplace_back(&op.getCondition());
+						regions.emplace_back(&op.getStep());
 					} else if (getOperation()->getParentRegion() == &op.getOrelse()) {
 						regions.emplace_back(op->getParentRegion());
 					} else {

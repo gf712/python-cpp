@@ -27,7 +27,11 @@ class ForIter final : public Instruction
 	{}
 
 	ForIter(Register dst, Register src, int32_t offset)
-		: m_dst(dst), m_src(src), m_offset(offset), m_body_offset(0)
+		: ForIter(dst, src, offset, int32_t{ 0 })
+	{}
+
+	ForIter(Register dst, Register src, int32_t offset, int32_t body_offset)
+		: m_dst(dst), m_src(src), m_offset(offset), m_body_offset(body_offset)
 	{}
 
 	std::string to_string() const final

@@ -234,26 +234,12 @@ def LogicalXorOp : Python_Op<"logical_xor"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def InplaceAddOp : Python_Op<"iadd"> {
-    let summary = "Generic inplace addition operation";
+def InplaceOp : Python_Op<"inplace_op"> {
+    let summary = "Generic inplace operation";
 
-    let arguments = (ins Python_PyObjectType:$src, Python_PyObjectType:$dst);
-
-    let results = (outs Python_PyObjectType:$result);
-}
-
-def InplaceSubtractOp : Python_Op<"isub"> {
-    let summary = "Generic inplace subtraction operation";
-
-    let arguments = (ins Python_PyObjectType:$src, Python_PyObjectType:$dst);
-
-    let results = (outs Python_PyObjectType:$result);
-}
-
-def InplaceMultiplyOp : Python_Op<"imul"> {
-    let summary = "Generic inplace multiplication operation";
-
-    let arguments = (ins Python_PyObjectType:$src, Python_PyObjectType:$dst);
+    let arguments = (ins Python_PyObjectType:$src,
+                         Python_PyObjectType:$dst,
+                         Python_InplaceOpKindAttr:$kind);
 
     let results = (outs Python_PyObjectType:$result);
 }
@@ -379,6 +365,23 @@ def SetAddOp : Python_Op<"set_add"> {
                          Python_PyObjectType:$value);
 }
 
+def BuildStringOp : Python_Op<"build_string"> {
+    let summary = "Builds a string";
+
+    let arguments = (ins Variadic<Python_PyObjectType>:$elements);
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
+def FormatValueOp : Python_Op<"format"> {
+    let summary = "Format an object as a string using the requested conversion";
+
+    let arguments = (ins Python_PyObjectType:$value,
+                         Python_FormatValueConversionAttr:$conversion);
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
 def LoadAttributeOp: Python_Op<"load_attribute"> {
     let summary = "Load an attribute";
 
@@ -459,7 +462,9 @@ def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpIn
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
-    let regions = (region AnyRegion:$condition, AnyRegion:$body, AnyRegion:$orelse);
+    let regions = (region MinSizedRegion<1>:$body,
+                          SizedRegion<1>:$step,
+                          MinSizedRegion<1>:$orelse);
 }
 
 def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {

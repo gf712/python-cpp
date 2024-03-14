@@ -1,11 +1,11 @@
 #include "EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 
 #include "Python/Dialect.hpp"
-#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -38,6 +38,14 @@ namespace emitpybytecode {
 		assert(index < getNumSuccessors() && "invalid successor index");
 		return SuccessorOperands(
 			index == 0 ? getTrueDestOperandsMutable() : getFalseDestOperandsMutable());
+	}
+
+	SuccessorOperands ForIter::getSuccessorOperands(unsigned index)
+	{
+		if (index == 0) {
+			return SuccessorOperands(1, mlir::MutableOperandRange{ getOperation(), 0, 0 });
+		}
+		return SuccessorOperands(mlir::MutableOperandRange{ getOperation(), 0, 0 });
 	}
 }// namespace emitpybytecode
 }// namespace mlir

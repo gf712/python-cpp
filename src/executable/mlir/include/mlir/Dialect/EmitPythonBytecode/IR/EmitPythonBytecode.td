@@ -275,6 +275,32 @@ def EmitPythonBytecode_SetUpdate : EmitPythonBytecode_Op<"SET_UPDATE"> {
     let arguments = (ins Python_PyObjectType:$set, Python_PyObjectType:$iterable);
 }
 
+def EmitPythonBytecode_BuildString : EmitPythonBytecode_Op<"BUILD_STRING"> {
+    let summary = "Build a string";
+
+    let arguments = (ins Variadic<Python_PyObjectType>:$elements);
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
+def EmitPythonBytecode_BuildSlice: EmitPythonBytecode_Op<"BUILD_SLICE"> {
+    let summary = "Build a slice object";
+
+    let arguments = (ins Python_PyObjectType:$lower,
+                         Python_PyObjectType:$upper,
+                         Python_PyObjectType:$step);
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
+def EmitPythonBytecode_FormatValue : EmitPythonBytecode_Op<"FORMAT_VALUE"> {
+    let summary = "Format value as a string using specified conversion";
+
+    let arguments = (ins Python_PyObjectType:$value,
+                         UI8Attr:$conversion);
+
+    let results = (outs Python_PyObjectType:$output);
+}
 
 def EmitPythonBytecode_LoadAttribute: EmitPythonBytecode_Op<"LOAD_ATTRIBUTE"> {
     let summary = "Load an attribute";
@@ -324,16 +350,6 @@ def EmitPythonBytecode_LoadMethod: EmitPythonBytecode_Op<"LOAD_METHOD"> {
                          StrAttr:$method_name);
 
     let results = (outs Python_PyObjectType:$method);
-}
-
-def EmitPythonBytecode_BuildSliceOp: EmitPythonBytecode_Op<"BUILD_SLICE"> {
-    let summary = "Build a slice object";
-
-    let arguments = (ins Python_PyObjectType:$lower,
-                         Python_PyObjectType:$upper,
-                         Python_PyObjectType:$step);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def EmitPythonBytecode_MakeFunction : EmitPythonBytecode_Op<"MAKE_FUNCTION", [AttrSizedOperandSegments]> {
@@ -423,10 +439,11 @@ def EmitPythonBytecode_GetIter: EmitPythonBytecode_Op<"GET_ITER"> {
     let results = (outs Python_PyObjectType:$iterator);
 }
 
-def EmitPythonBytecode_ForIter: EmitPythonBytecode_Op<"FOR_ITER", [Terminator]> {
+def EmitPythonBytecode_ForIter: EmitPythonBytecode_Op<"FOR_ITER", [Terminator,
+                                                                   DeclareOpInterfaceMethods<BranchOpInterface>]> {
     let summary = "Convenience op that calls Python's next function on an iterator";
 
-    let arguments = (ins Python_PyObjectType:$iterator, Python_PyObjectType:$value);
+    let arguments = (ins Python_PyObjectType:$iterator);
 
     let successors = (successor AnySuccessor:$body, AnySuccessor:$continuation);
 }

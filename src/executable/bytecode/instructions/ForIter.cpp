@@ -50,7 +50,8 @@ void ForIter::relocate(size_t instruction_idx)
 
 std::vector<uint8_t> ForIter::serialize() const
 {
-	ASSERT(m_offset.has_value())
+	ASSERT(m_offset.has_value());
+	ASSERT(m_body_offset.has_value());
 
 	std::vector<uint8_t> result{
 		FOR_ITER,
@@ -59,6 +60,7 @@ std::vector<uint8_t> ForIter::serialize() const
 	};
 
 	::serialize(*m_offset, result);
+	::serialize(*m_body_offset, result);
 
 	return result;
 }

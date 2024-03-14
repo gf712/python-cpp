@@ -26,5 +26,4 @@ add_subdirectory(lib/Target)
 
 add_executable(test_mlir main.cpp)
 target_link_libraries(test_mlir python-cpp PythonMLIRDialect TargetPythonBytecode PythonConversionPasses cxxopts)
-target_include_directories(test_mlir PRIVATE ${MLIR_INCLUDE_DIRS})
-# target_link_libraries(test_mlir python-cpp cxxopts)
+target_include_directories(test_mlir SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})

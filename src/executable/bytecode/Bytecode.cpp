@@ -66,7 +66,12 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 	const auto instruction_count = py::deserialize<size_t>(buffer);
 
 	for (size_t i = 0; i < instruction_count; ++i) {
-		instructions.push_back(::deserialize(buffer));
+		auto instruction = ::deserialize(buffer);
+		if (!instruction) {
+			for (const auto &ins : instructions) { std::cout << ins->to_string() << '\n'; }
+			std::abort();
+		}
+		instructions.push_back(std::move(instruction));
 	}
 
 	return std::make_unique<Bytecode>(

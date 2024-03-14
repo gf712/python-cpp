@@ -429,18 +429,61 @@ namespace py {
 			}
 		};
 
-		template<typename InplaceOpType, BinaryOperation::Operation OperationEnumType>
-		struct InplaceOpLowering : public mlir::OpRewritePattern<InplaceOpType>
+		struct InplaceOpLowering : public mlir::OpRewritePattern<InplaceOp>
 		{
-			using OpRewritePattern<InplaceOpType>::OpRewritePattern;
+			using OpRewritePattern<InplaceOp>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(InplaceOpType op,
+			mlir::LogicalResult matchAndRewrite(InplaceOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
+				auto kind = [&op]() {
+					switch (op.getKind()) {
+					case py::InplaceOpKind::add: {
+						return BinaryOperation::Operation::PLUS;
+					} break;
+					case py::InplaceOpKind::sub: {
+						return BinaryOperation::Operation::MINUS;
+					} break;
+					case py::InplaceOpKind::mod: {
+						return BinaryOperation::Operation::MODULO;
+					} break;
+					case py::InplaceOpKind::mul: {
+						return BinaryOperation::Operation::MULTIPLY;
+					} break;
+					case py::InplaceOpKind::exp: {
+						return BinaryOperation::Operation::EXP;
+					} break;
+					case py::InplaceOpKind::div: {
+						return BinaryOperation::Operation::SLASH;
+					} break;
+					case py::InplaceOpKind::fldiv: {
+						return BinaryOperation::Operation::FLOORDIV;
+					} break;
+					case py::InplaceOpKind::lshift: {
+						return BinaryOperation::Operation::LEFTSHIFT;
+					} break;
+					case py::InplaceOpKind::rshift: {
+						return BinaryOperation::Operation::RIGHTSHIFT;
+					} break;
+					case py::InplaceOpKind::and_: {
+						return BinaryOperation::Operation::AND;
+					} break;
+					case py::InplaceOpKind::or_: {
+						return BinaryOperation::Operation::OR;
+					} break;
+					case py::InplaceOpKind::xor_: {
+						return BinaryOperation::Operation::XOR;
+					} break;
+					case py::InplaceOpKind::mmul: {
+						return BinaryOperation::Operation::MATMUL;
+					} break;
+					}
+					ASSERT_NOT_REACHED();
+				}();
 				auto dst = op.getDst();
 				auto src = op.getSrc();
 				auto op_type = mlir::IntegerAttr::get(
-					rewriter.getIntegerType(8, false), static_cast<uint8_t>(OperationEnumType));
+					rewriter.getIntegerType(8, false), static_cast<uint8_t>(kind));
 
 				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::InplaceOp>(
 					op, op.getResult().getType(), dst, src, op_type);
@@ -448,13 +491,6 @@ namespace py {
 				return success();
 			}
 		};
-
-		using InplaceAddOpLowering =
-			InplaceOpLowering<py::InplaceAddOp, BinaryOperation::Operation::PLUS>;
-		using InplaceSubOpLowering =
-			InplaceOpLowering<py::InplaceSubtractOp, BinaryOperation::Operation::MINUS>;
-		using InplaceMulOpLowering =
-			InplaceOpLowering<py::InplaceMultiplyOp, BinaryOperation::Operation::MULTIPLY>;
 
 		template<typename BinaryOpType, BinaryOperation::Operation OperationEnumType>
 		struct BinaryOpLowering : public mlir::OpRewritePattern<BinaryOpType>
@@ -777,6 +813,36 @@ namespace py {
 			}
 		};
 
+		struct BuildStringOpLowering : public mlir::OpRewritePattern<mlir::py::BuildStringOp>
+		{
+			using OpRewritePattern<mlir::py::BuildStringOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::BuildStringOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildString>(
+					op, op.getOutput().getType(), op.getElements());
+
+				return success();
+			}
+		};
+
+		struct FormatValueOpLowering : public mlir::OpRewritePattern<mlir::py::FormatValueOp>
+		{
+			using OpRewritePattern<mlir::py::FormatValueOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::FormatValueOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::FormatValue>(op,
+					op.getOutput().getType(),
+					op.getValue(),
+					static_cast<uint8_t>(op.getConversion()));
+
+				return success();
+			}
+		};
+
 		struct LoadAttributeOpLowering : public mlir::OpRewritePattern<mlir::py::LoadAttributeOp>
 		{
 			using OpRewritePattern<mlir::py::LoadAttributeOp>::OpRewritePattern;
@@ -876,7 +942,7 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::py::BuildSliceOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildSliceOp>(
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildSlice>(
 					op, op.getSlice().getType(), op.getLower(), op.getUpper(), op.getStep());
 
 				return success();
@@ -1110,46 +1176,48 @@ namespace py {
 				auto iterable = op.getIterable();
 				rewriter.setInsertionPointToEnd(initBlock);
 				auto iterator = rewriter.create<mlir::emitpybytecode::GetIter>(
-					op.getCondition().getLoc(), iterable.getType(), iterable);
+					op.getStep().getLoc(), iterable.getType(), iterable);
 
 				// advance iterator
 				auto iterator_next_block = rewriter.createBlock(endBlock);
-				iterator_next_block->addArgument(iterator.getType(), op.getCondition().getLoc());
+				// iterator_next_block->addArgument(iterator.getType(), op.getStep().getLoc());
 				rewriter.setInsertionPointToEnd(initBlock);
 				const auto &iterators = getIterators(op, iterator);
-				rewriter.create<mlir::cf::BranchOp>(
-					op.getCondition().getLoc(), iterator_next_block, iterators);
+				rewriter.create<mlir::cf::BranchOp>(op.getStep().getLoc(), iterator_next_block);
 
 				rewriter.setInsertionPointToStart(iterator_next_block);
 
-				auto value_placeholder = rewriter.create<mlir::py::ConstantOp>(
-					op.getCondition().getLoc(), rewriter.getNoneType());
-				rewriter.create<mlir::emitpybytecode::ForIter>(op.getCondition().getLoc(),
-					iterator_next_block->getArgument(0),
-					value_placeholder,
-					&op.getCondition().front(),
+				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
+					// iterator_next_block->getArgument(0),
+					iterators.front(),
+					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
 
-				// pass value and iterator to iterator region
-				// add argument to iterator region entry block
-				for (const auto &it : iterators) {
-					op.getCondition().addArgument(it.getType(), op.getCondition().getLoc());
-				}
-
-				ASSERT(!op.getCondition().empty())
-				auto *iterator_exit_block = &op.getCondition().back();
+				ASSERT(!op.getStep().empty())
+				auto *iterator_exit_block = &op.getStep().back();
 				ASSERT(iterator_exit_block->getTerminator());
 				ASSERT(mlir::isa<mlir::py::ControlFlowYield>(iterator_exit_block->getTerminator()));
 
 				rewriter.setInsertionPointToEnd(iterator_exit_block);
 				rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-					iterator_exit_block->getTerminator(), &op.getBody().front(), iterators);
-				rewriter.inlineRegionBefore(
-					op.getCondition(), *op->getParentRegion(), endBlock->getIterator());
+					iterator_exit_block->getTerminator(), &op.getBody().front() /*, iterators*/);
 
-				for (const auto &it : iterators) {
-					op.getBody().addArgument(it.getType(), op.getCondition().getLoc());
-				}
+				auto *for_iter_block = rewriter.createBlock(&op.getBody());
+				// for (const auto &it : iterators) {
+				// 	for_iter_block->addArgument(it.getType(), op.getStep().getLoc());
+				// }
+				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
+					iterators.front(),
+					&op.getStep().front(),
+					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
+
+				rewriter.inlineRegionBefore(
+					op.getStep(), *op->getParentRegion(), endBlock->getIterator());
+
+				// for (const auto &it : iterators) {
+				// 	op.getBody().addArgument(it.getType(), op.getStep().getLoc());
+				// }
+
 				op.getBody().walk<WalkOrder::PreOrder>([&](mlir::Operation *operation) {
 					if (mlir::isa<mlir::py::ForLoopOp, mlir::py::WhileOp>(operation)) {
 						return WalkResult::skip();
@@ -1167,7 +1235,7 @@ namespace py {
 						if (!yield_op.getKind().has_value()
 							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
 							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-								yield_op, iterator_next_block, iterators);
+								yield_op, for_iter_block);
 						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
 							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, endBlock);
 						}
@@ -1219,10 +1287,13 @@ namespace py {
 				ASSERT(condition_op);
 
 				rewriter.setInsertionPointToEnd(initBlock);
-				rewriter.create<mlir::cf::BranchOp>(
-					condition_op.getLoc(), condition_op->getBlock());
+				rewriter.create<mlir::cf::BranchOp>(condition_op.getLoc(), &condition_start);
 
-				rewriter.setInsertionPointAfter(condition_op.getCond().getDefiningOp());
+				if (mlir::isa<mlir::BlockArgument>(condition_op.getCond())) {
+					rewriter.setInsertionPointToStart(condition_op.getCond().getParentBlock());
+				} else {
+					rewriter.setInsertionPointAfter(condition_op.getCond().getDefiningOp());
+				}
 				auto should_jump = rewriter.create<mlir::py::CastToBoolOp>(
 					condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
 				ASSERT(!op.getBody().empty());
@@ -1596,9 +1667,20 @@ namespace py {
 						item,
 						"__exit__");
 
-					// ignore return value since we reached this path through normal exit of context
-					rewriter.create<mlir::py::WithExceptStartOp>(
-						item.getLoc(), mlir::py::PyObjectType::get(rewriter.getContext()), exit);
+					auto none = rewriter.create<mlir::py::ConstantOp>(
+						item.getLoc(), rewriter.getNoneType());
+
+					rewriter.create<mlir::py::FunctionCallOp>(item.getLoc(),
+						mlir::py::PyObjectType::get(rewriter.getContext()),
+						exit,
+						std::vector<mlir::Value>{ none, none, none },
+						mlir::DenseStringElementsAttr::get(
+							mlir::VectorType::get(
+								{ 0 }, mlir::StringAttr::get(rewriter.getContext()).getType()),
+							{}),
+						std::vector<mlir::Value>{},
+						false,
+						false);
 
 					rewriter.create<mlir::py::ClearExceptionStateOp>(item.getLoc());
 				}
@@ -1658,7 +1740,7 @@ namespace py {
 				return nullptr;
 			}
 
-			static mlir::Block *get_handler(mlir::Operation *op)
+			static mlir::Block *get_handler(mlir::Operation *op, mlir::PatternRewriter &rewriter)
 			{
 				// find possible catch block in order to not clobber an active result register
 				auto *handler_op =
@@ -1671,7 +1753,20 @@ namespace py {
 														: &op.getHandlers().front().front();
 					})
 					.Case([](mlir::py::WithOp op) { return op->getParentOp()->getBlock(); })
-					.Case([](mlir::func::FuncOp op) { return &op.back(); })
+					.Case([&rewriter](mlir::func::FuncOp op) {
+						if (op.getBlocks().size() == 1) {
+							auto insertion_point = rewriter.getInsertionPoint();
+							auto *return_block = rewriter.createBlock(&op.getRegion());
+							auto value = rewriter.create<mlir::py::ConstantOp>(
+								op.getLoc(), rewriter.getNoneType());
+							rewriter.create<mlir::func::ReturnOp>(
+								op.getLoc(), mlir::ValueRange{ value });
+							rewriter.setInsertionPoint(
+								insertion_point->getBlock(), insertion_point);
+							return return_block;
+						}
+						return &op.back();
+					})
 					.Default([](mlir::Operation *op) {
 						TODO();
 						return nullptr;
@@ -1683,10 +1778,10 @@ namespace py {
 			{
 				if (auto exception = op.getException()) {
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
-						op, exception, op.getCause(), get_handler(op));
+						op, exception, op.getCause(), get_handler(op, rewriter));
 				} else {
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
-						op, get_handler(op));
+						op, get_handler(op, rewriter));
 				}
 
 				return success();
@@ -1856,8 +1951,7 @@ namespace py {
 			LogicalAndOpLowering,
 			LogicalOrOpLowering,
 			LogicalXorOpLowering>(&getContext());
-		patterns.add<InplaceAddOpLowering, InplaceSubOpLowering, InplaceMulOpLowering>(
-			&getContext());
+		patterns.add<InplaceOpLowering>(&getContext());
 		patterns
 			.add<ConditionalBranchOpLowering, CondBranchSubclassOpLowering, CastToBoolOpLowering>(
 				&getContext());
@@ -1871,7 +1965,9 @@ namespace py {
 			ListAppendOpLowering,
 			BuildTupleOpLowering,
 			BuildSetOpLowering,
-			SetAddOpLowering>(&getContext());
+			SetAddOpLowering,
+			BuildStringOpLowering,
+			FormatValueOpLowering>(&getContext());
 		patterns.add<LoadAttributeOpLowering, LoadMethodOpLowering>(&getContext());
 		patterns
 			.add<BinarySubscriptOpLowering, StoreSubscriptOpLowering, DeleteSubscriptOpLowering>(

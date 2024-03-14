@@ -318,4 +318,5 @@ add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings)
 
 add_executable(freeze utilities/freeze.cpp)
-target_link_libraries(freeze PRIVATE python-cpp cxxopts  project_options project_warnings)
+target_link_libraries(freeze PRIVATE python-cpp PythonMLIRDialect TargetPythonBytecode PythonConversionPasses cxxopts project_options project_warnings)
+target_include_directories(freeze SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})
