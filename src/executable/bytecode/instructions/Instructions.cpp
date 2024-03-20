@@ -69,7 +69,7 @@
 #include "UnpackSequence.hpp"
 #include "WithExceptStart.hpp"
 #include "YieldValue.hpp"
-
+#include "YieldLoad.hpp"
 
 #include "../serialization/deserialize.hpp"
 
@@ -437,6 +437,10 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case YIELD_VALUE: {
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<YieldValue>(src);
+	}
+	case YIELD_LOAD: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<YieldLoad>(dst);
 	}
 	case BUILD_STRING: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);

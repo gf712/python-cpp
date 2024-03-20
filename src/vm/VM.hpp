@@ -43,10 +43,12 @@ struct StackFrame : NonCopyable
 	}
 
 	Registers registers;
-	std::vector<py::Value> locals_storage; 
+	std::vector<py::Value> locals_storage;
 	std::span<py::Value> locals;
 	InstructionVector::const_iterator return_address;
 	InstructionVector::const_iterator last_instruction_pointer;
+	std::vector<py::Value>::iterator base_pointer;
+	std::vector<py::Value>::iterator stack_pointer;
 	VirtualMachine *vm{ nullptr };
 	std::unique_ptr<State> state;
 
@@ -179,7 +181,7 @@ class VirtualMachine
 	std::unique_ptr<StackFrame> push_frame(size_t register_count, size_t stack_size);
 	void push_frame(StackFrame &frame);
 
-	void pop_frame();
+	void pop_frame(bool should_return_value);
 
 	void push(py::Value value) { *m_stack_pointer++ = value; }
 

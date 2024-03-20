@@ -251,7 +251,7 @@ ScopedStack::~ScopedStack()
 {
 	auto &vm = VirtualMachine::the();
 	if (!vm.stack().empty() && top_frame && &vm.stack().top().get() == top_frame.get()) {
-		vm.pop_frame();
+		vm.pop_frame(true);
 	}
 }
 
@@ -259,7 +259,7 @@ std::unique_ptr<StackFrame> ScopedStack::release()
 {
 	ASSERT(top_frame);
 	auto &vm = VirtualMachine::the();
-	vm.pop_frame();
+	vm.pop_frame(true);
 	return StackFrame::create(top_frame->clone());
 }
 

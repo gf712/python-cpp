@@ -16,10 +16,10 @@ Bytecode::Bytecode(size_t register_count,
 	InstructionVector instructions,
 	std::shared_ptr<Program> program)
 	: Function(register_count,
-		stack_size,
-		function_name,
-		FunctionExecutionBackend::BYTECODE,
-		std::move(program)),
+		  stack_size,
+		  function_name,
+		  FunctionExecutionBackend::BYTECODE,
+		  std::move(program)),
 	  m_instructions(std::move(instructions))
 {}
 
@@ -115,6 +115,7 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 
 	const auto stack_depth = vm.stack().size();
 	const auto initial_ip = vm.instruction_pointer();
+	spdlog::info("Entering: {}", m_function_name);
 
 	const auto end_instruction_it = end();
 	for (; vm.instruction_pointer() != end_instruction_it;
@@ -122,7 +123,12 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		ASSERT((*vm.instruction_pointer()).get())
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;
-		spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
+		if (m_function_name.starts_with("_bootstrap._find_and_load.")) {
+			spdlog::info("{} {}", (void *)instruction.get(), instruction->to_string());
+			vm.dump();
+		}
+		// spdlog::info("{} {}", (void *)instruction.get(), instruction->to_string());
+		// spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 		auto result = instruction->execute(vm, vm.interpreter());
 		// we left the current stack frame in the previous instruction
 		if (vm.stack().size() != stack_depth) {
@@ -144,7 +150,10 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 
 			ASSERT(vm.state().cleanup.size() > 0);
 			if (!vm.state().cleanup.top()) {
-				vm.ret();
+				ASSERT(vm.state().cleanup.size() == 1);
+				// when a function returns without handling the exception do not copy the value
+				// to the callers the return register
+				vm.pop_frame(false);
 				return result;
 			} else {
 				auto [exit_cleanup_type, exit_ins] = *vm.state().cleanup.top();

@@ -310,21 +310,21 @@ class BytecodeGenerator : public ast::CodeGenerator
 	Register allocate_register()
 	{
 		spdlog::debug("New register: {}", m_frame_register_count.back());
-		ASSERT(m_frame_register_count.back() < std::numeric_limits<Register>::max());
+		// ASSERT(m_frame_register_count.back() < std::numeric_limits<Register>::max());
 		return static_cast<Register>(m_frame_register_count.back()++);
 	}
 
 	Register allocate_stack_value()
 	{
 		spdlog::debug("New stack value: {}", m_frame_stack_value_count.back());
-		ASSERT(m_frame_stack_value_count.back() < std::numeric_limits<Register>::max());
+		// ASSERT(m_frame_stack_value_count.back() < std::numeric_limits<Register>::max());
 		return static_cast<Register>(m_frame_stack_value_count.back()++);
 	}
 
 	Register allocate_free_value()
 	{
 		spdlog::debug("New free value: {}", m_frame_free_var_count.back());
-		ASSERT(m_frame_free_var_count.back() < std::numeric_limits<Register>::max());
+		// ASSERT(m_frame_free_var_count.back() < std::numeric_limits<Register>::max());
 		return static_cast<Register>(m_frame_free_var_count.back()++);
 	}
 

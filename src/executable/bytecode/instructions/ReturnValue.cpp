@@ -1,5 +1,7 @@
 #include "ReturnValue.hpp"
+#include "executable/Function.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyCode.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyGenerator.hpp"
 #include "runtime/StopIteration.hpp"
@@ -30,6 +32,7 @@ PyResult<Value> ReturnValue::execute(VirtualMachine &vm, Interpreter &interprete
 	vm.reg(0) = result;
 
 	// tell the VM to return to the calling stack frame
+	// spdlog::info("Leaving: {}", interpreter.execution_frame()->code()->function()->function_name());
 	vm.ret();
 
 	return Ok(result);

@@ -8,12 +8,16 @@
 #include "runtime/PyNone.hpp"
 #include "runtime/PyTraceback.hpp"
 #include "runtime/PyType.hpp"
+#include "utilities.hpp"
 #include "vm/VM.hpp"
 
 using namespace py;
 
 PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
+	ASSERT(interpreter.execution_frame()->exception_info().has_value());
+	spdlog::info("WithExceptStart::execute frame@{}", static_cast<void*>(interpreter.execution_frame()));
+
 	const auto &exit_method = vm.reg(m_exit_method);
 
 	if (!std::holds_alternative<PyObject *>(exit_method)) { TODO(); }

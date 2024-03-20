@@ -655,7 +655,6 @@ class Arguments : public ASTNode
 	{
 		m_kwonlyargs.push_back(std::move(kwarg));
 	}
-	std::vector<std::string> keyword_argument_names() const;
 
 	void push_default(std::shared_ptr<ASTNode> default_value)
 	{

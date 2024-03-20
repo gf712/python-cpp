@@ -24,6 +24,8 @@ class AttributeError : public Exception
 	}
 
   public:
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *static_type() const override;
