@@ -485,7 +485,7 @@ class IOBase : public PyBaseObject
 	}
 };
 
-class RawIOBase : public PyBaseObject
+class RawIOBase : public IOBase
 {
 	friend class ::Heap;
 
@@ -493,7 +493,7 @@ class RawIOBase : public PyBaseObject
 	RawIOBase() : RawIOBase(s_io_raw_iobase->type()) {}
 
   protected:
-	RawIOBase(const PyType *type) : PyBaseObject(type->underlying_type()) {}
+	RawIOBase(const PyType *type) : IOBase(type) {}
 
   public:
 	static constexpr std::string_view __doc__ = "Base class for raw binary I/O.";
@@ -508,7 +508,7 @@ class RawIOBase : public PyBaseObject
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
 	{
-		return IOBase::create(type);
+		return RawIOBase::create(type);
 	}
 
 	PyType *static_type() const override { return s_io_raw_iobase; }
@@ -1829,7 +1829,7 @@ class BytesIO : public BufferedIOBase
 
 #if defined(__GLIBCXX__) || defined(__GLIBCPP__)
 // taken from https://stackoverflow.com/a/19749019
-typedef std::basic_ofstream<char>::__filebuf_type buffer_t;
+typedef std::basic_fstream<char>::__filebuf_type buffer_t;
 typedef __gnu_cxx::stdio_filebuf<char> io_buffer_t;
 FILE *cfile_impl(buffer_t *const fb)
 {
