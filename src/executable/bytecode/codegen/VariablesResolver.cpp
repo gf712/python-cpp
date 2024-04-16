@@ -215,6 +215,11 @@ void VariablesResolver::load(const std::string &name,
 			load("__class__", source_location, type);
 		} else {
 			annotate_free_and_cell_variables("__class__");
+			if (!scope->symbol_map.get_hidden_symbol("__classcell__").has_value()) {
+				scope->symbol_map.add_symbol(Symbol{ .name = "__classcell__",
+					.visibility = Visibility::HIDDEN,
+					.source_location = source_location });
+			}
 			return;
 		}
 	}
@@ -354,6 +359,10 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 	m_visibility[class_name]->symbol_map.add_symbol(Symbol{ .name = "__class__",
 		.visibility = Visibility::CELL,
 		.source_location = node->source_location() });
+
+	load("__name__", node->source_location(), Scope::Type::CLASS);
+	store("__module__", node->source_location(), Scope::Type::CLASS);
+	store("__qualname__", node->source_location(), Scope::Type::CLASS);
 
 	for (const auto &statement : node->body()) {
 		m_to_visit.emplace_back(*m_current_scope, statement);
@@ -666,6 +675,8 @@ Value *VariablesResolver::visit(const Module *node)
 		.type = Scope::Type::MODULE,
 		.parent = nullptr });
 	m_current_scope = std::ref(*m_visibility.at(module_name));
+
+	store("__name__", node->source_location(), Scope::Type::MODULE);
 
 	for (const auto &statement : node->body()) {
 		m_to_visit.emplace_back(*m_current_scope, statement);
