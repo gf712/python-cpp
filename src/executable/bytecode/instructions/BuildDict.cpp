@@ -18,15 +18,15 @@ PyResult<Value> BuildDict::execute(VirtualMachine &vm, Interpreter &) const
 		}
 	}
 
-	auto result = PyDict::create(map);
-	if (result.is_err()) return Err(result.unwrap_err());
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return Ok(Value{ result.unwrap() });
+	return PyDict::create(map).and_then([&vm, this](PyDict *dict) {
+		vm.reg(m_dst) = dict;
+		return Ok(dict);
+	});
 }
 
 std::vector<uint8_t> BuildDict::serialize() const
 {
-	ASSERT(m_size < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_size < std::numeric_limits<uint8_t>::max());
 
 	return {
 		BUILD_DICT,

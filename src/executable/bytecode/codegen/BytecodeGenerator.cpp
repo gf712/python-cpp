@@ -329,20 +329,13 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	auto *dst = create_value();
 
 	const auto &scope_name = m_stack.top().mangled_name;
-	const auto &visibility_map = [&] {
-		if (auto it = m_variable_visibility.find(scope_name); it != m_variable_visibility.end()) {
-			return it;
-		} else {
-			TODO();
-		}
-	}();
+	const auto &visibility_map = m_variable_visibility.at(scope_name);
 
 	const auto visibility = [&] {
-		if (auto it = visibility_map->second->symbol_map.get_hidden_symbol(name); it.has_value()) {
-			ASSERT(visibility_map->second->type == VariablesResolver::Scope::Type::CLASS);
+		if (auto it = visibility_map->symbol_map.get_hidden_symbol(name); it.has_value()) {
+			ASSERT(visibility_map->type == VariablesResolver::Scope::Type::CLASS);
 			return it->get().visibility;
-		} else if (auto it = visibility_map->second->symbol_map.get_visible_symbol(name);
-				   it.has_value()) {
+		} else if (auto it = visibility_map->symbol_map.get_visible_symbol(name); it.has_value()) {
 			return it->get().visibility;
 		} else {
 			TODO();
@@ -1232,14 +1225,12 @@ Value *BytecodeGenerator::visit(const Call *node)
 
 	auto *func = generate(node->function().get(), m_function_id);
 
-	auto is_args_expansion = [](const std::shared_ptr<ASTNode> &node) {
-		if (node->node_type() == ASTNodeType::Starred) { return true; }
-		return false;
+	auto is_args_expansion = [](const std::shared_ptr<ast::ASTNode> &node) {
+		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 
-	auto is_kwargs_expansion = [](const std::shared_ptr<Keyword> &node) {
-		if (!node->arg().has_value()) { return true; }
-		return false;
+	auto is_kwargs_expansion = [](const std::shared_ptr<ast::Keyword> &node) {
+		return !node->arg().has_value();
 	};
 
 	bool requires_args_expansion =

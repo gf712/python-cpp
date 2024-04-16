@@ -8,10 +8,11 @@ PyResult<Value> BuildList::execute(VirtualMachine &vm, Interpreter &) const
 {
 	std::vector<Value> elements;
 	elements.reserve(m_size);
-	auto result = PyList::create(std::span{ vm.sp() - m_size, m_size });
-	if (result.is_err()) return Err(result.unwrap_err());
-	if (result.is_ok()) { vm.reg(m_dst) = result.unwrap(); }
-	return Ok(Value{ result.unwrap() });
+	return PyList::create(std::span{ vm.sp() - m_size, m_size })
+		.and_then([&vm, this](PyList *list) {
+			vm.reg(m_dst) = list;
+			return Ok(list);
+		});
 }
 
 std::vector<uint8_t> BuildList::serialize() const
