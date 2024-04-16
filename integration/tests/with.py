@@ -32,7 +32,7 @@ def test_no_return():
 
     return a
 assert test_no_return() == ["it works", "EOF"], "Expected Wrapper.readlines to return the list [it works, EOF]"
-    
+
 def test_return():
     with Mock("test.py", None, None) as f:
         a = f.readlines()

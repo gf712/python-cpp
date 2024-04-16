@@ -1,5 +1,4 @@
-# path_separators = ['/', '\\']
-path_separators = ['/']
+path_separators = ['/', '\\']
 assert all(len(sep) == 1 for sep in path_separators)
 
 greater_than_5 = [x for x in range(10) if x > 5]
