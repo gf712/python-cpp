@@ -280,8 +280,7 @@ void PySetIterator::visit_graph(Visitor &visitor)
 	std::visit(
 		[&visitor]<typename T>(const T &el) {
 			if constexpr (!std::is_same_v<T, std::monostate>) {
-				const_cast<typename std::remove_cv_t<typename T::type> &>(el.get()).visit_graph(
-					visitor);
+				visitor.visit(const_cast<typename std::remove_cv_t<typename T::type> &>(el.get()));
 			}
 		},
 		m_pyset);

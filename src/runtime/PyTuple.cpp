@@ -382,7 +382,7 @@ PyResult<PyObject *> PyTupleIterator::operator*() const
 void PyTupleIterator::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	const_cast<PyTuple &>(m_pytuple).visit_graph(visitor);
+	visitor.visit(const_cast<PyTuple &>(m_pytuple));
 }
 
 

@@ -412,7 +412,7 @@ void PyListIterator::visit_graph(Visitor &visitor)
 	// the iterator has to keep a reference to the list
 	// otherwise GC could clean up a temporary list in a loop
 	// TODO: should visit_graph be const and the bit flags mutable?
-	const_cast<PyList &>(m_pylist).visit_graph(visitor);
+	visitor.visit(const_cast<PyList &>(m_pylist));
 }
 
 PyResult<PyObject *> PyListIterator::__repr__() const { return PyString::create(to_string()); }
