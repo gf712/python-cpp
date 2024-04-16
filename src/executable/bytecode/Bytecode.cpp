@@ -11,11 +11,13 @@
 using namespace py;
 
 Bytecode::Bytecode(size_t register_count,
+	size_t locals_count,
 	size_t stack_size,
 	std::string function_name,
 	InstructionVector instructions,
 	std::shared_ptr<Program> program)
 	: Function(register_count,
+		locals_count,
 		stack_size,
 		function_name,
 		FunctionExecutionBackend::BYTECODE,
@@ -38,6 +40,7 @@ std::vector<uint8_t> Bytecode::serialize() const
 	std::vector<uint8_t> result;
 
 	py::serialize(m_register_count, result);
+	py::serialize(m_locals_count, result);
 	py::serialize(m_stack_size, result);
 	py::serialize(m_function_name, result);
 	py::serialize(static_cast<uint8_t>(m_backend), result);
@@ -57,6 +60,7 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 	std::shared_ptr<Program> program)
 {
 	const auto register_count = py::deserialize<size_t>(buffer);
+	const auto locals_count = py::deserialize<size_t>(buffer);
 	const auto stack_size = py::deserialize<size_t>(buffer);
 	const auto function_name = py::deserialize<std::string>(buffer);
 	const auto backend = static_cast<FunctionExecutionBackend>(py::deserialize<uint8_t>(buffer));
@@ -66,18 +70,25 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 	const auto instruction_count = py::deserialize<size_t>(buffer);
 
 	for (size_t i = 0; i < instruction_count; ++i) {
-		instructions.push_back(::deserialize(buffer));
+		auto instruction = ::deserialize(buffer);
+		if (!instruction) {
+			for (const auto &ins : instructions) { std::cout << ins->to_string() << '\n'; }
+			std::abort();
+		}
+		instructions.push_back(std::move(instruction));
 	}
 
 	return std::make_unique<Bytecode>(
-		register_count, stack_size, function_name, std::move(instructions), std::move(program));
+		register_count, locals_count, stack_size, function_name, std::move(instructions), std::move(program));
 }
 
 PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	// create main stack frame
 	[[maybe_unused]] auto main_frame = [&vm, this]() -> std::unique_ptr<StackFrame> {
-		if (vm.stack().empty()) { return vm.setup_call_stack(m_register_count, m_stack_size); }
+		if (vm.stack().empty()) {
+			return vm.setup_call_stack(m_register_count, m_locals_count, m_stack_size);
+		}
 		return nullptr;
 	}();
 

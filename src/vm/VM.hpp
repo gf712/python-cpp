@@ -30,6 +30,7 @@ struct StackFrame : NonCopyable
 	StackFrame() = default;
 
 	StackFrame(size_t register_count,
+		size_t locals_count,
 		size_t stack_size,
 		InstructionVector::const_iterator return_address,
 		VirtualMachine *);
@@ -43,10 +44,12 @@ struct StackFrame : NonCopyable
 	}
 
 	Registers registers;
-	std::vector<py::Value> locals_storage; 
+	std::vector<py::Value> locals_storage;
 	std::span<py::Value> locals;
 	InstructionVector::const_iterator return_address;
 	InstructionVector::const_iterator last_instruction_pointer;
+	std::vector<py::Value>::const_iterator base_pointer;
+	std::vector<py::Value>::iterator stack_pointer;
 	VirtualMachine *vm{ nullptr };
 	std::unique_ptr<State> state;
 
@@ -148,7 +151,7 @@ class VirtualMachine
 	Interpreter &initialize_interpreter(std::shared_ptr<Program> &&);
 	Interpreter &interpreter();
 	const Interpreter &interpreter() const;
-	bool has_interpreter() const { return m_interpreter.operator bool(); }
+	bool has_interpreter() const { return static_cast<bool>(m_interpreter); }
 
 	void set_instruction_pointer(InstructionVector::const_iterator pos)
 	{
@@ -169,6 +172,7 @@ class VirtualMachine
 	void dump() const;
 
 	[[nodiscard]] std::unique_ptr<StackFrame> setup_call_stack(size_t register_count,
+		size_t locals_count,
 		size_t stack_size);
 
 	void ret();
@@ -176,14 +180,15 @@ class VirtualMachine
 		InstructionVector::const_iterator exit_instruction);
 	void leave_cleanup_handling();
 
-	std::unique_ptr<StackFrame> push_frame(size_t register_count, size_t stack_size);
+	[[nodiscard]] std::unique_ptr<StackFrame>
+		push_frame(size_t register_count, size_t locals_count, size_t stack_size);
 	void push_frame(StackFrame &frame);
 
-	void pop_frame();
+	void pop_frame(bool should_return_value);
 
 	void push(py::Value value) { *m_stack_pointer++ = value; }
 
-	py::Value pop() { return *m_stack_pointer--; }
+	py::Value pop() { return *--m_stack_pointer; }
 
 	std::deque<std::vector<const py::Value *>> stack_objects() const;
 

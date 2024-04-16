@@ -8,6 +8,7 @@ class Function : NonCopyable
 {
   protected:
 	size_t m_register_count;
+	size_t m_locals_count;
 	size_t m_stack_size;
 	std::string m_function_name;
 	FunctionExecutionBackend m_backend;
@@ -15,16 +16,18 @@ class Function : NonCopyable
 
   public:
 	Function(size_t register_count,
+		size_t locals_count,
 		size_t stack_size,
 		std::string function_name,
 		FunctionExecutionBackend backend,
 		std::shared_ptr<Program> program)
-		: m_register_count(register_count), m_stack_size(stack_size),
+		: m_register_count(register_count), m_locals_count(locals_count), m_stack_size(stack_size),
 		  m_function_name(function_name), m_backend(backend), m_program(std::move(program))
 	{}
 	virtual ~Function() = default;
 
 	size_t register_count() const { return m_register_count; }
+	size_t locals_count() const { return m_locals_count; }
 	size_t stack_size() const { return m_stack_size; }
 
 	FunctionExecutionBackend backend() const { return m_backend; }

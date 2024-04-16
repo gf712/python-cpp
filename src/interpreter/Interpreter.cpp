@@ -267,8 +267,9 @@ ScopedStack Interpreter::setup_call_stack(const std::unique_ptr<Function> &func,
 	PyFrame *function_frame)
 {
 	auto &vm = VirtualMachine::the();
-	auto frame = vm.setup_call_stack(
-		function_frame->m_register_count, func->stack_size() + function_frame->freevars().size());
+	auto frame = vm.setup_call_stack(function_frame->m_register_count,
+		func->locals_count(),
+		func->stack_size() + function_frame->freevars().size());
 	return ScopedStack{ std::move(frame) };
 }
 

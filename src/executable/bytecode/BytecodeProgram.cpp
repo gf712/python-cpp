@@ -33,6 +33,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 
 	auto &main_func = func_blocks.functions.front();
 	auto main_bytecode = std::make_unique<Bytecode>(main_func.metadata.register_count,
+		main_func.metadata.varnames.size(),
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
 		std::move(main_func.blocks),
@@ -64,6 +65,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 		auto &func = *std::next(func_blocks.functions.begin(), i);
 
 		auto bytecode = std::make_unique<Bytecode>(func.metadata.register_count,
+			func.metadata.varnames.size(),
 			func.metadata.stack_size,
 			func.metadata.function_name,
 			std::move(func.blocks),

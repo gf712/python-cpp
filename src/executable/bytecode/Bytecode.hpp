@@ -18,6 +18,7 @@ class Bytecode : public Function
 
   public:
 	Bytecode(size_t register_count,
+		size_t locals_count,
 		size_t stack_size,
 		std::string function_name,
 		InstructionVector instructions,

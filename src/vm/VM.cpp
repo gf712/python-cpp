@@ -10,17 +10,21 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTraceback.hpp"
+#include <iterator>
+#include <spdlog/spdlog.h>
 
 using namespace py;
 
 
 StackFrame::StackFrame(size_t register_count,
+	size_t locals_count,
 	size_t stack_size,
 	InstructionVector::const_iterator return_address,
 	VirtualMachine *vm_)
 	: registers(register_count, nullptr),
 	  locals(vm_->m_stack_pointer, vm_->m_stack_pointer + stack_size),
-	  return_address(return_address), vm(vm_)
+	  return_address(return_address), base_pointer(vm_->m_stack_pointer + locals_count),
+	  stack_pointer(vm_->m_stack_pointer + locals_count), vm(vm_)
 {
 	state = std::make_unique<State>();
 	spdlog::debug("Added frame with {} registers and stack size {}. New stack frame count: {}",
@@ -34,7 +38,8 @@ StackFrame::StackFrame(size_t register_count,
 
 StackFrame::StackFrame(StackFrame &&other)
 	: registers(std::move(other.registers)), locals_storage(std::move(other.locals_storage)),
-	  return_address(other.return_address), vm(std::exchange(other.vm, nullptr)),
+	  return_address(other.return_address), base_pointer(other.base_pointer),
+	  stack_pointer(other.stack_pointer), vm(std::exchange(other.vm, nullptr)),
 	  state(std::exchange(other.state, nullptr))
 {
 	if (!locals_storage.empty()) {
@@ -47,7 +52,9 @@ StackFrame::StackFrame(StackFrame &&other)
 
 StackFrame::~StackFrame()
 {
-	if (vm) { spdlog::debug("Popping frame. New stack frame count: {}", vm->m_stack_frames.size()); }
+	if (vm) {
+		spdlog::debug("Popping frame. New stack frame count: {}", vm->m_stack_frames.size());
+	}
 	for (auto &local : locals) { local = nullptr; }
 }
 
@@ -60,6 +67,8 @@ StackFrame StackFrame::clone() const
 		std::span{ stack_frame.locals_storage.begin(), stack_frame.locals_storage.end() };
 	stack_frame.return_address = return_address;
 	stack_frame.last_instruction_pointer = last_instruction_pointer;
+	stack_frame.base_pointer = base_pointer;
+	stack_frame.stack_pointer = stack_pointer;
 	stack_frame.vm = vm;
 	stack_frame.state = std::make_unique<State>(*state);
 	return stack_frame;
@@ -91,10 +100,10 @@ VirtualMachine::VirtualMachine()
 	m_heap->set_start_stack_pointer(rbp);
 }
 
-std::unique_ptr<StackFrame> VirtualMachine::setup_call_stack(size_t register_count,
-	size_t stack_size)
+std::unique_ptr<StackFrame>
+	VirtualMachine::setup_call_stack(size_t register_count, size_t locals_count, size_t stack_size)
 {
-	return push_frame(register_count, stack_size);
+	return push_frame(register_count, locals_count, stack_size);
 }
 
 void VirtualMachine::ret()
@@ -163,49 +172,58 @@ void VirtualMachine::show_current_instruction(size_t index, size_t window) const
 
 void VirtualMachine::dump() const
 {
-	size_t i = 0;
+	// size_t i = 0;
 	ASSERT(registers().has_value());
 
+	std::cout << "bp: " << static_cast<const void *>(bp()) << " \n";
 	std::cout << "sp: " << static_cast<const void *>(sp()) << " \n";
 	for (const auto &register_ : stack_locals()) {
-		std::visit(overloaded{ [&i](const auto &stack_value) {
+		std::visit(overloaded{ [](const auto &stack_value) {
 								  std::ostringstream os;
 								  os << stack_value;
-								  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
+								  std::cout << fmt::format("@{}:  {}\n",
+									  static_cast<const void *>(&stack_value),
+									  os.str());
 							  },
-					   [&i](PyObject *obj) {
+					   [](const PyObject *&obj) {
 						   if (obj) {
-							   std::cout << fmt::format("[{}]  {} ({})\n",
-								   i++,
-								   static_cast<const void *>(obj),
-								   obj->to_string());
+							   //    std::cout << fmt::format("[{}]  {} ({})\n",
+							   // 	   i++,
+							   // 	   static_cast<const void *>(obj),
+							   // 	   obj->to_string());
+							   std::cout << fmt::format("@{}:  {}\n",
+								   static_cast<const void *>(&obj),
+								   static_cast<const void *>(obj));
 						   } else {
-							   std::cout << fmt::format("[{}]  (Empty)\n", i++);
+							   std::cout << fmt::format(
+								   "@{}:  (Empty)\n", static_cast<const void *>(&obj));
 						   }
 					   } },
 			register_);
 	}
 
-	i = 0;
-	std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
-	for (const auto &register_ : registers()->get()) {
-		std::visit(overloaded{ [&i](const auto &register_value) {
-								  std::ostringstream os;
-								  os << register_value;
-								  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
-							  },
-					   [&i](PyObject *obj) {
-						   if (obj) {
-							   std::cout << fmt::format("[{}]  {} ({})\n",
-								   i++,
-								   static_cast<const void *>(obj),
-								   obj->to_string());
-						   } else {
-							   std::cout << fmt::format("[{}]  (Empty)\n", i++);
-						   }
-					   } },
-			register_);
-	}
+	// i = 0;
+	// std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
+	// for (const auto &register_ : registers()->get()) {
+	// 	std::visit(overloaded{ [&i](const auto &register_value) {
+	// 							  std::ostringstream os;
+	// 							  os << register_value;
+	// 							  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
+	// 						  },
+	// 				   [&i](PyObject *obj) {
+	// 					   if (obj) {
+	// 						   //    std::cout << fmt::format("[{}]  {} ({})\n",
+	// 						   // 	   i++,
+	// 						   // 	   static_cast<const void *>(obj),
+	// 						   // 	   obj->to_string());
+	// 						   std::cout << fmt::format(
+	// 							   "[{}]  {}\n", i++, static_cast<const void *>(obj));
+	// 					   } else {
+	// 						   std::cout << fmt::format("[{}]  (Empty)\n", i++);
+	// 					   }
+	// 				   } },
+	// 		register_);
+	// }
 }
 
 
@@ -229,14 +247,15 @@ void VirtualMachine::leave_cleanup_handling()
 	m_state->cleanup.pop();
 }
 
-std::unique_ptr<StackFrame> VirtualMachine::push_frame(size_t register_count, size_t stack_size)
+std::unique_ptr<StackFrame>
+	VirtualMachine::push_frame(size_t register_count, size_t locals_count, size_t stack_size)
 {
 	auto new_frame =
 		m_stack_frames.empty()
 			? StackFrame::create(
-				register_count, stack_size, InstructionVector::const_iterator{}, this)
-			: StackFrame::create(register_count, stack_size, m_instruction_pointer, this);
-	m_base_pointer = m_stack_pointer;
+				register_count, locals_count, stack_size, InstructionVector::const_iterator{}, this)
+			: StackFrame::create(
+				register_count, locals_count, stack_size, m_instruction_pointer, this);
 	push_frame(*new_frame);
 
 	return new_frame;
@@ -244,6 +263,10 @@ std::unique_ptr<StackFrame> VirtualMachine::push_frame(size_t register_count, si
 
 void VirtualMachine::push_frame(StackFrame &frame)
 {
+	if (!m_stack_frames.empty()) {
+		// stash the current stack pointer so we can restore it later
+		m_stack_frames.top().get().stack_pointer = m_stack_pointer;
+	}
 	m_stack_frames.push(frame);
 	// set a new state for this stack frame
 	m_state = m_stack_frames.top().get().state.get();
@@ -252,30 +275,33 @@ void VirtualMachine::push_frame(StackFrame &frame)
 	auto &stack_objects = m_stack_objects.emplace_back();
 	if (r.has_value()) {
 		for (const auto &v : r->get()) { stack_objects.push_back(&v); }
+		for (const auto &v : stack_locals()) { stack_objects.push_back(&v); }
 	}
 
-	if (std::distance(m_stack.begin(), m_stack_pointer) + frame.locals.size() >= m_stack.size()) {
+	ASSERT(std::distance(m_stack_pointer, frame.stack_pointer) >= 0);
+	ASSERT(std::distance(m_base_pointer, frame.base_pointer) >= 0);
+
+	if (std::distance(m_stack.begin(), frame.stack_pointer)
+		>= static_cast<int64_t>(m_stack.size())) {
 		ASSERT(false && "Stack overflow!");
 	}
-	std::advance(m_stack_pointer, frame.locals.size());
+
+	m_stack_pointer = frame.stack_pointer;
+	m_base_pointer = frame.base_pointer;
 
 	spdlog::debug("Pushing frame. New stack frame count: {}", m_stack_frames.size());
 }
 
-std::deque<std::vector<const py::Value *>> VirtualMachine::stack_objects() const {
-	auto stack_objects = m_stack_objects;
-	if (!stack_objects.empty()) {
-		auto *start = &m_stack.front();
-		while (start != sp()) { stack_objects.back().push_back(&*start++); }
-	}
-
-	return stack_objects;
+std::deque<std::vector<const py::Value *>> VirtualMachine::stack_objects() const
+{
+	return m_stack_objects;
 }
 
 void VirtualMachine::pop_frame()
 {
 	if (m_stack_frames.size() > 1) {
-		size_t sp_decrement = m_stack_frames.top().get().locals.size();
+		const size_t locals_size = m_stack_frames.top().get().locals.size();
+
 		auto return_value = m_stack_frames.top().get().registers[0];
 		ASSERT((*m_stack_frames.top().get().return_address).get());
 		m_instruction_pointer = m_stack_frames.top().get().return_address;
@@ -285,12 +311,15 @@ void VirtualMachine::pop_frame()
 		// restore stack frame state
 		m_state = m_stack_frames.top().get().state.get();
 		m_stack_objects.pop_back();
-		ASSERT(m_stack_pointer >= m_stack.cbegin());
-		ASSERT(static_cast<size_t>(m_stack_pointer - m_stack.cbegin()) >= sp_decrement);
-		f.get().locals_storage.resize(sp_decrement, nullptr);
-		for (size_t i = 0; i < sp_decrement; ++i) { f.get().locals_storage[i] = f.get().locals[i]; }
+
+		f.get().locals_storage.resize(locals_size, nullptr);
+		for (size_t i = 0; i < locals_size; ++i) { f.get().locals_storage[i] = f.get().locals[i]; }
 		f.get().locals = std::span{ f.get().locals_storage.begin(), f.get().locals_storage.end() };
-		m_stack_pointer -= sp_decrement;
+
+		ASSERT(std::distance(m_stack_frames.top().get().stack_pointer, m_stack_pointer) >= 0);
+		ASSERT(std::distance(m_stack_frames.top().get().base_pointer, m_base_pointer) >= 0);
+		m_base_pointer = m_stack_frames.top().get().base_pointer;
+		m_stack_pointer = m_stack_frames.top().get().stack_pointer;
 	} else {
 		m_stack_frames.pop();
 		m_stack_objects.pop_back();
