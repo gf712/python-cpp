@@ -1474,8 +1474,10 @@ struct StarTargetPattern : PatternV2<StarTargetPattern>
 			StarTargetPattern>;
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'*' (!'*' star_target)");
-			(void)result;
-			TODO_NO_FAIL();
+			auto [star_token, _, value] = *result;
+			return std::make_shared<Starred>(value,
+				ContextType::STORE,
+				SourceLocation{ star_token.token.start(), value->source_location().start });
 		}
 
 		// target_with_star_atom
