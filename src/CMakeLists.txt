@@ -42,6 +42,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/JumpForward.cpp
     executable/bytecode/instructions/JumpIfFalse.cpp
     executable/bytecode/instructions/JumpIfFalseOrPop.cpp
+    executable/bytecode/instructions/JumpIfExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfNotExceptionMatch.cpp
     executable/bytecode/instructions/JumpIfTrue.cpp
     executable/bytecode/instructions/JumpIfTrueOrPop.cpp
@@ -68,6 +69,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ReRaise.cpp
     executable/bytecode/instructions/ReturnValue.cpp
     executable/bytecode/instructions/SetAdd.cpp
+    executable/bytecode/instructions/SetUpdate.cpp
     executable/bytecode/instructions/SetupExceptionHandling.cpp
     executable/bytecode/instructions/SetupWith.cpp
     executable/bytecode/instructions/StoreAttr.cpp
@@ -76,6 +78,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/StoreGlobal.cpp
     executable/bytecode/instructions/StoreName.cpp
     executable/bytecode/instructions/StoreSubscript.cpp
+    executable/bytecode/instructions/ToBool.cpp
     executable/bytecode/instructions/Unary.cpp
     executable/bytecode/instructions/UnpackSequence.cpp
     executable/bytecode/instructions/WithExceptStart.cpp
@@ -235,7 +238,7 @@ add_library(
 add_executable(unittests_ ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp
-  PUBLIC spdlog_header_only
+  PUBLIC spdlog
   PRIVATE project_options project_warnings ICU::uc ICU::data ${GMPXX_LIBRARIES} ${GMP_LIBRARIES}
 )
 
@@ -273,7 +276,7 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
   target_include_directories(llvm-interface INTERFACE . )
   # include llvm include directories as system paths to silence compiler warnings
   target_include_directories(llvm-interface SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
-  target_link_libraries(llvm-interface INTERFACE spdlog_header_only)
+  target_link_libraries(llvm-interface INTERFACE spdlog)
   separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
   target_compile_definitions(llvm-interface INTERFACE ${LLVM_DEFINITIONS_LIST})
 

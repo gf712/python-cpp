@@ -35,6 +35,7 @@
 #include "executable/bytecode/instructions/JumpForward.hpp"
 #include "executable/bytecode/instructions/JumpIfFalse.hpp"
 #include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
+#include "executable/bytecode/instructions/JumpIfExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
 #include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
