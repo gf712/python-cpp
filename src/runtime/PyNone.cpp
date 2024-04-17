@@ -14,7 +14,11 @@ std::string PyNone::to_string() const { return "None"; }
 
 PyResult<PyObject *> PyNone::__repr__() const { return PyString::create(to_string()); }
 
-PyResult<PyObject *> PyNone::__add__(const PyObject *) const { TODO(); }
+PyResult<PyObject *> PyNone::__add__(const PyObject *other) const
+{
+	return Err(type_error(
+		"unsupported operand type(s) for +: 'NoneType' and '{}'", other->type()->name()));
+}
 
 PyResult<bool> PyNone::__bool__() const { return Ok(false); }
 
