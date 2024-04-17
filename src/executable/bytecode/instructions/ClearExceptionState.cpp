@@ -3,6 +3,7 @@
 #include "runtime/BaseException.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyNone.hpp"
+#include "runtime/PyTraceback.hpp"
 
 using namespace py;
 
@@ -21,8 +22,12 @@ PyResult<Value> ClearExceptionState::execute(VirtualMachine &, Interpreter &inte
 	// 			interpreter.execution_frame()->exception_info()->exception->to_string());
 	// 	}
 	// }
-	while (interpreter.execution_frame()->exception_info().has_value()) {
-		interpreter.execution_frame()->pop_exception();
+	if (interpreter.execution_frame()->exception_info().has_value()) {
+		while (interpreter.execution_frame()->exception_info().has_value()
+			   && (interpreter.execution_frame()->exception_info()->traceback->m_tb_frame
+				   == interpreter.execution_frame())) {
+			interpreter.execution_frame()->pop_exception();
+		}
 	}
 
 	return Ok(Value{ py_none() });
