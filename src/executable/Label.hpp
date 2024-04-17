@@ -7,13 +7,15 @@
 
 namespace codegen {
 class BytecodeGenerator;
-}
+class PythonBytecodeEmitter;
+}// namespace codegen
 
 class Label
 	: NonCopyable
 	, NonMoveable
 {
 	friend codegen::BytecodeGenerator;
+	friend codegen::PythonBytecodeEmitter;
 
 	std::string m_label_name;
 	size_t m_function_id;
