@@ -5,11 +5,18 @@
 
 namespace py {
 
-AttributeError::AttributeError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
+AttributeError::AttributeError(PyType *type) : Exception(type) {}
 
 AttributeError::AttributeError(PyTuple *args)
 	: Exception(types::BuiltinTypes::the().attribute_error(), args)
 {}
+
+PyResult<PyObject *> AttributeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(type == types::attribute_error());
+	ASSERT(!kwargs || kwargs->map().empty())
+	return Ok(AttributeError::create(args));
+}
 
 PyType *AttributeError::static_type() const
 {

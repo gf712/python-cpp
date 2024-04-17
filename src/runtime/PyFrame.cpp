@@ -118,6 +118,7 @@ BaseException *PyFrame::pop_exception()
 
 PyResult<std::monostate> PyFrame::put_local(const std::string &name, const Value &value)
 {
+	ASSERT(!std::holds_alternative<PyObject *>(value) || std::get<PyObject *>(value));
 	if (auto *locals = as<PyDict>(m_locals)) {
 		locals->insert(String{ name }, value);
 		return Ok(std::monostate{});
