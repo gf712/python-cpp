@@ -279,7 +279,8 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		const auto offset = deserialize<int32_t>(instruction_buffer);
-		return std::make_unique<ForIter>(dst, src, offset);
+		const auto body_offset = deserialize<int32_t>(instruction_buffer);
+		return std::make_unique<ForIter>(dst, src, offset, body_offset);
 	}
 	case GET_ITER: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
