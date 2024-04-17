@@ -88,7 +88,7 @@ void StackFrame::leave()
 {
 	ASSERT(vm);
 	// ASSERT(vm->m_stack_frames.top() == *this);
-	vm->pop_frame();
+	vm->pop_frame(true);
 }
 
 VirtualMachine::VirtualMachine()
@@ -123,7 +123,7 @@ void VirtualMachine::ret()
 		ret();
 	} else {
 		ASSERT(m_state->cleanup.size() == 1)
-		pop_frame();
+		pop_frame(true);
 	}
 }
 
@@ -297,7 +297,7 @@ std::deque<std::vector<const py::Value *>> VirtualMachine::stack_objects() const
 	return m_stack_objects;
 }
 
-void VirtualMachine::pop_frame()
+void VirtualMachine::pop_frame(bool should_return_value)
 {
 	if (m_stack_frames.size() > 1) {
 		const size_t locals_size = m_stack_frames.top().get().locals.size();
@@ -307,7 +307,12 @@ void VirtualMachine::pop_frame()
 		m_instruction_pointer = m_stack_frames.top().get().return_address;
 		auto f = m_stack_frames.top();
 		m_stack_frames.pop();
-		m_stack_frames.top().get().registers[0] = std::move(return_value);
+		if (should_return_value) {
+			// returning a value may not be always desirable (e.g. leaving a function in an
+			// exception state)
+			m_stack_frames.top().get().registers[0] = std::move(return_value);
+		}
+
 		// restore stack frame state
 		m_state = m_stack_frames.top().get().state.get();
 		m_stack_objects.pop_back();

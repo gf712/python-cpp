@@ -48,7 +48,7 @@ PyResult<Value> YieldFrom::execute(VirtualMachine &vm, Interpreter &interpreter)
 		vm.reg(m_dst) = result.unwrap();
 		vm.reg(0) = result.unwrap();
 		vm.set_instruction_pointer(vm.instruction_pointer() - 1);
-		vm.pop_frame();
+		vm.pop_frame(true);
 	}
 
 	return result;

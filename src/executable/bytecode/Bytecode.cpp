@@ -150,7 +150,10 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 
 			ASSERT(vm.state().cleanup.size() > 0);
 			if (!vm.state().cleanup.top()) {
-				vm.ret();
+				ASSERT(vm.state().cleanup.size() == 1);
+				// when a function returns without handling the exception do not copy the value
+				// to the callers the return register
+				vm.pop_frame(false);
 				return result;
 			} else {
 				auto [exit_cleanup_type, exit_ins] = *vm.state().cleanup.top();
