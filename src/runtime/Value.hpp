@@ -251,9 +251,9 @@ template<typename T> class PyResult
 
 	template<typename FunctorType,
 		typename PyResultType =
-			std::conditional_t<detail::is_ok<typename std::result_of_t<FunctorType(T)>>{},
-				typename detail::is_ok<typename std::result_of_t<FunctorType(T)>>::type,
-				typename detail::is_pyresult<typename std::result_of_t<FunctorType(T)>>::type>>
+			std::conditional_t<detail::is_ok<typename std::invoke_result_t<FunctorType, T>>{},
+				typename detail::is_ok<typename std::invoke_result_t<FunctorType, T>>::type,
+				typename detail::is_pyresult<typename std::invoke_result_t<FunctorType, T>>::type>>
 	PyResult<PyResultType> and_then(FunctorType &&op) const;
 
 	template<typename FunctorType> PyResult<T> or_else(FunctorType &&op) const;
@@ -263,7 +263,7 @@ template<typename T>
 template<typename FunctorType, typename PyResultType>
 PyResult<PyResultType> PyResult<T>::and_then(FunctorType &&op) const
 {
-	using ResultType = typename std::result_of_t<FunctorType(T)>;
+	using ResultType = typename std::invoke_result_t<FunctorType, T>;
 	static_assert(detail::is_ok<ResultType>{} || detail::is_pyresult<ResultType>{},
 		"Return type of function must be of type Ok<U> or PyResult<U>");
 	if (is_ok()) {
@@ -277,7 +277,7 @@ template<typename T>
 template<typename FunctorType>
 PyResult<T> PyResult<T>::or_else(FunctorType &&op) const
 {
-	using ResultType = typename std::result_of_t<FunctorType(ErrType)>;
+	using ResultType = typename std::invoke_result_t<FunctorType, ErrType>;
 	static_assert(detail::is_ok<ResultType>{} || detail::is_pyresult<ResultType>{},
 		"Return type of function must be of type Ok<U> or PyResult<U>");
 	if (is_err()) {
