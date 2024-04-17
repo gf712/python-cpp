@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common.hpp"
 #include "forward.hpp"
 #include "memory/GarbageCollector.hpp"
 #include "runtime/forward.hpp"
@@ -9,6 +10,7 @@
 
 class Function;
 class VirtualMachine;
+
 
 class CodeFlags
 {
@@ -86,3 +88,10 @@ class Program
 
 	virtual std::vector<uint8_t> serialize() const = 0;
 };
+
+namespace compiler {
+std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
+	std::vector<std::string> argv,
+	Backend backend,
+	OptimizationLevel lvl);
+}

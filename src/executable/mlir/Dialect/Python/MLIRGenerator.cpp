@@ -3,6 +3,10 @@
 #include "Python/IR/PythonOps.hpp"
 
 #include "executable/Mangler.hpp"
+#include "executable/Program.hpp"
+#include "executable/mlir/Conversion/Passes.hpp"
+#include "executable/mlir/Conversion/PythonToPythonBytecode/PythonToPythonBytecode.hpp"
+#include "executable/mlir/Target/PythonBytecode/PythonBytecodeEmitter.hpp"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "runtime/Value.hpp"
 
@@ -236,10 +240,9 @@ bool MLIRGenerator::compile(std::shared_ptr<ast::Module> m,
 	m->codegen(&generator);
 	std::vector<mlir::StringRef> argv_ref;
 	argv_ref.reserve(argv.size());
-	for (const auto& argv_: argv) {
-		argv_ref.push_back(argv_);
-	}
-	ctx.module()->setAttr(ctx.builder().getStringAttr("llvm.argv"), ctx.builder().getStrArrayAttr(argv_ref));
+	for (const auto &argv_ : argv) { argv_ref.push_back(argv_); }
+	ctx.module()->setAttr(
+		ctx.builder().getStringAttr("llvm.argv"), ctx.builder().getStrArrayAttr(argv_ref));
 
 	// ctx.module().print(llvm::outs());
 	// llvm::outs() << '\n';
@@ -2130,17 +2133,18 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_slice(
 				auto lower = slice.lower
 								 ? static_cast<MLIRValue &>(*slice.lower->codegen(this)).value
 								 : m_context.builder().create<mlir::py::ConstantOp>(
-									 loc(m_context.builder(), m_context.filename(), location),
-									 m_context.builder().getNoneType());
+									   loc(m_context.builder(), m_context.filename(), location),
+									   m_context.builder().getNoneType());
 				auto upper = slice.upper
 								 ? static_cast<MLIRValue &>(*slice.upper->codegen(this)).value
 								 : m_context.builder().create<mlir::py::ConstantOp>(
-									 loc(m_context.builder(), m_context.filename(), location),
-									 m_context.builder().getNoneType());
-				auto step = slice.step ? static_cast<MLIRValue &>(*slice.step->codegen(this)).value
-									   : m_context.builder().create<mlir::py::ConstantOp>(
-										   loc(m_context.builder(), m_context.filename(), location),
-										   m_context.builder().getNoneType());
+									   loc(m_context.builder(), m_context.filename(), location),
+									   m_context.builder().getNoneType());
+				auto step = slice.step
+								? static_cast<MLIRValue &>(*slice.step->codegen(this)).value
+								: m_context.builder().create<mlir::py::ConstantOp>(
+									  loc(m_context.builder(), m_context.filename(), location),
+									  m_context.builder().getNoneType());
 				return new_value(m_context.builder().create<mlir::py::BuildSliceOp>(
 					loc(m_context.builder(), m_context.filename(), location),
 					m_context->pyobject_type(),

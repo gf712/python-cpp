@@ -2,7 +2,7 @@ add_mlir_conversion_library(PythonToPythonBytecode
     PythonToPythonBytecode.cpp
 
     ADDITIONAL_HEADER_DIRS
-    ${PROJECT_SOURCE_DIR}/src/executable/mlir/include/mlir/Conversion/PythonToPythonBytecode
+    ${PROJECT_SOURCE_DIR}/src/executable/mlir/Conversion/PythonToPythonBytecode
 
     LINK_LIBS
     MLIRIR

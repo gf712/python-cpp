@@ -915,8 +915,8 @@ PyResult<PyObject *> eval(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 		parser::Parser p{ l };
 		auto m = p.parse_expression();
 		if (m.is_err()) { return Err(m.unwrap_err()); }
-		auto program =
-			codegen::BytecodeGenerator::compile(m.unwrap(), {}, compiler::OptimizationLevel::None);
+		auto program = compiler::compile(
+			m.unwrap(), {}, compiler::Backend::MLIR, compiler::OptimizationLevel::None);
 		auto code = program->main_function();
 		ASSERT(as<PyCode>(code));
 		return as<PyCode>(code)->eval(as<PyDict>(globals),
@@ -1004,8 +1004,10 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 		parser::Parser p{ lexer };
 		p.parse();
 
-		std::shared_ptr<Program> bytecode = codegen::BytecodeGenerator::compile(
-			p.module(), { filename_str }, compiler::OptimizationLevel::None);
+		std::shared_ptr<Program> bytecode = compiler::compile(p.module(),
+			{ filename_str },
+			compiler::Backend::MLIR,
+			compiler::OptimizationLevel::None);
 		if (!bytecode) { TODO(); }
 
 		return Ok(bytecode->main_function());

@@ -1,5 +1,6 @@
 #include "BytecodeProgram.hpp"
 #include "codegen/BytecodeGenerator.hpp"
+#include "executable/common.hpp"
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
 #include "vm/VM.hpp"
@@ -16,8 +17,8 @@ std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module)
 
-	return std::static_pointer_cast<BytecodeProgram>(
-		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None));
+	return std::static_pointer_cast<BytecodeProgram>(compiler::compile(
+		module, {}, compiler::Backend::BYTECODE_GENERATOR, compiler::OptimizationLevel::None));
 }
 }// namespace
 

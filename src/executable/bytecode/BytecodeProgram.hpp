@@ -6,6 +6,7 @@
 #include "executable/Program.hpp"
 #include "runtime/Value.hpp"
 #include "runtime/forward.hpp"
+#include <memory>
 
 class BytecodeProgram : public Program
 {

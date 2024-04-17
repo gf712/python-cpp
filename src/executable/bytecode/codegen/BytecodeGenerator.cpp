@@ -1,4 +1,5 @@
 #include "BytecodeGenerator.hpp"
+#include "ast/AST.hpp"
 #include "executable/bytecode/BytecodeProgram.hpp"
 #include "executable/bytecode/instructions/BinaryOperation.hpp"
 #include "executable/bytecode/instructions/BinarySubscript.hpp"
@@ -3129,7 +3130,7 @@ InstructionVector *BytecodeGenerator::allocate_block(size_t function_id)
 	return &function->blocks;
 }
 
-std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::ASTNode> node,
+std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::Module> node,
 	std::vector<std::string> argv,
 	compiler::OptimizationLevel lvl)
 {

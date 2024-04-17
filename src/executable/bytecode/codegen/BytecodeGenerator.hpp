@@ -253,7 +253,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 	std::unordered_map<size_t, size_t> m_current_exception_depth;
 
   public:
-	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
+	static std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 		std::vector<std::string> argv,
 		compiler::OptimizationLevel lvl);
 
