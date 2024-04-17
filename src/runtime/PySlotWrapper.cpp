@@ -31,6 +31,7 @@ PyResult<PyObject *> PySlotWrapper::__call__(PyTuple *args, PyDict *kwargs)
 	// split args tuple -> (args[0], args[1:])
 	// since args[0] is self (right?)
 	std::vector<Value> new_args_vector;
+	ASSERT(args->size() > 0);
 	new_args_vector.reserve(args->size() - 1);
 	auto self_ = PyObject::from(args->elements()[0]);
 	if (self_.is_err()) return self_;
