@@ -1,13 +1,6 @@
 #pragma once
 
 #include "ast/AST.hpp"
-#include "utilities.hpp"
-
-namespace compiler {
-
-enum class OptimizationLevel { None = 0, Basic = 1 };
-
-}
 
 namespace ast {
 namespace optimizer {

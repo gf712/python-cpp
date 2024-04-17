@@ -2,12 +2,12 @@
 
 #include <memory>
 
-class BytecodeProgram;
+class Program;
 
 namespace mlir {
 class Operation;
 }
 
 namespace codegen {
-std::shared_ptr<BytecodeProgram> translateToPythonBytecode(mlir::Operation *op);
+std::shared_ptr<Program> translateToPythonBytecode(mlir::Operation *op);
 }

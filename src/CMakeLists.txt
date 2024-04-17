@@ -257,9 +257,15 @@ if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
 endif()
 
-
+# MLIR backend
 add_subdirectory(executable/mlir)
 
+target_link_libraries(python-cpp
+  PUBLIC
+  python-mlir
+)
+
+# LLVM backend
 find_package(LLVM CONFIG 10.0)
 if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
   message(FATAL_ERROR "Could not find LLVM in the local environment")
@@ -318,5 +324,5 @@ add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings)
 
 add_executable(freeze utilities/freeze.cpp)
-target_link_libraries(freeze PRIVATE python-cpp PythonMLIRDialect TargetPythonBytecode PythonConversionPasses cxxopts project_options project_warnings)
+target_link_libraries(freeze PRIVATE python-cpp cxxopts project_options project_warnings)
 target_include_directories(freeze SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})

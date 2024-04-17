@@ -1950,7 +1950,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::ModuleOp &mo
 }
 
 
-std::shared_ptr<BytecodeProgram> translateToPythonBytecode(Operation *op)
+std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 {
 	if (mlir::verify(op, /*verifyRecursively*/ true).failed()) {
 		std::cerr << "Invalid Python bytecode IR\n";

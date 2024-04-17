@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/AST.hpp"
+#include "executable/Program.hpp"
 #include "executable/bytecode/codegen/VariablesResolver.hpp"
 
 #include <memory>

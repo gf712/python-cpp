@@ -9,7 +9,7 @@
 #include "runtime/PyTraceback.hpp"
 #include "runtime/PyTuple.hpp"
 
-#include <numeric>
+#include <memory>
 
 using namespace py;
 

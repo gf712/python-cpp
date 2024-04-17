@@ -3,6 +3,7 @@
 #include "parser/Parser.hpp"
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
+#include "executable/Program.hpp"
 
 #include "gtest/gtest.h"
 
