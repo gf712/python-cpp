@@ -13,17 +13,20 @@
 #include "DeleteName.hpp"
 #include "DeleteSubscript.hpp"
 #include "DictMerge.hpp"
+#include "DictUpdate.hpp"
 #include "ForIter.hpp"
 #include "FormatValue.hpp"
 #include "FunctionCall.hpp"
 #include "FunctionCallEx.hpp"
 #include "FunctionCallWithKeywords.hpp"
 #include "GetIter.hpp"
+#include "GetYieldFromIter.hpp"
 #include "ImportFrom.hpp"
 #include "ImportName.hpp"
 #include "InplaceOp.hpp"
 #include "Jump.hpp"
 #include "JumpForward.hpp"
+#include "JumpIfExceptionMatch.hpp"
 #include "JumpIfFalse.hpp"
 #include "JumpIfFalseOrPop.hpp"
 #include "JumpIfNotExceptionMatch.hpp"
@@ -52,6 +55,7 @@
 #include "ReRaise.hpp"
 #include "ReturnValue.hpp"
 #include "SetAdd.hpp"
+#include "SetUpdate.hpp"
 #include "SetupExceptionHandling.hpp"
 #include "SetupWith.hpp"
 #include "StoreAttr.hpp"
@@ -60,10 +64,12 @@
 #include "StoreGlobal.hpp"
 #include "StoreName.hpp"
 #include "StoreSubscript.hpp"
+#include "ToBool.hpp"
 #include "Unary.hpp"
 #include "UnpackSequence.hpp"
 #include "WithExceptStart.hpp"
 #include "YieldValue.hpp"
+#include "YieldLoad.hpp"
 
 #include "../serialization/deserialize.hpp"
 
@@ -247,6 +253,11 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto size = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<BuildDict>(dst, size);
 	}
+	case DICT_UPDATE: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		const auto size = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<DictUpdate>(dst, size);
+	}
 	case BUILD_SLICE: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto argcount = deserialize<uint8_t>(instruction_buffer);
@@ -427,6 +438,10 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<YieldValue>(src);
 	}
+	case YIELD_LOAD: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<YieldLoad>(dst);
+	}
 	case BUILD_STRING: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto size = deserialize<uint8_t>(instruction_buffer);
@@ -443,9 +458,32 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		return std::make_unique<Push>(src);
 	}
 	case POP: {
-		return std::make_unique<Pop>();
+		const auto discard = deserialize<uint8_t>(instruction_buffer);
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+
+		return std::make_unique<Pop>(dst, discard);
+	}
+	case GET_YIELD_FROM_ITER: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		const auto src = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<GetYieldFromIter>(dst, src);
+	}
+	case JUMP_IF_EXCEPTION_MATCH: {
+		const auto exception_type_reg = deserialize<uint8_t>(instruction_buffer);
+		const auto offset = deserialize<uint32_t>(instruction_buffer);
+		return std::make_unique<JumpIfExceptionMatch>(exception_type_reg, offset);
+	}
+	case TO_BOOL: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		const auto src = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<ToBool>(dst, src);
+	}
+	case SET_UPDATE: {
+		const auto set = deserialize<uint8_t>(instruction_buffer);
+		const auto iterable = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<SetUpdate>(set, iterable);
 	}
 	}
 	spdlog::error("Missing opcode: {}", instruction_code);
-	TODO();
+	return nullptr;
 }
