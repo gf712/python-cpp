@@ -143,6 +143,7 @@ class MLIRGenerator : ast::CodeGenerator
 		const std::vector<std::shared_ptr<ast::ASTNode>> &body,
 		const std::vector<std::shared_ptr<ast::ASTNode>> &decorator_list,
 		bool is_anon,
+		bool is_async,
 		const SourceLocation &source_location);
 
 	MLIRValue *build_comprehension(std::string_view function_name,

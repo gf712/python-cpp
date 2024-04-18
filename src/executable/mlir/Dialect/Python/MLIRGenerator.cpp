@@ -652,7 +652,16 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 
 ast::Value *MLIRGenerator::visit(const ast::AsyncFunctionDefinition *node)
 {
-	TODO();
+	const std::string &mangled_name = Mangler::default_mangler().function_mangle(
+		mangle_namespace(m_scope), node->name(), node->source_location());
+	make_function(node->name(),
+		mangled_name,
+		node->args(),
+		node->body(),
+		node->decorator_list(),
+		false,
+		true,
+		node->source_location());
 	return nullptr;
 }
 
@@ -1523,6 +1532,7 @@ ast::Value *MLIRGenerator::visit(const ast::FunctionDefinition *node)
 		node->body(),
 		node->decorator_list(),
 		false,
+		false,
 		node->source_location());
 	return nullptr;
 }
@@ -1751,6 +1761,7 @@ ast::Value *MLIRGenerator::visit(const ast::Lambda *node)
 		{ std::make_shared<ast::Return>(node->body(), node->body()->source_location()) },
 		{},
 		true,
+		false,
 		node->source_location());
 	ASSERT(fn);
 	return fn;
@@ -2361,6 +2372,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 	const std::vector<std::shared_ptr<ast::ASTNode>> &body,
 	const std::vector<std::shared_ptr<ast::ASTNode>> &decorator_list,
 	bool is_anon,
+	bool is_async,
 	const SourceLocation &source_location)
 {
 	auto *last_block = m_context.builder().getBlock();
@@ -2443,6 +2455,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 
 	{
 		[[maybe_unused]] auto function_scope = setup_function(f, function_name, mangled_name);
+		if (is_async) { f->setAttr("async", m_context.builder().getBoolAttr(true)); }
 
 		// captures.reserve(m_variable_visibility.at(mangled_name)->captures.size());
 		for (const auto &el : m_variable_visibility.at(mangled_name)->symbol_map.symbols) {

@@ -759,6 +759,8 @@ struct PythonBytecodeEmitter
 
 		void set_is_generator() { m_flags.set(CodeFlags::Flag::GENERATOR); }
 
+		void set_is_async() { m_flags.set(CodeFlags::Flag::COROUTINE); }
+
 		void set_is_class() { m_flags.set(CodeFlags::Flag::CLASS); }
 
 		void set_kwonlyarg_count(size_t kwonlyarg_count) { m_kwonly_arg_count = kwonlyarg_count; }
@@ -1005,8 +1007,13 @@ struct PythonBytecodeEmitter
 			current_function().set_is_generator();
 		}
 
-		if (auto is_generator = op->getAttrOfType<mlir::BoolAttr>("is_class");
-			is_generator && is_generator.getValue()) {
+		if (auto is_async = op->getAttrOfType<mlir::BoolAttr>("async");
+			is_async && is_async.getValue()) {
+			current_function().set_is_async();
+		}
+
+		if (auto is_class = op->getAttrOfType<mlir::BoolAttr>("is_class");
+			is_class && is_class.getValue()) {
 			current_function().set_is_class();
 		}
 
@@ -1903,9 +1910,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::ModuleOp &mo
 	ASSERT(argv);
 	auto argv_array = argv.cast<mlir::ArrayAttr>();
 	m_argv.reserve(argv_array.size());
-	for (const auto& argv_: argv_array) {
-		m_argv.push_back(argv_.cast<mlir::StringAttr>().str());
-	}
+	for (const auto &argv_ : argv_array) { m_argv.push_back(argv_.cast<mlir::StringAttr>().str()); }
 	auto &module_region = module_.getBodyRegion();
 	ASSERT(module_region.getBlocks().size() == 1);
 	auto fn = std::find_if(module_region.getBlocks().back().getOperations().begin(),
