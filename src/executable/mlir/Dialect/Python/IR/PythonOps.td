@@ -1,3 +1,4 @@
+include "Python/IR/PythonAttributes.td"
 include "Python/IR/PythonTypes.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -20,6 +21,7 @@ def ConstantOp : Python_Op<"constant"> {
         OpBuilder<(ins "NoneType":$value)>,
         OpBuilder<(ins "StringAttr":$value)>,
         OpBuilder<(ins "std::vector<std::byte>":$value)>,
+        OpBuilder<(ins "::mlir::py::PyEllipsisType":$value)>,
     ];
 }
 

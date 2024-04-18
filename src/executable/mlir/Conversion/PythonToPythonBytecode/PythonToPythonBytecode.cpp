@@ -1,6 +1,7 @@
 #include "Conversion/PythonToPythonBytecode/PythonToPythonBytecode.hpp"
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "Dialect/Python/IR/Dialect.hpp"
+#include "Dialect/Python/IR/PythonAttributes.hpp"
 #include "Dialect/Python/IR/PythonOps.hpp"
 #include "ast/AST.hpp"
 #include "executable/Mangler.hpp"
@@ -14,6 +15,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -30,6 +32,15 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				auto constant_value = op.getValue();
+
+
+				auto ellipsis =
+					mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(getContext());
+				if (op.getValue() == ellipsis) {
+					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadEllipsisOp>(
+						op, op.getOutput().getType());
+					return success();
+				}
 
 				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ConstantOp>(
 					op, op.getOutput().getType(), constant_value);

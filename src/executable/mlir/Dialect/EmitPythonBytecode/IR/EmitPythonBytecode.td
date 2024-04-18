@@ -6,11 +6,13 @@ include "Python/IR/PythonTypes.td"
 class EmitPythonBytecode_Op<string mnemonic, list<Trait> traits = []>
     : Op<EmitPythonBytecode_Dialect, mnemonic, traits>;
 
-def RegisterType : TypeAlias<UI8, "register name">;
-
 def EmitPythonBytecode_ConstantOp: EmitPythonBytecode_Op<"LOAD_CONST"> {
     let arguments = (ins AnyAttr:$value);
 
+    let results = (outs Python_PyObjectType:$output);
+}
+
+def EmitPythonBytecode_LoadEllipsisOp: EmitPythonBytecode_Op<"LOAD_ELLIPSIS"> {
     let results = (outs Python_PyObjectType:$output);
 }
 

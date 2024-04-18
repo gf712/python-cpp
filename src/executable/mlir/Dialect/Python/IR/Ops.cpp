@@ -1,10 +1,14 @@
-#include "Python/IR/Dialect.hpp"
-#include "Python/IR/PythonOps.hpp"
-#include "Python/IR/PythonTypes.hpp"
+#include "Dialect.hpp"
+#include "PythonAttributes.hpp"
+#include "PythonOps.hpp"
+#include "PythonTypes.hpp"
 
+#include "mlir/IR/AttributeSupport.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 
@@ -24,6 +28,11 @@ namespace py {
 		addTypes<
 #define GET_TYPEDEF_LIST
 #include "Python/IR/PythonTypes.cpp.inc"
+			>();
+
+		addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Python/IR/PythonAttributes.cpp.inc"
 			>();
 	}
 
@@ -68,8 +77,21 @@ namespace py {
 		auto byte_array_attr = mlir::DenseIntElementsAttr::get(
 			mlir::VectorType::get(
 				static_cast<int64_t>(bytes.size()), builder.getIntegerType(8, false)),
-			mlir::ArrayRef<unsigned char>{ llvm::bit_cast<unsigned char *>(bytes.data()), bytes.size() });
+			mlir::ArrayRef<unsigned char>{
+				llvm::bit_cast<unsigned char *>(bytes.data()), bytes.size() });
 		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), byte_array_attr);
+	}
+
+	void ConstantOp::build(mlir::OpBuilder &builder,
+		mlir::OperationState &state,
+		mlir::py::PyEllipsisType)
+	{
+		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), EllipsisAttr::get(builder.getContext()));
+	}
+
+	EllipsisAttr EllipsisAttr::get(mlir::MLIRContext* context)
+	{
+		return mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(context);
 	}
 
 	SuccessorOperands CondBranchSubclassOp::getSuccessorOperands(unsigned index)
@@ -261,3 +283,6 @@ namespace py {
 #include "Python/IR/PythonTypes.cpp.inc"
 
 #include "Python/IR/PythonOpsEnums.cpp.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "Python/IR/PythonAttributes.cpp.inc"

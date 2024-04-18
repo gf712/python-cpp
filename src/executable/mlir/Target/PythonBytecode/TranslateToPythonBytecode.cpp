@@ -83,6 +83,7 @@
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
+#include "runtime/Value.hpp"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -1097,6 +1098,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			mlir::emitpybytecode::StoreGlobalOp,
 			mlir::emitpybytecode::StoreNameOp,
 			mlir::emitpybytecode::StoreDerefOp,
+			mlir::emitpybytecode::LoadEllipsisOp,
 			mlir::emitpybytecode::LoadFastOp,
 			mlir::emitpybytecode::LoadNameOp,
 			mlir::emitpybytecode::LoadGlobalOp,
@@ -1671,6 +1673,14 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 			emit<LoadConst>(get_register(op.getResult()), idx);
 			return success();
 		});
+}
+
+template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::LoadEllipsisOp &op)
+{
+	const auto idx = add_const(::py::Ellipsis{});
+	emit<LoadConst>(get_register(op.getResult()), idx);
+	return success();
 }
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::StoreFastOp &op)
