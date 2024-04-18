@@ -2373,8 +2373,9 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 		decorator_functions.push_back(static_cast<MLIRValue *>(f)->value);
 	}
 
-	const size_t args_size = args->args().size() + args->kwonlyargs().size()
-							 + (args->vararg() != nullptr) + (args->kwarg() != nullptr);
+	const size_t args_size = args->args().size() + args->posonlyargs().size()
+							 + args->kwonlyargs().size() + (args->vararg() != nullptr)
+							 + (args->kwarg() != nullptr);
 
 	std::vector<mlir::Value> defaults;
 	for (const auto &default_ : args->defaults()) {
