@@ -1968,14 +1968,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 				m_context.builder().setInsertionPointToStart(&for_loop.getStep().emplaceBlock());
 				auto iterator = new_value(for_loop.getStep().addArgument(
 					m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
-				if (auto target = as<ast::Name>(generator->target())) {
-					auto target_ids = target->ids();
-					if (target_ids.size() != 1) { TODO(); }
-					auto target_name = target_ids[0];
-					store_name(target_name, iterator, target->source_location());
-				} else {
-					TODO();
-				}
+				assign(generator->target(), iterator, generator->target()->source_location());
 				m_context.builder().create<mlir::py::ControlFlowYield>(
 					m_context.builder().getUnknownLoc());
 			}
