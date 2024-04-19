@@ -489,9 +489,17 @@ def EmitPythonBytecode_YieldFrom : EmitPythonBytecode_Op<"YIELD_FROM"> {
 }
 
 def UnpackSequenceOp: EmitPythonBytecode_Op<"UNPACK_SEQUENCE"> {
-    let summary = "Unpack ";
+    let summary = "Unpack sequence";
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
+}
+
+def GetAwaitableOp : EmitPythonBytecode_Op<"GET_AWAITABLE"> {
+    let summary = "Get awaitable";
+
+    let arguments = (ins Python_PyObjectType:$iterable);
+
+    let results = (outs Python_PyObjectType:$iterator);
 }

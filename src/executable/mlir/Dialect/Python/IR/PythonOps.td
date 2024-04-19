@@ -629,3 +629,11 @@ def BuildSliceOp : Python_Op<"build_slice"> {
 
     let results = (outs Python_PyObjectType:$slice);
 }
+
+def GetAwaitableOp : Python_Op<"get_awaitable"> {
+    let summary = "Get awaitable";
+
+    let arguments = (ins Python_PyObjectType:$iterable);
+
+    let results = (outs Python_PyObjectType:$iterator);
+}

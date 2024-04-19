@@ -669,8 +669,15 @@ ast::Value *MLIRGenerator::visit(const ast::AsyncFunctionDefinition *node)
 
 ast::Value *MLIRGenerator::visit(const ast::Await *node)
 {
-	TODO();
-	return nullptr;
+	auto iterable = static_cast<const MLIRValue &>(*node->value()->codegen(this)).value;
+	auto iterator = m_context.builder().create<mlir::py::GetAwaitableOp>(
+		loc(m_context.builder(), m_context.filename(), node->value()->source_location()),
+		m_context->pyobject_type(),
+		iterable);
+	return new_value(m_context.builder().create<mlir::py::YieldFromOp>(
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		m_context->pyobject_type(),
+		iterator));
 }
 
 ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)

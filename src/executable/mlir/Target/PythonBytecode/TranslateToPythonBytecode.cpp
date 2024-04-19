@@ -24,6 +24,7 @@
 #include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "executable/bytecode/instructions/FunctionCallEx.hpp"
 #include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
+#include "executable/bytecode/instructions/GetAwaitable.hpp"
 #include "executable/bytecode/instructions/GetIter.hpp"
 #include "executable/bytecode/instructions/GetYieldFromIter.hpp"
 #include "executable/bytecode/instructions/ImportFrom.hpp"
@@ -1235,6 +1236,10 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			if (emitOperation(op).failed()) { return failure(); };
 			return success();
 		})
+		.Case<mlir::emitpybytecode::ForIter, mlir::emitpybytecode::GetAwaitableOp>([this](auto op) {
+			if (emitOperation(op).failed()) { return failure(); };
+			return success();
+		})
 		.Default([this](Operation *op) {
 			llvm::outs() << "Operation " << op->getName() << " not implemented\n";
 			return failure();
@@ -1901,6 +1906,13 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::UnpackS
 	std::vector<Register> unpacked_values;
 	for (const auto &el : op.getUnpackedValues()) { unpacked_values.push_back(get_register(el)); }
 	emit<UnpackSequence>(unpacked_values, get_register(op.getIterable()));
+	return success();
+}
+
+template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::GetAwaitableOp &op)
+{
+	emit<GetAwaitable>(get_register(op.getIterator()), get_register(op.getIterable()));
 	return success();
 }
 

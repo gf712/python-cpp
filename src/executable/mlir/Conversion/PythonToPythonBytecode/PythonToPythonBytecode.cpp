@@ -6,6 +6,7 @@
 #include "ast/AST.hpp"
 #include "executable/Mangler.hpp"
 #include "executable/bytecode/instructions/BinaryOperation.hpp"
+#include "executable/bytecode/instructions/GetAwaitable.hpp"
 #include "executable/bytecode/instructions/Unary.hpp"
 
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -1909,6 +1910,19 @@ namespace py {
 			}
 		};
 
+		struct GetAwaitableOpLowering : public mlir::OpRewritePattern<mlir::py::GetAwaitableOp>
+		{
+			using OpRewritePattern<mlir::py::GetAwaitableOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::GetAwaitableOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::GetAwaitableOp>(
+					op, op.getIterator().getType(), op.getIterable());
+				return success();
+			}
+		};
+
 		struct PythonToPythonBytecodePass
 			: public PassWrapper<PythonToPythonBytecodePass, OperationPass<ModuleOp>>
 		{
@@ -1992,6 +2006,7 @@ namespace py {
 		patterns.add<ImportOpLowering, ImportFromOpLowering, ImportAllOpLowering>(&getContext());
 		patterns.add<ClassDefinitionOpLowering>(&getContext());
 		patterns.add<YieldOpLowering, YieldFromOpLowering>(&getContext());
+		patterns.add<GetAwaitableOpLowering>(&getContext());
 
 		if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
 			signalPassFailure();
