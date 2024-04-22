@@ -26,6 +26,9 @@ PyResult<Value> unary_positive(const Value &val)
 				}
 				return Ok(Value{ c });
 			},
+			[](const Tuple &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary +: 'tuple'"));
+			},
 			[](PyObject *obj) -> PyResult<Value> {
 				if (auto r = obj->pos(); r.is_ok()) {
 					return Ok(Value{ r.unwrap() });
@@ -58,6 +61,9 @@ PyResult<Value> unary_negative(const Value &val)
 				}
 				if (std::get<bool>(c.value)) { return Ok(Value{ Number{ int64_t{ -1 } } }); }
 				return Ok(Value{ Number{ int64_t{ 0 } } });
+			},
+			[](const Tuple &) -> PyResult<Value> {
+				return Err(type_error("bad operand type for unary -: 'tuple'"));
 			},
 			[](PyObject *obj) -> PyResult<Value> {
 				if (auto r = obj->neg(); r.is_ok()) {

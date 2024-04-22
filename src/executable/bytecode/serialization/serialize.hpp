@@ -32,6 +32,7 @@ enum class ValueType {
 	NONE = 5,
 	BOOL = 6,
 	OBJECT = 7,
+	TUPLE = 8,
 };
 
 template<typename T> inline void serialize(const T &value, std::vector<uint8_t> &result)
@@ -109,9 +110,13 @@ template<> inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<u
 								   } },
 						val.value);
 				},
+				[&](const Tuple &tuple) {
+					serialize(static_cast<uint8_t>(ValueType::TUPLE), result);
+					serialize(tuple.elements, result);
+				},
 				[&](PyObject *const &) { TODO(); },
 			},
 			el);
-	}
+	}// namespace py
 }
 }// namespace py

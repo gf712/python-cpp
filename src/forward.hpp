@@ -34,8 +34,9 @@ struct Bytes;
 struct Ellipsis;
 struct NoneType;
 struct NameConstant;
+struct Tuple;
 class PyObject;
-using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, PyObject *>;
+using Value = std::variant<Number, String, Bytes, Ellipsis, NameConstant, Tuple, PyObject *>;
 template<typename T> class PyResult;
 }// namespace py
 

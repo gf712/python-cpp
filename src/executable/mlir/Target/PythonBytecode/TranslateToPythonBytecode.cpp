@@ -79,12 +79,18 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Value.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 #include "runtime/Value.hpp"
+#include "utilities.hpp"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -864,38 +870,50 @@ struct PythonBytecodeEmitter
 
 	size_t add_const(::py::Value value) { return current_function().add_const(std::move(value)); }
 
-	size_t add_const(bool value) { return add_const(::py::NameConstant{ value }); }
-
-	size_t add_const(::py::NoneType) { return add_const(::py::NameConstant{ ::py::NoneType{} }); }
-
-	size_t add_const(llvm::StringRef str)
+	::py::Value get_value(mlir::Attribute attr) const
 	{
-		::py::String s{ str.str() };
-		return add_const(std::move(s));
-	}
-
-	size_t add_const(llvm::APSInt int_value)
-	{
-		::py::BigIntType big_int_value{};
-		if (int_value.isZero()) {
-			big_int_value.get_mpz_t()->_mp_size = 0;
-		} else {
-			mpz_init2(big_int_value.get_mpz_t(), int_value.getBitWidth());
-			big_int_value.get_mpz_t()->_mp_size =
-				int_value.getNumWords() * (int_value.isNegative() ? -1 : 1);
-			std::copy_n(
-				int_value.getRawData(), int_value.getNumWords(), big_int_value.get_mpz_t()->_mp_d);
-		}
-		::py::Number value{ std::move(big_int_value) };
-		return add_const(std::move(value));
-	}
-
-	size_t add_const(double value) { return add_const(::py::Number{ value }); }
-
-	size_t add_const(std::vector<std::byte> bytes)
-	{
-		return add_const(::py::Bytes{ std::move(bytes) });
-	}
+		ASSERT(attr);
+		::py::Value value =
+			llvm::TypeSwitch<mlir::Attribute, ::py::Value>(attr)
+				.Case<FloatAttr>([](FloatAttr f) { return ::py::Number{ f.getValueAsDouble() }; })
+				.Case<BoolAttr>([](BoolAttr b) { return ::py::NameConstant{ b.getValue() }; })
+				.Case<UnitAttr>([](UnitAttr) { return ::py::NameConstant{ ::py::NoneType{} }; })
+				.Case<StringAttr>([](StringAttr str) { return ::py::String{ str.str() }; })
+				.Case<IntegerAttr>([](IntegerAttr int_attr) {
+					const auto &int_value = int_attr.getAPSInt();
+					::py::BigIntType big_int_value{};
+					if (int_value.isZero()) {
+						big_int_value.get_mpz_t()->_mp_size = 0;
+					} else {
+						mpz_init2(big_int_value.get_mpz_t(), int_value.getBitWidth());
+						big_int_value.get_mpz_t()->_mp_size =
+							int_value.getNumWords() * (int_value.isNegative() ? -1 : 1);
+						std::copy_n(int_value.getRawData(),
+							int_value.getNumWords(),
+							big_int_value.get_mpz_t()->_mp_d);
+					}
+					return ::py::Number{ std::move(big_int_value) };
+				})
+				.Case<DenseIntElementsAttr>([](DenseIntElementsAttr bytes_attr) {
+					std::vector<std::byte> bytes;
+					for (const auto &el : bytes_attr) {
+						ASSERT(el.isIntN(8));
+						bytes.push_back(std::byte{ *bit_cast<const uint8_t *>(el.getRawData()) });
+					}
+					return ::py::Bytes{ std::move(bytes) };
+				})
+				.Case<ArrayAttr>([this](ArrayAttr arr) {
+					std::vector<::py::Value> elements;
+					elements.reserve(arr.size());
+					for (const auto &el : arr) { elements.push_back(get_value(el)); }
+					return ::py::Tuple{ std::move(elements) };
+				})
+				.Default([](auto) {
+					TODO();
+					return ::py::NameConstant{ ::py::NoneType{} };
+				});
+		return value;
+	};
 
 	Register get_register(const mlir::Value &value) const
 	{
@@ -1641,42 +1659,20 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::JumpIfN
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::ConstantOp &op)
 {
 	return llvm::TypeSwitch<mlir::Attribute, LogicalResult>(op.getValue())
-		.Case<FloatAttr>([this, &op](FloatAttr f) {
-			const auto value_as_double = f.getValueAsDouble();
-			const auto idx = add_const(value_as_double);
+		.Case<FloatAttr,
+			BoolAttr,
+			UnitAttr,
+			StringAttr,
+			IntegerAttr,
+			DenseIntElementsAttr,
+			ArrayAttr>([this, &op](auto attr) {
+			const auto idx = add_const(get_value(attr));
 			emit<LoadConst>(get_register(op.getResult()), idx);
 			return success();
 		})
-		.Case<BoolAttr>([this, &op](BoolAttr b) {
-			const auto value_as_bool = b.getValue();
-			const auto idx = add_const(value_as_bool);
-			emit<LoadConst>(get_register(op.getResult()), idx);
-			return success();
-		})
-		.Case<UnitAttr>([this, &op](UnitAttr b) {
-			const auto idx = add_const(::py::NoneType{});
-			emit<LoadConst>(get_register(op.getResult()), idx);
-			return success();
-		})
-		.Case<StringAttr>([this, &op](StringAttr str) {
-			const auto idx = add_const(str.getValue());
-			emit<LoadConst>(get_register(op.getResult()), idx);
-			return success();
-		})
-		.Case<IntegerAttr>([this, &op](IntegerAttr int_attr) {
-			const auto idx = add_const(int_attr.getAPSInt());
-			emit<LoadConst>(get_register(op.getResult()), idx);
-			return success();
-		})
-		.Case<DenseIntElementsAttr>([this, &op](DenseIntElementsAttr bytes_attr) {
-			std::vector<std::byte> bytes;
-			for (const auto &el : bytes_attr) {
-				ASSERT(el.isIntN(8));
-				bytes.push_back(std::byte{ *bit_cast<const uint8_t *>(el.getRawData()) });
-			}
-			const auto idx = add_const(std::move(bytes));
-			emit<LoadConst>(get_register(op.getResult()), idx);
-			return success();
+		.Default([](auto) {
+			TODO();
+			return failure();
 		});
 }
 
@@ -1882,7 +1878,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::LoadClo
 template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteNameOp &op)
 {
-	emit<DeleteName>(add_const(op.getName()));
+	emit<DeleteName>(add_const(get_value(op.getNameAttr())));
 	return success();
 }
 
@@ -1896,7 +1892,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteF
 template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteGlobalOp &op)
 {
-	emit<DeleteGlobal>(add_const(op.getName()));
+	emit<DeleteGlobal>(add_const(get_value(op.getNameAttr())));
 	return success();
 }
 

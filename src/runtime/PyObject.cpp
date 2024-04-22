@@ -63,32 +63,33 @@ size_t ValueHash::operator()(const Value &value) const
 {
 	// TODO: put these hash functions somewhere global so they can be reused by the respective
 	//       PyObject classes
-	const auto result =
-		std::visit(overloaded{ [](const Number &number) -> size_t {
-								  if (std::holds_alternative<double>(number.value)) {
-									  return std::hash<double>{}(std::get<double>(number.value));
-								  } else {
-									  if (std::get<BigIntType>(number.value) == -1) return -2;
-									  ASSERT(std::get<BigIntType>(number.value).fits_ulong_p());
-									  return std::get<BigIntType>(number.value).get_ui();
-								  }
-							  },
-					   [](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
-					   [](const Bytes &b) -> size_t { return ::bit_cast<size_t>(b.b.data()); },
-					   [](const Ellipsis &) -> size_t { return ::bit_cast<size_t>(py_ellipsis()); },
-					   [](const NameConstant &c) -> size_t {
-						   if (std::holds_alternative<bool>(c.value)) {
-							   return std::get<bool>(c.value) ? 0 : 1;
-						   } else {
-							   return bit_cast<size_t>(py_none()) >> 4;
-						   }
-					   },
-					   [](PyObject *obj) -> size_t {
-						   auto val = obj->hash();
-						   ASSERT(val.is_ok())
-						   return val.unwrap();
-					   } },
-			value);
+	const auto result = std::visit(
+		overloaded{ [](const Number &number) -> size_t {
+					   if (std::holds_alternative<double>(number.value)) {
+						   return std::hash<double>{}(std::get<double>(number.value));
+					   } else {
+						   if (std::get<BigIntType>(number.value) == -1) return -2;
+						   ASSERT(std::get<BigIntType>(number.value).fits_ulong_p());
+						   return std::get<BigIntType>(number.value).get_ui();
+					   }
+				   },
+			[](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
+			[](const Bytes &b) -> size_t { return ::bit_cast<size_t>(b.b.data()); },
+			[](const Ellipsis &) -> size_t { return ::bit_cast<size_t>(py_ellipsis()); },
+			[](const NameConstant &c) -> size_t {
+				if (std::holds_alternative<bool>(c.value)) {
+					return std::get<bool>(c.value) ? 0 : 1;
+				} else {
+					return bit_cast<size_t>(py_none()) >> 4;
+				}
+			},
+			[](const Tuple &t) -> size_t { return ::bit_cast<size_t>(t.elements.data()); },
+			[](PyObject *obj) -> size_t {
+				auto val = obj->hash();
+				ASSERT(val.is_ok())
+				return val.unwrap();
+			} },
+		value);
 	return result;
 }
 
@@ -193,8 +194,7 @@ namespace {
 					return Ok(std::monostate{});
 				}
 			} else {
-				[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
-				();
+				[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }();
 			}
 		} else {
 			TODO();
@@ -367,6 +367,11 @@ template<> PyResult<PyObject *> PyObject::from(const NameConstant &value)
 		const bool bool_value = std::get<bool>(value.value);
 		return Ok(bool_value ? py_true() : py_false());
 	}
+}
+
+template<> PyResult<PyObject *> PyObject::from(const Tuple &tuple)
+{
+	return PyTuple::create(tuple.elements);
 }
 
 template<> PyResult<PyObject *> PyObject::from(const Value &value)
@@ -1318,21 +1323,21 @@ PyType *PyObject::static_type() const
 
 namespace {
 
-std::once_flag object_type_flag;
+	std::once_flag object_type_flag;
 
-std::unique_ptr<TypePrototype> register_type()
-{
-	return std::move(klass<PyObject>("object")
-						 .property(
-							 "__class__",
-							 [](PyObject *self) { return Ok(self->type()); },
-							 [](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
-								 (void)self;
-								 (void)value;
-								 TODO();
-							 })
-						 .type);
-}
+	std::unique_ptr<TypePrototype> register_type()
+	{
+		return std::move(klass<PyObject>("object")
+							 .property(
+								 "__class__",
+								 [](PyObject *self) { return Ok(self->type()); },
+								 [](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
+									 (void)self;
+									 (void)value;
+									 TODO();
+								 })
+							 .type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyObject::type_factory()
@@ -1345,6 +1350,6 @@ std::function<std::unique_ptr<TypePrototype>()> PyObject::type_factory()
 }
 
 namespace detail {
-size_t slot_count(PyType *t) { return t->__slots__.size(); }
+	size_t slot_count(PyType *t) { return t->__slots__.size(); }
 }// namespace detail
 }// namespace py

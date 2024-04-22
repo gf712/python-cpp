@@ -11,15 +11,20 @@
 
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Iterators.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <algorithm>
 
 namespace mlir {
 namespace py {
@@ -149,6 +154,8 @@ namespace py {
 					fn->setAttr("names", builder.getStrArrayAttr({ identifier }));
 				}
 			}
+
+			void build_const(mlir::func::FuncOp &fn, std::vector<mlir::Value> values) {}
 		}// namespace
 
 		template<typename T> struct GlobalDeclarationInterface : public T
@@ -683,6 +690,9 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				const auto &requires_expansion = op.getRequiresExpansion();
+				auto known_at_compiletime = [](mlir::Value element) -> bool {
+					return element.getDefiningOp<mlir::py::ConstantOp>();
+				};
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),
 						[](const auto &el) { return el == 1; })) {
@@ -698,6 +708,21 @@ namespace py {
 						}
 					}
 					rewriter.replaceOp(op, list);
+				} else if (std::all_of(op.getElements().begin(),
+							   op.getElements().end(),
+							   known_at_compiletime)) {
+					std::vector<mlir::Attribute> elements;
+					elements.reserve(op.getElements().size());
+					for (const auto &el : op.getElements()) {
+						ASSERT(el.getDefiningOp<mlir::py::ConstantOp>());
+						elements.push_back(el.getDefiningOp<mlir::py::ConstantOp>().getValue());
+					}
+					auto list = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildList>(
+						op, op.getOutput().getType(), ::mlir::ValueRange{});
+					auto tuple = rewriter.create<mlir::py::ConstantOp>(op.getLoc(),
+						op.getOutput().getType(),
+						mlir::ArrayAttr::get(getContext(), elements));
+					rewriter.create<mlir::emitpybytecode::ListExtend>(op.getLoc(), list, tuple);
 				} else {
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildList>(
 						op, op.getOutput().getType(), op.getElements());

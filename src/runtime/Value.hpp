@@ -7,9 +7,9 @@
 #include <gmpxx.h>
 #include <spdlog/fmt/bundled/format.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <memory>
 #include <sstream>
 #include <variant>
 #include <vector>
@@ -65,8 +65,9 @@ struct Number
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const Ellipsis &) const { return false; }
 	bool operator==(const NameConstant &) const;
+	bool operator==(const Tuple &) const { return false; }
 
-	Number floordiv(const Number&) const;
+	Number floordiv(const Number &) const;
 };
 
 struct String
@@ -86,6 +87,7 @@ struct String
 	bool operator==(const Ellipsis &) const { return false; }
 	bool operator==(const NameConstant &) const { return false; }
 	bool operator==(const Number &) const { return false; }
+	bool operator==(const Tuple &) const { return false; }
 
 	std::string to_string() const { return s; }
 };
@@ -112,6 +114,7 @@ struct Bytes
 	bool operator==(const Ellipsis &) const { return false; }
 	bool operator==(const NameConstant &) const { return false; }
 	bool operator==(const Number &) const { return false; }
+	bool operator==(const Tuple &) const { return false; }
 };
 
 struct Ellipsis
@@ -129,6 +132,7 @@ struct Ellipsis
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const String &) const { return false; }
 	bool operator==(const Number &) const { return false; }
+	bool operator==(const Tuple &) const { return false; }
 };
 
 struct NoneType
@@ -158,6 +162,7 @@ struct NameConstant
 	bool operator==(const Bytes &) const { return false; }
 	bool operator==(const String &) const { return false; }
 	bool operator==(const Number &) const;
+	bool operator==(const Tuple &) const { return false; }
 
 	std::string to_string() const
 	{
@@ -165,6 +170,24 @@ struct NameConstant
 							  [](const NoneType) { return "None"; } },
 			value);
 	}
+};
+
+struct Tuple
+{
+	std::vector<Value> elements;
+
+	friend std::ostream &operator<<(std::ostream &os, const Tuple &tuple);
+
+	std::string to_string() const;
+
+	bool operator==(const NoneType &) const { return false; }
+	bool operator==(const NameConstant &) const { return false; }
+	bool operator==(const PyObject *) const { return false; }
+	bool operator==(const Ellipsis &) const { return false; }
+	bool operator==(const Bytes &) const { return false; }
+	bool operator==(const String &) const { return false; }
+	bool operator==(const Number &) const { return false; }
+	bool operator==(const Tuple &other) const { return elements == other.elements; }
 };
 
 class BaseException;

@@ -613,7 +613,8 @@ template<size_t TypeIdx, typename... PatternTypes> struct OrPatternV2_
 		using PatternMatcher = PatternMatchV2<Pattern>;
 		static_assert(
 			std::tuple_size_v<typename std::invoke_result_t<decltype(PatternMatcher::match),
-				Parser &>::value_type> == 1);
+				Parser &>::value_type>
+			== 1);
 		if constexpr (TypeIdx == std::tuple_size_v<PatternTuple> - 1) {
 			if (auto result = PatternMatcher::match(p)) {
 				return std::get<0>(*result);
@@ -838,13 +839,15 @@ template<typename lhs, typename rhs> struct AndLiteralV2 : PatternV2<AndLiteralV
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token)
+		requires(!is_tuple_v<PatternType>)
 	{
 		return PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token)
+		requires(is_tuple_v<PatternTypes>)
 	{
 		return std::apply(
 			[&](auto... r) { return (... && decltype(r)::matches(token)); }, PatternTypes{});
@@ -869,13 +872,15 @@ template<typename lhs, typename rhs> struct AndNotLiteralV2 : PatternV2<AndNotLi
 	static constexpr size_t advance_by = lhs::advance_by;
 
 	template<typename PatternType>
-	static bool matches_(std::string_view token) requires(!is_tuple_v<PatternType>)
+	static bool matches_(std::string_view token)
+		requires(!is_tuple_v<PatternType>)
 	{
 		return !PatternType::matches(token);
 	}
 
 	template<typename PatternTypes>
-	static bool matches_(std::string_view token) requires(is_tuple_v<PatternTypes>)
+	static bool matches_(std::string_view token)
+		requires(is_tuple_v<PatternTypes>)
 	{
 		return !std::apply(
 			[&](auto... r) { return (... || decltype(r)::matches(token)); }, PatternTypes{});
@@ -1119,7 +1124,7 @@ struct NAMEPattern : PatternV2<NAMEPattern>
 
 template<> struct traits<struct StarTargetsTupleSeq>
 {
-	using result_type = std::shared_ptr<Tuple>;
+	using result_type = std::shared_ptr<ast::Tuple>;
 };
 
 struct StarTargetsTupleSeq : PatternV2<StarTargetsTupleSeq>
@@ -1137,7 +1142,7 @@ struct StarTargetsTupleSeq : PatternV2<StarTargetsTupleSeq>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("star_target (',' star_target )+ [',']");
 			auto [els, _] = *result;
-			return std::make_shared<Tuple>(els,
+			return std::make_shared<ast::Tuple>(els,
 				ContextType::STORE,
 				SourceLocation{
 					els.front()->source_location().start, els.back()->source_location().end });
@@ -1226,7 +1231,7 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 				els = tpl->elements();
 			}
 			// create new tuple with the correct source location
-			return std::make_shared<Tuple>(
+			return std::make_shared<ast::Tuple>(
 				els, ContextType::STORE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
@@ -1532,7 +1537,7 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 					auto [_, target] = el;
 					return target;
 				});
-			return std::make_shared<Tuple>(targets,
+			return std::make_shared<ast::Tuple>(targets,
 				ContextType::STORE,
 				SourceLocation{ targets.front()->source_location().start,
 					targets.back()->source_location().end });
@@ -2146,7 +2151,7 @@ struct TuplePattern : PatternV2<TuplePattern>
 			auto [l, maybe_named_expression, r] = *result;
 
 			if (!maybe_named_expression.has_value()) {
-				return std::make_shared<Tuple>(std::vector<std::shared_ptr<ASTNode>>{},
+				return std::make_shared<ast::Tuple>(std::vector<std::shared_ptr<ASTNode>>{},
 					ContextType::LOAD,
 					SourceLocation{ l.token.start(), r.token.end() });
 			}
@@ -2157,7 +2162,7 @@ struct TuplePattern : PatternV2<TuplePattern>
 			elements.reserve(els.size() + 1);
 			elements.push_back(lhs);
 			elements.insert(elements.end(), els.begin(), els.end());
-			return std::make_shared<Tuple>(
+			return std::make_shared<ast::Tuple>(
 				elements, ContextType::LOAD, SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
@@ -4411,7 +4416,7 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 			expressions.push_back(expression);
 			for (const auto &[_, expr] : more_expressions) { expressions.push_back(expr); }
 			auto end_token = p.lexer().peek_token(p.token_position() - 1);
-			return std::make_shared<Tuple>(expressions,
+			return std::make_shared<ast::Tuple>(expressions,
 				ContextType::LOAD,
 				SourceLocation{ expression->source_location().start, end_token->end() });
 		}
@@ -4422,7 +4427,7 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("star_expression ','");
 			auto [expression, token] = *result;
-			return std::make_shared<Tuple>(std::vector{ expression },
+			return std::make_shared<ast::Tuple>(std::vector{ expression },
 				ContextType::LOAD,
 				SourceLocation{ expression->source_location().start, token.token.end() });
 		}
@@ -4793,7 +4798,7 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 			target_elements.reserve(els.size());
 			for (const auto &[el, _] : els) { target_elements.push_back(el); }
 
-			auto targets = std::make_shared<Tuple>(target_elements,
+			auto targets = std::make_shared<ast::Tuple>(target_elements,
 				ContextType::STORE,
 				SourceLocation{ target_elements.front()->source_location().start,
 					target_elements.back()->source_location().end });
@@ -5415,7 +5420,7 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'(' del_target ')'");
 			auto [l, del_target, r] = *result;
-			return std::make_shared<Tuple>(std::vector{ del_target },
+			return std::make_shared<ast::Tuple>(std::vector{ del_target },
 				ContextType::DELETE,
 				SourceLocation{ l.token.start(), r.token.end() });
 		}
@@ -5428,11 +5433,11 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			DEBUG_LOG("'(' [del_targets] ')'");
 			auto [l, del_targets, r] = *result;
 			if (del_targets) {
-				return std::make_shared<Tuple>(del_targets->first,
+				return std::make_shared<ast::Tuple>(del_targets->first,
 					ContextType::DELETE,
 					SourceLocation{ l.token.start(), r.token.end() });
 			}
-			return std::make_shared<Tuple>(
+			return std::make_shared<ast::Tuple>(
 				ContextType::DELETE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
@@ -7628,7 +7633,7 @@ PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()
 			m_module->emplace(std::make_shared<Return>(
 				expressions.back(), expressions.back()->source_location()));
 		} else {
-			auto result = std::make_shared<Tuple>(expressions,
+			auto result = std::make_shared<ast::Tuple>(expressions,
 				ContextType::LOAD,
 				SourceLocation{ .start = expressions.front()->source_location().start,
 					.end = expressions.back()->source_location().end });

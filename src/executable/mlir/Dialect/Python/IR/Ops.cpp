@@ -6,6 +6,7 @@
 #include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
@@ -86,10 +87,23 @@ namespace py {
 		mlir::OperationState &state,
 		mlir::py::PyEllipsisType)
 	{
-		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), EllipsisAttr::get(builder.getContext()));
+		ConstantOp::build(builder,
+			state,
+			PyObjectType::get(builder.getContext()),
+			EllipsisAttr::get(builder.getContext()));
 	}
 
-	EllipsisAttr EllipsisAttr::get(mlir::MLIRContext* context)
+	void ConstantOp::build(mlir::OpBuilder &builder,
+		mlir::OperationState &state,
+		mlir::ArrayRef<mlir::Attribute> elements)
+	{
+		ConstantOp::build(builder,
+			state,
+			PyObjectType::get(builder.getContext()),
+			mlir::ArrayAttr::get(builder.getContext(), std::move(elements)));
+	}
+
+	EllipsisAttr EllipsisAttr::get(mlir::MLIRContext *context)
 	{
 		return mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(context);
 	}

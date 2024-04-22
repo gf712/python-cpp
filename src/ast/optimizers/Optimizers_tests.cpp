@@ -299,12 +299,12 @@ void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Tuple);
 
-	const auto result_context = as<Tuple>(result)->context();
-	const auto expected_context = as<Tuple>(expected)->context();
+	const auto result_context = as<ast::Tuple>(result)->context();
+	const auto expected_context = as<ast::Tuple>(expected)->context();
 	ASSERT_EQ(result_context, expected_context);
 
-	const auto result_elements = as<Tuple>(result)->elements();
-	const auto expected_elements = as<Tuple>(expected)->elements();
+	const auto result_elements = as<ast::Tuple>(result)->elements();
+	const auto expected_elements = as<ast::Tuple>(expected)->elements();
 	ASSERT_EQ(result_elements.size(), expected_elements.size());
 	for (size_t i = 0; i < result_elements.size(); ++i) {
 		dispatch(expected_elements[i], expected_elements[i]);

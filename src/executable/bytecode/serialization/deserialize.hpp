@@ -1,5 +1,6 @@
 #pragma once
 
+#include "forward.hpp"
 #include "runtime/Value.hpp"
 #include "serialize.hpp"
 
@@ -110,10 +111,12 @@ inline auto deserialize(std::span<const uint8_t> &buffer)
 		case ValueType::OBJECT: {
 			TODO();
 		} break;
+		case ValueType::TUPLE: {
+			return Tuple{ .elements = deserialize<std::vector<Value>>(buffer) };
+		}
 		}
 	} else {
-		[]<bool flag = false>() { static_assert(flag, "unsupported deserialization type"); }
-		();
+		[]<bool flag = false>() { static_assert(flag, "unsupported deserialization type"); }();
 	}
 	ASSERT_NOT_REACHED();
 }

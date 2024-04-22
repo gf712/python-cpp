@@ -401,12 +401,12 @@ void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Tuple);
 
-	const auto result_context = as<Tuple>(result)->context();
-	const auto expected_context = as<Tuple>(expected)->context();
+	const auto result_context = as<ast::Tuple>(result)->context();
+	const auto expected_context = as<ast::Tuple>(expected)->context();
 	ASSERT_EQ(result_context, expected_context);
 
-	const auto result_elements = as<Tuple>(result)->elements();
-	const auto expected_elements = as<Tuple>(expected)->elements();
+	const auto result_elements = as<ast::Tuple>(result)->elements();
+	const auto expected_elements = as<ast::Tuple>(expected)->elements();
 	ASSERT_EQ(result_elements.size(), expected_elements.size());
 	for (size_t i = 0; i < result_elements.size(); ++i) {
 		dispatch(expected_elements[i], expected_elements[i]);
@@ -1200,13 +1200,13 @@ TEST(Parser, MultipleAssignmentsWithStructuredBinding)
 
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<ast::Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
 				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Tuple>(
+		std::make_shared<ast::Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
 				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
@@ -1226,7 +1226,7 @@ TEST(Parser, SingleValueAssignmentTuple)
 	expected_ast->emplace(std::make_shared<Assign>(
 		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
 			"_CASE_INSENSITIVE_PLATFORMS_STR_KEY", ContextType::STORE, SourceLocation{}) },
-		std::make_shared<Tuple>(
+		std::make_shared<ast::Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Constant>(String{ "win" }, SourceLocation{}),
 			},
@@ -1244,7 +1244,7 @@ TEST(Parser, AssignToTuple)
 
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Tuple>(
+		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<ast::Tuple>(
 			std::vector<std::shared_ptr<ASTNode>>{
 				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
 				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
@@ -1627,7 +1627,7 @@ TEST(Parser, LiteralTuple)
 	expected_ast->emplace(
 		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
 									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Tuple>(
+			std::make_shared<ast::Tuple>(
 				std::vector<std::shared_ptr<ASTNode>>{
 					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
@@ -1724,7 +1724,7 @@ TEST(Parser, ForLoopMultipleTargets)
 
 	auto expected_ast = create_test_module();
 	expected_ast->emplace(std::make_shared<For>(
-		std::make_shared<Tuple>(
+		std::make_shared<ast::Tuple>(
 			std::vector<std::shared_ptr<ast::ASTNode>>{
 				std::make_shared<Name>("x", ContextType::STORE, SourceLocation{}),
 				std::make_shared<Name>("y", ContextType::STORE, SourceLocation{}) },
@@ -3189,7 +3189,7 @@ TEST(Parser, FunctionDefinitionWithPositionalArgWithDefault)
 			std::vector<std::shared_ptr<ASTNode>>{},
 			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
 			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Tuple>(
+				std::make_shared<ast::Tuple>(
 					std::vector<std::shared_ptr<ASTNode>>{}, ContextType::LOAD, SourceLocation{}),
 				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 			},
@@ -3397,7 +3397,7 @@ TEST(Parser, DictComprehension)
 			std::make_shared<Name>("v", ContextType::LOAD, SourceLocation{}),
 			std::vector<std::shared_ptr<Comprehension>>{
 				std::make_shared<Comprehension>(
-					std::make_shared<Tuple>(
+					std::make_shared<ast::Tuple>(
 						std::vector<std::shared_ptr<ASTNode>>{
 							std::make_shared<Name>("k", ContextType::STORE, SourceLocation{}),
 							std::make_shared<Name>("v", ContextType::STORE, SourceLocation{}),
@@ -3576,7 +3576,7 @@ TEST(Parser, YieldMutipleValues)
 			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
 		std::vector<std::shared_ptr<ASTNode>>{
 			std::make_shared<Yield>(
-				std::make_shared<Tuple>(
+				std::make_shared<ast::Tuple>(
 					std::vector<std::shared_ptr<ASTNode>>{
 						std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
 						std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),

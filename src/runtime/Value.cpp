@@ -13,6 +13,8 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
+#include <ranges>
+
 using namespace py;
 
 std::string Number::to_string() const
@@ -532,6 +534,35 @@ bool NameConstant::operator==(const NameConstant &other) const
 		[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
 }
 
+std::ostream &py::operator<<(std::ostream &os, const Tuple &tuple)
+{
+	os << tuple.to_string();
+	return os;
+}
+
+std::string Tuple::to_string() const
+{
+	std::ostringstream os;
+	os << "(";
+	for (const auto &el : elements | std::ranges::views::drop(1)) {
+		std::visit(overloaded{
+					   [&os](auto el_) { os << el_.to_string(); },
+					   [&os](PyObject *obj) { os << obj->to_string(); },
+				   },
+			el);
+		os << ", ";
+	}
+	if (!elements.empty()) {
+		std::visit(overloaded{
+					   [&os](auto el_) { os << el_.to_string(); },
+					   [&os](PyObject *obj) { os << obj->to_string(); },
+				   },
+			elements.back());
+	}
+	os << ")";
+	return os.str();
+}
+
 namespace py {
 
 PyResult<Value> add(const Value &lhs, const Value &rhs, Interpreter &)
@@ -923,6 +954,7 @@ PyResult<bool> truthy(const Value &value, Interpreter &)
 						  [](const String &str) -> PyResult<bool> { return Ok(!str.s.empty()); },
 						  [](const Bytes &bytes) -> PyResult<bool> { return Ok(!bytes.b.empty()); },
 						  [](const Ellipsis &) -> PyResult<bool> { return Ok(true); },
+						  [](const Tuple &t) -> PyResult<bool> { return Ok(!t.elements.empty()); },
 						  [](PyObject *obj) -> PyResult<bool> { return obj->true_(); } },
 		value);
 }

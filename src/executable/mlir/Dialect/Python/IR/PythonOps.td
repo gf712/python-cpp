@@ -22,6 +22,7 @@ def ConstantOp : Python_Op<"constant"> {
         OpBuilder<(ins "StringAttr":$value)>,
         OpBuilder<(ins "std::vector<std::byte>":$value)>,
         OpBuilder<(ins "::mlir::py::PyEllipsisType":$value)>,
+        OpBuilder<(ins "::mlir::ArrayRef<mlir::Attribute>":$elements)>,
     ];
 }
 
