@@ -939,13 +939,20 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 		auto it = node->values().begin();
 		auto end = node->values().end();
 		while (std::next(it) != end) {
+			auto *result_block = m_context.builder().createBlock(continuation);
+			m_context.builder().setInsertionPointToEnd(current);
+			m_context.builder().create<mlir::cf::BranchOp>(
+				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
+				result_block);
+			m_context.builder().setInsertionPointToStart(result_block);
 			auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
 			auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				m_context.builder().getI1Type(),
 				result);
+			auto *this_block = m_context.builder().getInsertionBlock();
 			auto *next = m_context.builder().createBlock(continuation);
-			m_context.builder().setInsertionPointToEnd(current);
+			m_context.builder().setInsertionPointToEnd(this_block);
 			m_context.builder().create<mlir::cf::CondBranchOp>(
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				cond,
@@ -968,13 +975,20 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 		auto it = node->values().begin();
 		auto end = node->values().end();
 		while (std::next(it) != end) {
+			auto *result_block = m_context.builder().createBlock(continuation);
+			m_context.builder().setInsertionPointToEnd(current);
+			m_context.builder().create<mlir::cf::BranchOp>(
+				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
+				result_block);
+			m_context.builder().setInsertionPointToStart(result_block);
 			auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
 			auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				m_context.builder().getI1Type(),
 				result);
+			auto *this_block = m_context.builder().getInsertionBlock();
 			auto *next = m_context.builder().createBlock(continuation);
-			m_context.builder().setInsertionPointToEnd(current);
+			m_context.builder().setInsertionPointToEnd(this_block);
 			m_context.builder().create<mlir::cf::CondBranchOp>(
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				cond,
