@@ -201,21 +201,6 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	for (size_t i = 0; i < total_arguments_count - arg_cells_count; ++i) {
 		VirtualMachine::the().stack_local(i) = nullptr;
 	}
-	// keeps track of the offset of the arg given that the Cell objects are not put on the stack
-	std::vector<size_t> arg_stack_offset(total_arguments_count, 0);
-	for (size_t i = 0; i < total_arguments_count; ++i) {
-		const bool arg_is_cell =
-			std::find(m_cell2arg.begin(), m_cell2arg.end(), i) == m_cell2arg.end();
-		if (arg_is_cell) {
-			if (i > 0) { arg_stack_offset[i] = arg_stack_offset[i - 1]; }
-		} else {
-			if (i > 0) {
-				arg_stack_offset[i] = arg_stack_offset[i - 1] + 1;
-			} else {
-				arg_stack_offset[i]++;
-			}
-		}
-	}
 
 	ASSERT(m_arg_count <= m_varnames.size());
 	std::vector<std::string> positional_args{ m_varnames.begin(),
@@ -292,10 +277,9 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 					cell->set_cell(*default_iter);
 				}
 			} else {
-				const size_t index = i - arg_stack_offset[i];
-				const auto &arg = VirtualMachine::the().stack_local(index);
+				const auto &arg = VirtualMachine::the().stack_local(i);
 				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-					VirtualMachine::the().stack_local(index) = *default_iter;
+					VirtualMachine::the().stack_local(i) = *default_iter;
 				}
 			}
 			default_iter = std::next(default_iter);
@@ -317,10 +301,9 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 					cell->set_cell(*kw_default_iter);
 				}
 			} else {
-				const size_t index = i - arg_stack_offset[i];
-				const auto &arg = VirtualMachine::the().stack_local(index);
+				const auto &arg = VirtualMachine::the().stack_local(i);
 				if (std::holds_alternative<PyObject *>(arg) && !std::get<PyObject *>(arg)) {
-					VirtualMachine::the().stack_local(index) = *kw_default_iter;
+					VirtualMachine::the().stack_local(i) = *kw_default_iter;
 				}
 			}
 			kw_default_iter = std::next(kw_default_iter);
