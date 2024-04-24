@@ -1495,9 +1495,7 @@ ast::Value *MLIRGenerator::visit(const ast::Expression *node)
 
 ast::Value *MLIRGenerator::visit(const ast::For *node)
 {
-	auto *current = m_context.builder().getBlock();
-	auto *parent = current->getParent();
-	m_context.builder().setInsertionPointToEnd(current);
+	auto *parent = m_context.builder().getBlock()->getParent();
 
 	auto iterable = static_cast<MLIRValue *>(node->iter()->codegen(this))->value;
 	auto for_loop = m_context.builder().create<mlir::py::ForLoopOp>(
@@ -1533,7 +1531,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
 	}
 
-	m_context.builder().setInsertionPointToEnd(current);
+	m_context.builder().setInsertionPointAfter(for_loop);
 
 	return nullptr;
 }
@@ -1845,7 +1843,7 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 	m_context.builder().setInsertionPointToEnd(entry_block);
 	for (const auto &node : m->body()) { node->codegen(this); }
 
-	// If a program does not have end in a terminator jump to the exit_block
+	// If a program does not end with a terminator instruction, jump to the exit_block
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 		m_context.builder().create<mlir::cf::BranchOp>(
