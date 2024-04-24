@@ -675,16 +675,33 @@ struct LinearScanRegisterAllocation
 						}
 					}
 					ASSERT(scratch_reg.has_value());
-					if (std::holds_alternative<mlir::Value>(cur.value)
-						&& !std::get<mlir::Value>(cur.value).isa<mlir::BlockArgument>()) {
-						auto &current_value = std::get<mlir::Value>(cur.value);
+					if (std::holds_alternative<mlir::Value>(cur.value)) {
+						auto current_value = std::get<mlir::Value>(cur.value);
+						if (current_value.isa<mlir::BlockArgument>()) {
+							if (auto it =
+									live_interval_analysis.block_input_mappings.find(cur.value);
+								it != live_interval_analysis.block_input_mappings.end()) {
+								for (auto mapped_value : it->second) {
+									ASSERT(!std::holds_alternative<ForwardedOutput>(mapped_value));
+									if ((std::get<mlir::Value>(mapped_value).getDefiningOp()
+											&& is_function_call(
+												std::get<mlir::Value>(mapped_value)))) {
+										ASSERT(current_value.isa<mlir::BlockArgument>());
+										current_value = std::get<mlir::Value>(mapped_value);
+										break;
+									}
+								}
+							}
+						}
+						ASSERT(!current_value.isa<mlir::BlockArgument>());
 						auto loc = current_value.getLoc();
 						builder.setInsertionPoint(current_value.getDefiningOp());
 						builder.create<mlir::emitpybytecode::Push>(loc, *cur_reg);
 						builder.setInsertionPointAfter(current_value.getDefiningOp());
 						builder.create<mlir::emitpybytecode::Move>(loc, *scratch_reg, *cur_reg);
 						builder.create<mlir::emitpybytecode::Pop>(loc, *cur_reg);
-						value2mem_map.insert_or_assign(current_value, Reg{ .idx = *scratch_reg });
+						value2mem_map.insert_or_assign(
+							std::get<mlir::Value>(cur.value), Reg{ .idx = *scratch_reg });
 						free.set(*scratch_reg, false);
 					}
 				} else {
