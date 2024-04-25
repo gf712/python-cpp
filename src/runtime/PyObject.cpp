@@ -556,7 +556,7 @@ PyResult<PyObject *> PyObject::eq(const PyObject *other) const
 
 PyResult<PyObject *> PyObject::ge(const PyObject *other) const
 {
-	if (type_prototype().__eq__.has_value()) {
+	if (type_prototype().__ge__.has_value()) {
 		return call_slot(*type_prototype().__ge__, this, other);
 	}
 	return Ok(not_implemented());
