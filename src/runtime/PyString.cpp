@@ -14,14 +14,19 @@
 #include "TypeError.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyBytes.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "utilities.hpp"
 
+#include <limits>
 #include <mutex>
 #include <numeric>
+#include <ranges>
 #include <span>
 
+#include <unicode/stringpiece.h>
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 
@@ -1075,7 +1080,7 @@ PyResult<PyString *> PyString::printf(const PyObject *values) const
 		values = values_.unwrap();
 	}
 
-	const auto *tuple = static_cast<const PyTuple*>(values);
+	const auto *tuple = static_cast<const PyTuple *>(values);
 	if (tuple->size() != conversions.size()) {
 		return Err(type_error("not enough arguments for format string"));
 	}
@@ -1344,6 +1349,66 @@ PyResult<PyString *> PyString::convert_to_ascii(PyObject *obj)
 
 		return PyString::create(new_string);
 	});
+}
+
+PyResult<PyString *> PyString::from_encoded_object(const PyObject *obj,
+	const std::string &encoding,
+	const std::string &errors)
+{
+	ASSERT(obj);
+
+	if (obj->type()->issubclass(types::bytes())) {
+		if (!encoding.empty() && encoding != "utf-8") {
+			return Err(not_implemented_error(
+				"only utf-8 encoding implemented for 'str' decoding, got {}", encoding));
+		}
+		if (static_cast<const PyBytes &>(*obj).value().b.empty()) { return PyString::create(""); }
+
+		return PyString::decode(
+			std::span<const std::byte>{ static_cast<const PyBytes &>(*obj).value().b.begin(),
+				static_cast<const PyBytes &>(*obj).value().b.end() },
+			encoding,
+			errors);
+	}
+	return Err(not_implemented_error("PyString::from_encoded_object only implemented for 'bytes'"));
+}
+
+PyResult<PyString *> PyString::decode(std::span<const std::byte> bytes,
+	const std::string &encoding,
+	const std::string & /*errors*/)
+{
+	if (encoding.empty() || encoding == "utf-8") {
+		icu::UnicodeString uni_str{ static_cast<int32_t>(bytes.size()), UChar32{}, 0 };
+		std::string encoded_cp;
+		encoded_cp.reserve(4);
+		while (!bytes.empty()) {
+			auto c = bytes.front();
+			ASSERT(
+				static_cast<int>(c) < static_cast<int>(std::numeric_limits<unsigned char>::max()));
+			auto size = utf8::codepoint_length(static_cast<char>(bytes.front()));
+			if (size > bytes.size()) {
+				return Err(value_error("str.decode: malformed utf-8 sequence"));
+			}
+			for (const auto &el : bytes.subspan(0, bytes.size())) {
+				ASSERT(static_cast<int>(el)
+					   < static_cast<int>(std::numeric_limits<unsigned char>::max()));
+				encoded_cp.push_back(static_cast<char>(el));
+			}
+			const auto cp = utf8::codepoint(encoded_cp.data(), size);
+			if (!cp.has_value()) {
+				return Err(value_error("invalid utf-8 encoded codepoint {}", encoded_cp));
+			}
+			encoded_cp.clear();
+			uni_str.append(UChar32{ static_cast<int32_t>(*cp) });
+			bytes = bytes.subspan(size);
+		}
+		std::string result;
+		result.reserve(uni_str.length() * 2);
+		uni_str.toUTF8String(result);
+		return PyString::create(std::move(result));
+	}
+
+	return Err(not_implemented_error("str.decode only implemented for 'utf-8' encoding"));
 }
 
 namespace {

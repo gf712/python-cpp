@@ -1,6 +1,9 @@
 #pragma once
 
 #include "PyObject.hpp"
+#include "runtime/PyDict.hpp"
+#include "runtime/PyTuple.hpp"
+#include "runtime/Value.hpp"
 
 namespace py {
 
@@ -27,6 +30,8 @@ class PyBytes : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 
 	const Bytes &value() const { return m_value; }
+
+	PyResult<PyObject *> decode(const std::string& encoding, const std::string& errors) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

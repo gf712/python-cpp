@@ -2,6 +2,12 @@
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "StopIteration.hpp"
+#include "runtime/PyDict.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
+#include "runtime/TypeError.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -78,6 +84,11 @@ PyResult<PyObject *> PyBytes::__iter__() const
 
 PyResult<PyObject *> PyBytes::__repr__() const { return PyString::create(to_string()); }
 
+PyResult<PyObject *> PyBytes::decode(const std::string &encoding, const std::string &errors) const
+{
+	return PyString::from_encoded_object(this, encoding, errors);
+}
+
 PyType *PyBytes::static_type() const { return types::bytes(); }
 
 namespace {
@@ -86,7 +97,42 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_bytes()
 	{
-		return std::move(klass<PyBytes>("bytes").type);
+		return std::move(
+			klass<PyBytes>("bytes")
+				.def("decode",
+					[](PyBytes *obj, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						std::optional<std::string> encoding;
+						std::optional<std::string> errors;
+						if (args) {
+							if (args->size() > 2) {
+								return Err(type_error(
+									"decode() takes at most 2 arguments ({} given)", args->size()));
+							}
+							if (args->size() > 0) {
+								auto arg0 = PyObject::from(args->elements()[0]).unwrap();
+								if (auto enc = as<PyString>(arg0)) {
+									encoding = enc->value();
+								} else {
+									return Err(type_error(
+										"decode() argument 'encoding' must be str, not {}",
+										arg0->type()->to_string()));
+								}
+							}
+							if (args->size() > 1) {
+								auto arg1 = PyObject::from(args->elements()[1]).unwrap();
+								if (auto err = as<PyString>(arg1)) {
+									errors = err->value();
+								} else {
+									return Err(
+										type_error("decode() argument 'errors' must be str, not {}",
+											arg1->type()->to_string()));
+								}
+							}
+						}
+						if (kwargs) { TODO(); }
+						return obj->decode(encoding.value_or("utf-8"), errors.value_or("strict"));
+					})
+				.type);
 	}
 }// namespace
 

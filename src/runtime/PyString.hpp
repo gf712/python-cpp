@@ -2,6 +2,7 @@
 
 #include "PyObject.hpp"
 #include "PyTuple.hpp"
+#include "runtime/Value.hpp"
 
 #include <optional>
 
@@ -108,6 +109,8 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> format(PyTuple *args, PyDict *kwargs) const;
 
 	static PyResult<PyString *> convert_to_ascii(PyObject *obj);
+	static PyResult<PyString *> from_encoded_object(const PyObject *obj, const std::string& encoding, const std::string& errors);
+	static PyResult<PyString *> decode(std::span<const std::byte>, const std::string& encoding, const std::string& errors);
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
