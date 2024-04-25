@@ -30,6 +30,8 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> __iter__() const;
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
+	PyResult<PyObject *> __le__(const PyObject *other) const;
+	PyResult<PyObject *> __lt__(const PyObject *other) const;
 	PyResult<bool> __contains__(const PyObject *value) const;
 
 	PyResult<PyObject *> __and__(PyObject *other);
@@ -45,6 +47,7 @@ class PySet : public PyBaseObject
 	PyResult<PySet *> update(PyObject* iterable);
 	PyResult<PySet *> intersection(PyTuple* args, PyDict* kwargs) const;
 	PyResult<PyObject *> pop();
+	PyResult<PyObject *> issubset(const PyObject* other) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

@@ -12,10 +12,15 @@
 #include "PyTuple.hpp"
 #include "StopIteration.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/NotImplementedError.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
+
+#include <algorithm>
 
 namespace py {
 
@@ -126,6 +131,22 @@ PyResult<PyObject *> PySet::pop()
 	return Ok(py_none());
 }
 
+PyResult<PyObject *> PySet::issubset(const PyObject *other) const
+{
+	if (this == other) { return Ok(py_true()); }
+
+	// fastpath
+	if (other->type()->issubclass(types::set())) {
+		const auto &other_set = static_cast<const PySet &>(*other);
+		for (const auto &el : m_elements) {
+			if (!other_set.elements().contains(el)) { return Ok(py_false()); }
+		}
+		return Ok(py_true());
+	}
+	return Err(not_implemented_error(
+		"set.issubset not implemented when arg is of type {}", other->type()->to_string()));
+}
+
 std::string PySet::to_string() const
 {
 	std::ostringstream os;
@@ -192,10 +213,31 @@ PyResult<size_t> PySet::__len__() const { return Ok(m_elements.size()); }
 
 PyResult<PyObject *> PySet::__eq__(const PyObject *other) const
 {
-	(void)other;
-	TODO();
-	return Err(nullptr);
+	if (!other->type()->issubclass(types::set())) { return Ok(py_false()); }
+	return Ok(m_elements == static_cast<const PySet &>(*other).elements() ? py_true() : py_false());
 }
+
+PyResult<PyObject *> PySet::__le__(const PyObject *other) const
+{
+	if (!other->type()->issubclass(types::set())) {
+		return Err(type_error(
+			"'<=' not supported between instances of 'set' and '{}'", other->type()->to_string()));
+	}
+	return issubset(other);
+}
+
+PyResult<PyObject *> PySet::__lt__(const PyObject *other) const
+{
+	if (!other->type()->issubclass(types::set())) {
+		return Err(type_error(
+			"'<' not supported between instances of 'set' and '{}'", other->type()->to_string()));
+	}
+	return __eq__(other).and_then([this, other](PyObject *is_equal) -> PyResult<PyObject *> {
+		if (is_equal == py_false()) { return issubset(other); }
+		return Ok(py_false());
+	});
+}
+
 
 PyResult<bool> PySet::__contains__(const PyObject *value) const
 {
@@ -245,6 +287,7 @@ namespace {
 							 .def("intersection", &PySet::intersection)
 							 .def("update", &PySet::update)
 							 .def("pop", &PySet::pop)
+							 .def("issubset", &PySet::issubset)
 							 .type);
 	}
 }// namespace

@@ -28,3 +28,30 @@ finally:
 a = {1, 2, 3}
 a.update([4, 5, 6, 1, 2, 3])
 assert len(a) == 6, "set.update should add new elements to the original set"
+
+def set_equals():
+    a = {1, 2, 3}
+    b = {1, 2, 3}
+    c = {1, 4, 3}
+    d = [1, 2, 3]
+    assert a == b
+    assert not a == c
+    assert not a == d
+
+set_equals()
+
+def set_less():
+    a = {1, 2, 3}
+    b = {1, 2, 3}
+    c = {1, 4, 3}
+    d = {1, 2, 3, 4}
+    assert a <= b
+    assert not a < b
+
+    assert not a <= c
+    assert not a < c
+
+    assert a <= d
+    assert a < d
+
+set_less()
