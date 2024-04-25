@@ -13,6 +13,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
+#include <locale>
 #include <ranges>
 
 using namespace py;
@@ -395,6 +396,14 @@ bool Bytes::operator==(const PyObject *other) const
 	}
 }
 
+constexpr unsigned char to_digit_value(char value)
+{
+	if (value >= 0 && value <= 9) { return value; }
+	if (value >= 'a' && value <= 'z') { return (value - 'a') + 10; }
+	if (value >= 'A' && value <= 'Z') { return (value - 'A') + 10; }
+	return 37;
+}
+
 Bytes Bytes::from_unescaped_string(const std::string &str)
 {
 	std::vector<std::byte> bytes;
@@ -461,7 +470,19 @@ Bytes Bytes::from_unescaped_string(const std::string &str)
 			bytes.push_back(std::byte{ static_cast<unsigned char>(c) });
 		} break;
 		case 'x': {
-			TODO();
+			ASSERT(it + 1 < end);
+			const auto digit1 = to_digit_value(*it);
+			const auto digit2 = to_digit_value(*(it + 1));
+			if (digit1 < 16 && digit2 < 16) {
+				it += 2;
+				const auto c = static_cast<unsigned char>((digit1 << 4) + digit2);
+				bytes.push_back(std::byte{ c });
+			}
+			auto &f = std::use_facet<std::ctype<char>>(std::locale());
+			/* skip \x */
+			if (it < end && f.is(std::ctype<char>::xdigit, *it)) {
+				it++;// and a hexdigit
+			}
 		} break;
 		default: {
 			bytes.push_back(std::byte{ '\\' });
