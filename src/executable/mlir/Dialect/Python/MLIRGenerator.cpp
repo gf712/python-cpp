@@ -344,7 +344,7 @@ void MLIRGenerator::store_name(std::string_view name,
 			m_context->pyobject_type(),
 			name,
 			value->value);
-	}
+	} break;
 	case VariablesResolver::Visibility::LOCAL: {
 		m_context.builder().create<mlir::py::StoreFastOp>(
 			loc(m_context.builder(), m_context.filename(), location),
