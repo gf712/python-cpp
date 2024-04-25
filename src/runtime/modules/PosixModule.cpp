@@ -4,12 +4,16 @@
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/Value.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/types/api.hpp"
 
+#include <cstddef>
 #include <filesystem>
+#include <string_view>
 
 #include <sys/stat.h>
 
@@ -127,6 +131,24 @@ namespace {
 			return s_stat_result;
 		}
 	};
+
+	PyResult<PyObject *> convertenviron()
+	{
+		size_t i = 0;
+		PyDict::MapType environ_dict;
+		while (environ[i]) {
+			auto env_pair = std::string_view{ environ[i++] };
+			auto delimiter = env_pair.find('=');
+			if (delimiter == std::string_view::npos) {
+				return Err(value_error("Invalid environ entry {}", env_pair));
+			}
+			auto key = env_pair.substr(0, delimiter);
+			auto value = env_pair.substr(delimiter + 1);
+			environ_dict.emplace(Bytes::from_unescaped_string(std::string{ key }),
+				Bytes::from_unescaped_string(std::string{ value }));
+		}
+		return PyDict::create(std::move(environ_dict));
+	}
 }// namespace
 
 PyModule *posix_module()
@@ -258,6 +280,11 @@ PyModule *posix_module()
 				return path;
 			})
 			.unwrap());
+
+	s_posix_module->add_symbol(
+		PyString::create("_have_functions").unwrap(), PyList::create().unwrap());
+
+	s_posix_module->add_symbol(PyString::create("environ").unwrap(), convertenviron().unwrap());
 
 	return s_posix_module;
 }
