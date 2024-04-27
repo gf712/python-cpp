@@ -22,11 +22,13 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "utilities.hpp"
 #include "llvm/ADT/SmallVector.h"
 
 #include <filesystem>
 #include <memory>
 #include <ranges>
+#include <variant>
 
 namespace fs = std::filesystem;
 
@@ -2183,7 +2185,18 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_slice(
 					upper,
 					step));
 			},
-			[](ast::Subscript::ExtSlice) -> MLIRValue * { TODO(); },
+			[this, &location](ast::Subscript::ExtSlice slices) -> MLIRValue * {
+				std::vector<MLIRValue *> slice_objects;
+				slice_objects.reserve(slices.dims.size());
+				for (const auto &slice : slices.dims) {
+					auto *slice_value = std::visit(overloaded{ [this, &location](auto s) {
+						return build_slice(s, location);
+					} },
+						slice);
+					slice_objects.push_back(slice_value);
+				}
+				return build_tuple(slice_objects, location);
+			},
 		},
 		sliceNode);
 }
