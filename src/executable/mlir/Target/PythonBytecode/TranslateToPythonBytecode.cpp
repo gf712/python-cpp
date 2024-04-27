@@ -978,7 +978,10 @@ struct PythonBytecodeEmitter
 			return el == name;
 		});
 		ASSERT(it != varnames.end());
-		const auto idx = std::distance(varnames.begin(), it);
+		const auto &cellvars = m_current_function->get().second.m_cellvars;
+		const auto idx = std::count_if(varnames.begin(), it, [&cellvars](const std::string& varname){
+			return std::find(cellvars.begin(), cellvars.end(), varname) == cellvars.end();
+		});
 		ASSERT(idx <= std::numeric_limits<Register>::max());
 		return idx;
 	}
