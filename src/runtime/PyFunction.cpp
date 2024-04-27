@@ -16,6 +16,7 @@
 #include "types/builtin.hpp"
 
 #include "utilities.hpp"
+#include "vm/VM.hpp"
 
 namespace py {
 
@@ -173,12 +174,17 @@ std::string PyNativeFunction::to_string() const
 
 PyResult<PyObject *> PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
-	if (is_method()) {
-		ASSERT(m_self);
-		return VirtualMachine::the().interpreter().call(this, m_self, args, kwargs);
-	} else {
-		return VirtualMachine::the().interpreter().call(this, args, kwargs);
-	}
+	auto result_reg_value = VirtualMachine::the().reg(0);
+	auto result = [this, args, kwargs]() {
+		if (is_method()) {
+			ASSERT(m_self);
+			return VirtualMachine::the().interpreter().call(this, m_self, args, kwargs);
+		} else {
+			return VirtualMachine::the().interpreter().call(this, args, kwargs);
+		}
+	}();
+	VirtualMachine::the().reg(0) = std::move(result_reg_value);
+	return result;
 }
 
 PyResult<PyObject *> PyNativeFunction::__repr__() const { return PyString::create(to_string()); }
