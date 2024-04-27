@@ -9,6 +9,7 @@
 #include "runtime/PyNamespace.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTraceback.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/types/api.hpp"
 
@@ -17,6 +18,7 @@
 #include "runtime/modules/paths.hpp"
 #include "vm/VM.hpp"
 
+#include <bit>
 #include <filesystem>
 
 using namespace py;
@@ -290,6 +292,20 @@ PyResult<PyObject *> exc_info(Interpreter &interpreter)
 	return PyTuple::create(exc->exception_type, exc->exception, exc->traceback);
 }
 
+PyResult<PyObject *> getfilesystemencoding() { return PyString::create("utf-8"); }
+
+PyResult<PyObject *> getfilesystemencodeerrors() { return PyString::create("surrogateescape"); }
+
+std::string_view get_endianness()
+{
+	if (std::endian::native == std::endian::big) {
+		return "big";
+	} else if (std::endian::native == std::endian::little) {
+		return "little";
+	}
+	return "mixed";
+}
+
 }// namespace
 
 namespace py {
@@ -382,6 +398,19 @@ PyModule *sys_module(Interpreter &interpreter)
 				return Ok(string);
 			})
 			.unwrap());
+
+	s_sys_module->add_symbol(PyString::create("getfilesystemencoding").unwrap(),
+		PyNativeFunction::create("getfilesystemencoding", [](PyTuple *, PyDict *) {
+			return getfilesystemencoding();
+		}).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("getfilesystemencodeerrors").unwrap(),
+		PyNativeFunction::create("getfilesystemencodeerrors", [](PyTuple *, PyDict *) {
+			return getfilesystemencodeerrors();
+		}).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("byteorder").unwrap(),
+		PyString::create(std::string{ get_endianness() }).unwrap());
 
 	return s_sys_module;
 }
