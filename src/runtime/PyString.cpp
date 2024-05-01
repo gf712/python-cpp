@@ -843,6 +843,65 @@ PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 	return PyTuple::create(PyString::create(lhs).unwrap(), sep_obj, PyString::create(rhs).unwrap());
 }
 
+PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
+{
+	ASSERT(!kwargs || kwargs->size() == 0)
+
+	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
+		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
+		auto args0 = PyObject::from(args->elements()[0]);
+
+		auto str = as<PyString>(args0.unwrap());
+		if (!str) { return Err(type_error("")); }
+		return Ok(str->codepoints());
+	}();
+
+	if (chars.is_err()) return Err(chars.unwrap_err());
+
+	if (chars.unwrap().empty()) {
+		const auto it_start = std::find_if(
+			m_value.begin(), m_value.end(), [](const auto &el) { return !std::isspace(el); });
+		const auto it_end = std::find_if(
+			m_value.rbegin(), m_value.rend(), [](const auto &el) { return !std::isspace(el); });
+
+		if (it_start == m_value.begin() && it_end == m_value.rend()) {
+			return Ok(const_cast<PyString *>(this));
+		}
+		std::string result{ it_start, it_end.base() };
+		return PyString::create(result);
+	} else {
+		const auto codepoints = this->codepoints();
+		const auto patterns = chars.unwrap();
+
+		auto contains = [patterns](const int32_t &cp) {
+			return std::find(patterns.begin(), patterns.end(), cp) != patterns.end();
+		};
+
+		auto codepoints_start_it = codepoints.begin();
+		size_t string_index_start = 0;
+		while (contains(*codepoints_start_it)) {
+			string_index_start += utf8::codepoint_length(*codepoints_start_it);
+			codepoints_start_it++;
+		}
+
+		auto codepoints_end_it = codepoints.rbegin();
+		size_t string_index_end = m_value.size();
+		while (contains(*codepoints_end_it)) {
+			string_index_end -= utf8::codepoint_length(*codepoints_end_it);
+			codepoints_end_it++;
+		}
+
+		if (string_index_start == 0 && string_index_end == m_value.size()) {
+			return Ok(const_cast<PyString *>(this));
+		} else {
+			ASSERT(string_index_end >= string_index_start);
+			const auto &result =
+				m_value.substr(string_index_start, string_index_end - string_index_start);
+			return PyString::create(result);
+		}
+	}
+}
+
 PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(!kwargs || kwargs->size() == 0)
@@ -1436,6 +1495,7 @@ namespace {
 							 .def("lower", &PyString::lower)
 							 .def("upper", &PyString::upper)
 							 .def("rpartition", &PyString::rpartition)
+							 .def("strip", &PyString::strip)
 							 .def("rstrip", &PyString::rstrip)
 							 .def("format", &PyString::format)
 							 .staticmethod("maketrans", &PyString::maketrans)

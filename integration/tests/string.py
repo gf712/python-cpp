@@ -119,7 +119,7 @@ string_rpartition_tests()
 def test_string_truthyness_behaviour():
     if "":
         assert False, "Empty strings should be falsy"
-        
+
 test_string_truthyness_behaviour()
 
 def test_string_index():
@@ -141,6 +141,15 @@ def test_rstrip():
     assert b == "mississ"
 
 test_rstrip()
+
+def test_strip():
+    assert '   spacious   '.strip() == 'spacious'
+    assert 'www.example.com'.strip('cmowz.') == 'example'
+
+    comment_string = '#....... Section 3.2.1 Issue #32 .......'
+    assert comment_string.strip('.#! ') == 'Section 3.2.1 Issue #32'
+
+test_strip()
 
 def test_literal_hex_string():
     a = '\xff'

@@ -103,6 +103,7 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> upper() const;
 	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> rstrip(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> strip(PyTuple *args, PyDict *kwargs) const;
 
 	static PyResult<PyObject *> maketrans(PyTuple *args, PyDict *kwargs);
 
