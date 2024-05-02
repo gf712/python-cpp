@@ -28,6 +28,7 @@ class PyList : public PyBaseObject
 
 	PyResult<PyObject *> __getitem__(int64_t index);
 	PyResult<std::monostate> __setitem__(int64_t index, PyObject *value);
+	PyResult<std::monostate> __delitem__(PyObject *key);
 
 	PyResult<PyObject *> __add__(const PyObject *other) const;
 	PyResult<PyObject *> __eq__(const PyObject *other) const;

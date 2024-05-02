@@ -14,6 +14,8 @@
 #include "StopIteration.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/TypeError.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -236,6 +238,85 @@ PyResult<std::monostate> PyList::__setitem__(int64_t index, PyObject *value)
 		// TODO: write wrap around logic
 		TODO();
 	}
+}
+
+PyResult<std::monostate> PyList::__delitem__(PyObject *key)
+{
+	if (!key->type()->issubclass(types::integer()) && !key->type()->issubclass(types::slice())) {
+		return Err(type_error(
+			"list indices must be integers or slices, not {}", key->type()->to_string()));
+	}
+
+	auto validate_index = [this](BigIntType index_value) -> PyResult<size_t> {
+		if (index_value >= 0) {
+			ASSERT(index_value.fits_ulong_p());
+			const auto index = index_value.get_ui();
+			if (index > m_elements.size()) {
+				return Err(index_error("list deletion index out of range"));
+			}
+			return Ok(index);
+		} else {
+			ASSERT(index_value.fits_slong_p());
+			const auto index = index_value.get_si();
+			if (static_cast<size_t>(std::abs(index)) > m_elements.size()) {
+				return Err(index_error("list deletion index out of range"));
+			}
+			return Ok(m_elements.size() - std::abs(index));
+		}
+		ASSERT_NOT_REACHED();
+	};
+
+	auto delete_index = [this, validate_index](BigIntType index_value) -> PyResult<std::monostate> {
+		const auto index = validate_index(index_value);
+		if (index.is_err()) { return Err(index.unwrap_err()); }
+		m_elements.erase(m_elements.begin() + index.unwrap());
+		return Ok(std::monostate{});
+	};
+
+	if (key->type()->issubclass(types::slice())) {
+		const auto *slice = static_cast<const PySlice *>(key);
+		auto unpack_indices = slice->unpack();
+		if (unpack_indices.is_err()) { return Err(unpack_indices.unwrap_err()); }
+		auto [start, stop, step] = unpack_indices.unwrap();
+		start = start == std::numeric_limits<int64_t>::max()
+					? static_cast<int64_t>(m_elements.size()) - 1
+					: start;
+		stop = stop == std::numeric_limits<int64_t>::min()
+					? static_cast<int64_t>(m_elements.size()) - 1
+					: start;
+		if (step == 0) { return Err(value_error("slice step cannot be zero")); }
+		auto start_index = validate_index(start);
+		if (start_index.is_err()) { return Err(start_index.unwrap_err()); }
+		auto stop_index = validate_index(stop);
+		if (stop_index.is_err()) { return Err(stop_index.unwrap_err()); }
+		start = start_index.unwrap();
+		stop = stop_index.unwrap();
+		if (step > 0) {
+			if (start > stop) { return Ok(std::monostate{}); }
+			if (step == 1) {
+				m_elements.erase(m_elements.begin() + start, m_elements.begin() + stop);
+			} else {
+				for (auto idx = start; idx < stop; idx += step) {
+					auto result = delete_index(idx);
+					if (result.is_err()) { return result; }
+					idx -= 1;
+					stop -= 1;
+				}
+			}
+		} else if (step < 0) {
+			if (stop >= start) { return Ok(std::monostate{}); }
+			for (auto idx = start - 1; idx > stop; idx += step) {
+				auto result = delete_index(idx);
+				if (result.is_err()) { return result; }
+			}
+		}
+	} else {
+		ASSERT(key->type()->issubclass(types::integer()));
+		const auto index_value = static_cast<PyInteger &>(*key).as_big_int();
+		return delete_index(index_value);
+	}
+
+	return Ok(std::monostate{});
 }
 
 PyResult<PyObject *> PyList::__getitem__(PyObject *index)
@@ -499,8 +580,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyListReverseIterator::type_fact
 {
 	return [] {
 		static std::unique_ptr<TypePrototype> type = nullptr;
-		std::call_once(
-			list_reverseiterator_flag, []() { type = register_list_reverseiterator(); });
+		std::call_once(list_reverseiterator_flag, []() { type = register_list_reverseiterator(); });
 		return std::move(type);
 	};
 }
