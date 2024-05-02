@@ -20,6 +20,7 @@
 #include "types/builtin.hpp"
 #include "utilities.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <mutex>
 #include <numeric>
@@ -951,6 +952,71 @@ PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 	}
 }
 
+PyResult<PyList *> PyString::split(PyTuple *args, PyDict *kwargs) const
+{
+	ASSERT(!kwargs || kwargs->map().empty());
+
+	const auto sep_ = [args]() -> PyResult<std::vector<uint32_t>> {
+		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
+		auto args0 = PyObject::from(args->elements()[0]);
+
+		auto str = as<PyString>(args0.unwrap());
+		if (!str) { return Err(type_error("")); }
+		return Ok(str->codepoints());
+	}();
+
+	if (sep_.is_err()) { return Err(sep_.unwrap_err()); }
+	const auto &sep = sep_.unwrap();
+
+	const auto maxsplit_ = [this, args]() -> PyResult<BigIntType> {
+		if (!args || args->size() < 2) { return Ok(BigIntType{ m_value.size() }); }
+		auto args1 = PyObject::from(args->elements()[1]);
+
+		auto maxsplit = as<PyInteger>(args1.unwrap());
+		if (!maxsplit) { return Err(type_error("")); }
+		if (maxsplit->as_big_int() == -1) { return Ok(BigIntType{ m_value.size() }); }
+		return Ok(maxsplit->as_big_int());
+	}();
+
+	if (maxsplit_.is_err()) { return Err(maxsplit_.unwrap_err()); }
+	const auto &maxsplit = maxsplit_.unwrap();
+
+	auto result_ = PyList::create();
+	if (result_.is_err()) { return result_; }
+	auto *result = result_.unwrap();
+
+	const auto cps = codepoints();
+	size_t start = 0;
+
+	for (size_t i = 0; i < cps.size();) {
+		if (result->elements().size() >= maxsplit) { break; }
+		bool is_match = true;
+		for (size_t j = 0; j < sep.size(); ++j) {
+			if (cps[i + j] != sep[j]) {
+				is_match = false;
+				break;
+			}
+		}
+		if (is_match) {
+			auto el = PyString::create(m_value.substr(start, i - start));
+			if (el.is_err()) { return Err(el.unwrap_err()); }
+			result->elements().push_back(el.unwrap());
+			i += sep.size();
+			start = i;
+		} else {
+			++i;
+		}
+	}
+
+	// handle remainder
+	auto el = PyString::create(m_value.substr(start, m_value.size() - start));
+	if (el.is_err()) { return Err(el.unwrap_err()); }
+	result->elements().push_back(el.unwrap());
+
+	return Ok(result);
+}
+
+
 std::vector<uint32_t> PyString::codepoints() const
 {
 	std::vector<uint32_t> codepoints;
@@ -1497,6 +1563,7 @@ namespace {
 							 .def("rpartition", &PyString::rpartition)
 							 .def("strip", &PyString::strip)
 							 .def("rstrip", &PyString::rstrip)
+							 .def("split", &PyString::split)
 							 .def("format", &PyString::format)
 							 .staticmethod("maketrans", &PyString::maketrans)
 							 .type);

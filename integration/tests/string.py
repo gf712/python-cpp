@@ -151,6 +151,13 @@ def test_strip():
 
 test_strip()
 
+def test_split():
+    assert '1,2,3'.split(',') == ['1', '2', '3']
+    assert '1,2,3'.split(',', 1) == ['1', '2,3']
+    assert '1,2,,3,'.split(',') == ['1', '2', '', '3', '']
+
+test_split()
+
 def test_literal_hex_string():
     a = '\xff'
     assert ord(a) == 255
