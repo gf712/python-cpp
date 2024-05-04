@@ -960,13 +960,19 @@ PyResult<PyList *> PyString::split(PyTuple *args, PyDict *kwargs) const
 		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
 		auto args0 = PyObject::from(args->elements()[0]);
 
+		if (args0.unwrap() == py_none()) { return Ok(std::vector<uint32_t>{}); }
 		auto str = as<PyString>(args0.unwrap());
 		if (!str) { return Err(type_error("")); }
+		if (str->value().empty()) { return Err(value_error("empty separator")); }
 		return Ok(str->codepoints());
 	}();
 
 	if (sep_.is_err()) { return Err(sep_.unwrap_err()); }
 	const auto &sep = sep_.unwrap();
+	if (m_value.empty() && !sep.empty()) {
+		// Splitting an empty string with a specified separator returns ['']
+		return PyList::create(std::vector<Value>{ PyString::create("").unwrap() });
+	}
 
 	const auto maxsplit_ = [this, args]() -> PyResult<BigIntType> {
 		if (!args || args->size() < 2) { return Ok(BigIntType{ m_value.size() }); }
@@ -985,33 +991,67 @@ PyResult<PyList *> PyString::split(PyTuple *args, PyDict *kwargs) const
 	if (result_.is_err()) { return result_; }
 	auto *result = result_.unwrap();
 
-	const auto cps = codepoints();
-	size_t start = 0;
-
-	for (size_t i = 0; i < cps.size();) {
-		if (result->elements().size() >= maxsplit) { break; }
-		bool is_match = true;
-		for (size_t j = 0; j < sep.size(); ++j) {
-			if (cps[i + j] != sep[j]) {
-				is_match = false;
-				break;
+	if (!sep.empty()) {
+		size_t start = 0;
+		const auto cps = codepoints();
+		for (size_t i = 0; i < cps.size();) {
+			if (result->elements().size() >= maxsplit) { break; }
+			bool is_match = true;
+			for (size_t j = 0; j < sep.size(); ++j) {
+				if (cps[i + j] != sep[j]) {
+					is_match = false;
+					break;
+				}
+			}
+			if (is_match) {
+				auto el = PyString::create(m_value.substr(start, i - start));
+				if (el.is_err()) { return Err(el.unwrap_err()); }
+				result->elements().push_back(el.unwrap());
+				i += sep.size();
+				start = i;
+			} else {
+				++i;
 			}
 		}
-		if (is_match) {
-			auto el = PyString::create(m_value.substr(start, i - start));
+		// handle remainder
+		auto el = PyString::create(m_value.substr(start, m_value.size() - start));
+		if (el.is_err()) { return Err(el.unwrap_err()); }
+		result->elements().push_back(el.unwrap());
+	} else {
+		// If sep is not specified or is None, a different splitting algorithm is applied: runs of
+		// consecutive whitespace are regarded as a single separator, and the result will contain no
+		// empty strings at the start or end if the string has leading or trailing whitespace.
+		// Consequently, splitting an empty string or a string consisting of just whitespace with a
+		// None separator returns [].
+		size_t start = 0;
+		size_t end = start;
+		for (const auto &el : m_value) {
+			if (result->elements().size() >= maxsplit) { break; }
+			if (std::isspace(el)) {
+				if (end != start) {
+					if (!std::isspace(m_value[start])) {
+						auto el = PyString::create(m_value.substr(start, end - start));
+						if (el.is_err()) { return Err(el.unwrap_err()); }
+						result->elements().push_back(el.unwrap());
+					}
+					end++;
+					start = end;
+				} else {
+					start++;
+					end++;
+				}
+			} else {
+				end++;
+			}
+		}
+		// handle remainder
+		std::string_view remainder{ m_value.begin() + start, m_value.end() };
+		if (!remainder.empty()) {
+			auto el = PyString::create(std::string{ remainder });
 			if (el.is_err()) { return Err(el.unwrap_err()); }
 			result->elements().push_back(el.unwrap());
-			i += sep.size();
-			start = i;
-		} else {
-			++i;
 		}
 	}
-
-	// handle remainder
-	auto el = PyString::create(m_value.substr(start, m_value.size() - start));
-	if (el.is_err()) { return Err(el.unwrap_err()); }
-	result->elements().push_back(el.unwrap());
 
 	return Ok(result);
 }
