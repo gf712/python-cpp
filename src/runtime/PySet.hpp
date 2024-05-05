@@ -35,6 +35,7 @@ class PySet : public PyBaseObject
 	PyResult<bool> __contains__(const PyObject *value) const;
 
 	PyResult<PyObject *> __and__(PyObject *other);
+	PyResult<PyObject *> __or__(PyObject *obj);
 
 	const SetType &elements() const { return m_elements; }
 	SetType &elements() { return m_elements; }
@@ -44,15 +45,18 @@ class PySet : public PyBaseObject
 	PyResult<PyObject *> add(PyObject *element);
 	PyResult<PyObject *> discard(PyObject *element);
 	PyResult<PyObject *> remove(PyObject *element);
-	PyResult<PySet *> update(PyObject* iterable);
-	PyResult<PySet *> intersection(PyTuple* args, PyDict* kwargs) const;
+	PyResult<PySet *> update(PyObject *iterable);
+	PyResult<PySet *> intersection(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> pop();
-	PyResult<PyObject *> issubset(const PyObject* other) const;
+	PyResult<PyObject *> issubset(const PyObject *other) const;
+	PyResult<PyObject *> union_(PyTuple *others, PyDict *kwargs) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
 
   private:
+	PyResult<std::monostate> union_helper(const PyObject *other, SetType &result, bool strict) const;
+
 	PySet();
 	PySet(SetType elements);
 };

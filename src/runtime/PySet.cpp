@@ -14,6 +14,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "runtime/NotImplementedError.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/TypeError.hpp"
 #include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -147,6 +148,54 @@ PyResult<PyObject *> PySet::issubset(const PyObject *other) const
 		"set.issubset not implemented when arg is of type {}", other->type()->to_string()));
 }
 
+PyResult<PyObject *> PySet::union_(PyTuple *args, PyDict *kwargs) const
+{
+	if (!args || args->elements().empty()) { return PySet::create(m_elements); }
+	if (kwargs && kwargs->map().size() > 0) {
+		return Err(type_error("union() takes no keyword arguments"));
+	}
+
+	auto result = m_elements;
+	for (const auto &el : args->elements()) {
+		auto value = PyObject::from(el);
+		if (value.is_err()) { return value; }
+		if (auto r = union_helper(value.unwrap(), result, false); r.is_err()) {
+			return Err(r.unwrap_err());
+		}
+	}
+
+	return PySet::create(std::move(result));
+}
+
+PyResult<std::monostate>
+	PySet::union_helper(const PyObject *other, SetType &result, bool strict) const
+{
+	if (other->type()->issubclass(types::set())) {
+		const auto &elements = static_cast<const PySet &>(*other).elements();
+		result.insert(elements.begin(), elements.end());
+	} else {
+		if (strict) {
+			return Err(type_error(
+				"unsupported operand type(s) for |: 'set' and '{}'", other->type()->name()));
+		}
+		auto other_iterator_ = other->iter();
+		if (other_iterator_.is_err()) { return Err(other_iterator_.unwrap_err()); }
+		auto *other_iterator = other_iterator_.unwrap();
+
+		auto other_value = other_iterator->next();
+		while (other_value.is_ok()) {
+			result.insert(other_value.unwrap());
+			other_value = other_iterator->next();
+		}
+
+		if (!other_value.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+			return Err(other_value.unwrap_err());
+		}
+	}
+
+	return Ok(std::monostate{});
+}
+
 std::string PySet::to_string() const
 {
 	std::ostringstream os;
@@ -199,7 +248,38 @@ PyResult<int32_t> PySet::__init__(PyTuple *args, PyDict *kwargs)
 		.and_then([](auto) { return Ok(0); });
 }
 
-PyResult<PyObject *> PySet::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PySet::__repr__() const
+{
+	std::ostringstream os;
+
+	if (m_elements.empty()) {
+		os << "set()";
+	} else {
+		os << "{";
+		auto it = m_elements.begin();
+		while (std::next(it) != m_elements.end()) {
+			auto r = std::visit(
+				overloaded{
+					[](const auto &value) { return PyString::create(value.to_string()); },
+					[](PyObject *value) { return value->repr(); },
+				},
+				*it);
+			if (r.is_err()) { return Err(r.unwrap_err()); }
+			os << r.unwrap()->value() << ", ";
+			std::advance(it, 1);
+		}
+		auto r =
+			std::visit(overloaded{
+						   [](const auto &value) { return PyString::create(value.to_string()); },
+						   [](PyObject *value) { return value->repr(); },
+					   },
+				*it);
+		if (r.is_err()) { return Err(r.unwrap_err()); }
+		os << r.unwrap()->value() << "}";
+	}
+
+	return PyString::create(os.str());
+}
 
 PyResult<PyObject *> PySet::__iter__() const
 {
@@ -262,6 +342,15 @@ PyResult<PyObject *> PySet::__and__(PyObject *other)
 	return PySet::create(result);
 }
 
+PyResult<PyObject *> PySet::__or__(PyObject *other)
+{
+	auto result = m_elements;
+	return union_helper(other, result, true).and_then([&result](auto) {
+		return PySet::create(std::move(result));
+	});
+}
+
+
 void PySet::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
@@ -288,6 +377,7 @@ namespace {
 							 .def("update", &PySet::update)
 							 .def("pop", &PySet::pop)
 							 .def("issubset", &PySet::issubset)
+							 .def("union", &PySet::union_)
 							 .type);
 	}
 }// namespace

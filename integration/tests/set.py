@@ -55,3 +55,23 @@ def set_less():
     assert a < d
 
 set_less()
+
+def set_union():
+    x = {"a", "b", "c"}
+    y = {"f", "d", "a"}
+    z = {"c", "d", "e"}
+    z_list = list(z)
+
+    expected = {'f', 'a', 'c', 'b', 'd', 'e'}
+    assert x.union(y, z) == expected
+    assert x.union(y, z_list) == expected
+
+    assert x | y | z == expected
+    try:
+        result = x | y | z_list
+    except TypeError:
+        assert True
+    else:
+        assert False
+
+set_union()
