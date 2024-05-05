@@ -259,13 +259,7 @@ PyResult<PyObject *> PyDict::pop(PyObject *key, PyObject *default_value)
 
 PyResult<PyObject *> PyDict::update(PyDict *other)
 {
-	for (const auto &[key, value] : other->map()) {
-		if (auto it = m_map.find(key); it != m_map.end()) {
-			it->second = value;
-		} else {
-			other->insert(key, value);
-		}
-	}
+	for (const auto &[key, value] : other->map()) { m_map.insert_or_assign(key, value); }
 
 	return Ok(py_none());
 }
