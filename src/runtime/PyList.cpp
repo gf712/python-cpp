@@ -201,7 +201,37 @@ std::string PyList::to_string() const
 	return os.str();
 }
 
-PyResult<PyObject *> PyList::__repr__() const { return PyString::create(to_string()); }
+PyResult<PyObject *> PyList::__repr__() const
+{
+	std::ostringstream os;
+
+	os << "[";
+	if (!m_elements.empty()) {
+		auto it = m_elements.begin();
+		while (std::next(it) != m_elements.end()) {
+			auto r = std::visit(
+				overloaded{
+					[](const auto &value) { return PyString::create(value.to_string()); },
+					[](PyObject *value) { return value->repr(); },
+				},
+				*it);
+			if (r.is_err()) { return r; }
+			os << std::move(r.unwrap()->value()) << ", ";
+			std::advance(it, 1);
+		}
+		auto r =
+			std::visit(overloaded{
+						   [](const auto &value) { return PyString::create(value.to_string()); },
+						   [](PyObject *value) { return value->repr(); },
+					   },
+				*it);
+		if (r.is_err()) { return r; }
+		os << std::move(r.unwrap()->value());
+	}
+	os << "]";
+
+	return PyString::create(os.str());
+}
 
 PyResult<PyObject *> PyList::__iter__() const
 {
