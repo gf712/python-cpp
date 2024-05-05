@@ -16,13 +16,14 @@ class PyBytes : public PyBaseObject
 	PyBytes(PyType *);
 
   public:
-	static PyResult<PyBytes *> create(const Bytes &number);
+	static PyResult<PyBytes *> create(Bytes number);
 	static PyResult<PyBytes *> create();
 
 	~PyBytes() = default;
 	std::string to_string() const override;
 
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __mul__(const PyObject *obj) const;
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __eq__(const PyObject *obj) const;
 	PyResult<PyObject *> __iter__() const;
@@ -38,7 +39,7 @@ class PyBytes : public PyBaseObject
 
   private:
 	PyBytes();
-	PyBytes(const Bytes &number);
+	PyBytes(Bytes number);
 };
 
 class PyBytesIterator : public PyBaseObject

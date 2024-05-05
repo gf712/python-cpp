@@ -3,6 +3,7 @@
 #include "PyBool.hpp"
 #include "StopIteration.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyInteger.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
@@ -28,16 +29,16 @@ template<> const PyBytes *as(const PyObject *obj)
 
 PyBytes::PyBytes(PyType *type) : PyBaseObject(type) {}
 
-PyBytes::PyBytes(const Bytes &number)
-	: PyBaseObject(types::BuiltinTypes::the().bytes()), m_value(number)
+PyBytes::PyBytes(Bytes number)
+	: PyBaseObject(types::BuiltinTypes::the().bytes()), m_value(std::move(number))
 {}
 
 PyBytes::PyBytes() : PyBytes(Bytes{}) {}
 
-PyResult<PyBytes *> PyBytes::create(const Bytes &value)
+PyResult<PyBytes *> PyBytes::create(Bytes value)
 {
 	auto &heap = VirtualMachine::the().heap();
-	auto *obj = heap.allocate<PyBytes>(value);
+	auto *obj = heap.allocate<PyBytes>(std::move(value));
 	if (!obj) { return Err(memory_error(sizeof(PyBytes))); }
 	return Ok(obj);
 }
@@ -62,6 +63,30 @@ PyResult<PyObject *> PyBytes::__add__(const PyObject *other) const
 	new_bytes.b.insert(new_bytes.b.end(), bytes->value().b.begin(), bytes->value().b.end());
 	return PyBytes::create(new_bytes);
 }
+
+PyResult<PyObject *> PyBytes::__mul__(const PyObject *obj) const
+{
+	if (!obj->type()->issubclass(types::integer())) {
+		return Err(
+			type_error("can't multiply sequence by non-int of type '{}'", obj->type()->name()));
+	}
+
+	const auto &value = static_cast<const PyInteger &>(*obj).as_big_int();
+	if (value <= 0) { return PyBytes::create(); }
+	if (value == 1) { return PyBytes::create(m_value); }
+
+	ASSERT(value.fits_uint_p());
+	const auto repeats = value.get_ui();
+	std::vector<std::byte> bytes;
+	bytes.reserve(repeats * m_value.b.size());
+	const auto stride = m_value.b.size();
+	const auto end = repeats * m_value.b.size();
+	for (size_t offset = 0; offset < end; offset += stride) {
+		bytes.insert(bytes.begin() + offset, m_value.b.begin(), m_value.b.end());
+	}
+	return PyBytes::create(Bytes{ std::move(bytes) });
+}
+
 
 PyResult<size_t> PyBytes::__len__() const { return Ok(m_value.b.size()); }
 
