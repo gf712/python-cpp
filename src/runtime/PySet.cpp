@@ -127,9 +127,13 @@ PyResult<PySet *> PySet::intersection(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PySet::pop()
 {
+	// Remove and return an arbitrary element from the set. Raises KeyError if the set is empty.
 	if (m_elements.empty()) { return Err(key_error("pop from an empty set")); }
+
+	// in this implementation arbitrary means first element of the set
+	auto value = *m_elements.begin();
 	m_elements.erase(m_elements.begin());
-	return Ok(py_none());
+	return PyObject::from(value);
 }
 
 PyResult<PyObject *> PySet::issubset(const PyObject *other) const
