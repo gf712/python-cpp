@@ -5,8 +5,11 @@
 #include "TypeError.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include "utilities.hpp"
 #include "vm/VM.hpp"
 
 namespace py {
@@ -129,6 +132,19 @@ PyResult<PyObject *> PyInteger::__rshift__(const PyObject *obj) const
 	}
 
 	return PyNumber::create(m_value >> as<PyInteger>(obj)->value());
+}
+
+PyResult<PyObject *> PyInteger::bit_length() const
+{
+	return PyInteger::create(mpz_sizeinbase(as_big_int().get_mpz_t(), 2));
+}
+
+PyResult<PyObject *> PyInteger::bit_count() const
+{
+	auto value_ = as_big_int();
+	auto *value = value_.get_mpz_t();
+	mpz_abs(value, value);
+	return PyInteger::create(mpz_popcount(value));
 }
 
 PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
@@ -266,6 +282,8 @@ namespace {
 	std::unique_ptr<TypePrototype> register_int()
 	{
 		return std::move(klass<PyInteger>("int")
+							 .def("bit_length", &PyInteger::bit_length)
+							 .def("bit_count", &PyInteger::bit_count)
 							 .def("to_bytes", &PyInteger::to_bytes)
 							 .classmethod("from_bytes", &PyInteger::from_bytes)
 							 .type);

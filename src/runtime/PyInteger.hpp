@@ -30,6 +30,9 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 	PyResult<PyObject *> __lshift__(const PyObject *other) const;
 	PyResult<PyObject *> __rshift__(const PyObject *other) const;
 
+	PyResult<PyObject *> bit_length() const;
+	PyResult<PyObject *> bit_count() const;
+
 	PyResult<PyObject *> to_bytes(PyTuple *args, PyDict *kwargs) const;
 
 	static PyResult<PyObject *> from_bytes(PyType *type, PyTuple *args, PyDict *kwargs);
