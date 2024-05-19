@@ -53,6 +53,7 @@ class PyDict : public PyBaseObject
 	void insert(const Value &key, const Value &value);
 	void remove(const Value &key);
 	PyResult<PyObject *> merge(PyTuple *args, PyDict *kwargs);
+	PyResult<PyObject *> update(PyObject *other);
 	PyResult<PyObject *> update(PyDict *other);
 	PyResult<PyDictKeys *> keys() const;
 	PyResult<PyDictValues *> values() const;

@@ -257,6 +257,58 @@ PyResult<PyObject *> PyDict::pop(PyObject *key, PyObject *default_value)
 	return Err(key_error("{}", key->repr().unwrap()->to_string()));
 }
 
+PyResult<PyObject *> PyDict::update(PyObject *other)
+{
+	auto iter = other->iter();
+	if (iter.is_err()) { return iter; }
+	auto value_ = iter.unwrap()->next();
+	if (value_.is_err()) { return value_; }
+
+	size_t index = 0;
+	while (value_.is_ok()) {
+		auto *value = value_.unwrap();
+		if (value->type()->issubclass(types::tuple())) {
+			const auto &other_pair = static_cast<const PyTuple &>(*value);
+			if (other_pair.size() != 2) {
+				return Err(value_error(
+					"dictionary update sequence element #{} has length {}; 2 is required",
+					index,
+					other_pair.size()));
+			}
+			m_map.insert_or_assign(other_pair.elements()[0], other_pair.elements()[1]);
+		} else {
+			auto iter_inner = value->iter();
+			if (iter_inner.is_err()) { return iter_inner; }
+			auto value_inner_ = iter_inner.unwrap()->next();
+			if (value_inner_.is_err()) { return value_inner_; }
+			Value key = value_inner_.unwrap();
+			value_inner_ = iter_inner.unwrap()->next();
+			if (value_inner_.is_err()) { return value_inner_; }
+			Value value = value_inner_.unwrap();
+
+			value_inner_ = iter_inner.unwrap()->next();
+			if (value_inner_.is_ok()) {
+				return Err(value_error(
+					"dictionary update sequence element #{} does not have required length 2",
+					index));
+			}
+			if (!value_inner_.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+				return value_inner_;
+			}
+
+			m_map.insert_or_assign(std::move(key), std::move(value));
+
+			value_inner_ = iter_inner.unwrap()->next();
+		}
+		value_ = iter.unwrap()->next();
+		index++;
+	}
+
+	if (!value_.unwrap_err()->type()->issubclass(types::stop_iteration())) { return value_; }
+
+	return Ok(py_none());
+}
+
 PyResult<PyObject *> PyDict::update(PyDict *other)
 {
 	for (const auto &[key, value] : other->map()) { m_map.insert_or_assign(key, value); }
@@ -356,8 +408,10 @@ namespace {
 						auto other_ = PyObject::from(args->elements()[0]);
 						if (other_.is_err()) return other_;
 						auto *other = other_.unwrap();
-						if (other->type() != types::dict()) { return Err(runtime_error("TODO")); }
-						return self->update(as<PyDict>(other));
+						if (other->type() == types::dict()) {
+							return self->update(as<PyDict>(other));
+						}
+						return self->update(other);
 					})
 				.def(
 					"items",
