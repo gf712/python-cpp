@@ -1,13 +1,17 @@
 #include "PyNumber.hpp"
-#include "PyBool.hpp"
 #include "PyFloat.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
 #include "TypeError.hpp"
+#include "PyNone.hpp"
+#include "PyObject.hpp"
+#include "Value.hpp"
+#include "NotImplemented.hpp"
 #include "types/builtin.hpp"
 
 #include "interpreter/Interpreter.hpp"
+#include <variant>
 
 namespace py {
 
@@ -98,6 +102,30 @@ PyResult<PyObject *> PyNumber::__mul__(const PyObject *obj) const
 		return PyNumber::create(m_value * rhs->value());
 	} else {
 		return Err(type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
+			type()->name(),
+			obj->type()->name()));
+	}
+}
+
+PyResult<PyObject *> PyNumber::__pow__(const PyObject *obj, const PyObject *modulo_obj) const
+{
+	if (auto rhs_ = as_number(obj)) {
+		if (modulo_obj == py_none()) {
+			return PyObject::from(m_value.exp(rhs_->value()));
+		}
+		auto modulo_ = as_number(modulo_obj);
+		if (!modulo_) {
+			return Ok(not_implemented());
+		}
+		mpz_class result{};
+		mpz_class lhs = std::holds_alternative<BigIntType>( m_value.value) ? std::get<BigIntType>(m_value.value) : BigIntType{std::get<double>(m_value.value)};
+		mpz_class rhs = std::holds_alternative<BigIntType>( rhs_->value().value) ? std::get<BigIntType>(rhs_->value().value) : BigIntType{std::get<double>(rhs_->value().value)};
+		mpz_class modulo = std::holds_alternative<BigIntType>( modulo_->value().value) ? std::get<BigIntType>(modulo_->value().value) : BigIntType{std::get<double>(modulo_->value().value)};
+		mpz_powm(result.get_mpz_t(), lhs.get_mpz_t(), rhs.get_mpz_t(), modulo.get_mpz_t());
+
+		return PyNumber::create(Number{result});
+	} else {
+		return Err(type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
 			type()->name(),
 			obj->type()->name()));
 	}

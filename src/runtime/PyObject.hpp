@@ -11,9 +11,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <unordered_map>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -129,7 +127,7 @@ using SubtractSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using MultiplySlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
-using ExpSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
+using PowSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *, const PyObject *, const PyObject *)>;
 using FloorDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using TrueDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using LeftShiftSlotFunctionType =
@@ -243,7 +241,7 @@ struct TypePrototype
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __add__;
 	std::optional<std::variant<SubtractSlotFunctionType, PyObject *>> __sub__;
 	std::optional<std::variant<MultiplySlotFunctionType, PyObject *>> __mul__;
-	std::optional<std::variant<ExpSlotFunctionType, PyObject *>> __exp__;
+	std::optional<std::variant<PowSlotFunctionType, PyObject *>> __pow__;
 	std::optional<std::variant<TrueDivSlotFunctionType, PyObject *>> __truediv__;
 	std::optional<std::variant<FloorDivSlotFunctionType, PyObject *>> __floordiv__;
 	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
@@ -380,7 +378,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> add(const PyObject *other) const;
 	PyResult<PyObject *> subtract(const PyObject *other) const;
 	PyResult<PyObject *> multiply(const PyObject *other) const;
-	PyResult<PyObject *> exp(const PyObject *other) const;
+	PyResult<PyObject *> pow(const PyObject *other, const PyObject* modulo) const;
 	PyResult<PyObject *> floordiv(PyObject *);
 	PyResult<PyObject *> truediv(PyObject *);
 	PyResult<PyObject *> lshift(const PyObject *other) const;
@@ -709,10 +707,10 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 			return static_cast<const Type *>(self)->__mul__(other);
 		};
 	}
-	if constexpr (HasExp<Type>) {
-		type_prototype->__exp__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__exp__(other);
+	if constexpr (HasPow<Type>) {
+		type_prototype->__pow__ =
+			+[](const PyObject *self, const PyObject *other, const PyObject *modulo) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__pow__(other, modulo);
 		};
 	}
 	if constexpr (HasTrueDiv<Type>) {

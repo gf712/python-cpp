@@ -651,9 +651,9 @@ static std::array slotdefs = {
 	// 	"__rmod__($self, value, /)\n--\n\nReturn value % self." },
 	// Slot{ "__divmod__", &TypePrototype::__divmod__, "Return divmod(self, value)." },
 	// Slot{ "__rdivmod__", &TypePrototype::__rdivmod__, "Return divmod(value, self)." },
-	// Slot{ "__pow__",
-	// 	&TypePrototype::__pow__,
-	// 	"__pow__($self, value, mod=None, /)\n--\n\nReturn pow(self, value, mod)." },
+	Slot{ "__pow__",
+		&TypePrototype::__pow__,
+		"__pow__($self, value, mod=None, /)\n--\n\nReturn pow(self, value, mod)." },
 	// Slot{ "__rpow__",
 	// 	&TypePrototype::__rpow__,
 	// 	"__pow__($self, value, mod=None, /)\n--\n\nReturn pow(value, self, mod)." },
@@ -1664,7 +1664,7 @@ void PyType::visit_graph(Visitor &visitor)
 	VISIT_SLOT(__add__)
 	VISIT_SLOT(__sub__)
 	VISIT_SLOT(__mul__)
-	VISIT_SLOT(__exp__)
+	VISIT_SLOT(__pow__)
 	VISIT_SLOT(__lshift__)
 	VISIT_SLOT(__mod__)
 	VISIT_SLOT(__and__)

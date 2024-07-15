@@ -732,10 +732,10 @@ PyResult<PyObject *> PyObject::multiply(const PyObject *other) const
 		other->type_prototype().__name__));
 }
 
-PyResult<PyObject *> PyObject::exp(const PyObject *other) const
+PyResult<PyObject *> PyObject::pow(const PyObject *other, const PyObject* modulo) const
 {
-	if (type_prototype().__exp__.has_value()) {
-		return call_slot(*type_prototype().__exp__, this, other);
+	if (type_prototype().__pow__.has_value()) {
+		return call_slot(*type_prototype().__pow__, this, other, modulo);
 	}
 	return Err(type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
 		type_prototype().__name__,

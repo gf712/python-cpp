@@ -648,7 +648,7 @@ PyResult<Value> exp(const Value &lhs, const Value &rhs, Interpreter &)
 				if (py_lhs.is_err()) return py_lhs;
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (py_rhs.is_err()) return py_rhs;
-				return py_lhs.unwrap()->exp(py_rhs.unwrap());
+				return py_lhs.unwrap()->pow(py_rhs.unwrap(), py_none());
 			} },
 		lhs,
 		rhs);

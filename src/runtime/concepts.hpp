@@ -250,9 +250,9 @@ namespace concepts {
 	};
 
 	template<typename T>
-	concept HasExp = requires(const T *obj, const PyObject *other)
+	concept HasPow = requires(const T *obj, const PyObject *other, const PyObject *modulo)
 	{
-		obj->__exp__(other);
+		obj->__pow__(other, modulo);
 	};
 
 	template<typename T>

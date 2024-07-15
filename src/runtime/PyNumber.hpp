@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PyObject.hpp"
+#include "runtime/Value.hpp"
 
 namespace py {
 
@@ -23,6 +24,7 @@ class PyNumber : public PyBaseObject
 	PyResult<PyObject *> __sub__(const PyObject *obj) const;
 	PyResult<PyObject *> __mod__(const PyObject *obj) const;
 	PyResult<PyObject *> __mul__(const PyObject *obj) const;
+	PyResult<PyObject *> __pow__(const PyObject *obj, const PyObject *modulo) const;
 	PyResult<PyObject *> __truediv__(const PyObject *obj) const;
 	PyResult<PyObject *> __floordiv__(const PyObject *obj) const;
 
