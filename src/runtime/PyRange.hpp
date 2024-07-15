@@ -20,6 +20,7 @@ class PyRange : public PyBaseObject
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
+	PyResult<PyObject *> __getitem__(int64_t index) const;
 
 	const BigIntType &start() const { return m_start; }
 	const BigIntType &stop() const { return m_stop; }

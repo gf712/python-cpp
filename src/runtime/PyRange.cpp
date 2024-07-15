@@ -5,6 +5,7 @@
 #include "PyString.hpp"
 #include "StopIteration.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/IndexError.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -133,6 +134,18 @@ PyResult<PyObject *> PyRange::__reversed__() const
 	if (!range) { return Err(memory_error(sizeof(PyRange))); }
 
 	return range->__iter__();
+}
+
+PyResult<PyObject *> PyRange::__getitem__(int64_t index_) const {
+	BigIntType index = index_;
+	const BigIntType n = (m_stop - m_start) / m_step;
+	if (index < 0) {
+		index += n;
+	}
+	if (index >= n) {
+		return Err(index_error("range object index out of range"));
+	}
+	return PyInteger::create(m_start + m_step * index);
 }
 
 PyType *PyRange::static_type() const { return types::range(); }
