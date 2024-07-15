@@ -590,6 +590,24 @@ PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
+PyResult<PyObject *> chr(const PyTuple *args, const PyDict *, Interpreter &)
+{
+	ASSERT(args->size() == 1)
+	auto obj_ = args->operator[](0);
+	if (obj_.is_err()) return obj_;
+	auto *obj = obj_.unwrap();
+
+	if (auto cp = PyNumber::as_number(obj)) {
+		if (std::holds_alternative<double>(cp->value().value)) {
+			return Err(type_error("'float' object cannot be interpreted as an integer"));
+		}
+		return PyString::chr(std::get<BigIntType>(cp->value().value));
+	} else {
+		return Err(
+			type_error("'{}' object cannot be interpreted as an integer", obj->type()->name()));
+	}
+}
+
 PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
 	ASSERT(args->size() < 2)
@@ -781,7 +799,7 @@ PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	auto iterable_ = PyObject::from(args->elements()[0]);
 	if (iterable_.is_err()) return iterable_;
 	auto *iterable = iterable_.unwrap();
-#
+
 	const auto &iterator = iterable->iter();
 	if (iterator.is_err()) return iterator;
 	auto next_value = iterator.unwrap()->next();
@@ -792,10 +810,39 @@ PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter 
 		next_value = iterator.unwrap()->next();
 	}
 
-	// FIXME: store StopIteration type somewhere so we don't have to instantiate a StopIteration
-	//        exception object just to get its type
-	if (next_value.unwrap_err()->type() == stop_iteration()->type()) {
+	if (next_value.unwrap_err()->type()->issubclass(types::stop_iteration())) {
 		return Ok(py_true());
+	} else {
+		return next_value;
+	}
+}
+
+
+PyResult<PyObject *> any(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+{
+	if (args->size() != 1) {
+		return Err(type_error("any expected 1 arguments, got {}", args->size()));
+	}
+
+	if (kwargs && !kwargs->map().empty()) {
+		return Err(type_error("any() takes no keyword arguments"));
+	}
+	auto iterable_ = PyObject::from(args->elements()[0]);
+	if (iterable_.is_err()) return iterable_;
+	auto *iterable = iterable_.unwrap();
+
+	const auto &iterator = iterable->iter();
+	if (iterator.is_err()) return iterator;
+	auto next_value = iterator.unwrap()->next();
+	while (!next_value.is_err()) {
+		const auto is_truthy = next_value.unwrap()->true_();
+		if (is_truthy.is_err()) return Err(is_truthy.unwrap_err());
+		if (is_truthy.unwrap()) { return Ok(py_true()); }
+		next_value = iterator.unwrap()->next();
+	}
+
+	if (next_value.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+		return Ok(py_false());
 	} else {
 		return next_value;
 	}
@@ -1220,6 +1267,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("ord").unwrap(),
 		heap.allocate<PyNativeFunction>("ord", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return ord(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("chr").unwrap(),
+		heap.allocate<PyNativeFunction>("chr", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return chr(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->add_symbol(PyString::create("print").unwrap(),

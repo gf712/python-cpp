@@ -121,6 +121,8 @@ class PyString : public PyBaseObject
 
 	PyResult<PyObject *> operator[](int64_t) const;
 
+	static PyResult<PyString*> chr(BigIntType cp);
+
   private:
 	PyString(std::string s);
 

@@ -1576,6 +1576,21 @@ PyResult<PyString *> PyString::decode(std::span<const std::byte> bytes,
 	return Err(not_implemented_error("str.decode only implemented for 'utf-8' encoding"));
 }
 
+PyResult<PyString*> PyString::chr(BigIntType cp) {
+	if (cp < 0 || cp >= 0x110000) {
+		return Err(value_error("chr() arg not in range(0x110000)"));
+	}
+
+	ASSERT(cp.fits_uint_p());
+
+	icu::UnicodeString s;
+	s.append(UChar32{static_cast<int32_t>(cp.get_ui())});
+	std::string result;
+	result.reserve(s.length() * 2);
+	s.toUTF8String(result);
+	return PyString::create(std::move(result));
+}
+
 namespace {
 
 	std::once_flag str_flag;

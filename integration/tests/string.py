@@ -168,3 +168,40 @@ def test_literal_hex_string():
     assert len(a) == 1
 
 test_literal_hex_string()
+
+def test_chr():
+    a = chr(0)
+    assert a == '\x00'
+
+    try:
+        chr(0x10ffff + 1)
+    except ValueError:
+        assert True
+    else:
+        assert False, "Expected chr to raise ValueError when given an invalid codepoint"
+
+    try:
+        chr(-1)
+    except ValueError:
+        assert True
+    else:
+        assert False, "Expected chr to raise ValueError when given an invalid codepoint"
+
+    try:
+        chr(1.0)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected chr to raise TypeError when given a non-integer value"
+
+    try:
+        chr("1")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected chr to raise TypeError when given a non-integer value"
+
+    assert chr(128515) == "😃"
+
+
+test_chr()
