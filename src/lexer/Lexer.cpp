@@ -369,7 +369,7 @@ std::optional<size_t> Lexer::point_float_number(size_t n) const
 	// \.(?:[0-9](?:_?[0-9])*)?`
 	if (peek(n) != '.') { return {}; }
 	n++;
-	if (!std::isdigit(peek(n))) { return {}; }
+	if (!std::isdigit(peek(n))) { return n; }
 	n++;
 	return parse_digits(n, [](const char c) { return std::isdigit(c); });
 }
