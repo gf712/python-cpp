@@ -6,6 +6,10 @@
 #include "StopIteration.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/IndexError.hpp"
+#include "runtime/PySlice.hpp"
+#include "runtime/TypeError.hpp"
+#include "runtime/Value.hpp"
+#include "runtime/ValueError.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -136,17 +140,45 @@ PyResult<PyObject *> PyRange::__reversed__() const
 	return range->__iter__();
 }
 
-PyResult<PyObject *> PyRange::__getitem__(int64_t index_) const {
+PyResult<PyObject *> PyRange::__getitem__(int64_t index_) const
+{
 	BigIntType index = index_;
 	const BigIntType n = (m_stop - m_start) / m_step;
-	if (index < 0) {
-		index += n;
-	}
-	if (index >= n) {
-		return Err(index_error("range object index out of range"));
-	}
+	if (index < 0) { index += n; }
+	if (index >= n) { return Err(index_error("range object index out of range")); }
 	return PyInteger::create(m_start + m_step * index);
 }
+
+PyResult<PyObject *> PyRange::__getitem__(PyObject *key) const
+{
+	if (key->type()->issubclass(types::integer())) {
+		auto value = static_cast<const PyInteger &>(*key).as_big_int();
+		if (!value.fits_ulong_p()) { return Err(value_error("range object index too large")); }
+		return __getitem__(value.get_ui());
+	} else if (key->type()->issubclass(types::slice())) {
+		const auto &slice = static_cast<const PySlice &>(*key);
+		auto slice_values = slice.unpack();
+		if (slice_values.is_err()) { return Err(slice_values.unwrap_err()); }
+		auto [start, stop, step] = slice_values.unwrap();
+
+		start = start == std::numeric_limits<int64_t>::max() ? -1 : start;
+		stop = (stop == std::numeric_limits<int64_t>::min()
+				   || stop == std::numeric_limits<int64_t>::max())
+				   ? -1
+				   : stop;
+
+		BigIntType new_step = step * m_step;
+		BigIntType new_start = m_start + (start * m_step);
+		BigIntType new_stop = m_start + (stop * m_step);
+
+		auto *obj = VirtualMachine::the().heap().allocate<PyRange>(new_start, new_stop, new_step);
+		if (!obj) { return Err(memory_error(sizeof(PyRange))); }
+		return Ok(obj);
+	}
+
+	return Err(type_error("range indices must be integers or slices, not {}", key->type()->name()));
+}
+
 
 PyType *PyRange::static_type() const { return types::range(); }
 

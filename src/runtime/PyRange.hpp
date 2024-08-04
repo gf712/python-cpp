@@ -21,6 +21,7 @@ class PyRange : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __getitem__(int64_t index) const;
+	PyResult<PyObject *> __getitem__(PyObject *key) const;
 
 	const BigIntType &start() const { return m_start; }
 	const BigIntType &stop() const { return m_stop; }
