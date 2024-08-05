@@ -721,6 +721,55 @@ PyResult<PyObject *> max(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	}
 }
 
+PyResult<PyObject *> min(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
+{
+	if (!args || args->size() == 0) { return Err(type_error("")); }
+
+	if (kwargs && kwargs->size() > 0) { TODO(); }
+
+	if (args->size() == 1) {
+		auto iterable = PyObject::from(args->elements()[0]);
+		if (iterable.is_err()) return Err(iterable.unwrap_err());
+
+		auto iterator = iterable.unwrap()->iter();
+		if (iterator.is_err()) return Err(iterator.unwrap_err());
+
+		auto value = iterator.unwrap()->next();
+		if (value.is_err()) return value;
+		auto *min_value = value.unwrap();
+
+		while (value.is_ok()) {
+			auto cmp = value.unwrap()->richcompare(min_value, RichCompare::Py_LT);
+			if (cmp.is_err()) return cmp;
+			if (cmp.unwrap() == py_true()) { min_value = value.unwrap(); }
+			value = iterator.unwrap()->next();
+		}
+
+		if (value.unwrap_err()->type() != stop_iteration()->type()) {
+			return Err(value.unwrap_err());
+		}
+
+		return Ok(min_value);
+	} else {
+		std::optional<Value> min_value;
+		for (const auto &el : args->elements()) {
+			if (min_value.has_value()) {
+				auto cmp = less_than(el, *min_value, interpreter);
+				if (cmp.is_err()) return Err(cmp.unwrap_err());
+				auto r = truthy(cmp.unwrap(), interpreter);
+				if (r.is_err()) return Err(r.unwrap_err());
+				if (r.unwrap()) { min_value = el; }
+			} else {
+				min_value = el;
+			}
+		}
+
+		ASSERT(min_value.has_value());
+
+		return PyObject::from(*min_value);
+	}
+}
+
 PyResult<PyObject *> isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
 	if (args->size() != 2) {
@@ -1330,6 +1379,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("max").unwrap(),
 		heap.allocate<PyNativeFunction>("max", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return max(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("min").unwrap(),
+		heap.allocate<PyNativeFunction>("min", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return min(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->add_symbol(PyString::create("eval").unwrap(),
