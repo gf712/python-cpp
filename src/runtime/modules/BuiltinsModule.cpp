@@ -1269,6 +1269,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 			return all(args, kwargs, interpreter);
 		}));
 
+	s_builtin_module->add_symbol(PyString::create("any").unwrap(),
+		heap.allocate<PyNativeFunction>("any", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return any(args, kwargs, interpreter);
+		}));
+
 	s_builtin_module->add_symbol(PyString::create("dir").unwrap(),
 		heap.allocate<PyNativeFunction>("dir", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return dir(args, kwargs, interpreter);
