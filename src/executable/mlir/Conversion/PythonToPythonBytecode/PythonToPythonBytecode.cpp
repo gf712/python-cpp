@@ -639,7 +639,7 @@ namespace py {
 				const auto &requires_expansion = op.getRequiresExpansion();
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),
-						[](const auto &el) { return el == 1; })) {
+						[](const auto &el) { return el; })) {
 					std::optional<mlir::Value> result;
 					std::vector<mlir::Value> keys;
 					std::vector<mlir::Value> values;
@@ -674,8 +674,24 @@ namespace py {
 
 					rewriter.replaceOp(op, { *result });
 				} else {
-					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
-						op, op.getOutput().getType(), op.getKeys(), op.getValues());
+					// TODO: this is a hack to avoid spilling to the stack when building large
+					// dictionaries from literals
+					if (op.getValues().size() > 10) {
+						auto keys = op.getKeys();
+						auto values = op.getValues();
+						rewriter.setInsertionPointAfterValue(keys.front());
+						auto result = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
+							op, op.getOutput().getType(), mlir::ValueRange{}, mlir::ValueRange{});
+
+						for (auto [key, value] : llvm::zip(keys, values)) {
+							rewriter.setInsertionPointAfterValue(value);
+							rewriter.create<mlir::emitpybytecode::DictAdd>(op.getLoc(),
+								result, key, value);
+						}
+					} else {
+						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
+							op, op.getOutput().getType(), op.getKeys(), op.getValues());
+					}
 				}
 
 				return success();
