@@ -23,6 +23,7 @@
 #include "runtime/PyModule.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
+#include "runtime/PyObject.hpp"
 #include "runtime/PyRange.hpp"
 #include "runtime/PyStaticMethod.hpp"
 #include "runtime/PyString.hpp"
@@ -34,6 +35,7 @@
 #include "runtime/TypeError.hpp"
 #include "runtime/UnboundLocalError.hpp"
 #include "runtime/ValueError.hpp"
+#include "runtime/modules/Modules.hpp"
 #include "runtime/types/builtin.hpp"
 #include "runtime/warnings/ImportWarning.hpp"
 #include "runtime/warnings/Warning.hpp"
@@ -55,6 +57,7 @@
 #include "vm/VM.hpp"
 
 #include "utilities.hpp"
+#include <variant>
 
 using namespace py;
 
@@ -1067,6 +1070,26 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
+PyResult<PyObject *> callable(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+{
+	if (!args) {
+		return Err(type_error("callable() takes exactly one argument (0 given)"));
+	} else if (args->size() != 1) {
+		return Err(type_error("callable() takes exactly one argument ({} given)", args->size()));
+	}
+
+	if (kwargs && kwargs->size() != 0) {
+		return Err(type_error("callable() takes no keyword arguments", args->size()));
+	}
+
+	auto obj = args->elements()[0];
+	return std::visit(overloaded{
+						  [](auto) { return false; },
+						  [](PyObject *obj) { return obj->type_prototype().__call__.has_value(); },
+					  },
+		obj) ? Ok(py_true()) : Ok(py_false());
+}
+
 PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
@@ -1292,6 +1315,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("exec").unwrap(),
 		heap.allocate<PyNativeFunction>("exec", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return exec(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("callable").unwrap(),
+		heap.allocate<PyNativeFunction>("callable", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return callable(args, kwargs, interpreter);
 		}));
 
 	s_builtin_module->add_symbol(PyString::create("compile").unwrap(),
