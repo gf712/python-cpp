@@ -14,13 +14,25 @@
 #include "StopIteration.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyObject.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <ranges>
+#include <unordered_set>
+#include <variant>
+
+
 namespace py {
+
+static std::unordered_set<PyObject *> visited;
 
 template<> PyList *as(PyObject *obj)
 {
@@ -177,54 +189,50 @@ PyResult<PyObject *> PyList::pop(PyObject *index)
 
 std::string PyList::to_string() const
 {
-	std::ostringstream os;
-
-	os << "[";
-	if (!m_elements.empty()) {
-		auto it = m_elements.begin();
-		while (std::next(it) != m_elements.end()) {
-			std::visit(overloaded{
-						   [&os](const auto &value) { os << value << ", "; },
-						   [&os](PyObject *value) { os << value->to_string() << ", "; },
-					   },
-				*it);
-			std::advance(it, 1);
-		}
-		std::visit(overloaded{
-					   [&os](const auto &value) { os << value; },
-					   [&os](PyObject *value) { os << value->to_string(); },
-				   },
-			*it);
-	}
-	os << "]";
-
-	return os.str();
+	auto r = __repr__();
+	if (r.is_err()) { return "<list to string error>"; }
+	return as<PyString>(r.unwrap())->to_string();
 }
 
 PyResult<PyObject *> PyList::__repr__() const
 {
 	std::ostringstream os;
 
+	[[maybe_unused]] struct Cleanup
+	{
+		const PyList *list;
+		bool do_cleanup;
+
+		~Cleanup()
+		{
+			if (do_cleanup) {
+				auto it = visited.find(const_cast<PyList *>(list));
+				if (it != visited.end()) { visited.erase(it); }
+			}
+		}
+	} cleanup{ this, !visited.contains(const_cast<PyList *>(this)) };
+	visited.insert(const_cast<PyList *>(this));
+
+	auto repr = [](const auto &el) -> PyResult<PyString *> {
+		return std::visit(overloaded{
+							  [](const auto &value) { return PyString::create(value.to_string()); },
+							  [](PyObject *value) {
+								  if (visited.contains(value)) { return PyString::create("[...]"); }
+								  return value->repr();
+							  },
+						  },
+			el);
+	};
 	os << "[";
 	if (!m_elements.empty()) {
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
-			auto r = std::visit(
-				overloaded{
-					[](const auto &value) { return PyString::create(value.to_string()); },
-					[](PyObject *value) { return value->repr(); },
-				},
-				*it);
+			auto r = repr(*it);
 			if (r.is_err()) { return r; }
 			os << std::move(r.unwrap()->value()) << ", ";
 			std::advance(it, 1);
 		}
-		auto r =
-			std::visit(overloaded{
-						   [](const auto &value) { return PyString::create(value.to_string()); },
-						   [](PyObject *value) { return value->repr(); },
-					   },
-				*it);
+		auto r = repr(*it);
 		if (r.is_err()) { return r; }
 		os << std::move(r.unwrap()->value());
 	}
@@ -312,8 +320,8 @@ PyResult<std::monostate> PyList::__delitem__(PyObject *key)
 					? static_cast<int64_t>(m_elements.size()) - 1
 					: start;
 		stop = stop == std::numeric_limits<int64_t>::min()
-					? static_cast<int64_t>(m_elements.size()) - 1
-					: start;
+				   ? static_cast<int64_t>(m_elements.size()) - 1
+				   : start;
 		if (step == 0) { return Err(value_error("slice step cannot be zero")); }
 		auto start_index = validate_index(start);
 		if (start_index.is_err()) { return Err(start_index.unwrap_err()); }
