@@ -5,15 +5,20 @@
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
-#include "RuntimeError.hpp"
 #include "StopIteration.hpp"
 #include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+#include <unordered_set>
+#include <variant>
+
 namespace py {
+
+static std::unordered_set<PyObject *> visited_dict_values;
 
 template<> PyDict *as(PyObject *obj)
 {
@@ -613,6 +618,55 @@ PyDictValues::PyDictValues(const PyDict &pydict)
 	: PyBaseObject(types::BuiltinTypes::the().dict_values()), m_pydict(pydict)
 {}
 
+PyResult<PyObject *> PyDictValues::__repr__() const
+{
+	std::ostringstream os;
+
+	[[maybe_unused]] struct Cleanup
+	{
+		const PyDictValues *dict_values;
+		bool do_cleanup;
+
+		~Cleanup()
+		{
+			if (do_cleanup) {
+				auto it = visited_dict_values.find(const_cast<PyDictValues *>(dict_values));
+				if (it != visited_dict_values.end()) { visited_dict_values.erase(it); }
+			}
+		}
+	} cleanup{ this, !visited_dict_values.contains(const_cast<PyDictValues *>(this)) };
+	visited_dict_values.insert(const_cast<PyDictValues *>(this));
+
+	auto repr = [](const auto &el) -> PyResult<PyString *> {
+		return std::visit(overloaded{
+							  [](const auto &value) { return PyString::create(value.to_string()); },
+							  [](PyObject *value) {
+								  if (visited_dict_values.contains(value)) {
+									  return PyString::create("...");
+								  }
+								  return value->repr();
+							  },
+						  },
+			el);
+	};
+	os << "dict_values([";
+	if (!m_pydict->get().map().empty()) {
+		auto it = m_pydict->get().map().begin();
+		while (std::next(it) != m_pydict->get().map().end()) {
+			auto r = repr(it->second);
+			if (r.is_err()) { return r; }
+			os << std::move(r.unwrap()->value()) << ", ";
+			std::advance(it, 1);
+		}
+		auto r = repr(it->second);
+		if (r.is_err()) { return r; }
+		os << std::move(r.unwrap()->value());
+	}
+	os << "])";
+
+	return PyString::create(os.str());
+}
+
 PyResult<PyObject *> PyDictValues::__iter__() const { return PyDictValueIterator::create(*this); }
 
 PyDictValueIterator PyDictValues::begin() const { return PyDictValueIterator(*this); }
@@ -655,7 +709,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_dict_values()
 	{
-		return std::move(klass<PyDictKeys>("dict_values").type);
+		return std::move(klass<PyDictValues>("dict_values").type);
 	}
 }// namespace
 
