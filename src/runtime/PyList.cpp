@@ -266,16 +266,12 @@ PyResult<PyObject *> PyList::__getitem__(int64_t index)
 
 PyResult<std::monostate> PyList::__setitem__(int64_t index, PyObject *value)
 {
-	if (index >= 0) {
-		if (static_cast<size_t>(index) >= m_elements.size()) {
-			return Err(index_error("list index out of range"));
-		}
-		m_elements[index] = value;
-		return Ok(std::monostate{});
-	} else {
-		// TODO: write wrap around logic
-		TODO();
+	if (index < 0) { index += m_elements.size(); }
+	if (static_cast<size_t>(index) >= m_elements.size()) {
+		return Err(index_error("list index out of range"));
 	}
+	m_elements[index] = value;
+	return Ok(std::monostate{});
 }
 
 PyResult<std::monostate> PyList::__delitem__(PyObject *key)
