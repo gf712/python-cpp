@@ -262,12 +262,56 @@ PyResult<PyObject *> PyDict::pop(PyObject *key, PyObject *default_value)
 	return Err(key_error("{}", key->repr().unwrap()->to_string()));
 }
 
-PyResult<PyObject *> PyDict::update(PyObject *other)
+PyResult<std::monostate> PyDict::merge(PyObject *other, bool override)
+{
+	if (other->type()->issubclass(types::dict())
+		&& other->type()->underlying_type().__iter__.has_value()
+		&& get_address(*other->type()->underlying_type().__iter__)
+			   == get_address(*types::dict()->underlying_type().__iter__)) {
+		return merge(static_cast<PyDict *>(other), override);
+	}
+
+	auto iter_ = other->get_attribute(PyString::create("keys").unwrap())
+					 .and_then([](auto *keys_method) {
+						 return keys_method->call(PyTuple::create().unwrap(), nullptr);
+					 })
+					 .and_then([](auto *keys) { return keys->iter(); });
+
+	if (iter_.is_err()) { return Err(iter_.unwrap_err()); }
+	auto *iter = iter_.unwrap();
+
+	auto key_ = iter->next();
+	if (key_.is_err()) { return Err(key_.unwrap_err()); }
+
+	while (key_.is_ok()) {
+		if (!override) {
+			if (!m_map.contains(key_.unwrap())) {
+				return KeyError::create(PyTuple::create(key_.unwrap()).unwrap())
+					.and_then([](auto err) -> PyResult<std::monostate> { return Err(err); });
+			}
+		}
+
+		auto value_ = other->getitem(key_.unwrap());
+		if (value_.is_err()) { return Err(value_.unwrap_err()); }
+
+		m_map.insert_or_assign(key_.unwrap(), value_.unwrap());
+		key_ = iter->next();
+	}
+
+	if (!key_.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+		return Err(key_.unwrap_err());
+	}
+
+	return Ok(std::monostate{});
+}
+
+
+PyResult<std::monostate> PyDict::merge_from_seq_2(PyObject *other, bool override)
 {
 	auto iter = other->iter();
-	if (iter.is_err()) { return iter; }
+	if (iter.is_err()) { return Err(iter.unwrap_err()); }
 	auto value_ = iter.unwrap()->next();
-	if (value_.is_err()) { return value_; }
+	if (value_.is_err()) { return Err(value_.unwrap_err()); }
 
 	size_t index = 0;
 	while (value_.is_ok()) {
@@ -280,15 +324,19 @@ PyResult<PyObject *> PyDict::update(PyObject *other)
 					index,
 					other_pair.size()));
 			}
-			m_map.insert_or_assign(other_pair.elements()[0], other_pair.elements()[1]);
+			if (override) {
+				m_map.insert_or_assign(other_pair.elements()[0], other_pair.elements()[1]);
+			} else {
+				m_map.insert({ other_pair.elements()[0], other_pair.elements()[1] });
+			}
 		} else {
 			auto iter_inner = value->iter();
-			if (iter_inner.is_err()) { return iter_inner; }
+			if (iter_inner.is_err()) { return Err(iter_inner.unwrap_err()); }
 			auto value_inner_ = iter_inner.unwrap()->next();
-			if (value_inner_.is_err()) { return value_inner_; }
+			if (value_inner_.is_err()) { return Err(value_inner_.unwrap_err()); }
 			Value key = value_inner_.unwrap();
 			value_inner_ = iter_inner.unwrap()->next();
-			if (value_inner_.is_err()) { return value_inner_; }
+			if (value_inner_.is_err()) { return Err(value_inner_.unwrap_err()); }
 			Value value = value_inner_.unwrap();
 
 			value_inner_ = iter_inner.unwrap()->next();
@@ -298,27 +346,58 @@ PyResult<PyObject *> PyDict::update(PyObject *other)
 					index));
 			}
 			if (!value_inner_.unwrap_err()->type()->issubclass(types::stop_iteration())) {
-				return value_inner_;
+				return Err(value_inner_.unwrap_err());
 			}
 
-			m_map.insert_or_assign(std::move(key), std::move(value));
-
+			if (override) {
+				m_map.insert_or_assign(std::move(key), std::move(value));
+			} else {
+				m_map.insert({ std::move(key), std::move(value) });
+			}
 			value_inner_ = iter_inner.unwrap()->next();
 		}
 		value_ = iter.unwrap()->next();
 		index++;
 	}
 
-	if (!value_.unwrap_err()->type()->issubclass(types::stop_iteration())) { return value_; }
+	if (!value_.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+		return Err(value_.unwrap_err());
+	}
 
-	return Ok(py_none());
+	return Ok(std::monostate{});
 }
 
-PyResult<PyObject *> PyDict::update(PyDict *other)
+PyResult<PyObject *> PyDict::update(PyObject *other)
 {
-	for (const auto &[key, value] : other->map()) { m_map.insert_or_assign(key, value); }
+	if (other->type() == types::dict()) {
+		if (auto result = merge(static_cast<PyDict *>(other), true); result.is_ok()) {
+			return Ok(py_none());
+		} else {
+			return Err(result.unwrap_err());
+		}
+	}
 
-	return Ok(py_none());
+	if (auto keys = other->getattribute(PyString::create("keys").unwrap()); keys.is_ok()) {
+		if (auto result = merge(other, true); result.is_ok()) {
+			return Ok(py_none());
+		} else {
+			return Err(result.unwrap_err());
+		}
+	}
+	return merge_from_seq_2(other, true).and_then([](auto) -> PyResult<PyObject *> {
+		return Ok(py_none());
+	});
+}
+
+PyResult<std::monostate> PyDict::merge(PyDict *other, bool override)
+{
+	if (override) {
+		for (const auto &[key, value] : other->map()) { m_map.insert_or_assign(key, value); }
+	} else {
+		for (const auto &[key, value] : other->map()) { m_map.insert({ key, value }); }
+	}
+
+	return Ok(std::monostate{});
 }
 
 PyResult<PyObject *> PyDict::setdefault(PyTuple *args, PyDict *kwargs)
@@ -413,9 +492,6 @@ namespace {
 						auto other_ = PyObject::from(args->elements()[0]);
 						if (other_.is_err()) return other_;
 						auto *other = other_.unwrap();
-						if (other->type() == types::dict()) {
-							return self->update(as<PyDict>(other));
-						}
 						return self->update(other);
 					})
 				.def(

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "PyObject.hpp"
+#include "runtime/Value.hpp"
+#include <variant>
 
 namespace py {
 
@@ -70,6 +72,11 @@ class PyDict : public PyBaseObject
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
+
+  private:
+	PyResult<std::monostate> merge(PyObject *other, bool override);
+	PyResult<std::monostate> merge(PyDict *other, bool override);
+	PyResult<std::monostate> merge_from_seq_2(PyObject *other, bool override);
 };
 
 class PyDictItems : public PyBaseObject
@@ -146,6 +153,7 @@ class PyDictValues : public PyBaseObject
 	PyDictValueIterator begin() const;
 	PyDictValueIterator end() const;
 
+	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 
 	std::string to_string() const override;
