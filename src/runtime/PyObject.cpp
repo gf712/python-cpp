@@ -823,13 +823,13 @@ PyResult<bool> PyObject::contains(PyObject *value)
 			return seq.unwrap().contains(value);
 		}
 	}
-	auto it = iter();
+	auto it = value->iter();
 	if (it.is_err()) { return Err(it.unwrap_err()); }
 
 	auto n = it.unwrap()->next();
 
 	while (n.is_ok()) {
-		if (auto r = n.unwrap()->eq(value); r.is_ok()) {
+		if (auto r = eq(n.unwrap()); r.is_ok()) {
 			if (auto c = truthy(r.unwrap(), VirtualMachine::the().interpreter());
 				c.is_ok() && c.unwrap()) {
 				return Ok(true);
