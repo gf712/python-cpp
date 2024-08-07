@@ -2,6 +2,10 @@
 #include "MemoryError.hpp"
 #include "PyBytes.hpp"
 #include "StopIteration.hpp"
+#include "runtime/IndexError.hpp"
+#include "runtime/PyInteger.hpp"
+#include "runtime/TypeError.hpp"
+#include "runtime/ValueError.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "utilities.hpp"
@@ -105,6 +109,39 @@ PyResult<PyObject *> PyByteArray::__iter__() const
 }
 
 PyResult<PyObject *> PyByteArray::__repr__() const { return PyString::create(to_string()); }
+
+PyResult<PyObject *> PyByteArray::__getitem__(int64_t index)
+{
+	if (index < 0) { index += m_value.b.size(); }
+	if (index < 0 || static_cast<size_t>(index) >= m_value.b.size()) {
+		return Err(index_error("bytearray index out of range"));
+	}
+	return PyInteger::create(static_cast<int64_t>(m_value.b[index]));
+}
+
+PyResult<std::monostate> PyByteArray::__setitem__(int64_t index, PyObject *value)
+{
+	if (index < 0) { index += m_value.b.size(); }
+	if (index < 0 || static_cast<size_t>(index) >= m_value.b.size()) {
+		return Err(index_error("bytearray index out of range"));
+	}
+
+	if (!value->type()->issubclass(types::integer())) {
+		return Err(
+			type_error("'{}' object cannot be interpreted as an integer", value->type()->name()));
+	}
+
+	auto new_value = static_cast<const PyInteger &>(*value).as_big_int();
+
+	if (new_value < 0 || new_value > 255) {
+		return Err(value_error("byte must be in range(0, 256)"));
+	}
+
+	m_value.b[index] = static_cast<std::byte>(new_value.get_ui());
+
+	return Ok(std::monostate{});
+}
+
 
 namespace {
 

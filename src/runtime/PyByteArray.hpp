@@ -25,6 +25,9 @@ class PyByteArray : public PyBaseObject
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __repr__() const;
 
+	PyResult<PyObject *> __getitem__(int64_t index);
+	PyResult<std::monostate> __setitem__(int64_t index, PyObject *value);
+
 	const Bytes &value() const { return m_value; }
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
