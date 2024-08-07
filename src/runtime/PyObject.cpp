@@ -1,19 +1,15 @@
 #include "PyObject.hpp"
 
 #include "AttributeError.hpp"
-#include "CustomPyObject.hpp"
 #include "NotImplemented.hpp"
 #include "NotImplementedError.hpp"
 #include "PyBool.hpp"
-#include "PyBoundMethod.hpp"
-#include "PyBuiltInMethod.hpp"
 #include "PyBytes.hpp"
 #include "PyDict.hpp"
 #include "PyEllipsis.hpp"
-#include "PyFunction.hpp"
 #include "PyGenericAlias.hpp"
 #include "PyInteger.hpp"
-#include "PyMethodDescriptor.hpp"
+#include "PyIterator.hpp"
 #include "PyNone.hpp"
 #include "PyNumber.hpp"
 #include "PySlotWrapper.hpp"
@@ -26,9 +22,8 @@
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-#include "executable/bytecode/instructions/FunctionCall.hpp"
-#include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
+#include <variant>
 
 namespace py {
 
@@ -910,6 +905,11 @@ PyResult<PyObject *> PyObject::iter() const
 		return call_slot(*type_prototype().__iter__, this);
 	}
 
+	if (type_prototype().sequence_type_protocol.has_value()
+		&& type_prototype().sequence_type_protocol->__getitem__.has_value()) {
+		return PyIterator::create(const_cast<PyObject *>(this));
+	}
+
 	return Err(type_error("'{}' object is not iterable", type()->name()));
 }
 
@@ -1009,6 +1009,15 @@ PyResult<PyObject *> PyObject::getitem(PyObject *key)
 			return method.unwrap()->call(PyTuple::create(key).unwrap(), PyDict::create().unwrap());
 		}
 	}
+	return Err(type_error("'{}' object is not subscriptable", type()->name()));
+}
+
+PyResult<PyObject *> PyObject::getitem(size_t index)
+{
+	if (as_sequence().is_ok() && type_prototype().sequence_type_protocol->__getitem__.has_value()) {
+		return call_slot(*type_prototype().sequence_type_protocol->__getitem__, this, index);
+	}
+
 	return Err(type_error("'{}' object is not subscriptable", type()->name()));
 }
 

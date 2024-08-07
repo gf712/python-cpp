@@ -417,6 +417,7 @@ class PyObject : public Cell
 	PyResult<int32_t> init(PyTuple *args, PyDict *kwargs);
 
 	PyResult<PyObject *> getitem(PyObject *key);
+	PyResult<PyObject *> getitem(size_t index);
 	PyResult<std::monostate> setitem(PyObject *key, PyObject *value);
 	PyResult<std::monostate> delitem(PyObject *key);
 
