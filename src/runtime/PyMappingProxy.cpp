@@ -84,6 +84,20 @@ PyResult<PyObject *> PyMappingProxy::items() const
 	});
 }
 
+PyResult<PyObject *> PyMappingProxy::keys() const
+{
+	return m_mapping->get_method(PyString::create("keys").unwrap()).and_then([](PyObject *items) {
+		return items->call(nullptr, nullptr);
+	});
+}
+
+PyResult<PyObject *> PyMappingProxy::values() const
+{
+	return m_mapping->get_method(PyString::create("values").unwrap()).and_then([](PyObject *items) {
+		return items->call(nullptr, nullptr);
+	});
+}
+
 PyType *PyMappingProxy::static_type() const { return types::mappingproxy(); }
 
 void PyMappingProxy::visit_graph(Visitor &visitor)
@@ -101,6 +115,8 @@ namespace {
 		return std::move(klass<PyMappingProxy>("mappingproxy")
 							 .def("get", &PyMappingProxy::get)
 							 .def("items", &PyMappingProxy::items)
+							 .def("keys", &PyMappingProxy::keys)
+							 .def("value", &PyMappingProxy::values)
 							 .type);
 	}
 }// namespace
