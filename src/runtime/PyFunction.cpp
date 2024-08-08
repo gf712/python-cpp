@@ -1,22 +1,18 @@
 #include "PyFunction.hpp"
 #include "PyBoundMethod.hpp"
-#include "PyCell.hpp"
 #include "PyCode.hpp"
 #include "PyDict.hpp"
-#include "PyFrame.hpp"
-#include "PyModule.hpp"
 #include "PyNone.hpp"
 #include "PyString.hpp"
-#include "TypeError.hpp"
 #include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/instructions/FunctionCall.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyObject.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
-#include "utilities.hpp"
 #include "vm/VM.hpp"
+
+#include <variant>
 
 namespace py {
 
@@ -63,14 +59,24 @@ PyFunction::PyFunction(std::vector<Value> defaults,
 void PyFunction::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	visitor.visit(*m_code);
-	if (m_globals) visitor.visit(*m_globals);
-	if (m_module) visitor.visit(*m_module);
-	if (m_dict) visitor.visit(*m_dict);
 	if (m_name) visitor.visit(*m_name);
-	if (m_qualname) visitor.visit(*m_qualname);
 	if (m_doc) visitor.visit(*m_doc);
+	if (m_code) visitor.visit(*m_code);
+	if (m_globals) visitor.visit(*m_globals);
+	if (m_dict) visitor.visit(*m_dict);
+	for (const auto &el : m_defaults) {
+		if (std::holds_alternative<PyObject *>(el)) {
+			if (std::get<PyObject *>(el)) { visitor.visit(*std::get<PyObject *>(el)); }
+		}
+	}
+	for (const auto &el : m_kwonly_defaults) {
+		if (std::holds_alternative<PyObject *>(el)) {
+			if (std::get<PyObject *>(el)) { visitor.visit(*std::get<PyObject *>(el)); }
+		}
+	}
 	if (m_closure) visitor.visit(*m_closure);
+	if (m_module) visitor.visit(*m_module);
+	if (m_qualname) visitor.visit(*m_qualname);
 }
 
 PyType *PyFunction::static_type() const { return types::function(); }
