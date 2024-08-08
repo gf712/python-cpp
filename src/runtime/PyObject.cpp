@@ -273,6 +273,22 @@ PyResult<bool> PySequenceWrapper::contains(PyObject *value)
 	return Err(type_error("object of type '{}' has no contains()", m_object->type()->name()));
 }
 
+PyResult<PyObject *> PySequenceWrapper::repeat(const PyObject *value)
+{
+	if (!value->type()->issubclass(types::integer())) {
+		return Err(
+			type_error("can't multiply sequence by non-int of type '{}'", value->type()->name()));
+	}
+	if (!m_object->type_prototype().sequence_type_protocol.has_value()) { TODO(); }
+	if (m_object->type_prototype().sequence_type_protocol->__repeat__.has_value()) {
+		return call_slot(*m_object->type_prototype().sequence_type_protocol->__repeat__,
+			m_object,
+			static_cast<const PyInteger &>(*value).as_size_t());
+	}
+
+	return Err(type_error("object of type '{}' has no contains()", m_object->type()->name()));
+}
+
 
 PyResult<PyObject *> PySequenceWrapper::getitem(int64_t index)
 {
@@ -338,6 +354,11 @@ template<> PyResult<PyObject *> PyObject::from(const Number &value)
 }
 
 template<> PyResult<PyObject *> PyObject::from(const int64_t &value)
+{
+	return PyNumber::create(Number{ value });
+}
+
+template<> PyResult<PyObject *> PyObject::from(const size_t &value)
 {
 	return PyNumber::create(Number{ value });
 }
@@ -718,10 +739,29 @@ PyResult<PyObject *> PyObject::subtract(const PyObject *other) const
 PyResult<PyObject *> PyObject::multiply(const PyObject *other) const
 {
 	if (type_prototype().__mul__.has_value()) {
-		return call_slot(*type_prototype().__mul__, this, other);
-	} else if (other->type_prototype().__mul__.has_value()) {
-		return call_slot(*other->type_prototype().__mul__, other, this);
+		auto result = call_slot(*type_prototype().__mul__, this, other);
+		if (result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
 	}
+	if (other->type_prototype().__mul__.has_value()) {
+		auto result = call_slot(*other->type_prototype().__mul__, other, this);
+		if (result.is_err() || (result.is_ok() && result.unwrap() != not_implemented())) {
+			return result;
+		}
+	}
+
+	if (auto sequence = const_cast<PyObject *>(this)->as_sequence();
+		sequence.is_ok() && type_prototype().sequence_type_protocol->__repeat__.has_value()) {
+		return sequence.unwrap().repeat(other);
+	}
+
+	if (auto sequence = const_cast<PyObject *>(other)->as_sequence();
+		sequence.is_ok()
+		&& other->type_prototype().sequence_type_protocol->__repeat__.has_value()) {
+		return sequence.unwrap().repeat(this);
+	}
+
 	return Err(type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
 		type_prototype().__name__,
 		other->type_prototype().__name__));

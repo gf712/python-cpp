@@ -104,6 +104,8 @@ using SetItemSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
 using DelItemSlotFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
 
+using RepeatSequenceSlotFunctionType =
+	std::function<PyResult<PyObject *>(PyObject *, size_t)>;
 using GetItemSequenceSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, int64_t)>;
 using SetItemSequenceSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, int64_t, PyObject *)>;
@@ -161,6 +163,7 @@ struct SequenceTypePrototype
 {
 	std::optional<std::variant<LenSlotFunctionType, PyObject *>> __len__;
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __concat__;
+	std::optional<std::variant<RepeatSequenceSlotFunctionType, PyObject *>> __repeat__;
 	std::optional<std::variant<GetItemSequenceSlotFunctionType, PyObject *>> __getitem__;
 	std::optional<std::variant<SetItemSequenceSlotFunctionType, PyObject *>> __setitem__;
 	std::optional<std::variant<DelItemSequenceSlotFunctionType, PyObject *>> __delitem__;
@@ -338,6 +341,7 @@ class PySequenceWrapper
 	PyResult<std::monostate> setitem(int64_t, PyObject *);// sq_ass_item
 	PyResult<std::monostate> delitem(int64_t);// sq_ass_item
 	PyResult<bool> contains(PyObject *);
+	PyResult<PyObject *> repeat(const PyObject *);
 };
 
 class PyObject : public Cell
@@ -674,7 +678,7 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 			};
 		}
 	}
-	if constexpr (std::is_base_of_v<PySequence, Type>) {
+	if constexpr (std::is_base_of_v<PySequence, Type> && HasAdd<Type>) {
 		if (!type_prototype->sequence_type_protocol.has_value()) {
 			type_prototype->sequence_type_protocol = SequenceTypePrototype{
 				.__concat__ =
@@ -702,12 +706,29 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 			return static_cast<const Type *>(self)->__sub__(other);
 		};
 	}
-	if constexpr (HasMul<Type>) {
-		type_prototype->__mul__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__mul__(other);
-		};
+	if constexpr (std::is_base_of_v<PySequence, Type> && HasRepeat<Type>) {
+		if (!type_prototype->sequence_type_protocol.has_value()) {
+			type_prototype->sequence_type_protocol = SequenceTypePrototype{
+				.__repeat__ =
+					+[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
+					return static_cast<const Type *>(self)->__mul__(count);
+				}
+			};
+		} else {
+			type_prototype->sequence_type_protocol->__repeat__ =
+				+[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
+				return static_cast<const Type *>(self)->__mul__(count);
+			};
+		}
+	} else {
+		if constexpr (HasMul<Type>) {
+			type_prototype->__mul__ =
+				+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
+				return static_cast<const Type *>(self)->__mul__(other);
+			};
+		}
 	}
+
 	if constexpr (HasPow<Type>) {
 		type_prototype->__pow__ =
 			+[](const PyObject *self, const PyObject *other, const PyObject *modulo) -> PyResult<PyObject *> {
