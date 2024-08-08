@@ -129,7 +129,8 @@ using SubtractSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using MultiplySlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
-using PowSlotFunctionType = std::function<PyResult<PyObject *>(const PyObject *, const PyObject *, const PyObject *)>;
+using PowSlotFunctionType =
+	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *, const PyObject *)>;
 using FloorDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using TrueDivSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using LeftShiftSlotFunctionType =
@@ -140,6 +141,7 @@ using ModuloSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using AndSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using OrSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
+using XorSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 
 using HashSlotFunctionType = std::function<PyResult<int64_t>(const PyObject *)>;
 using CompareSlotFunctionType =
@@ -252,6 +254,7 @@ struct TypePrototype
 	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
 	std::optional<std::variant<AndSlotFunctionType, PyObject *>> __and__;
 	std::optional<std::variant<OrSlotFunctionType, PyObject *>> __or__;
+	std::optional<std::variant<XorSlotFunctionType, PyObject *>> __xor__;
 
 	std::optional<std::variant<AbsSlotFunctionType, PyObject *>> __abs__;
 	std::optional<std::variant<NegSlotFunctionType, PyObject *>> __neg__;
@@ -382,7 +385,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> add(const PyObject *other) const;
 	PyResult<PyObject *> subtract(const PyObject *other) const;
 	PyResult<PyObject *> multiply(const PyObject *other) const;
-	PyResult<PyObject *> pow(const PyObject *other, const PyObject* modulo) const;
+	PyResult<PyObject *> pow(const PyObject *other, const PyObject *modulo) const;
 	PyResult<PyObject *> floordiv(PyObject *);
 	PyResult<PyObject *> truediv(PyObject *);
 	PyResult<PyObject *> lshift(const PyObject *other) const;
@@ -390,6 +393,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> modulo(const PyObject *other) const;
 	PyResult<PyObject *> and_(PyObject *other);
 	PyResult<PyObject *> or_(PyObject *other);
+	PyResult<PyObject *> xor_(PyObject *other);
 
 	PyResult<bool> contains(PyObject *value);
 	PyResult<std::monostate> delete_item(PyObject *key);
@@ -730,8 +734,9 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 	}
 
 	if constexpr (HasPow<Type>) {
-		type_prototype->__pow__ =
-			+[](const PyObject *self, const PyObject *other, const PyObject *modulo) -> PyResult<PyObject *> {
+		type_prototype->__pow__ = +[](const PyObject *self,
+									   const PyObject *other,
+									   const PyObject *modulo) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__pow__(other, modulo);
 		};
 	}
@@ -772,6 +777,11 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 	if constexpr (HasOr<Type>) {
 		type_prototype->__or__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
 			return static_cast<Type *>(self)->__or__(other);
+		};
+	}
+	if constexpr (HasXor<Type>) {
+		type_prototype->__xor__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__xor__(other);
 		};
 	}
 	if constexpr (HasAbs<Type>) {

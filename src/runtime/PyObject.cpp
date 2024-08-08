@@ -767,7 +767,7 @@ PyResult<PyObject *> PyObject::multiply(const PyObject *other) const
 		other->type_prototype().__name__));
 }
 
-PyResult<PyObject *> PyObject::pow(const PyObject *other, const PyObject* modulo) const
+PyResult<PyObject *> PyObject::pow(const PyObject *other, const PyObject *modulo) const
 {
 	if (type_prototype().__pow__.has_value()) {
 		return call_slot(*type_prototype().__pow__, this, other, modulo);
@@ -847,6 +847,18 @@ PyResult<PyObject *> PyObject::or_(PyObject *other)
 		return call_slot(*other->type_prototype().__or__, other, this);
 	}
 	return Err(type_error("unsupported operand type(s) for |: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<PyObject *> PyObject::xor_(PyObject *other)
+{
+	if (type_prototype().__xor__.has_value()) {
+		return call_slot(*type_prototype().__xor__, this, other);
+	} else if (other->type_prototype().__xor__.has_value()) {
+		return call_slot(*other->type_prototype().__xor__, other, this);
+	}
+	return Err(type_error("unsupported operand type(s) for ^: \'{}\' and \'{}\'",
 		type_prototype().__name__,
 		other->type_prototype().__name__));
 }
