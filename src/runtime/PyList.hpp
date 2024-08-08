@@ -4,7 +4,9 @@
 
 namespace py {
 
-class PyList : public PyBaseObject
+class PyList
+	: public PyBaseObject
+	, PySequence
 {
 	friend class ::Heap;
 
@@ -24,6 +26,7 @@ class PyList : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __getitem__(PyObject *index);
+	PyResult<std::monostate> __setitem__(PyObject *index, PyObject *value);
 	PyResult<size_t> __len__() const;
 
 	PyResult<PyObject *> __getitem__(int64_t index);
@@ -31,6 +34,7 @@ class PyList : public PyBaseObject
 	PyResult<std::monostate> __delitem__(PyObject *key);
 
 	PyResult<PyObject *> __add__(const PyObject *other) const;
+	PyResult<PyObject *> __mul__(size_t count) const;
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
 	const std::vector<Value> &elements() const { return m_elements; }
@@ -45,7 +49,7 @@ class PyList : public PyBaseObject
 	PyResult<PyObject *> __class_getitem__(PyType *cls, PyObject *args);
 	PyResult<PyObject *> __reversed__() const;
 
-	void sort();
+	PyResult<PyObject *> sort();
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

@@ -385,6 +385,76 @@ PyResult<PyObject *> PyList::__getitem__(PyObject *index)
 	}
 }
 
+PyResult<std::monostate> PyList::__setitem__(PyObject *index, PyObject *value)
+{
+	if (index->type()->issubclass(types::integer())) {
+		const auto i = static_cast<const PyInteger &>(*index).as_i64();
+		return __setitem__(i, value);
+	} else if (index->type()->issubclass(types::slice())) {
+		auto value_iter = value->iter();
+		if (value_iter.is_err()) { return Err(type_error("can only assign an iterable")); }
+		auto validate_index = [this](BigIntType index_value) -> PyResult<size_t> {
+			if (index_value >= 0) {
+				ASSERT(index_value.fits_ulong_p());
+				const auto index = index_value.get_ui();
+				if (index > m_elements.size()) {
+					return Err(index_error("list assignment index out of range"));
+				}
+				return Ok(index);
+			} else {
+				ASSERT(index_value.fits_slong_p());
+				const auto index = index_value.get_si();
+				if (static_cast<size_t>(std::abs(index)) > m_elements.size()) {
+					return Err(index_error("list assignment index out of range"));
+				}
+				return Ok(m_elements.size() - std::abs(index));
+			}
+			ASSERT_NOT_REACHED();
+		};
+		const auto &slice = static_cast<const PySlice &>(*index);
+		auto unpack_indices = slice.unpack();
+		if (unpack_indices.is_err()) { return Err(unpack_indices.unwrap_err()); }
+		auto [start, stop, step] = unpack_indices.unwrap();
+		start = start == std::numeric_limits<int64_t>::max()
+					? static_cast<int64_t>(m_elements.size()) - 1
+					: start;
+		stop = stop == std::numeric_limits<int64_t>::min()
+				   ? static_cast<int64_t>(m_elements.size()) - 1
+				   : start;
+		if (step == 0) { return Err(value_error("slice step cannot be zero")); }
+		if (step != 1) { TODO(); }
+		auto start_index = validate_index(start);
+		if (start_index.is_err()) { return Err(start_index.unwrap_err()); }
+		auto stop_index = validate_index(stop);
+		if (stop_index.is_err()) { return Err(stop_index.unwrap_err()); }
+		start = start_index.unwrap();
+		stop = stop_index.unwrap();
+
+		auto val = value_iter.unwrap()->next();
+		auto i = start;
+		for (; i < stop && val.is_ok(); i += step) {
+			auto index_ = validate_index(i);
+			if (index_.is_err()) { return Err(index_.unwrap_err()); }
+			m_elements[index_.unwrap()] = val.unwrap();
+			val = value_iter.unwrap()->next();
+		}
+		while (val.is_ok()) {
+			m_elements.insert(m_elements.begin() + i, val.unwrap());
+			val = value_iter.unwrap()->next();
+			++i;
+		}
+
+		if (!val.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+			return Err(val.unwrap_err());
+		}
+
+		return Ok(std::monostate{});
+	}
+
+	return Err(
+		type_error("list indices must be integers or slices, not {}", index->type()->name()));
+}
+
 PyResult<size_t> PyList::__len__() const { return Ok(m_elements.size()); }
 
 PyResult<PyObject *> PyList::__add__(const PyObject *other) const
@@ -402,6 +472,18 @@ PyResult<PyObject *> PyList::__add__(const PyObject *other) const
 		other_list.elements().end());
 
 	return result;
+}
+
+PyResult<PyObject *> PyList::__mul__(size_t count) const
+{
+	if (count <= 0) { return PyList::create(); }
+	std::vector<Value> values;
+	values.reserve(count * m_elements.size());
+	for (auto _ : std::views::iota(size_t{ 0 }, count)) {
+		values.insert(values.end(), m_elements.begin(), m_elements.end());
+	}
+
+	return PyList::create(std::move(values));
 }
 
 PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
@@ -432,20 +514,25 @@ PyResult<PyObject *> PyList::__reversed__() const
 	return PyListReverseIterator::create(*const_cast<PyList *>(this));
 }
 
-void PyList::sort()
+PyResult<PyObject *> PyList::sort()
 {
-	std::sort(m_elements.begin(), m_elements.end(), [](const Value &lhs, const Value &rhs) -> bool {
-		if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
-			auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
-			ASSERT(is_true.is_ok())
-			return is_true.unwrap();
-		} else {
-			// VirtualMachine::the().interpreter().raise_exception("Failed to compare {} with {}",
-			// 	PyObject::from(lhs)->to_string(),
-			// 	PyObject::from(rhs)->to_string());
-			return false;
-		}
-	});
+	PyResult<PyObject *> result = Ok(py_none());
+	std::sort(m_elements.begin(),
+		m_elements.end(),
+		[&result](const Value &lhs, const Value &rhs) -> bool {
+			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
+				auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+				if (is_true.is_err()) {
+					result = Err(is_true.unwrap_err());
+					return true;
+				}
+				return is_true.unwrap();
+			} else {
+				return false;
+			}
+		});
+
+	return result;
 }
 
 void PyList::visit_graph(Visitor &visitor)
@@ -482,12 +569,7 @@ namespace {
 						if (result.is_err()) return Err(result.unwrap_err());
 						return static_cast<PyList *>(self)->pop(std::get<0>(result.unwrap()));
 					})
-				//  .def(
-				// 	 "sort",
-				// 	 +[](PyObject *self) {
-				// 		 self->sort();
-				// 		 return py_none();
-				// 	 })
+				.def("sort", &PyList::sort)
 				.classmethod(
 					"__class_getitem__",
 					+[](PyType *type, PyTuple *args, PyDict *kwargs) {
