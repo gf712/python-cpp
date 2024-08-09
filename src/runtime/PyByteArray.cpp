@@ -3,6 +3,7 @@
 #include "PyBytes.hpp"
 #include "StopIteration.hpp"
 #include "runtime/IndexError.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyObject.hpp"
@@ -330,7 +331,7 @@ PyResult<PyObject *> PyByteArray::translate(PyTuple *args, PyDict *kwargs) const
 		table = static_cast<const PyBytes &>(*el0).value();
 	} else if (el0->type()->issubclass(types::bytearray())) {
 		table = static_cast<const PyByteArray &>(*el0).value();
-	} else {
+	} else if (el0 != py_none()) {
 		return Err(type_error("a bytes-like object is required, not '{}'", el0->type()->name()));
 	}
 
@@ -364,8 +365,8 @@ PyResult<PyObject *> PyByteArray::translate(PyTuple *args, PyDict *kwargs) const
 
 	Bytes result;
 	std::ranges::remove_copy_if(
-		m_value.b, std::back_inserter(result.b), [&table](const auto &el) -> bool {
-			return std::ranges::find(table.b, el) != table.b.end();
+		m_value.b, std::back_inserter(result.b), [&to_delete](const auto &el) -> bool {
+			return std::ranges::find(to_delete.b, el) != to_delete.b.end();
 		});
 
 	if (!table.b.empty()) {
@@ -376,6 +377,19 @@ PyResult<PyObject *> PyByteArray::translate(PyTuple *args, PyDict *kwargs) const
 
 	return PyByteArray::create(result);
 }
+
+PyResult<PyObject *> PyByteArray::__eq__(const PyObject *other) const
+{
+	if (other->type()->issubclass(types::bytearray())) {
+		return Ok(m_value.b == static_cast<const PyByteArray &>(*other).value().b ? py_true()
+																				  : py_false());
+	} else if (other->type()->issubclass(types::bytes())) {
+		return Ok(
+			m_value.b == static_cast<const PyBytes &>(*other).value().b ? py_true() : py_false());
+	}
+	return Ok(py_false());
+}
+
 
 namespace {
 

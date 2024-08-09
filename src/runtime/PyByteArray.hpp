@@ -27,6 +27,7 @@ class PyByteArray : public PyBaseObject
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __repr__() const;
 	PyResult<size_t> __len__() const;
+	PyResult<PyObject *> __eq__(const PyObject *other) const;
 
 	PyResult<PyObject *> __getitem__(int64_t index);
 	PyResult<std::monostate> __setitem__(int64_t index, PyObject *value);
