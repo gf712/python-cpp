@@ -29,6 +29,7 @@
 
 #include <unicode/stringpiece.h>
 #include <unicode/uchar.h>
+#include <unicode/umachine.h>
 #include <unicode/unistr.h>
 
 namespace py {
@@ -117,6 +118,54 @@ PyResult<PyString *> PyString::create(PyObject *obj)
 	}
 }
 
+PyResult<PyString *> PyString::create(const Bytes &bytes, const std::string &encoding)
+{
+	if (encoding.empty()) { return PyString::create(bytes.to_string()); }
+	if (encoding == "latin1") {
+		// based on https://stackoverflow.com/a/4059934
+		std::string result;
+		for (const auto &byte : bytes.b) {
+			if (byte < std::byte{ 128 }) {
+				result.push_back(static_cast<char>(byte));
+			} else {
+				result.push_back(0xc2 + (static_cast<unsigned char>(byte) > 0xbf));
+				result.push_back((static_cast<char>(byte) & 0x3f) + 0x80);
+			}
+		}
+		return PyString::create(result);
+	} else if (encoding == "utf8") {
+		std::string result;
+		auto it = bytes.b.begin();
+		while (it != bytes.b.end()) {
+			if (*it > std::byte{ 127 }) {
+				return Err(value_error(
+					"'utf-8' codec can't decode byte {} in position {}: invalid start byte",
+					*it,
+					std::distance(bytes.b.begin(), it)));
+			}
+			auto length = utf8::codepoint_length(static_cast<char>(*it));
+			if (!utf8::codepoint(bit_cast<const char *>(it.base()), length).has_value()) {
+				return Err(value_error(
+					"'utf-8' codec can't decode byte {} in position {}: invalidutf8 codepoint ",
+					*it,
+					std::distance(bytes.b.begin(), it)));
+			}
+			for (size_t i = 0; i < length; ++i) {
+				if (it == bytes.b.end()) {
+					return Err(value_error(
+						"'utf-8' codec can't decode byte {} in position {}: invalidutf8 codepoint ",
+						*it,
+						std::distance(bytes.b.begin(), it)));
+				}
+				result.push_back(static_cast<char>(*it));
+				it++;
+			}
+		}
+		return PyString::create(result);
+	}
+	TODO();
+}
+
 PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	// FIXME: this should use either __str__ or __repr__ rather than relying on first arg being a
@@ -125,15 +174,33 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 	// FIXME: handle encoding argument
 	// FIXME: handle errors argument
 	ASSERT(!kwargs || kwargs->map().size() == 0)
-	ASSERT(args && args->size() == 1)
+	ASSERT(args && args->size() <= 2)
 	ASSERT(type == types::str())
 
+	std::string encoding;
+
 	const auto &string = args->elements()[0];
+	if (args->size() > 1) {
+		auto *el1 = PyObject::from(args->elements()[1]).unwrap();
+		if (!el1->type()->issubclass(types::str())) {
+			return Err(
+				type_error("str() argument 'encoding' must be str, not {}", el1->type()->name()));
+		}
+		encoding = static_cast<const PyString &>(*el1).value();
+	}
+
 	if (std::holds_alternative<String>(string)) {
 		return PyString::create(std::get<String>(string).s);
 	} else if (std::holds_alternative<PyObject *>(string)) {
 		auto s = std::get<PyObject *>(string);
+		if (s->type()->issubclass(types::bytes())) {
+			return PyString::create(static_cast<const PyBytes &>(*s).value(), encoding);
+		} else if (s->type()->issubclass(types::bytearray())) {
+			return PyString::create(static_cast<const PyBytes &>(*s).value(), encoding);
+		}
 		return PyString::create(s);
+	} else if (std::holds_alternative<Bytes>(string)) {
+		return PyString::create(std::get<Bytes>(string), encoding);
 	} else {
 		TODO();
 	}
