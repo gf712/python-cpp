@@ -153,8 +153,8 @@ PyResult<PyObject *> PyRange::__getitem__(PyObject *key) const
 {
 	if (key->type()->issubclass(types::integer())) {
 		auto value = static_cast<const PyInteger &>(*key).as_big_int();
-		if (!value.fits_ulong_p()) { return Err(value_error("range object index too large")); }
-		return __getitem__(value.get_ui());
+		if (!value.fits_slong_p()) { return Err(value_error("range object index too large")); }
+		return __getitem__(value.get_si());
 	} else if (key->type()->issubclass(types::slice())) {
 		const auto &slice = static_cast<const PySlice &>(*key);
 		auto slice_values = slice.unpack();
