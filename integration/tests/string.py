@@ -205,3 +205,29 @@ def test_chr():
 
 
 test_chr()
+
+def test_replace():
+    try:
+        "".replace("")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected str.replace to raise TypeError with only one arg"
+
+    try:
+        "".replace(1, 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected str.replace to raise TypeError with not str args"
+
+    assert "123".replace("", "") == "123"
+    assert "123".replace("", "456") == "456145624563456"
+    assert "123".replace("", "456", 0) == "123"
+    assert "123".replace("", "456", -1) == "456145624563456"
+    assert "123".replace("", "456", 1) == "456123"
+    assert "1231".replace("1", "", 1) == "231"
+    assert "1231".replace("1", "", 2) == "23"
+    assert "1231".replace("1", "123", 2) == "12323123"
+
+test_replace()

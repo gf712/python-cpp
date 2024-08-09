@@ -104,6 +104,7 @@ class PyString : public PyBaseObject
 	PyResult<PyObject *> lower() const;
 	PyResult<PyObject *> upper() const;
 	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
+	PyResult<PyObject *> replace(PyTuple *args, PyDict *kwargs) const;
 
 	PyResult<PyObject *> rstrip(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> strip(PyTuple *args, PyDict *kwargs) const;

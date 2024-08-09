@@ -1657,6 +1657,69 @@ PyResult<PyString *> PyString::chr(BigIntType cp)
 	return PyString::create(std::move(result));
 }
 
+PyResult<PyObject *> PyString::replace(PyTuple *args, PyDict *kwargs) const
+{
+	auto parse_result = PyArgsParser<PyString *, PyString *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"str.find",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr);
+
+	if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
+
+	auto [old, new_, count] = parse_result.unwrap();
+
+	if (old->value().empty() && new_->value().empty()) { return PyString::create(m_value); }
+	if (count && count->as_big_int() == 0) { return PyString::create(m_value); }
+
+	const size_t count_ = [count]() {
+		if (!count || count->as_big_int() < 0) { return std::numeric_limits<size_t>::max(); }
+		return count->as_size_t();
+	}();
+
+	size_t counter = 0;
+	icu::UnicodeString result;
+	const auto cps = codepoints();
+	if (old->value().empty()) {
+		for (auto it = cps.begin(); it != cps.end(); ++it, ++counter) {
+			if (counter < count_) {
+				for (const auto &el : new_->value()) { result.append(UChar32{ el }); }
+			}
+			result.append(UChar32(*it));
+		}
+		if (counter < count_) {
+			for (const auto &el : new_->value()) { result.append(UChar32{ el }); }
+		}
+	} else {
+		const auto old_cps = old->codepoints();
+
+		for (auto it = cps.begin(); it != cps.end();) {
+			if (old_cps.size() > static_cast<size_t>(std::distance(it, cps.end()))) {
+				while (it != cps.end()) {
+					result.append(UChar32(*it));
+					++it;
+				}
+				break;
+			}
+			std::span next{ it, it + old_cps.size() };
+			if (counter < count_
+				&& std::equal(next.begin(), next.end(), old_cps.begin(), old_cps.end())) {
+				for (const auto &el : new_->value()) { result.append(el); }
+				it += old_cps.size();
+				counter++;
+			} else {
+				result.append(UChar32(*it));
+				++it;
+			}
+		}
+	}
+
+	std::string result_str;
+	result.toUTF8String(result_str);
+	return PyString::create(result_str);
+}
+
 namespace {
 
 	std::once_flag str_flag;
@@ -1686,6 +1749,7 @@ namespace {
 							 .def("rstrip", &PyString::rstrip)
 							 .def("split", &PyString::split)
 							 .def("format", &PyString::format)
+							 .def("replace", &PyString::replace)
 							 .staticmethod("maketrans", &PyString::maketrans)
 							 .type);
 	}
