@@ -186,36 +186,9 @@ PyResult<PyObject *> PyDict::merge(PyTuple *args, PyDict *kwargs)
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [other_dict, override] = result.unwrap();
-	// TODO: handle other mappable objects
-	//       - iterate over keys
-	//       - get corresponding values
-	//       - insert or insert_or_assign (depending on whether override is true)
-	if (!as<PyDict>(other_dict)) { TODO(); }
-
-	auto map_copy = as<PyDict>(other_dict)->map();
-	// the expectation is that std::unordered_map::merge is faster than manually extracting and
-	// moving nodes
-	m_map.merge(map_copy);
-
-	if (!map_copy.empty()) {
-		if (!override) {
-			const auto &key = map_copy.begin()->first;
-			return PyObject::from(key)
-				.and_then([](PyObject *key_object) { return key_object->repr(); })
-				.and_then([](PyObject *key_repr) -> PyResult<PyObject *> {
-					return Err(key_error("{}", key_repr->to_string()));
-				});
-		} else {
-			while (!map_copy.empty()) {
-				auto node = map_copy.extract(map_copy.begin());
-				const auto &key = node.key();
-				const auto &mapped = node.mapped();
-				m_map.insert_or_assign(key, mapped);
-			}
-		}
-	}
-
-	return Ok(py_none());
+	return merge(other_dict, override).and_then([](auto) -> PyResult<PyObject *> {
+		return Ok(py_none());
+	});
 }
 
 

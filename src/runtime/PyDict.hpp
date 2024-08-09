@@ -2,6 +2,9 @@
 
 #include "PyObject.hpp"
 #include "runtime/Value.hpp"
+
+#include <tsl/ordered_map.h>
+
 #include <variant>
 
 namespace py {
@@ -18,7 +21,7 @@ class PyDictValueIterator;
 class PyDict : public PyBaseObject
 {
   public:
-	using MapType = std::unordered_map<Value, Value, ValueHash>;
+	using MapType = tsl::ordered_map<Value, Value, ValueHash>;
 
   private:
 	friend class ::Heap;

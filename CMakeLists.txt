@@ -34,6 +34,12 @@ FetchContent_Declare(
 	GIT_TAG v3.9.13)
 FetchContent_MakeAvailable(cpython)
 
+FetchContent_Declare(
+	tsl
+	GIT_REPOSITORY https://github.com/Tessil/ordered-map
+	GIT_TAG v1.1.0)
+FetchContent_MakeAvailable(tsl)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(GMP REQUIRED)
 

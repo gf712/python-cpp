@@ -238,8 +238,15 @@ add_library(
 add_executable(unittests_ ${UNITTEST_SOURCES})
 
 target_link_libraries(python-cpp
-  PUBLIC spdlog
-  PRIVATE project_options project_warnings ICU::uc ICU::data ${GMPXX_LIBRARIES} ${GMP_LIBRARIES}
+  PUBLIC spdlog m
+  PRIVATE
+    project_options
+    project_warnings
+    ICU::uc
+    ICU::data
+    ${GMPXX_LIBRARIES}
+    ${GMP_LIBRARIES}
+    tsl::ordered_map
 )
 
 target_include_directories(python-cpp
