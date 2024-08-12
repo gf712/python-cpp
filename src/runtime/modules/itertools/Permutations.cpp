@@ -65,7 +65,7 @@ namespace itertools {
 
 		auto parsed_args = PyArgsParser<PyObject *, PyInteger *>::unpack_tuple(args,
 			kwargs,
-			"itertools.iterator",
+			"itertools.permutations",
 			std::integral_constant<size_t, 1>{},
 			std::integral_constant<size_t, 2>{},
 			nullptr);
