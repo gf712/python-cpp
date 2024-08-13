@@ -112,6 +112,8 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/BuiltinsModule.cpp
     runtime/modules/ImpModule.cpp
     runtime/modules/IOModule.cpp
+    runtime/modules/collections/module.cpp
+    runtime/modules/collections/DefaultDict.cpp
     runtime/modules/itertools/module.cpp
     runtime/modules/itertools/Chain.cpp
     runtime/modules/itertools/ISlice.cpp
