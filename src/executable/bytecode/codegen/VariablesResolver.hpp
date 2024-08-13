@@ -67,9 +67,9 @@ class VariablesResolver : public ast::CodeGenerator
 		void add_symbol(Symbol s)
 		{
 			if (s.visibility == Visibility::HIDDEN) {
-				ASSERT(!get_hidden_symbol(s.name).has_value());
+				if (get_hidden_symbol(s.name).has_value()) { return; }
 			} else {
-				ASSERT(!get_visible_symbol(s.name).has_value());
+				if (get_visible_symbol(s.name).has_value()) { return; }
 			}
 			symbols.push_back(std::move(s));
 		}
