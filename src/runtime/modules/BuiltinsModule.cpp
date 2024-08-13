@@ -34,6 +34,7 @@
 #include "runtime/SyntaxError.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/UnboundLocalError.hpp"
+#include "runtime/Value.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/modules/Modules.hpp"
 #include "runtime/types/builtin.hpp"
@@ -57,6 +58,7 @@
 #include "vm/VM.hpp"
 
 #include "utilities.hpp"
+#include <algorithm>
 #include <variant>
 
 using namespace py;
@@ -1136,7 +1138,9 @@ PyResult<PyObject *> callable(const PyTuple *args, const PyDict *kwargs, Interpr
 						  [](auto) { return false; },
 						  [](PyObject *obj) { return obj->type_prototype().__call__.has_value(); },
 					  },
-		obj) ? Ok(py_true()) : Ok(py_false());
+			   obj)
+			   ? Ok(py_true())
+			   : Ok(py_false());
 }
 
 PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
@@ -1151,6 +1155,126 @@ PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto [obj] = result.unwrap();
 
 	return PyString::convert_to_ascii(obj);
+}
+
+PyResult<PyObject *> sorted(PyTuple *args, PyDict *kwargs, Interpreter &interpreter)
+{
+	if (!args) { return Err(type_error("sorted expected 1 arguments, got 0")); }
+	if (args->elements().size() != 1) {
+		return Err(type_error("sorted expected 1 arguments, got {}", args->elements().size()));
+	}
+
+	auto iterable_ = PyObject::from(args->elements()[0]);
+	if (iterable_.is_err()) { return iterable_; }
+	auto *iterable = iterable_.unwrap();
+
+	PyObject *key = py_none();
+	bool reverse = false;
+
+	if (kwargs) {
+		if (auto it = kwargs->map().find(String{ "key" }); it != kwargs->map().end()) {
+			auto key_ = PyObject::from(it->second);
+			if (key_.is_err()) { return key_; }
+			if (!key_.unwrap()->type_prototype().__call__.has_value()) {
+				return Err(type_error("'{}' objects not callable", key_.unwrap()->type()->name()));
+			}
+			key = key_.unwrap();
+		}
+		if (auto it = kwargs->map().find(String{ "reverse" }); it != kwargs->map().end()) {
+			auto t = truthy(it->second, interpreter);
+			if (t.is_err()) { return Err(t.unwrap_err()); }
+			reverse = t.unwrap();
+		}
+	}
+
+	auto result_ = PyList::create();
+	if (result_.is_err()) { return result_; }
+	auto *result = result_.unwrap();
+
+	PyList *cmp_list = nullptr;
+	if (key != py_none()) {
+		auto cmp_list_ = PyList::create();
+		if (cmp_list_.is_err()) { return cmp_list_; }
+		cmp_list = cmp_list_.unwrap();
+	}
+
+	auto iter_ = iterable->iter();
+	if (iter_.is_err()) { return iter_; }
+	auto *iter = iter_.unwrap();
+
+	auto value = iter->next();
+	while (value.is_ok()) {
+		if (key != py_none()) {
+			ASSERT(cmp_list);
+			auto cmp_value = key->call(PyTuple::create(value.unwrap()).unwrap(), nullptr);
+			if (cmp_value.is_err()) { return cmp_value; }
+			cmp_list->elements().push_back(cmp_value.unwrap());
+		}
+		result->elements().push_back(value.unwrap());
+		value = iter->next();
+	}
+
+	if (!value.unwrap_err()->type()->issubclass(types::stop_iteration())) { return value; }
+
+	if (key == py_none()) {
+		// FIXME: should throw exception when comparing, as returning true is
+		// probably messing up the C++ Compare requirment
+		PyResult<PyObject *> err = Ok(py_none());
+		auto cmp = [&err](const Value &lhs, const Value &rhs) -> bool {
+			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
+				auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+				if (is_true.is_err()) {
+					err = Err(is_true.unwrap_err());
+					return true;
+				}
+				return is_true.unwrap();
+			} else {
+				return false;
+			}
+		};
+		if (reverse) {
+			std::stable_sort(result->elements().rbegin(), result->elements().rend(), cmp);
+		} else {
+			std::stable_sort(result->elements().begin(), result->elements().end(), cmp);
+		}
+
+		if (err.is_err()) { return err; }
+	} else {
+		PyResult<PyObject *> err = Ok(py_none());
+		std::vector<size_t> indices(cmp_list->elements().size());
+		std::iota(indices.begin(), indices.end(), 0);
+		// FIXME: should throw exception when comparing, as returning true is
+		// probably messing up the C++ Compare requirment
+		auto cmp = [&err, cmp_list](size_t lhs_index, size_t rhs_index) -> bool {
+			const auto &lhs = cmp_list->elements()[lhs_index];
+			const auto &rhs = cmp_list->elements()[rhs_index];
+			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
+				auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+				if (is_true.is_err()) {
+					err = Err(is_true.unwrap_err());
+					return true;
+				}
+				return is_true.unwrap();
+			} else {
+				return false;
+			}
+		};
+		if (reverse) {
+			std::stable_sort(indices.rbegin(), indices.rend(), cmp);
+		} else {
+			std::stable_sort(indices.begin(), indices.end(), cmp);
+		}
+
+		if (err.is_err()) { return err; }
+
+		cmp_list->elements().clear();
+		for (const auto &index : indices) {
+			cmp_list->elements().push_back(result->elements()[index]);
+		}
+		result = cmp_list;
+	}
+
+	return Ok(result);
 }
 
 auto builtin_types()
@@ -1399,6 +1523,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("ascii").unwrap(),
 		heap.allocate<PyNativeFunction>("ascii", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return ascii(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("sorted").unwrap(),
+		heap.allocate<PyNativeFunction>("sorted", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return sorted(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;
