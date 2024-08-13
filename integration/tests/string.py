@@ -231,3 +231,8 @@ def test_replace():
     assert "1231".replace("1", "123", 2) == "12323123"
 
 test_replace()
+
+def test_translate():
+    assert "foo".translate({ord("f"): "b"}) == "boo"
+
+test_translate()

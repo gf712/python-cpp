@@ -10,11 +10,10 @@
 #include "PyNone.hpp"
 #include "PySlice.hpp"
 #include "StopIteration.hpp"
-#include "SyntaxError.hpp"
 #include "TypeError.hpp"
 #include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
 #include "runtime/PyBytes.hpp"
+#include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -22,9 +21,7 @@
 
 #include <algorithm>
 #include <limits>
-#include <mutex>
-#include <numeric>
-#include <ranges>
+#include <optional>
 #include <span>
 
 #include <unicode/stringpiece.h>
@@ -95,6 +92,28 @@ namespace utf8 {
 		return std::nullopt;
 	}
 
+	std::optional<std::string> utf8chr(uint32_t cp)
+	{
+		if (cp <= 0x7F) {
+			return std::string{ static_cast<char>(cp) };
+		} else if (cp <= 0x7FF) {
+			return std::string{ { static_cast<char>((cp >> 6) + 192),
+				static_cast<char>((cp & 63) + 128) } };
+		} else if (0xd800 <= cp && cp <= 0xdfff) {
+			return std::nullopt;
+		}// invalid block of utf8
+		else if (cp <= 0xFFFF) {
+			return std::string{ { static_cast<char>((cp >> 12) + 224),
+				static_cast<char>(((cp >> 6) & 63) + 128),
+				static_cast<char>((cp & 63) + 128) } };
+		} else if (cp <= 0x10FFFF) {
+			return std::string{ { static_cast<char>((cp >> 18) + 240),
+				static_cast<char>(((cp >> 12) & 63) + 128),
+				static_cast<char>(((cp >> 6) & 63) + 128),
+				static_cast<char>((cp & 63) + 128) } };
+		}
+		return std::nullopt;
+	}
 }// namespace utf8
 
 PyString::PyString(PyType *type) : PyBaseObject(type) {}
@@ -1720,6 +1739,48 @@ PyResult<PyObject *> PyString::replace(PyTuple *args, PyDict *kwargs) const
 	return PyString::create(result_str);
 }
 
+PyResult<PyObject *> PyString::translate(PyObject *table) const
+{
+	const auto &cps = codepoints();
+
+	std::unordered_map<uint32_t, std::string> cache;
+	std::string result;
+	for (const auto &cp : codepoints()) {
+		if (auto it = cache.find(cp); it != cache.end()) {
+			result.append(it->second);
+			continue;
+		}
+		auto mapped_value = table->getitem(PyInteger::create(cp).unwrap());
+		if (mapped_value.is_err()) {
+			if (mapped_value.unwrap_err()->type()->issubclass(types::key_error())) {
+				auto str = utf8::utf8chr(cp);
+				result.append(*str);
+				continue;
+			}
+			return mapped_value;
+		}
+		if (mapped_value.unwrap() == py_none()) {
+			// omit cp
+		} else if (mapped_value.unwrap()->type()->issubclass(types::integer())) {
+			auto mapped_cp = static_cast<const PyInteger &>(*mapped_value.unwrap()).as_big_int();
+			if (mapped_cp > 0x110000 || mapped_cp < 0) {
+				return Err(value_error("character mapping must be in range(0x110000)"));
+			}
+			auto el = utf8::utf8chr(mapped_cp.get_ui());
+			if (!el.has_value()) {}
+			cache[mapped_cp.get_ui()] = *el;
+			result.append(*el);
+		} else if (mapped_value.unwrap()->type()->issubclass(types::str())) {
+			auto mapped_str = static_cast<const PyString &>(*mapped_value.unwrap()).value();
+			result.append(mapped_str);
+		} else {
+			return Err(type_error("character mapping must return integer, None or str"));
+		}
+	}
+
+	return PyString::create(result);
+}
+
 namespace {
 
 	std::once_flag str_flag;
@@ -1750,6 +1811,7 @@ namespace {
 							 .def("split", &PyString::split)
 							 .def("format", &PyString::format)
 							 .def("replace", &PyString::replace)
+							 .def("translate", &PyString::translate)
 							 .staticmethod("maketrans", &PyString::maketrans)
 							 .type);
 	}
