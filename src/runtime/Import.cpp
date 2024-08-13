@@ -14,6 +14,11 @@
 #include "frozen/importlib_external.h"
 #include "interpreter/Interpreter.hpp"
 #include "modules/config.hpp"
+#include "runtime/KeyError.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
+#include "runtime/Value.hpp"
+#include "vm/VM.hpp"
 
 namespace py {
 
@@ -107,6 +112,8 @@ namespace {
 		auto *base = base_.unwrap();
 		if (base->size() == 0) { return Ok(base); }
 
+		if (name->to_string().empty()) { return PyString::create(base); }
+
 		auto abs_name_str = fmt::format("{}.{}", base->to_string(), name->to_string());
 		auto abs_name = PyString::create(abs_name_str);
 
@@ -155,9 +162,10 @@ namespace {
 				if (args.is_err()) return Err(args.unwrap_err());
 				auto *importlib = VirtualMachine::the().interpreter().importlib();
 				if (!importlib) { return Err(import_error("importlib not imported")); }
-				value = importlib->get_method(_lock_unlock_module.unwrap()).and_then([args](PyObject* lock_unlock_module) {
-					return lock_unlock_module->call(args.unwrap(), nullptr);
-				});
+				value = importlib->get_method(_lock_unlock_module.unwrap())
+							.and_then([args](PyObject *lock_unlock_module) {
+								return lock_unlock_module->call(args.unwrap(), nullptr);
+							});
 				if (value.is_err()) return Err(value.unwrap_err());
 				return Ok(std::monostate{});
 			}
@@ -178,7 +186,7 @@ namespace {
 		if (args.is_err()) return Err(args.unwrap_err());
 
 		auto module = import_find_and_load.unwrap()->call(args.unwrap(), nullptr);
-		if (module.is_err()) return Err(module.unwrap_err());
+		if (module.is_err()) { return Err(module.unwrap_err()); }
 		if (!as<PyModule>(module.unwrap())) {
 			return Err(type_error("expected module to be of type module"));
 		}
@@ -229,15 +237,58 @@ PyResult<PyObject *> import_module_level_object(PyString *name,
 		auto module = import_get_module(absolute_name.unwrap());
 		if (module.has_value()) {
 			auto is_initialized = import_ensure_initialized(*module, absolute_name.unwrap());
-			if (is_initialized.is_err()) {
-				return Err(is_initialized.unwrap_err());
-			} else {
-				return Ok(*module);
-			}
-		} else {
-			return import_find_and_load(absolute_name.unwrap());
+			if (is_initialized.is_err()) { return Err(is_initialized.unwrap_err()); }
+			return Ok(*module);
 		}
+
+		return import_find_and_load(absolute_name.unwrap());
 	}();
+
+	if (module.is_err()) { return module; }
+
+	const auto has_from = [fromlist]() -> PyResult<bool> {
+		if (!fromlist) { return Ok(false); }
+		return truthy(fromlist, VirtualMachine::the().interpreter());
+	}();
+	if (has_from.is_err()) { return Err(has_from.unwrap_err()); }
+
+	if (!has_from.unwrap()) {
+		if (name->value().empty()) { return module; }
+		auto it = name->value().find('.');
+		if (it == std::string::npos) { return module; }
+		if (level == 0) {
+			return import_module_level_object(
+				PyString::create(name->value().substr(0, it)).unwrap(),
+				nullptr,
+				nullptr,
+				nullptr,
+				0);
+		}
+		auto to_return = absolute_name.unwrap()->value().substr(0, name->value().size() - it);
+		auto final_mod = import_get_module(PyString::create(to_return).unwrap());
+		if (!final_mod.has_value()) {
+			return Err(key_error("{} not in sys.modules as expected", to_return));
+		}
+		return Ok(*final_mod);
+	} else {
+		auto path = module.unwrap()->symbol_table()->map().find(String{ "__path__" });
+		if (path != module.unwrap()->symbol_table()->map().end()) {
+			return VirtualMachine::the()
+				.interpreter()
+				.importlib()
+				->get_method(PyString::create("_handle_fromlist").unwrap())
+				.and_then([module, fromlist](auto *_handle_fromlist) {
+					return _handle_fromlist->call(
+						PyTuple::create(module.unwrap(),
+							fromlist,
+							VirtualMachine::the().interpreter().importfunc())
+							.unwrap(),
+						nullptr);
+				});
+		} else {
+			return module;
+		}
+	}
 
 	return module;
 }
