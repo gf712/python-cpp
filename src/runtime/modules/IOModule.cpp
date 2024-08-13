@@ -1831,10 +1831,7 @@ class BytesIO : public BufferedIOBase
 // taken from https://stackoverflow.com/a/19749019
 typedef std::basic_fstream<char>::__filebuf_type buffer_t;
 typedef __gnu_cxx::stdio_filebuf<char> io_buffer_t;
-FILE *cfile_impl(buffer_t *const fb)
-{
-	return static_cast<io_buffer_t *>(fb)->file();
-}
+FILE *cfile_impl(buffer_t *const fb) { return static_cast<io_buffer_t *>(fb)->file(); }
 
 FILE *cfile(std::fstream const &fs) { return cfile_impl(fs.rdbuf()); }
 #else
@@ -1990,6 +1987,10 @@ class FileIO : public RawIOBase
 		if (m_filestream.fail()) { TODO(); }
 
 		const auto file_size = end_position - initial_position;
+		if (file_size == 0) {
+			m_filestream.seekg(0, std::ios_base::end);
+			return PyBytes::create();
+		}
 		std::vector<std::byte> result;
 		result.resize(file_size);
 		int64_t bytes_read = 0;
