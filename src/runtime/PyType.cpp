@@ -22,6 +22,7 @@
 #include "TypeError.hpp"
 #include "ValueError.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "runtime/PyTuple.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -111,8 +112,7 @@ namespace {
 					return Ok(std::monostate{});
 				}
 			} else {
-				[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }
-				();
+				[]<bool flag = false>() { static_assert(flag, "unsupported return type"); }();
 			}
 		} else {
 			TODO();
@@ -416,8 +416,22 @@ PyResult<std::monostate> PyType::initialize(const std::string &name,
 		if (as<PyString>(slots)) {
 			slots = PyTuple::create(slots).unwrap();
 		} else {
-			// TODO: handle iterables
-			if (!as<PyTuple>(slots)) { TODO(); }
+			auto slots_list = PyList::create();
+			if (slots_list.is_err()) { return Err(slots_list.unwrap_err()); }
+			auto iter = slots->iter();
+			if (iter.is_err()) { return Err(iter.unwrap_err()); }
+
+			auto value_ = iter.unwrap()->next();
+			while (value_.is_ok()) {
+				slots_list.unwrap()->elements().push_back(value_.unwrap());
+				value_ = iter.unwrap()->next();
+			}
+
+			if (!value_.unwrap_err()->type()->issubclass(types::stop_iteration())) {
+				return Err(value_.unwrap_err());
+			}
+
+			slots = PyTuple::create(slots_list.unwrap()->elements()).unwrap();
 		}
 		ASSERT(as<PyTuple>(slots));
 
