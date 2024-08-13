@@ -129,6 +129,15 @@ PyResult<PyObject *> PyDict::__iter__() const
 PyResult<PyObject *> PyDict::__getitem__(PyObject *key)
 {
 	if (auto it = m_map.find(key); it != m_map.end()) { return PyObject::from(it->second); }
+	if (type() != types::dict()) {
+		auto missing = lookup_attribute(PyString::create("__missing__").unwrap());
+		if (std::get<1>(missing) == LookupAttrResult::FOUND) {
+			return std::get<0>(missing).and_then([key](auto *method) -> PyResult<PyObject *> {
+				return method->call(PyTuple::create(key).unwrap(), nullptr);
+			});
+		}
+		if (std::get<0>(missing).is_err()) { return std::get<0>(missing); }
+	}
 	return Err(key_error("{}", key->to_string()));
 }
 
