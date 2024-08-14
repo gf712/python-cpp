@@ -159,6 +159,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyClassMethod.cpp
     runtime/PyClassMethodDescriptor.cpp
     runtime/PyCode.cpp
+    runtime/PyComplex.cpp
     runtime/PyCoroutine.cpp
     runtime/PyDict.cpp
     runtime/PyEllipsis.cpp

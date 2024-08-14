@@ -1289,6 +1289,7 @@ auto builtin_types()
 		types::str(),
 		types::float_(),
 		types::integer(),
+		types::complex(),
 		types::none(),
 		types::object(),
 		types::memoryview(),

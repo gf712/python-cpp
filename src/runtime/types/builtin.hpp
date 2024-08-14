@@ -19,6 +19,7 @@ namespace types {
 		mutable Type m_str;
 		mutable Type m_str_iterator;
 		mutable Type m_integer;
+		mutable Type m_complex;
 		mutable Type m_bool;
 		mutable Type m_bytes;
 		mutable Type m_bytes_iterator;
@@ -147,6 +148,7 @@ namespace types {
 		TypePrototype &str_iterator() const { return get_type(m_str_iterator); }
 		TypePrototype &float_() const { return get_type(m_float); }
 		TypePrototype &integer() const { return get_type(m_integer); }
+		TypePrototype &complex() const { return get_type(m_complex); }
 		TypePrototype &none() const { return get_type(m_none); }
 		TypePrototype &module() const { return get_type(m_module); }
 		TypePrototype &object() const { return get_type(m_object); }
@@ -250,6 +252,7 @@ namespace types {
 	PyType *str_iterator();
 	PyType *float_();
 	PyType *integer();
+	PyType *complex();
 	PyType *none();
 	PyType *module();
 	PyType *object();

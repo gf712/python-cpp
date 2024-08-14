@@ -22,6 +22,7 @@
 #include "runtime/PyClassMethod.hpp"
 #include "runtime/PyClassMethodDescriptor.hpp"
 #include "runtime/PyCode.hpp"
+#include "runtime/PyComplex.hpp"
 #include "runtime/PyCoroutine.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyEllipsis.hpp"
@@ -70,9 +71,9 @@ namespace py::types {
 BuiltinTypes::BuiltinTypes()
 	: m_type(PyType::type_factory()), m_super(PySuper::type_factory()),
 	  m_str(PyString::type_factory()), m_str_iterator(PyStringIterator::type_factory()),
-	  m_integer(PyInteger::type_factory()), m_bool(PyBool::type_factory()),
-	  m_bytes(PyBytes::type_factory()), m_bytes_iterator(PyBytesIterator::type_factory()),
-	  m_bytearray(PyByteArray::type_factory()),
+	  m_integer(PyInteger::type_factory()), m_complex(PyComplex::type_factory()),
+	  m_bool(PyBool::type_factory()), m_bytes(PyBytes::type_factory()),
+	  m_bytes_iterator(PyBytesIterator::type_factory()), m_bytearray(PyByteArray::type_factory()),
 	  m_bytearray_iterator(PyByteArrayIterator::type_factory()),
 	  m_ellipsis(PyEllipsis::type_factory()), m_float(PyFloat::type_factory()),
 	  m_none(PyNone::type_factory()), m_module(PyModule::type_factory()),
@@ -147,6 +148,7 @@ INITIALIZE_TYPE(str)
 INITIALIZE_TYPE(str_iterator)
 INITIALIZE_TYPE(float_)
 INITIALIZE_TYPE(integer)
+INITIALIZE_TYPE(complex)
 INITIALIZE_TYPE(none)
 INITIALIZE_TYPE(module)
 INITIALIZE_TYPE(object)
