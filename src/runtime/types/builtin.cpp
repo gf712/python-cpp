@@ -35,6 +35,7 @@
 #include "runtime/PyGenericAlias.hpp"
 #include "runtime/PyGetSetDescriptor.hpp"
 #include "runtime/PyInteger.hpp"
+#include "runtime/PyIterator.hpp"
 #include "runtime/PyLLVMFunction.hpp"
 #include "runtime/PyList.hpp"
 #include "runtime/PyMap.hpp"
@@ -96,7 +97,7 @@ BuiltinTypes::BuiltinTypes()
 	  m_range_iterator(PyRangeIterator::type_factory()), m_reversed(PyReversed::type_factory()),
 	  m_zip(PyZip::type_factory()), m_map(PyMap::type_factory()),
 	  m_enumerate(PyEnumerate::type_factory()), m_slice(PySlice::type_factory()),
-	  m_builtin_method(PyBuiltInMethod::type_factory()),
+	  m_iterator(PyIterator::type_factory()), m_builtin_method(PyBuiltInMethod::type_factory()),
 	  m_slot_wrapper(PySlotWrapper::type_factory()), m_bound_method(PyBoundMethod::type_factory()),
 	  m_method_wrapper(PyMethodDescriptor::type_factory()),
 	  m_classmethod_descriptor(PyClassMethodDescriptor::type_factory()),
@@ -185,6 +186,8 @@ INITIALIZE_TYPE(map)
 INITIALIZE_TYPE(enumerate)
 
 INITIALIZE_TYPE(slice)
+
+INITIALIZE_TYPE(iterator)
 
 INITIALIZE_TYPE(function)
 INITIALIZE_TYPE(native_function)

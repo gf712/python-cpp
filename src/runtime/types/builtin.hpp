@@ -70,6 +70,8 @@ namespace types {
 
 		mutable Type m_slice;
 
+		mutable Type m_iterator;
+
 		mutable Type m_builtin_method;
 		mutable Type m_slot_wrapper;
 		mutable Type m_bound_method;
@@ -186,6 +188,8 @@ namespace types {
 
 		TypePrototype &slice() const { return get_type(m_slice); }
 
+		TypePrototype &iterator() const { return get_type(m_iterator); }
+
 		TypePrototype &function() const { return get_type(m_function); }
 		TypePrototype &native_function() const { return get_type(m_native_function); }
 		TypePrototype &llvm_function() const { return get_type(m_llvm_function); }
@@ -280,6 +284,7 @@ namespace types {
 	PyType *map();
 	PyType *enumerate();
 	PyType *slice();
+	PyType *iterator();
 	PyType *function();
 	PyType *native_function();
 	PyType *llvm_function();
