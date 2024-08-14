@@ -685,8 +685,8 @@ namespace py {
 
 						for (auto [key, value] : llvm::zip(keys, values)) {
 							rewriter.setInsertionPointAfterValue(value);
-							rewriter.create<mlir::emitpybytecode::DictAdd>(op.getLoc(),
-								result, key, value);
+							rewriter.create<mlir::emitpybytecode::DictAdd>(
+								op.getLoc(), result, key, value);
 						}
 					} else {
 						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
@@ -1951,6 +1951,19 @@ namespace py {
 			}
 		};
 
+		struct UnpackExpandOpLowering : public mlir::OpRewritePattern<mlir::py::UnpackExpandOp>
+		{
+			using OpRewritePattern<mlir::py::UnpackExpandOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::UnpackExpandOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnpackExpandOp>(
+					op, op.getUnpackedValues().getType(), op.getRest().getType(), op.getIterable());
+				return success();
+			}
+		};
+
 		struct GetAwaitableOpLowering : public mlir::OpRewritePattern<mlir::py::GetAwaitableOp>
 		{
 			using OpRewritePattern<mlir::py::GetAwaitableOp>::OpRewritePattern;
@@ -1999,7 +2012,8 @@ namespace py {
 			LoadNameLowering,
 			LoadGlobalLowering,
 			LoadDerefLowering,
-			UnpackSequenceOpLowering>(&getContext());
+			UnpackSequenceOpLowering,
+			UnpackExpandOpLowering>(&getContext());
 		patterns.add<StoreFastLowering, StoreGlobalLowering, StoreNameLowering, StoreDerefLowering>(
 			&getContext());
 		patterns.add<DeleteFastLowering, DeleteGlobalLowering, DeleteNameLowering>(&getContext());

@@ -70,6 +70,7 @@
 #include "executable/bytecode/instructions/StoreSubscript.hpp"
 #include "executable/bytecode/instructions/ToBool.hpp"
 #include "executable/bytecode/instructions/Unary.hpp"
+#include "executable/bytecode/instructions/UnpackExpand.hpp"
 #include "executable/bytecode/instructions/UnpackSequence.hpp"
 #include "executable/bytecode/instructions/WithExceptStart.hpp"
 #include "executable/bytecode/instructions/YieldFrom.hpp"
@@ -979,9 +980,10 @@ struct PythonBytecodeEmitter
 		});
 		ASSERT(it != varnames.end());
 		const auto &cellvars = m_current_function->get().second.m_cellvars;
-		const auto idx = std::count_if(varnames.begin(), it, [&cellvars](const std::string& varname){
-			return std::find(cellvars.begin(), cellvars.end(), varname) == cellvars.end();
-		});
+		const auto idx =
+			std::count_if(varnames.begin(), it, [&cellvars](const std::string &varname) {
+				return std::find(cellvars.begin(), cellvars.end(), varname) == cellvars.end();
+			});
 		ASSERT(idx <= std::numeric_limits<Register>::max());
 		return idx;
 	}
@@ -1146,7 +1148,8 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			mlir::emitpybytecode::DeleteFastOp,
 			mlir::emitpybytecode::DeleteNameOp,
 			mlir::emitpybytecode::DeleteGlobalOp,
-			mlir::emitpybytecode::UnpackSequenceOp>([this](auto op) {
+			mlir::emitpybytecode::UnpackSequenceOp,
+			mlir::emitpybytecode::UnpackExpandOp>([this](auto op) {
 			if (emitOperation(op).failed()) { return failure(); };
 			m_current_operation_index.top()++;
 			return success();
@@ -1922,6 +1925,15 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::UnpackS
 	std::vector<Register> unpacked_values;
 	for (const auto &el : op.getUnpackedValues()) { unpacked_values.push_back(get_register(el)); }
 	emit<UnpackSequence>(unpacked_values, get_register(op.getIterable()));
+	return success();
+}
+
+template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::UnpackExpandOp &op)
+{
+	std::vector<Register> unpacked_values;
+	for (const auto &el : op.getUnpackedValues()) { unpacked_values.push_back(get_register(el)); }
+	emit<UnpackExpand>(unpacked_values, get_register(op.getRest()), get_register(op.getIterable()));
 	return success();
 }
 

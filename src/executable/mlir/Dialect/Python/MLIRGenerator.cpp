@@ -2,6 +2,7 @@
 #include "Python/IR/Dialect.hpp"
 #include "Python/IR/PythonOps.hpp"
 
+#include "ast/AST.hpp"
 #include "executable/Mangler.hpp"
 #include "executable/Program.hpp"
 #include "executable/mlir/Conversion/Passes.hpp"
@@ -25,6 +26,7 @@
 #include "utilities.hpp"
 #include "llvm/ADT/SmallVector.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <ranges>
@@ -563,16 +565,43 @@ void MLIRGenerator::assign(const std::shared_ptr<ast::ASTNode> &target,
 			index,
 			src->value);
 	} else if (auto tuple = as<ast::Tuple>(target)) {
-		std::vector<mlir::Value> unpacked_values;
-		std::vector<mlir::Type> unpacked_types(
-			tuple->elements().size(), m_context->pyobject_type());
-		auto unpack_sequence = m_context.builder().create<mlir::py::UnpackSequenceOp>(
-			loc(m_context.builder(), m_context.filename(), source_location),
-			unpacked_types,
-			src->value);
-		for (const auto &[el, unpacked_value] :
-			llvm::zip(tuple->elements(), unpack_sequence.getUnpackedValues())) {
-			assign(el, new_value(unpacked_value), source_location);
+
+		if (std::ranges::any_of(tuple->elements(),
+				[](const auto &el) -> bool { return as<ast::Starred>(el) != nullptr; })) {
+			if (auto starred = as<ast::Starred>(tuple->elements().back())) {
+				ASSERT(as<ast::Name>(starred->value()));
+				ASSERT(as<ast::Name>(starred->value())->context_type() == ast::ContextType::STORE);
+				std::vector<mlir::Value> unpacked_values;
+				std::vector<mlir::Type> unpacked_types(
+					tuple->elements().size() - 1, m_context->pyobject_type());
+				mlir::Type rest{ m_context->pyobject_type() };
+				auto unpack_sequence = m_context.builder().create<mlir::py::UnpackExpandOp>(
+					loc(m_context.builder(), m_context.filename(), source_location),
+					unpacked_types,
+					rest,
+					src->value);
+				for (const auto &[el, unpacked_value] :
+					llvm::zip(tuple->elements(), unpack_sequence.getUnpackedValues())) {
+					assign(el, new_value(unpacked_value), source_location);
+				}
+				assign(as<ast::Name>(starred->value()),
+					new_value(unpack_sequence.getRest()),
+					source_location);
+			} else {
+				TODO();
+			}
+		} else {
+			std::vector<mlir::Value> unpacked_values;
+			std::vector<mlir::Type> unpacked_types(
+				tuple->elements().size(), m_context->pyobject_type());
+			auto unpack_sequence = m_context.builder().create<mlir::py::UnpackSequenceOp>(
+				loc(m_context.builder(), m_context.filename(), source_location),
+				unpacked_types,
+				src->value);
+			for (const auto &[el, unpacked_value] :
+				llvm::zip(tuple->elements(), unpack_sequence.getUnpackedValues())) {
+				assign(el, new_value(unpacked_value), source_location);
+			}
 		}
 	} else if (auto attr = as<ast::Attribute>(target)) {
 		auto obj = static_cast<const MLIRValue &>(*attr->value()->codegen(this)).value;

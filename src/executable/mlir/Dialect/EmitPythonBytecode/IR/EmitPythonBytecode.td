@@ -496,6 +496,15 @@ def UnpackSequenceOp: EmitPythonBytecode_Op<"UNPACK_SEQUENCE"> {
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
 }
 
+def UnpackExpandOp: EmitPythonBytecode_Op<"UNPACK_EXPAND"> {
+    let summary = "Unpack and expand rest";
+
+    let arguments = (ins Python_PyObjectType:$iterable);
+
+    let results = (outs Variadic<Python_PyObjectType>:$unpacked_values,
+                        Python_PyObjectType:$rest);
+}
+
 def GetAwaitableOp : EmitPythonBytecode_Op<"GET_AWAITABLE"> {
     let summary = "Get awaitable";
 

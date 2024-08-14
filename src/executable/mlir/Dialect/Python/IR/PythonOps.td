@@ -432,11 +432,20 @@ def LoadMethodOp: Python_Op<"load_method"> {
 }
 
 def UnpackSequenceOp: Python_Op<"unpack"> {
-    let summary = "Unpack ";
+    let summary = "Unpack sequence";
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
+}
+
+def UnpackExpandOp: Python_Op<"unpack_ex"> {
+    let summary = "Unpack iterable with expansion";
+
+    let arguments = (ins Python_PyObjectType:$iterable);
+
+    let results = (outs Variadic<Python_PyObjectType>:$unpacked_values,
+                        Python_PyObjectType:$rest);
 }
 
 def ForIterOp: Python_Op<"for_iter", [Terminator]> {

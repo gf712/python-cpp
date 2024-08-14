@@ -1,4 +1,4 @@
-#include "UnpackSequence.hpp"
+#include "UnpackExpand.hpp"
 
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
@@ -14,39 +14,49 @@
 
 using namespace py;
 
-PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
+PyResult<Value> UnpackExpand::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &source = vm.reg(m_source);
 
 	return [&]() -> PyResult<Value> {
 		if (auto *obj = std::get_if<PyObject *>(&source)) {
 			if (auto *pytuple = as<PyTuple>(*obj)) {
-				if (pytuple->elements().size() > m_destination.size()) {
-					return Err(value_error(
-						"too many values to unpack (expected {})", m_destination.size()));
-				} else if (pytuple->elements().size() < m_destination.size()) {
-					return Err(value_error("not enough values to unpack (expected {}, got {})",
-						m_destination.size(),
-						pytuple->elements().size()));
+				if (pytuple->elements().size() < m_destination.size()) {
+					return Err(
+						value_error("not enough values to unpack (expected at least {}, got 0)",
+							m_destination.size()));
 				} else {
-					size_t idx{ 0 };
-					for (const auto &el : pytuple->elements()) {
-						vm.reg(m_destination[idx++]) = el;
+					size_t i = 0;
+					for (; i < m_destination.size(); ++i) {
+						vm.reg(m_destination[i]) = pytuple->elements()[i];
 					}
-					return Ok(Value{ py_none() });
+					std::vector<Value> rest;
+					for (; i < pytuple->elements().size(); ++i) {
+						rest.push_back(pytuple->elements()[i]);
+					}
+					return PyList::create(std::move(rest)).and_then([this, &vm](auto *rest) {
+						vm.reg(m_rest) = rest;
+						return Ok(Value{ py_none() });
+					});
 				}
 			} else if (auto *pylist = as<PyList>(*obj)) {
-				if (pylist->elements().size() > m_destination.size()) {
-					return Err(value_error(
-						"too many values to unpack (expected {})", m_destination.size()));
-				} else if (pylist->elements().size() < m_destination.size()) {
+				if (pylist->elements().size() < m_destination.size()) {
 					return Err(value_error("not enough values to unpack (expected {}, got {})",
 						m_destination.size(),
 						pylist->elements().size()));
 				} else {
-					size_t idx{ 0 };
-					for (const auto &el : pylist->elements()) { vm.reg(m_destination[idx++]) = el; }
-					return Ok(Value{ py_none() });
+					size_t i = 0;
+					for (; i < m_destination.size(); ++i) {
+						vm.reg(m_destination[i]) = pylist->elements()[i];
+					}
+					std::vector<Value> rest;
+					for (; i < pylist->elements().size(); ++i) {
+						rest.push_back(pylist->elements()[i]);
+					}
+					return PyList::create(std::move(rest)).and_then([this, &vm](auto *rest) {
+						vm.reg(m_rest) = rest;
+						return Ok(Value{ py_none() });
+					});
 				}
 			} else {
 				const auto mapping = (*obj)->as_mapping();
@@ -57,9 +67,10 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 				}();
 				if (source_size.is_err()) { return Err(source_size.unwrap_err()); }
 				auto len = source_size.unwrap();
-				if (len != m_destination.size()) {
-					return Err(value_error(
-						"too many values to unpack (expected {})", m_destination.size()));
+				if (len < m_destination.size()) {
+					return Err(value_error("not enough values to unpack (expected {}, got {})",
+						m_destination.size(),
+						len));
 				}
 				TODO();
 			}
@@ -67,35 +78,41 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 			return Err(type_error("cannot unpack non-iterable int object"));
 		} else if (std::holds_alternative<String>(source)) {
 			const auto str = std::get<String>(source);
-			if (str.s.size() > m_destination.size()) {
-				return Err(
-					value_error("too many values to unpack (expected {})", m_destination.size()));
-			} else if (str.s.size() < m_destination.size()) {
+			if (str.s.size() < m_destination.size()) {
 				return Err(value_error("not enough values to unpack (expected {}, got {})",
 					m_destination.size(),
 					str.s.size()));
 			} else {
-				size_t idx{ 0 };
-				for (const auto &el : str.s) {
-					vm.reg(m_destination[idx++]) = String{ std::string{ el } };
+				size_t i = 0;
+				for (; i < m_destination.size(); ++i) {
+					vm.reg(m_destination[i]) = String{ std::string{ str.s[i] } };
 				}
-				return Ok(Value{ py_none() });
+				std::vector<Value> rest;
+				for (; i < str.s.size(); ++i) { rest.push_back(String{ std::string{ str.s[i] } }); }
+				return PyList::create(std::move(rest)).and_then([this, &vm](auto *rest) {
+					vm.reg(m_rest) = rest;
+					return Ok(Value{ py_none() });
+				});
 			}
 		} else if (std::holds_alternative<Bytes>(source)) {
 			const auto bytes = std::get<Bytes>(source);
-			if (bytes.b.size() > m_destination.size()) {
-				return Err(
-					value_error("too many values to unpack (expected {})", m_destination.size()));
-			} else if (bytes.b.size() < m_destination.size()) {
+			if (bytes.b.size() < m_destination.size()) {
 				return Err(value_error("not enough values to unpack (expected {}, got {})",
 					m_destination.size(),
 					bytes.b.size()));
 			} else {
-				size_t idx{ 0 };
-				for (const auto &el : bytes.b) {
-					vm.reg(m_destination[idx++]) = Number{ std::to_integer<int64_t>(el) };
+				size_t i = 0;
+				for (; i < m_destination.size(); ++i) {
+					vm.reg(m_destination[i]) = Number{ std::to_integer<int64_t>(bytes.b[i]) };
 				}
-				return Ok(Value{ py_none() });
+				std::vector<Value> rest;
+				for (; i < bytes.b.size(); ++i) {
+					rest.push_back(Number{ std::to_integer<int64_t>(bytes.b[i]) });
+				}
+				return PyList::create(std::move(rest)).and_then([this, &vm](auto *rest) {
+					vm.reg(m_rest) = rest;
+					return Ok(Value{ py_none() });
+				});
 			}
 		} else if (std::holds_alternative<Ellipsis>(source)) {
 			return Err(type_error("cannot unpack non-iterable ellipsis object"));
@@ -110,12 +127,13 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 	}();
 }
 
-std::vector<uint8_t> UnpackSequence::serialize() const
+std::vector<uint8_t> UnpackExpand::serialize() const
 {
 	std::vector<uint8_t> bytes{
 		UNPACK_SEQUENCE,
 	};
 	::serialize(m_destination, bytes);
+	::serialize(m_rest, bytes);
 	::serialize(m_source, bytes);
 
 	return bytes;
