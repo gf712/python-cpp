@@ -412,6 +412,8 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module->add_symbol(PyString::create("byteorder").unwrap(),
 		PyString::create(std::string{ get_endianness() }).unwrap());
 
+	s_sys_module->add_symbol(PyString::create("warnoptions").unwrap(), PyList::create().unwrap());
+
 	return s_sys_module;
 }
 
