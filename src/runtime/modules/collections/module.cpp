@@ -1,5 +1,6 @@
 #include "../Modules.hpp"
 #include "DefaultDict.hpp"
+#include "Deque.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyType.hpp"
 
@@ -18,6 +19,8 @@ PyModule *collections_module()
 	auto *module = PyModule::create(symbols, name, doc).unwrap();
 	module->add_symbol(
 		PyString::create("defaultdict").unwrap(), collections::DefaultDict::register_type(module));
+	module->add_symbol(
+		PyString::create("deque").unwrap(), collections::Deque::register_type(module));
 
 	return module;
 }
