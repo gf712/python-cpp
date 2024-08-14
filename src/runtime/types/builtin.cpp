@@ -64,7 +64,10 @@
 #include "runtime/SyntaxError.hpp"
 #include "runtime/UnboundLocalError.hpp"
 #include "runtime/ValueError.hpp"
+#include "runtime/warnings/DeprecationWarning.hpp"
 #include "runtime/warnings/ImportWarning.hpp"
+#include "runtime/warnings/PendingDeprecationWarning.hpp"
+#include "runtime/warnings/ResourceWarning.hpp"
 #include "runtime/warnings/Warning.hpp"
 
 namespace py::types {
@@ -119,8 +122,12 @@ BuiltinTypes::BuiltinTypes()
 	  m_module_not_found_error(ModuleNotFoundError::type_factory()),
 	  m_os_error(OSError::type_factory()), m_lookup_error(LookupError::type_factory()),
 	  m_index_error(IndexError::type_factory()), m_warning(Warning::type_factory()),
-	  m_import_warning(ImportWarning::type_factory()), m_syntax_error(SyntaxError::type_factory()),
-	  m_memory_error(MemoryError::type_factory()), m_stop_iteration(StopIteration::type_factory()),
+	  m_deprecation_warning(DeprecationWarning::type_factory()),
+	  m_import_warning(ImportWarning::type_factory()),
+	  m_pending_deprecation_warning(PendingDeprecationWarning::type_factory()),
+	  m_resource_warning(ResourceWarning::type_factory()),
+	  m_syntax_error(SyntaxError::type_factory()), m_memory_error(MemoryError::type_factory()),
+	  m_stop_iteration(StopIteration::type_factory()),
 	  m_unbound_local_error(UnboundLocalError::type_factory())
 {}
 
@@ -235,6 +242,9 @@ INITIALIZE_TYPE(os_error)
 INITIALIZE_TYPE(lookup_error)
 INITIALIZE_TYPE(index_error)
 INITIALIZE_TYPE(warning)
+INITIALIZE_TYPE(deprecation_warning)
+INITIALIZE_TYPE(pending_deprecation_warning)
+INITIALIZE_TYPE(resource_warning)
 INITIALIZE_TYPE(import_warning)
 INITIALIZE_TYPE(syntax_error)
 INITIALIZE_TYPE(memory_error)

@@ -131,7 +131,10 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/SysModule.cpp
     runtime/modules/WarningsModule.cpp
     runtime/types/builtin.cpp
+    runtime/warnings/DeprecationWarning.cpp
     runtime/warnings/ImportWarning.cpp
+    runtime/warnings/PendingDeprecationWarning.cpp
+    runtime/warnings/ResourceWarning.cpp
     runtime/warnings/Warning.cpp
     runtime/AssertionError.cpp
     runtime/AttributeError.cpp

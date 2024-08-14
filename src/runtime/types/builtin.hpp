@@ -113,7 +113,10 @@ namespace types {
 		mutable Type m_lookup_error;
 		mutable Type m_index_error;
 		mutable Type m_warning;
+		mutable Type m_deprecation_warning;
 		mutable Type m_import_warning;
+		mutable Type m_pending_deprecation_warning;
+		mutable Type m_resource_warning;
 		mutable Type m_syntax_error;
 		mutable Type m_memory_error;
 		mutable Type m_stop_iteration;
@@ -237,7 +240,13 @@ namespace types {
 		TypePrototype &lookup_error() const { return get_type(m_lookup_error); }
 		TypePrototype &index_error() const { return get_type(m_index_error); }
 		TypePrototype &warning() const { return get_type(m_warning); }
+		TypePrototype &deprecation_warning() const { return get_type(m_deprecation_warning); }
 		TypePrototype &import_warning() const { return get_type(m_import_warning); }
+		TypePrototype &pending_deprecation_warning() const
+		{
+			return get_type(m_pending_deprecation_warning);
+		}
+		TypePrototype &resource_warning() const { return get_type(m_resource_warning); }
 		TypePrototype &syntax_error() const { return get_type(m_syntax_error); }
 		TypePrototype &memory_error() const { return get_type(m_memory_error); }
 		TypePrototype &stop_iteration() const { return get_type(m_stop_iteration); }
@@ -325,7 +334,10 @@ namespace types {
 	PyType *lookup_error();
 	PyType *index_error();
 	PyType *warning();
+	PyType *deprecation_warning();
 	PyType *import_warning();
+	PyType *pending_deprecation_warning();
+	PyType *resource_warning();
 	PyType *syntax_error();
 	PyType *memory_error();
 	PyType *stop_iteration();
