@@ -34,7 +34,7 @@ class PyType : public PyBaseObject
 	static PyType *initialize(TypePrototype &type_prototype);
 	static PyType *initialize(std::unique_ptr<TypePrototype> &&type_prototype);
 
-	const std::string &name() const { return underlying_type().__name__; }
+	std::string name() const;
 
 	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> __repr__() const;

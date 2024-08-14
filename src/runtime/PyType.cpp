@@ -27,6 +27,8 @@
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
 
+#include <algorithm>
+#include <string_view>
 #include <unordered_set>
 
 namespace py {
@@ -213,6 +215,16 @@ PyResult<PyType *> PyType::create(PyType *type)
 	new_type->m_metaclass = type;
 	if (!new_type) { return Err(memory_error(sizeof(PyType))); }
 	return Ok(new_type);
+}
+
+std::string PyType::name() const
+{
+	auto index = underlying_type().__name__.find_last_of('.');
+	if (index == std::string::npos) {
+		return underlying_type().__name__;
+	} else {
+		return underlying_type().__name__.substr(index + 1);
+	}
 }
 
 PyType *PyType::static_type() const
