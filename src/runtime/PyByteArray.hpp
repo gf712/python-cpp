@@ -24,6 +24,7 @@ class PyByteArray : public PyBaseObject
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 
+	PyResult<PyObject *> __add__(const PyObject *obj) const;
 	PyResult<PyObject *> __iter__() const;
 	PyResult<PyObject *> __repr__() const;
 	PyResult<size_t> __len__() const;

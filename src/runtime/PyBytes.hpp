@@ -34,7 +34,7 @@ class PyBytes : public PyBaseObject
 
 	const Bytes &value() const { return m_value; }
 
-	PyResult<PyObject *> decode(const std::string& encoding, const std::string& errors) const;
+	PyResult<PyObject *> decode(const std::string &encoding, const std::string &errors) const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;

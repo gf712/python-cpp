@@ -57,12 +57,16 @@ std::string PyBytes::to_string() const { return m_value.to_string(); }
 
 PyResult<PyObject *> PyBytes::__add__(const PyObject *other) const
 {
-	if (!as<PyBytes>(other)) {
+	auto new_bytes = m_value;
+	if (auto bytes = as<PyBytes>(other)) {
+		new_bytes.b.insert(new_bytes.b.end(), bytes->value().b.begin(), bytes->value().b.end());
+	} else if (auto bytearray = as<PyByteArray>(other)) {
+		new_bytes.b.insert(
+			new_bytes.b.end(), bytearray->value().b.begin(), bytearray->value().b.end());
+	} else {
 		return Err(type_error("can't concat {} to bytes", other->type()->name()));
 	}
-	auto bytes = as<PyBytes>(other);
-	auto new_bytes = m_value;
-	new_bytes.b.insert(new_bytes.b.end(), bytes->value().b.begin(), bytes->value().b.end());
+
 	return PyBytes::create(new_bytes);
 }
 

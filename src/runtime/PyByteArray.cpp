@@ -22,6 +22,18 @@
 #include <numeric>
 
 namespace py {
+template<> PyByteArray *as(PyObject *obj)
+{
+	if (obj->type() == types::bytearray()) { return static_cast<PyByteArray *>(obj); }
+	return nullptr;
+}
+
+template<> const PyByteArray *as(const PyObject *obj)
+{
+	if (obj->type() == types::bytearray()) { return static_cast<const PyByteArray *>(obj); }
+	return nullptr;
+}
+
 PyByteArray::PyByteArray(PyType *type) : PyBaseObject(type) {}
 
 PyByteArray::PyByteArray(const Bytes &value)
@@ -182,6 +194,21 @@ PyResult<PyObject *> PyByteArray::__getitem__(PyObject *index)
 		return Err(type_error(
 			"bytearray indices must be integers or slices, not {}", index->type()->name()));
 	}
+}
+
+PyResult<PyObject *> PyByteArray::__add__(const PyObject *other) const
+{
+	auto new_bytes = m_value;
+	if (auto bytes = as<PyBytes>(other)) {
+		new_bytes.b.insert(new_bytes.b.end(), bytes->value().b.begin(), bytes->value().b.end());
+	} else if (auto bytearray = as<PyByteArray>(other)) {
+		new_bytes.b.insert(
+			new_bytes.b.end(), bytearray->value().b.begin(), bytearray->value().b.end());
+	} else {
+		return Err(type_error("can't concat {} to bytes", other->type()->name()));
+	}
+
+	return PyByteArray::create(new_bytes);
 }
 
 PyResult<PyObject *> PyByteArray::find(PyTuple *args, PyDict *kwargs) const
