@@ -28,6 +28,8 @@ class PyBytes : public PyBaseObject
 	PyResult<PyObject *> __eq__(const PyObject *obj) const;
 	PyResult<PyObject *> __iter__() const;
 
+	PyResult<PyObject *> __getitem__(int64_t index);
+
 	PyResult<PyObject *> __repr__() const;
 
 	const Bytes &value() const { return m_value; }

@@ -2,6 +2,8 @@
 #include "MemoryError.hpp"
 #include "PyBool.hpp"
 #include "StopIteration.hpp"
+#include "runtime/IndexError.hpp"
+#include "runtime/PyByteArray.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyObject.hpp"
@@ -112,6 +114,17 @@ PyResult<PyObject *> PyBytes::__repr__() const { return PyString::create(to_stri
 PyResult<PyObject *> PyBytes::decode(const std::string &encoding, const std::string &errors) const
 {
 	return PyString::from_encoded_object(this, encoding, errors);
+}
+
+PyResult<PyObject *> PyBytes::__getitem__(int64_t index)
+{
+	if (index < 0) { index += m_value.b.size(); }
+
+	if (index < 0 || static_cast<size_t>(index) > m_value.b.size()) {
+		return Err(index_error("index out of range"));
+	}
+
+	return PyInteger::create(static_cast<int64_t>(m_value.b[index]));
 }
 
 PyType *PyBytes::static_type() const { return types::bytes(); }
