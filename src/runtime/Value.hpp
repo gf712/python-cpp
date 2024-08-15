@@ -43,6 +43,7 @@ struct Number
 	Number exp(const Number &rhs) const;
 
 	Number operator+(const Number &rhs) const;
+	Number& operator+=(const Number &rhs);
 
 	Number operator-(const Number &rhs) const;
 

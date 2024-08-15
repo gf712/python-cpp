@@ -1,5 +1,6 @@
 #include "../Modules.hpp"
 #include "Chain.hpp"
+#include "Count.hpp"
 #include "ISlice.hpp"
 #include "Permutations.hpp"
 #include "Product.hpp"
@@ -32,6 +33,7 @@ PyModule *itertools_module()
 		PyString::create("permutations").unwrap(), itertools::Permutations::register_type(module));
 	module->add_symbol(
 		PyString::create("product").unwrap(), itertools::Product::register_type(module));
+	module->add_symbol(PyString::create("count").unwrap(), itertools::Count::register_type(module));
 
 	return module;
 }

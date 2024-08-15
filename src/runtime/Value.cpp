@@ -52,22 +52,28 @@ Number Number::exp(const Number &rhs) const
 
 Number Number::operator+(const Number &rhs) const
 {
-	return std::visit(overloaded{
-						  [](const mpz_class &lhs_value, const mpz_class &rhs_value) -> Number {
-							  return Number{ lhs_value + rhs_value };
-						  },
-						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ lhs_value.get_d() + rhs_value };
-						  },
-						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
-							  return Number{ lhs_value + rhs_value.get_d() };
-						  },
-						  [](const double &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ lhs_value + rhs_value };
-						  },
-					  },
+	auto result = *this;
+	return result += rhs;
+}
+
+Number &Number::operator+=(const Number &rhs)
+{
+	std::visit(
+		overloaded{
+			[](mpz_class &lhs_value, const mpz_class &rhs_value) -> void {
+				lhs_value += rhs_value;
+			},
+			[this](mpz_class lhs_value, const double &rhs_value) -> void {
+				this->value = lhs_value.get_d() + rhs_value;
+			},
+			[](double &lhs_value, const mpz_class &rhs_value) -> void {
+				lhs_value += rhs_value.get_d();
+			},
+			[](double &lhs_value, const double &rhs_value) -> void { lhs_value += rhs_value; },
+		},
 		value,
 		rhs.value);
+	return *this;
 }
 
 Number Number::operator-(const Number &rhs) const
