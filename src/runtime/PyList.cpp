@@ -25,6 +25,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <numeric>
 #include <ranges>
 #include <unordered_set>
 #include <variant>
@@ -514,25 +515,95 @@ PyResult<PyObject *> PyList::__reversed__() const
 	return PyListReverseIterator::create(*const_cast<PyList *>(this));
 }
 
-PyResult<PyObject *> PyList::sort()
+PyResult<PyObject *> PyList::sort(PyTuple *args, PyDict *kwargs)
 {
-	PyResult<PyObject *> result = Ok(py_none());
-	std::sort(m_elements.begin(),
-		m_elements.end(),
-		[&result](const Value &lhs, const Value &rhs) -> bool {
+	PyObject *key = nullptr;
+	bool reverse = false;
+	if (args && !args->elements().empty()) {
+		return Err(type_error("sort() takes no positional arguments"));
+	}
+	if (kwargs) {
+		if (auto it = kwargs->map().find(String{ "key" }); it != kwargs->map().end()) {
+			key = PyObject::from(it->second).unwrap();
+		}
+		if (auto it = kwargs->map().find(String{ "reverse" }); it != kwargs->map().end()) {
+			auto reverse_ = truthy(it->second, VirtualMachine::the().interpreter());
+			if (reverse_.is_err()) { return Err(reverse_.unwrap_err()); }
+			reverse = reverse_.unwrap();
+		}
+	}
+
+	PyResult<PyObject *> err = Ok(py_none());
+	if (key && key != py_none()) {
+		auto cmp_list_ = PyList::create();
+		if (cmp_list_.is_err()) { return cmp_list_; }
+		auto *cmp_list = cmp_list_.unwrap();
+
+		for (const auto &el : m_elements) {
+			auto cmp_value = key->call(PyTuple::create({ el }).unwrap(), nullptr);
+			if (cmp_value.is_err()) { return cmp_value; }
+			cmp_list->elements().push_back(cmp_value.unwrap());
+		}
+		std::vector<size_t> indices(cmp_list->elements().size());
+		std::iota(indices.begin(), indices.end(), 0);
+		// FIXME: should throw exception when comparing, as returning true is
+		// probably messing up the C++ Compare requirment
+		auto cmp = [&err, cmp_list](size_t lhs_index, size_t rhs_index) -> bool {
+			const auto &lhs = cmp_list->elements()[lhs_index];
+			const auto &rhs = cmp_list->elements()[rhs_index];
 			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
 				auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
 				if (is_true.is_err()) {
-					result = Err(is_true.unwrap_err());
+					err = Err(is_true.unwrap_err());
 					return true;
 				}
 				return is_true.unwrap();
 			} else {
 				return false;
 			}
-		});
+		};
+		if (reverse) {
+			std::stable_sort(indices.rbegin(), indices.rend(), cmp);
+		} else {
+			std::stable_sort(indices.begin(), indices.end(), cmp);
+		}
 
-	return result;
+		if (err.is_err()) { return err; }
+
+		for (size_t i = 0; i < indices.size() - 1; ++i) {
+			if (indices[i] == i) { continue; }
+			size_t o = i + 1;
+			for (; o < indices.size(); ++o) {
+				if (indices[o] == i) { break; }
+			}
+			std::iter_swap(m_elements.begin() + i, m_elements.begin() + indices[i]);
+			std::iter_swap(indices.begin() + i, indices.begin() + o);
+		}
+	} else {
+		// FIXME: should throw exception when comparing, as returning true is
+		// probably messing up the C++ Compare requirment
+		auto cmp = [&err](const Value &lhs, const Value &rhs) -> bool {
+			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
+				auto is_true = truthy(cmp.unwrap(), VirtualMachine::the().interpreter());
+				if (is_true.is_err()) {
+					err = Err(is_true.unwrap_err());
+					return true;
+				}
+				return is_true.unwrap();
+			} else {
+				return false;
+			}
+		};
+		if (reverse) {
+			std::stable_sort(m_elements.rbegin(), m_elements.rend(), cmp);
+		} else {
+			std::stable_sort(m_elements.begin(), m_elements.end(), cmp);
+		}
+
+		if (err.is_err()) { return err; }
+	}
+
+	return err;
 }
 
 void PyList::visit_graph(Visitor &visitor)
