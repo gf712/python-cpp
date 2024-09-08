@@ -19,11 +19,13 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
+
 #include <algorithm>
 
 namespace mlir {
@@ -1122,19 +1124,22 @@ namespace py {
 						!= cell_names.end()) {
 
 						mlir::Operation *return_op_;
-						op.getBody().walk([&return_op_](mlir::Operation *child_op) {
-							if (mlir::isa<mlir::func::FuncOp>(child_op)) {
-								return WalkResult::skip();
-							}
-							if (mlir::isa<mlir::func::ReturnOp>(child_op)) {
-								return_op_ = child_op;
-								return WalkResult::interrupt();
-							}
-							return WalkResult::advance();
-						});
+						op.getBody().walk<WalkOrder::PreOrder>(
+							[&return_op_](mlir::Operation *child_op) {
+								if (mlir::isa<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
+										child_op)) {
+									return WalkResult::skip();
+								}
+								if (mlir::isa<mlir::func::ReturnOp>(child_op)) {
+									return_op_ = child_op;
+									return WalkResult::interrupt();
+								}
+								return WalkResult::advance();
+							});
 						ASSERT(return_op_);
 						auto return_op = mlir::cast<mlir::func::ReturnOp>(return_op_);
 						ASSERT(return_op.getOperands().size() == 1);
+						ASSERT(return_op->getParentOp() == op.getOperation());
 						ASSERT(return_op.getOperand(0).getDefiningOp());
 						rewriter.setInsertionPoint(return_op.getOperand(0).getDefiningOp());
 						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadClosureOp>(
