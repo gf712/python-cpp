@@ -1277,6 +1277,28 @@ PyResult<PyObject *> sorted(PyTuple *args, PyDict *kwargs, Interpreter &interpre
 	return Ok(result);
 }
 
+PyResult<PyObject *> vars(PyTuple *args, PyDict *kwargs, Interpreter &interpreter)
+{
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"vars",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr);
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+	auto [obj] = result.unwrap();
+
+	if (!obj) { return Ok(interpreter.execution_frame()->locals()); }
+
+	auto dict = obj->lookup_attribute(PyString::create("__dict__").unwrap());
+	if (std::get<1>(dict) == LookupAttrResult::NOT_FOUND) {
+		return Err(type_error("vars() argument must have __dict__ attribute"));
+	}
+
+	return std::get<0>(dict);
+}
+
 auto builtin_types()
 {
 	return std::array{
@@ -1532,6 +1554,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("sorted").unwrap(),
 		heap.allocate<PyNativeFunction>("sorted", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return sorted(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("vars").unwrap(),
+		heap.allocate<PyNativeFunction>("vars", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return vars(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;
