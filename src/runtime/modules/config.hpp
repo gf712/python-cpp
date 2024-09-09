@@ -16,6 +16,7 @@ static constexpr std::array builtin_modules{
 	std::tuple<std::string_view, PyModule *(*)()>{ "_warnings", warnings_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "itertools", itertools_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_collections", collections_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "time", time_module },
 };
 
 inline bool is_builtin(std::string_view name)

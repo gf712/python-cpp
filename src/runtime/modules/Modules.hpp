@@ -13,4 +13,5 @@ PyModule *weakref_module();
 PyModule *warnings_module();
 PyModule *itertools_module();
 PyModule *sys_module(Interpreter &interpreter);
+PyModule *time_module();
 }// namespace py
