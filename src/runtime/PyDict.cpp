@@ -263,7 +263,6 @@ PyResult<std::monostate> PyDict::merge(PyObject *other, bool override)
 	auto *iter = iter_.unwrap();
 
 	auto key_ = iter->next();
-	if (key_.is_err()) { return Err(key_.unwrap_err()); }
 
 	while (key_.is_ok()) {
 		if (!override) {
