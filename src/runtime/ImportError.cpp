@@ -67,7 +67,9 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_import_error()
 	{
-		return std::move(klass<ImportError>("ImportError", Exception::class_type()).type);
+		return std::move(klass<ImportError>("ImportError", Exception::class_type())
+		.attr("name", &ImportError::m_name)
+		.type);
 	}
 }// namespace
 

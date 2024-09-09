@@ -13,6 +13,7 @@ class ImportError : public Exception
 	template<typename... Args>
 	friend BaseException *import_error(const std::string &message, Args &&...args);
 
+  public:
 	PyObject *m_name{ nullptr };
 
   protected:
