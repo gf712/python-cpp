@@ -16,6 +16,11 @@
 #include <locale>
 #include <ranges>
 
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
+#include <unicode/urename.h>
+#include <unicode/utypes.h>
+
 using namespace py;
 
 std::string Number::to_string() const
@@ -348,6 +353,7 @@ String String::from_unescaped_string(const std::string &str)
 			output.push_back(static_cast<unsigned char>(c));
 		} break;
 		case 'x': {
+			// two digit hex sequence representing unicode code point
 			auto start = it;
 			if (start == end || std::next(start) == end) { TODO(); }
 			it++;
@@ -365,13 +371,55 @@ String String::from_unescaped_string(const std::string &str)
 			}
 		} break;
 		case 'u': {
-			TODO();
+			// four digit hex sequence representing unicode code point
+			std::string_view sequence{ it, it + 4 };
+			char *p_end = nullptr;
+			const auto cp = std::strtol(sequence.data(), &p_end, 16);
+			if (sequence.data() == p_end) {
+				// could not parse hex
+				TODO();
+			}
+			std::string tmp_result;
+			icu::UnicodeString{ UChar32(cp) }.toUTF8String(output);
+			it += 4;
 		} break;
 		case 'U': {
-			TODO();
+			// eight digit hex sequence representing unicode code point
+			std::string_view sequence{ it, it + 8 };
+			char *p_end = nullptr;
+			const auto cp = std::strtol(sequence.data(), &p_end, 16);
+			if (sequence.data() == p_end) {
+				// could not parse hex
+				TODO();
+			}
+			std::string tmp_result;
+			icu::UnicodeString{ UChar32(cp) }.toUTF8String(output);
+			it += 8;
 		} break;
 		case 'N': {
-			TODO();
+			// lookup unicode name from Unicode Character Database (UCD)
+			// \N{name}
+			if (*it != '{') {
+				// malformed
+				TODO();
+			}
+			it++;
+			auto name_end = std::find(it, end, '}');
+			if (name_end == end) {
+				// malformed
+				TODO();
+			}
+			// use std::string to get null terminated string, string_view would not work here (at
+			// least most of the time)
+			std::string name{ it, end - 1 };
+			UErrorCode error_code;
+			const auto cp = u_charFromName(U_CHAR_NAME_ALIAS, name.data(), &error_code);
+			if (U_FAILURE(error_code)) {
+				std::cerr << u_errorName(error_code) << std::endl;
+				TODO();
+			}
+			std::string tmp_result;
+			icu::UnicodeString{ cp }.toUTF8String(output);
 		} break;
 		default: {
 			output.push_back('\\');
@@ -937,6 +985,35 @@ PyResult<Value> or_(const Value &lhs, const Value &rhs, Interpreter &)
 				const auto py_rhs = PyObject::from(rhs_value);
 				if (py_rhs.is_err()) return py_rhs;
 				return py_lhs.unwrap()->or_(py_rhs.unwrap());
+			} },
+		lhs,
+		rhs);
+}
+
+PyResult<Value> xor_(const Value &lhs, const Value &rhs, Interpreter &)
+{
+	return std::visit(
+		overloaded{
+			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
+				if (std::holds_alternative<BigIntType>(lhs_value.value)
+					&& std::holds_alternative<BigIntType>(rhs_value.value)) {
+					return Ok(Number{ std::get<BigIntType>(lhs_value.value)
+									  ^ std::get<BigIntType>(rhs_value.value) });
+				} else {
+					const std::string lhs_type =
+						std::holds_alternative<BigIntType>(lhs_value.value) ? "int" : "float";
+					const std::string rhs_type =
+						std::holds_alternative<BigIntType>(rhs_value.value) ? "int" : "float";
+					return Err(type_error(
+						"unsupported operand type(s) for ^: '{}' and '{}'", lhs_type, rhs_type));
+				}
+			},
+			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+				const auto py_lhs = PyObject::from(lhs_value);
+				if (py_lhs.is_err()) return py_lhs;
+				const auto py_rhs = PyObject::from(rhs_value);
+				if (py_rhs.is_err()) return py_rhs;
+				return py_lhs.unwrap()->xor_(py_rhs.unwrap());
 			} },
 		lhs,
 		rhs);
