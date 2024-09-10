@@ -1157,7 +1157,13 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 {
 	auto *current_block = m_context.builder().getInsertionBlock();
-	ASSERT(node->decorator_list().empty());
+	std::vector<mlir::Value> decorator_functions;
+	decorator_functions.reserve(node->decorator_list().size());
+	for (const auto &decorator_function : node->decorator_list()) {
+		auto *f = decorator_function->codegen(this);
+		ASSERT(f);
+		decorator_functions.push_back(static_cast<MLIRValue *>(f)->value);
+	}
 
 	auto class_mangled_name = Mangler::default_mangler().class_mangle(
 		mangle_namespace(m_scope), node->name(), node->source_location());
@@ -1270,6 +1276,23 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 		captures_ref));
 
 	store_name(node->name(), new_value(output), node->source_location());
+
+	if (!decorator_functions.empty()) {
+		mlir::Value arg = load_name(node->name(), node->source_location())->value;
+		for (const auto &decorator_function : decorator_functions | std::ranges::views::reverse) {
+			arg = m_context.builder().create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),
+				m_context->pyobject_type(),
+				decorator_function,
+				mlir::ValueRange{ arg },
+				mlir::DenseStringElementsAttr::get(
+					mlir::VectorType::get({ 0 }, mlir::StringAttr::get(&m_context.ctx()).getType()),
+					{}),
+				mlir::ValueRange{},
+				false,
+				false);
+		}
+		store_name(node->name(), new_value(arg), node->source_location());
+	}
 
 	return nullptr;
 }
