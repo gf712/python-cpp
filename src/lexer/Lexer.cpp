@@ -833,14 +833,16 @@ bool Lexer::try_fstring()
 				return false;
 			}
 		} else {
+			if (peek(0) == '\\') {
+				// string escape
+				advance(1);
+			}
 			advance(1);
 		}
 		return false;
 	};
 
-	while (!reached_end()) {
-		ASSERT(!peek("\n"));
-	}
+	while (!reached_end()) { ASSERT(!peek("\n")); }
 
 	return true;
 }

@@ -1743,8 +1743,8 @@ struct FStringMiddlePattern : PatternV2<FStringMiddlePattern>
 					str.push_back(middle_str[i]);
 				}
 			}
-			return std::make_shared<Constant>(
-				std::move(str), SourceLocation{ middle.token.start(), middle.token.end() });
+			return std::make_shared<Constant>(String::from_unescaped_string(std::move(str)),
+				SourceLocation{ middle.token.start(), middle.token.end() });
 		}
 
 		return {};
