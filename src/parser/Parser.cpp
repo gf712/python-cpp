@@ -2452,16 +2452,17 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 	if (value[1] == 'o' || value[1] == 'O') {
 		// octal
 		std::string oct_str{ value.begin() + 2, value.end() };
-		int64_t int_value = std::stoll(oct_str, nullptr, 8);
+		BigIntType int_value{ oct_str, 8 };
 		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value[1] == 'x' || value[1] == 'X') {
 		// hex
-		int64_t int_value = std::stoll(value, nullptr, 16);
+		std::string hex_str{ value.begin() + 2, value.end() };
+		BigIntType int_value{ hex_str, 16 };
 		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value[1] == 'b' || value[1] == 'B') {
 		// binary
 		std::string bin_str{ value.begin() + 2, value.end() };
-		int64_t int_value = std::stoll(bin_str, nullptr, 2);
+		BigIntType int_value{ bin_str, 2 };
 		return std::make_shared<Constant>(int_value, source_location);
 	} else if (value.find_first_of("jJ") != std::string::npos) {
 		// imaginary number
