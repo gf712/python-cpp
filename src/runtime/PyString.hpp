@@ -8,7 +8,9 @@
 
 namespace py {
 
-class PyString : public PyBaseObject
+class PyString
+	: public PyBaseObject
+	, public PySequence
 {
 	friend class ::Heap;
 	std::string m_value;
@@ -83,6 +85,7 @@ class PyString : public PyBaseObject
 
 	PyResult<size_t> __len__() const;
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
+	PyResult<PyObject *> __mul__(size_t count) const;
 	PyResult<PyObject *> __mod__(const PyObject *obj) const;
 
 	PyResult<PyObject *> isalpha() const;

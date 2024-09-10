@@ -252,6 +252,17 @@ PyResult<PyObject *> PyString::__add__(const PyObject *obj) const
 	}
 }
 
+PyResult<PyObject *> PyString::__mul__(size_t count) const
+{
+	std::string result;
+	result.reserve(m_value.size() * count);
+	for (size_t i = 0; i < count; ++i) {
+		result.insert(result.end(), m_value.begin(), m_value.end());
+	}
+
+	return PyString::create(std::move(result));
+}
+
 PyResult<PyObject *> PyString::__mod__(const PyObject *obj) const { return printf(obj); }
 
 PyResult<PyObject *> PyString::__eq__(const PyObject *obj) const
