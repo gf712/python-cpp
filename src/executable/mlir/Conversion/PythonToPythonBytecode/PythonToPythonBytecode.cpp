@@ -699,14 +699,17 @@ namespace py {
 						auto keys = op.getKeys();
 						auto values = op.getValues();
 						rewriter.setInsertionPointAfterValue(keys.front());
-						auto result = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
-							op, op.getOutput().getType(), mlir::ValueRange{}, mlir::ValueRange{});
+						auto result = rewriter.create<mlir::emitpybytecode::BuildDict>(op->getLoc(),
+							op.getOutput().getType(),
+							mlir::ValueRange{},
+							mlir::ValueRange{});
 
 						for (auto [key, value] : llvm::zip(keys, values)) {
 							rewriter.setInsertionPointAfterValue(value);
 							rewriter.create<mlir::emitpybytecode::DictAdd>(
 								op.getLoc(), result, key, value);
 						}
+						rewriter.replaceOp(op, result);
 					} else {
 						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
 							op, op.getOutput().getType(), op.getKeys(), op.getValues());
@@ -726,7 +729,9 @@ namespace py {
 			{
 				const auto &requires_expansion = op.getRequiresExpansion();
 				auto known_at_compiletime = [](mlir::Value element) -> bool {
-					return element.getDefiningOp<mlir::py::ConstantOp>();
+					ASSERT(element.getDefiningOp());
+					return mlir::isa<mlir::py::ConstantOp>(element.getDefiningOp())
+						   || mlir::isa<mlir::emitpybytecode::ConstantOp>(element.getDefiningOp());
 				};
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),
@@ -749,8 +754,13 @@ namespace py {
 					std::vector<mlir::Attribute> elements;
 					elements.reserve(op.getElements().size());
 					for (const auto &el : op.getElements()) {
-						ASSERT(el.getDefiningOp<mlir::py::ConstantOp>());
-						elements.push_back(el.getDefiningOp<mlir::py::ConstantOp>().getValue());
+						if (el.getDefiningOp<mlir::py::ConstantOp>()) {
+							elements.push_back(el.getDefiningOp<mlir::py::ConstantOp>().getValue());
+						} else {
+							ASSERT(el.getDefiningOp<mlir::emitpybytecode::ConstantOp>());
+							elements.push_back(
+								el.getDefiningOp<mlir::emitpybytecode::ConstantOp>().getValue());
+						}
 					}
 					auto loc = op.getLoc();
 					auto output_type = op.getOutput().getType();
@@ -846,8 +856,8 @@ namespace py {
 					for (auto [el, expand] : llvm::zip(op.getElements(), requires_expansion)) {
 						if (expand) {
 							if (!set.has_value()) {
-								set = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildSet>(
-									op, op.getOutput().getType(), elements);
+								set = rewriter.create<mlir::emitpybytecode::BuildSet>(
+									op->getLoc(), op.getOutput().getType(), elements);
 							} else {
 								for (auto el : elements) {
 									rewriter.create<mlir::emitpybytecode::SetAdd>(
@@ -864,6 +874,7 @@ namespace py {
 					for (auto el : elements) {
 						rewriter.create<mlir::emitpybytecode::SetAdd>(op.getLoc(), *set, el);
 					}
+					rewriter.replaceOp(op, *set);
 				} else {
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildSet>(
 						op, op.getOutput().getType(), op.getElements());
@@ -2085,12 +2096,14 @@ namespace py {
 		patterns.add<YieldOpLowering, YieldFromOpLowering>(&getContext());
 		patterns.add<GetAwaitableOpLowering>(&getContext());
 
-		if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
-			signalPassFailure();
-		}
-
-		mlir::IRRewriter rewriter{ &getContext() };
-		(void)eraseUnreachableBlocks(rewriter, getOperation()->getRegions());
+		GreedyRewriteConfig config;
+		config.strictMode = GreedyRewriteStrictness::AnyOp;
+		config.enableRegionSimplification = false;
+		config.useTopDownTraversal = true;
+		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
+		// Currently ignoring the return value as it seems to always fail, even though the
+		// transformation seems to generate the expected output
+		(void)applyPatternsAndFoldGreedily(getOperation(), frozen_patterns, config);
 	}
 
 	std::unique_ptr<Pass> createPythonToPythonBytecodePass()
