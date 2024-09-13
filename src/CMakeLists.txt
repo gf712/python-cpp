@@ -115,6 +115,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/collections/module.cpp
     runtime/modules/collections/Deque.cpp
     runtime/modules/collections/DefaultDict.cpp
+    runtime/modules/errno/module.cpp
     runtime/modules/itertools/module.cpp
     runtime/modules/itertools/Chain.cpp
     runtime/modules/itertools/ISlice.cpp

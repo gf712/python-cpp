@@ -4,6 +4,7 @@ namespace py {
 
 PyModule *builtins_module(Interpreter &interpreter);
 PyModule *collections_module();
+PyModule *errno_module();
 PyModule *imp_module();
 PyModule *io_module();
 PyModule *marshal_module();
