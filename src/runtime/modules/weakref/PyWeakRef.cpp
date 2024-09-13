@@ -89,9 +89,9 @@ bool PyWeakRef::is_alive() const
 {
 	if (m_object
 		&& !VirtualMachine::the().heap().has_weakref_object(bit_cast<uint8_t *>(m_object))) {
-		m_object = nullptr;
+		m_object = py_none();
 	}
-	return m_object != nullptr;
+	return m_object != py_none();
 }
 
 }// namespace py

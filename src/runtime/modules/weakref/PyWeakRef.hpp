@@ -28,6 +28,9 @@ class PyWeakRef : public PyBaseObject
 
 	static PyType *register_type(PyModule *module, std::string_view name);
 
+  public:
+	PyObject *get_object() const { return m_object; }
+
   private:
 	bool is_alive() const;
 };

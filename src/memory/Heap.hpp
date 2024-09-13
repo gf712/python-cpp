@@ -2,11 +2,13 @@
 
 #include "GarbageCollector.hpp"
 #include "utilities.hpp"
+#include "runtime/forward.hpp"
 
 #include <bitset>
+#include <cstdint>
 #include <memory>
 #include <optional>
-#include <set>
+#include <unordered_map>
 
 static constexpr size_t KB = 1024;
 static constexpr size_t MB = 1024 * KB;
@@ -207,11 +209,9 @@ class Slab
 		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
 			return block2048->allocate();
 		} else {
-			[]<bool flag = false>()
-			{
+			[]<bool flag = false>() {
 				static_assert(flag, "only object sizes <= 2048 bytes are currently supported");
-			}
-			();
+			}();
 		}
 	}
 
@@ -250,11 +250,9 @@ class Slab
 
 	template<typename T> uint8_t *allocate()
 	{
-		[]<bool flag = false>()
-		{
+		[]<bool flag = false>() {
 			static_assert(flag, "only GC collected objects are currently supported");
-		}
-		();
+		}();
 		return nullptr;
 
 		// uint8_t *ptr{ nullptr };
@@ -315,7 +313,7 @@ class Heap
 	size_t m_static_offset{ 8 };
 	Slab m_slab;
 	std::unique_ptr<GarbageCollector> m_gc;
-	std::set<uint8_t *> m_weakrefs;
+	std::unordered_map<uint8_t *, std::vector<py::PyObject *>> m_weakrefs;
 	uintptr_t *m_bottom_stack_pointer;
 	bool m_allocate_in_static{ false };
 
@@ -360,7 +358,7 @@ class Heap
 
 	template<typename T, typename... Args> T *__attribute__((noinline)) allocate(Args &&...args)
 	{
-		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...).get(); }
+		if (m_allocate_in_static) { return allocate_static<T>(std::forward<Args>(args)...); }
 		collect_garbage();
 		auto *ptr = m_slab.allocate<T>();
 
@@ -389,7 +387,7 @@ class Heap
 	T *__attribute__((noinline)) allocate_weakref(TargetT &&target, Args &&...args)
 	{
 		T *obj = allocate<T>(std::forward<TargetT>(target), std::forward<Args>(args)...);
-		if (obj) { m_weakrefs.insert(bit_cast<uint8_t *>(target)); }
+		if (obj) { m_weakrefs[bit_cast<uint8_t *>(target)].push_back(obj); }
 		return obj;
 	}
 
@@ -423,6 +421,16 @@ class Heap
 	}
 
 	bool has_weakref_object(uint8_t *obj) const { return m_weakrefs.contains(obj); }
+	size_t weakref_count(uint8_t *obj) const
+	{
+		if (auto it = m_weakrefs.find(obj); it != m_weakrefs.end()) { return it->second.size(); }
+		return 0;
+	}
+	std::vector<py::PyObject *> get_weakrefs(uint8_t *obj) const
+	{
+		if (auto it = m_weakrefs.find(obj); it != m_weakrefs.end()) { return it->second; }
+		return {};
+	}
 
   private:
 	uint8_t *allocate_gc(uint8_t *ptr) const;

@@ -4,21 +4,21 @@
 
 namespace py {
 
-class PyWeakProxy : public PyBaseObject
+class PyCallableProxyType : public PyBaseObject
 {
 	friend class ::Heap;
 	mutable PyObject *m_object{ nullptr };
 	PyObject *m_callback{ nullptr };
 
   protected:
-	PyWeakProxy(PyType *);
+	PyCallableProxyType(PyType *);
 
-	PyWeakProxy(PyObject *object, PyObject *callback);
+	PyCallableProxyType(PyObject *object, PyObject *callback);
 
 	void visit_graph(Visitor &) override;
 
   public:
-	static PyResult<PyWeakProxy *> create(PyObject *object, PyObject *callback);
+	static PyResult<PyCallableProxyType *> create(PyObject *object, PyObject *callback);
 
 	std::string to_string() const override;
 
@@ -26,17 +26,15 @@ class PyWeakProxy : public PyBaseObject
 	PyResult<PyObject *> __repr__() const;
 	PyResult<PyObject *> __str__() const;
 	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
+	PyResult<PyObject *> __call__(PyTuple *args, PyDict *kwargs);
 
 	static PyType *register_type(PyModule *module, std::string_view name);
-
-  public:
-	PyObject *get_object() const { return m_object; }
 
   private:
 	bool is_alive() const;
 };
 
-template<> PyWeakProxy *as(PyObject *obj);
-template<> const PyWeakProxy *as(const PyObject *obj);
+template<> PyCallableProxyType *as(PyObject *obj);
+template<> const PyCallableProxyType *as(const PyObject *obj);
 
 }// namespace py
