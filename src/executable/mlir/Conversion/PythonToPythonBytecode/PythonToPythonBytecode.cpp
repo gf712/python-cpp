@@ -19,12 +19,16 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "utilities.hpp"
 #include "llvm/ADT/TypeSwitch.h"
+
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <algorithm>
 
@@ -401,13 +405,26 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				auto cond = op.getCondition();
-				ASSERT(mlir::isa<mlir::py::CastToBoolOp>(cond.getDefiningOp()));
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
-					mlir::cast<mlir::py::CastToBoolOp>(cond.getDefiningOp()).getValue(),
-					op.getTrueDest(),
-					op.getTrueDestOperands(),
-					op.getFalseDest(),
-					op.getFalseDestOperands());
+				if (mlir::isa<mlir::py::CastToBoolOp>(cond.getDefiningOp())) {
+					auto bool_cast = mlir::cast<mlir::py::CastToBoolOp>(cond.getDefiningOp());
+					auto pycond = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::CastToBool>(
+						bool_cast, bool_cast.getValue().getType(), bool_cast.getValue());
+					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
+						pycond.getValue(),
+						op.getTrueDest(),
+						op.getTrueDestOperands(),
+						op.getFalseDest(),
+						op.getFalseDestOperands());
+				} else {
+					ASSERT(mlir::isa<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp()))
+					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
+						mlir::cast<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp())
+							.getValue(),
+						op.getTrueDest(),
+						op.getTrueDestOperands(),
+						op.getFalseDest(),
+						op.getFalseDestOperands());
+				}
 				return success();
 			}
 		};
@@ -735,12 +752,14 @@ namespace py {
 						ASSERT(el.getDefiningOp<mlir::py::ConstantOp>());
 						elements.push_back(el.getDefiningOp<mlir::py::ConstantOp>().getValue());
 					}
-					auto list = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildList>(
-						op, op.getOutput().getType(), ::mlir::ValueRange{});
-					auto tuple = rewriter.create<mlir::py::ConstantOp>(op.getLoc(),
-						op.getOutput().getType(),
-						mlir::ArrayAttr::get(getContext(), elements));
-					rewriter.create<mlir::emitpybytecode::ListExtend>(op.getLoc(), list, tuple);
+					auto loc = op.getLoc();
+					auto output_type = op.getOutput().getType();
+					auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
+						loc, output_type, ::mlir::ValueRange{});
+					auto tuple = rewriter.create<mlir::py::ConstantOp>(
+						loc, output_type, mlir::ArrayAttr::get(getContext(), elements));
+					rewriter.create<mlir::emitpybytecode::ListExtend>(loc, list, tuple);
+					rewriter.replaceOp(op, list);
 				} else {
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildList>(
 						op, op.getOutput().getType(), op.getElements());
@@ -1425,6 +1444,7 @@ namespace py {
 					if (mlir::isa<mlir::py::ControlFlowYield>(childOp)
 						&& !mlir::cast<mlir::py::ControlFlowYield>(childOp).getKind().has_value()) {
 						callback(childOp);
+						return WalkResult::skip();
 					}
 					return WalkResult::advance();
 				});
@@ -1448,6 +1468,7 @@ namespace py {
 						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(
 							childOp->getLoc());
 						if (op.getHandlers().empty()) {
+							ASSERT(!op.getFinally().empty());
 							rewriter.create<mlir::cf::BranchOp>(
 								childOp->getLoc(), &op.getFinally().front());
 						} else if (!op.getOrelse().empty()) {
@@ -1459,7 +1480,6 @@ namespace py {
 						} else {
 							rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
 						}
-						rewriter.eraseOp(childOp);
 						rewriter.eraseBlock(next);
 					});
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
@@ -1480,17 +1500,17 @@ namespace py {
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
 								rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
-								rewriter.eraseOp(childOp);
 								rewriter.eraseBlock(next);
 							}
 
 							childOp = finally_mapping->lookup(childOp);
+							ASSERT(childOp);
 							{
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
-								rewriter.create<mlir::py::RaiseOp>(childOp->getLoc());
-								rewriter.eraseOp(childOp);
+								rewriter.create<mlir::emitpybytecode::ReRaiseOp>(
+									childOp->getLoc(), endBlock);
 								rewriter.eraseBlock(next);
 							}
 						});
@@ -1508,6 +1528,7 @@ namespace py {
 						handler_scope.getCond().empty() ? &handler_scope.getHandler().front()
 														: &handler_scope.getCond().front());
 				} else {
+					ASSERT(finally_mapping.has_value());
 					rewriter.create<mlir::emitpybytecode::SetupExceptionHandle>(
 						op.getLoc(), body_start, finally_mapping->lookup(&op.getFinally().front()));
 				}
@@ -1557,7 +1578,6 @@ namespace py {
 									rewriter.create<mlir::cf::BranchOp>(
 										childOp->getLoc(), endBlock);
 								}
-								rewriter.eraseOp(childOp);
 								rewriter.eraseBlock(next);
 							});
 						rewriter.inlineRegionBefore(handler_scope.getHandler(), endBlock);
@@ -1604,7 +1624,6 @@ namespace py {
 									rewriter.create<mlir::cf::BranchOp>(
 										childOp->getLoc(), endBlock);
 								}
-								rewriter.eraseOp(childOp);
 								rewriter.eraseBlock(next);
 							});
 						rewriter.inlineRegionBefore(handler_scope.getHandler(), endBlock);
@@ -1622,7 +1641,6 @@ namespace py {
 						} else {
 							rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
 						}
-						rewriter.eraseOp(childOp);
 						rewriter.eraseBlock(next);
 					});
 				rewriter.inlineRegionBefore(op.getOrelse(), endBlock);
@@ -1681,7 +1699,6 @@ namespace py {
 						rewriter.setInsertionPointToEnd(current);
 						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(op->getLoc());
 						rewriter.create<mlir::cf::BranchOp>(op->getLoc(), exit_block);
-						rewriter.eraseOp(op);
 						rewriter.eraseBlock(next);
 					}
 					return WalkResult::advance();
