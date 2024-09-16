@@ -106,6 +106,7 @@ class PyString
 	PyResult<PyObject *> join(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> lower() const;
 	PyResult<PyObject *> upper() const;
+	PyResult<PyObject *> partition(PyObject *sep) const;
 	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> replace(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> translate(PyObject *table) const;

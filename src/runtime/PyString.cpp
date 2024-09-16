@@ -919,6 +919,28 @@ PyResult<PyObject *> PyString::upper() const
 	return PyString::create(new_string);
 }
 
+PyResult<PyObject *> PyString::partition(PyObject *sep) const
+{
+	if (!sep->type()->issubclass(types::str())) {
+		return Err(type_error("must be str, not {}", sep->type()->name()));
+	}
+
+	auto split_index = m_value.find(static_cast<const PyString &>(*sep).value());
+
+	if (split_index == std::string::npos) {
+		return PyTuple::create(const_cast<PyString *>(this),
+			PyString::create("").unwrap(),
+			PyString::create("").unwrap());
+	}
+
+	auto lhs = m_value.substr(0, split_index);
+	std::string rhs{ m_value.begin() + split_index
+						 + static_cast<const PyString &>(*sep).value().size(),
+		m_value.end() };
+	return PyTuple::create(PyString::create(lhs).unwrap(), sep, PyString::create(rhs).unwrap());
+}
+
+
 PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 {
 	ASSERT(args && args->size() == 1)
@@ -1831,6 +1853,7 @@ namespace {
 							 .def("join", &PyString::join)
 							 .def("lower", &PyString::lower)
 							 .def("upper", &PyString::upper)
+							 .def("partition", &PyString::partition)
 							 .def("rpartition", &PyString::rpartition)
 							 .def("strip", &PyString::strip)
 							 .def("rstrip", &PyString::rstrip)
