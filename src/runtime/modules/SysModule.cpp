@@ -20,10 +20,19 @@
 
 #include <bit>
 #include <filesystem>
+#include <format>
 
 using namespace py;
 
 static PyModule *s_sys_module = nullptr;
+
+#if defined(__clang__)
+#define COMPILER_VERSION "[Clang " __clang_version__ "]"
+#elif defined(__GNUC__)
+#define COMPILER_VERSION "[GCC " __VERSION__ "]"
+#else
+static_assert(false, "Unknown compiler!");
+#endif
 
 namespace {
 PyResult<PyList *> create_sys_paths(Interpreter &interpreter)
@@ -413,6 +422,20 @@ PyModule *sys_module(Interpreter &interpreter)
 		PyString::create(std::string{ get_endianness() }).unwrap());
 
 	s_sys_module->add_symbol(PyString::create("warnoptions").unwrap(), PyList::create().unwrap());
+
+	s_sys_module->add_symbol(PyString::create("executable").unwrap(),
+		PyString::create(std::filesystem::canonical("/proc/self/exe").string()).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("base_prefix").unwrap(),
+		PyString::create(std::string{ kPythonInstallPath }).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("executable").unwrap(),
+		PyString::create(std::filesystem::canonical("/proc/self/exe").string()).unwrap());
+
+	std::string py_version = std::format("3.9.0 (main) {}", COMPILER_VERSION);
+
+	s_sys_module->add_symbol(
+		PyString::create("version").unwrap(), PyString::create(py_version).unwrap());
 
 	return s_sys_module;
 }
