@@ -228,23 +228,29 @@ class Flags : public PyBaseObject
 	}
 };
 
-class Version : public PyBaseObject
+class Version : public PyTuple
 {
 	friend class ::Heap;
 
   public:
-	uint8_t m_major{ 0 };
-	uint8_t m_minor{ 0 };
-	uint8_t m_micro{ 0 };
-	std::string m_release_level;
-	uint8_t m_serial{ 0 };
+	PyInteger *m_major{ nullptr };
+	PyInteger *m_minor{ nullptr };
+	PyInteger *m_micro{ nullptr };
+	PyString *m_release_level{ nullptr };
+	PyInteger *m_serial{ nullptr };
+
 
   private:
-	Version(PyType *t) : PyBaseObject(t) {}
+	Version(PyType *t) : PyTuple(t) {}
 
-	Version(uint8_t major, uint8_t minor, uint8_t micro, std::string release_level, uint8_t serial)
-		: PyBaseObject(s_sys_version->underlying_type()), m_major(major), m_minor(minor),
-		  m_micro(micro), m_release_level(release_level), m_serial(serial)
+	Version(PyInteger *major,
+		PyInteger *minor,
+		PyInteger *micro,
+		PyString *release_level,
+		PyInteger *serial)
+		: PyTuple(s_sys_version, std::vector<Value>{ major, minor, micro, release_level, serial }),
+		  m_major(major), m_minor(minor), m_micro(micro), m_release_level(release_level),
+		  m_serial(serial)
 	{}
 
   public:
@@ -254,8 +260,14 @@ class Version : public PyBaseObject
 		std::string release_level,
 		uint8_t serial)
 	{
+		auto *major_obj = PyInteger::create(major).unwrap();
+		auto *minor_obj = PyInteger::create(minor).unwrap();
+		auto *micro_obj = PyInteger::create(micro).unwrap();
+		auto *release_level_obj = PyString::create(release_level).unwrap();
+		auto *serial_obj = PyInteger::create(serial).unwrap();
+
 		auto *result = VirtualMachine::the().heap().allocate<Version>(
-			major, minor, micro, release_level, serial);
+			major_obj, minor_obj, micro_obj, release_level_obj, serial_obj);
 		if (!result) { return Err(memory_error(sizeof(Version))); }
 		return Ok(result);
 	}
@@ -264,11 +276,11 @@ class Version : public PyBaseObject
 	{
 		return fmt::format(
 			"sys.version_info(major={}, minor={}, micro={}, releaselevel={}, serial={})",
-			m_major,
-			m_minor,
-			m_micro,
-			m_release_level,
-			m_serial);
+			m_major ? m_major->as_i64() : 0,
+			m_minor ? m_minor->as_i64() : 0,
+			m_micro ? m_micro->as_i64() : 0,
+			m_release_level ? m_release_level->value() : "",
+			m_serial ? m_major->as_i64() : 0);
 	}
 
 	PyResult<PyObject *> __repr__() const { return PyString::create(to_string()); }
@@ -282,7 +294,7 @@ class Version : public PyBaseObject
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_sys_version) {
-			s_sys_version = klass<Version>(module, "version_info_")
+			s_sys_version = klass<Version>(module, "version_info", types::tuple())
 								.attribute_readonly("major", &Version::m_major)
 								.attribute_readonly("minor", &Version::m_minor)
 								.attribute_readonly("micro", &Version::m_micro)
