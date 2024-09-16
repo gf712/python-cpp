@@ -5,6 +5,7 @@
 #include "NotImplementedError.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
+#include "PyFloat.hpp"
 #include "PyInteger.hpp"
 #include "PyList.hpp"
 #include "PyNone.hpp"
@@ -15,11 +16,13 @@
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
+#include "runtime/forward.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "utilities.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <optional>
 #include <span>
@@ -1261,6 +1264,18 @@ PyResult<std::string> PyString::FormatSpec::apply(PyObject *obj) const
 	} break;
 	case 'r': {
 		return obj->repr().and_then([](PyString *str) { return Ok(str->value()); });
+	} break;
+	case 'd': {
+		if (obj->type()->issubclass(types::integer())) {
+			const auto &big_int = static_cast<const PyInteger &>(*obj).as_big_int();
+			return Ok(big_int.get_str(10));
+		} else if (obj->type()->issubclass(types::float_())) {
+			const auto &f = static_cast<const PyFloat &>(*obj).as_f64();
+			return Ok(BigIntType{ f }.get_str(10));
+		} else {
+			return Err(
+				type_error("%d format: a real number is required, not {}", obj->type()->name()));
+		}
 	} break;
 	default:
 		return Err(
