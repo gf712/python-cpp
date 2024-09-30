@@ -379,6 +379,7 @@ std::optional<size_t> Lexer::exp_float_number(size_t n) const
 	// [0-9](?:_?[0-9])*)
 	if (!(peek(n) >= '0' && peek(n) <= '9')) { return {}; }
 	n++;
+	if (peek(n) == '.') { n++; }
 	auto result = parse_digits(n, [](const char c) { return std::isdigit(c); });
 	if (result) { return exp_number(*result); }
 	return {};
@@ -413,9 +414,9 @@ std::optional<size_t> Lexer::imag_number(size_t n) const
 
 std::optional<size_t> Lexer::float_number(size_t n) const
 {
-	if (auto end = point_float_number(n)) {
+	if (auto end = exp_float_number(n)) {
 		return *end;
-	} else if (auto end = exp_float_number(n)) {
+	} else if (auto end = point_float_number(n)) {
 		return *end;
 	} else {
 		return {};
