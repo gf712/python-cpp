@@ -18,6 +18,8 @@ class PyFloat final : public PyNumber
 
 	double as_f64() const;
 
+	PyResult<PyObject *> __round__(PyObject *ndigits) const;
+
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 };
 

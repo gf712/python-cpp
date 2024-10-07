@@ -1,6 +1,8 @@
 #pragma once
 
 #include "PyNumber.hpp"
+#include "forward.hpp"
+#include "runtime/PyType.hpp"
 
 namespace py {
 
@@ -29,6 +31,8 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 
 	PyResult<PyObject *> __lshift__(const PyObject *other) const;
 	PyResult<PyObject *> __rshift__(const PyObject *other) const;
+
+	PyResult<PyObject *> __round__(PyObject *ndigits) const;
 
 	PyResult<PyObject *> bit_length() const;
 	PyResult<PyObject *> bit_count() const;

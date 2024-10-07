@@ -4,13 +4,14 @@
 #include "PyFloat.hpp"
 #include "TypeError.hpp"
 #include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
+#include "runtime/PyByteArray.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
-#include "utilities.hpp"
 #include "vm/VM.hpp"
+
+#include <gmpxx.h>
 
 namespace py {
 
@@ -266,6 +267,24 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 	return result;
 }
 
+PyResult<PyObject *> PyInteger::__round__(PyObject *ndigits_obj) const
+{
+	if (!ndigits_obj || ndigits_obj == py_none()) { return PyInteger::create(as_big_int()); }
+
+	if (!ndigits_obj->type()->issubclass(types::integer())) {
+		return Err(type_error(
+			"'{}' object cannot be interpreted as an integer", ndigits_obj->type()->name()));
+	}
+
+	auto ndigits = static_cast<const PyInteger &>(*ndigits_obj).as_big_int();
+
+	if (ndigits >= 0) { return PyInteger::create(as_big_int()); }
+
+	auto result = m_value - (m_value % Number{ BigIntType{ 10 } }.exp(Number{ -ndigits }));
+
+	return PyInteger::create(std::visit([](auto el) { return BigIntType{ el }; }, result.value));
+}
+
 int64_t PyInteger::as_i64() const
 {
 	ASSERT(std::holds_alternative<BigIntType>(m_value.value));
@@ -298,6 +317,7 @@ namespace {
 							 .def("bit_length", &PyInteger::bit_length)
 							 .def("bit_count", &PyInteger::bit_count)
 							 .def("to_bytes", &PyInteger::to_bytes)
+							 .def("__round__", &PyInteger::__round__)
 							 .classmethod("from_bytes", &PyInteger::from_bytes)
 							 .type);
 	}

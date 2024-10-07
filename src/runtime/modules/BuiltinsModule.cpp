@@ -1313,6 +1313,29 @@ PyResult<PyObject *> divmod(PyTuple *args, PyDict *kwargs, Interpreter &)
 	return lhs->divmod(rhs);
 }
 
+PyResult<PyObject *> round(PyTuple *args, PyDict *kwargs, Interpreter &)
+{
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"round",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 2>{},
+		nullptr);
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+	auto [value, ndigits] = result.unwrap();
+
+	auto round = value->lookup_attribute(PyString::create("__round__").unwrap());
+
+	if (std::get<1>(round) == LookupAttrResult::NOT_FOUND) {
+		return Err(type_error("type {} doesn't define __round__ method", value->type()->name()));
+	}
+	if (std::get<0>(round).is_err()) { return std::get<0>(round); }
+
+	if (!ndigits) { ndigits = py_none(); }
+	return std::get<0>(round).unwrap()->call(PyTuple::create(ndigits).unwrap(), nullptr);
+}
+
 auto builtin_types()
 {
 	return std::array{
@@ -1578,6 +1601,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("divmod").unwrap(),
 		heap.allocate<PyNativeFunction>("divmod", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return divmod(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("round").unwrap(),
+		heap.allocate<PyNativeFunction>("round", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return round(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;

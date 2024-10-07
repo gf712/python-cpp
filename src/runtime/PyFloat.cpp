@@ -1,8 +1,13 @@
 #include "PyFloat.hpp"
 #include "MemoryError.hpp"
+#include "runtime/PyNumber.hpp"
+#include "runtime/Value.hpp"
+#include "runtime/forward.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
+
+#include <cmath>
 
 namespace py {
 
@@ -56,6 +61,25 @@ PyResult<PyFloat *> PyFloat::create(double value)
 	return Ok(obj);
 }
 
+PyResult<PyObject *> PyFloat::__round__(PyObject *ndigits_obj) const
+{
+	if (!ndigits_obj || ndigits_obj == py_none()) {
+		return PyInteger::create(BigIntType{ as_f64() });
+	}
+
+	if (!ndigits_obj->type()->issubclass(types::integer())) {
+		return Err(type_error(
+			"'{}' object cannot be interpreted as an integer", ndigits_obj->type()->name()));
+	}
+
+	auto ndigits = static_cast<const PyInteger &>(*ndigits_obj).as_big_int();
+
+	const auto multiplier = std::pow(10., ndigits.get_d());
+	const auto value = std::floor(as_f64() * multiplier) / multiplier;
+	return PyFloat::create(value);
+}
+
+
 PyType *PyFloat::static_type() const { return types::float_(); }
 
 double PyFloat::as_f64() const
@@ -70,7 +94,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_float()
 	{
-		return std::move(klass<PyFloat>("float").type);
+		return std::move(klass<PyFloat>("float").def("__round__", &PyFloat::__round__).type);
 	}
 }// namespace
 
