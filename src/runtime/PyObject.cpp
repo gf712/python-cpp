@@ -19,6 +19,7 @@
 #include "PyType.hpp"
 #include "StopIteration.hpp"
 #include "TypeError.hpp"
+#include "runtime/Value.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
@@ -826,6 +827,16 @@ PyResult<PyObject *> PyObject::modulo(const PyObject *other) const
 		return call_slot(*type_prototype().__mod__, this, other);
 	}
 	return Err(type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
+		type_prototype().__name__,
+		other->type_prototype().__name__));
+}
+
+PyResult<PyObject *> PyObject::divmod(PyObject *other)
+{
+	if (type_prototype().__divmod__.has_value()) {
+		return call_slot(*type_prototype().__divmod__, this, other);
+	}
+	return Err(type_error("unsupported operand type(s) for divmod(): \'{}\' and \'{}\'",
 		type_prototype().__name__,
 		other->type_prototype().__name__));
 }

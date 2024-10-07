@@ -139,6 +139,7 @@ using RightShiftSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
 using ModuloSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, const PyObject *)>;
+using DivmodSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using AndSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using OrSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using XorSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
@@ -252,6 +253,7 @@ struct TypePrototype
 	std::optional<std::variant<LeftShiftSlotFunctionType, PyObject *>> __lshift__;
 	std::optional<std::variant<RightShiftSlotFunctionType, PyObject *>> __rshift__;
 	std::optional<std::variant<ModuloSlotFunctionType, PyObject *>> __mod__;
+	std::optional<std::variant<DivmodSlotFunctionType, PyObject *>> __divmod__;
 	std::optional<std::variant<AndSlotFunctionType, PyObject *>> __and__;
 	std::optional<std::variant<OrSlotFunctionType, PyObject *>> __or__;
 	std::optional<std::variant<XorSlotFunctionType, PyObject *>> __xor__;
@@ -391,6 +393,7 @@ class PyObject : public Cell
 	PyResult<PyObject *> lshift(const PyObject *other) const;
 	PyResult<PyObject *> rshift(const PyObject *other) const;
 	PyResult<PyObject *> modulo(const PyObject *other) const;
+	PyResult<PyObject *> divmod(PyObject *other);
 	PyResult<PyObject *> and_(PyObject *other);
 	PyResult<PyObject *> or_(PyObject *other);
 	PyResult<PyObject *> xor_(PyObject *other);
@@ -767,6 +770,11 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 		type_prototype->__mod__ =
 			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__mod__(other);
+		};
+	}
+	if constexpr (HasDivmod<Type>) {
+		type_prototype->__divmod__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__divmod__(other);
 		};
 	}
 	if constexpr (HasAnd<Type>) {

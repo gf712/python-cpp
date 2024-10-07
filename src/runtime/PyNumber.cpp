@@ -1,16 +1,19 @@
 #include "PyNumber.hpp"
+#include "NotImplemented.hpp"
 #include "PyFloat.hpp"
 #include "PyInteger.hpp"
+#include "PyNone.hpp"
+#include "PyObject.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
 #include "TypeError.hpp"
-#include "PyNone.hpp"
-#include "PyObject.hpp"
 #include "Value.hpp"
-#include "NotImplemented.hpp"
+#include "runtime/PyTuple.hpp"
+#include "runtime/ValueError.hpp"
 #include "types/builtin.hpp"
 
 #include "interpreter/Interpreter.hpp"
+#include <cmath>
 #include <variant>
 
 namespace py {
@@ -96,34 +99,79 @@ PyResult<PyObject *> PyNumber::__mod__(const PyObject *obj) const
 	}
 }
 
+PyResult<PyObject *> PyNumber::__divmod__(PyObject *obj)
+{
+	if (auto rhs = as_number(obj)) {
+		if (rhs->value() == Number{ 0 }) {
+			// TODO: implement ZeroDivisionError
+			return Err(value_error("ZeroDivisionError"));
+		}
+		return std::visit(
+			overloaded{
+				[](const mpz_class &lhs_value, const mpz_class &rhs_value) -> PyResult<PyTuple *> {
+					//  For integers, the result is the same as (a // b, a % b)
+					return PyTuple::create(
+						Number{ lhs_value / rhs_value }, Number{ lhs_value % rhs_value });
+				},
+				[](const mpz_class &lhs_value, const double &rhs_value) -> PyResult<PyTuple *> {
+					// For floating-point numbers the result is (q, a % b), where q is usually
+					// math.floor(a / b) but may be 1 less than that
+					const auto r = std::remainder(lhs_value.get_d(), rhs_value);
+					const auto q = Number{ (-r + lhs_value.get_d()) / rhs_value };
+					return PyTuple::create(q, Number{ r });
+				},
+				[](const double &lhs_value, const mpz_class &rhs_value) -> PyResult<PyTuple *> {
+					// For floating-point numbers the result is (q, a % b), where q is usually
+					// math.floor(a / b) but may be 1 less than that
+					const auto r = std::remainder(lhs_value, rhs_value.get_d());
+					const auto q = Number{ (-r + lhs_value) / rhs_value.get_d() };
+					return PyTuple::create(q, Number{ r });
+				},
+				[](const double &lhs_value, const double &rhs_value) -> PyResult<PyTuple *> {
+					// For floating-point numbers the result is (q, a % b), where q is usually
+					// math.floor(a / b) but may be 1 less than that
+					const auto r = std::remainder(lhs_value, rhs_value);
+					const auto q = Number{ (-r + lhs_value) / rhs_value };
+					return PyTuple::create(q, Number{ r });
+				},
+			},
+			m_value.value,
+			rhs->m_value.value);
+	} else {
+		return Err(type_error("unsupported operand type(s) for %: \'{}\' and \'{}\'",
+			type()->name(),
+			obj->type()->name()));
+	}
+}
+
 PyResult<PyObject *> PyNumber::__mul__(const PyObject *obj) const
 {
 	if (auto rhs = as_number(obj)) {
 		return PyNumber::create(m_value * rhs->value());
 	} else {
-		return Err(type_error("unsupported operand type(s) for *: \'{}\' and \'{}\'",
-			type()->name(),
-			obj->type()->name()));
+		return Ok(not_implemented());
 	}
 }
 
 PyResult<PyObject *> PyNumber::__pow__(const PyObject *obj, const PyObject *modulo_obj) const
 {
 	if (auto rhs_ = as_number(obj)) {
-		if (modulo_obj == py_none()) {
-			return PyObject::from(m_value.exp(rhs_->value()));
-		}
+		if (modulo_obj == py_none()) { return PyObject::from(m_value.exp(rhs_->value())); }
 		auto modulo_ = as_number(modulo_obj);
-		if (!modulo_) {
-			return Ok(not_implemented());
-		}
+		if (!modulo_) { return Ok(not_implemented()); }
 		mpz_class result{};
-		mpz_class lhs = std::holds_alternative<BigIntType>( m_value.value) ? std::get<BigIntType>(m_value.value) : BigIntType{std::get<double>(m_value.value)};
-		mpz_class rhs = std::holds_alternative<BigIntType>( rhs_->value().value) ? std::get<BigIntType>(rhs_->value().value) : BigIntType{std::get<double>(rhs_->value().value)};
-		mpz_class modulo = std::holds_alternative<BigIntType>( modulo_->value().value) ? std::get<BigIntType>(modulo_->value().value) : BigIntType{std::get<double>(modulo_->value().value)};
+		mpz_class lhs = std::holds_alternative<BigIntType>(m_value.value)
+							? std::get<BigIntType>(m_value.value)
+							: BigIntType{ std::get<double>(m_value.value) };
+		mpz_class rhs = std::holds_alternative<BigIntType>(rhs_->value().value)
+							? std::get<BigIntType>(rhs_->value().value)
+							: BigIntType{ std::get<double>(rhs_->value().value) };
+		mpz_class modulo = std::holds_alternative<BigIntType>(modulo_->value().value)
+							   ? std::get<BigIntType>(modulo_->value().value)
+							   : BigIntType{ std::get<double>(modulo_->value().value) };
 		mpz_powm(result.get_mpz_t(), lhs.get_mpz_t(), rhs.get_mpz_t(), modulo.get_mpz_t());
 
-		return PyNumber::create(Number{result});
+		return PyNumber::create(Number{ result });
 	} else {
 		return Err(type_error("unsupported operand type(s) for **: \'{}\' and \'{}\'",
 			type()->name(),

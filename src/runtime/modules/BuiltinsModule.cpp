@@ -1299,6 +1299,20 @@ PyResult<PyObject *> vars(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 	return std::get<0>(dict);
 }
 
+PyResult<PyObject *> divmod(PyTuple *args, PyDict *kwargs, Interpreter &)
+{
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"divmod",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+	auto [lhs, rhs] = result.unwrap();
+
+	return lhs->divmod(rhs);
+}
+
 auto builtin_types()
 {
 	return std::array{
@@ -1559,6 +1573,11 @@ PyModule *builtins_module(Interpreter &interpreter)
 	s_builtin_module->add_symbol(PyString::create("vars").unwrap(),
 		heap.allocate<PyNativeFunction>("vars", [&interpreter](PyTuple *args, PyDict *kwargs) {
 			return vars(args, kwargs, interpreter);
+		}));
+
+	s_builtin_module->add_symbol(PyString::create("divmod").unwrap(),
+		heap.allocate<PyNativeFunction>("divmod", [&interpreter](PyTuple *args, PyDict *kwargs) {
+			return divmod(args, kwargs, interpreter);
 		}));
 
 	return s_builtin_module;

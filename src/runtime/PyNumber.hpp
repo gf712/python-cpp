@@ -23,6 +23,7 @@ class PyNumber : public PyBaseObject
 	PyResult<PyObject *> __add__(const PyObject *obj) const;
 	PyResult<PyObject *> __sub__(const PyObject *obj) const;
 	PyResult<PyObject *> __mod__(const PyObject *obj) const;
+	PyResult<PyObject *> __divmod__(PyObject *obj);
 	PyResult<PyObject *> __mul__(const PyObject *obj) const;
 	PyResult<PyObject *> __pow__(const PyObject *obj, const PyObject *modulo) const;
 	PyResult<PyObject *> __truediv__(const PyObject *obj) const;
