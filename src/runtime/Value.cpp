@@ -108,13 +108,13 @@ Number Number::operator%(const Number &rhs) const
 							  return Number{ lhs_value % rhs_value };
 						  },
 						  [](const mpz_class &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ std::fmod(lhs_value.get_d(), rhs_value) };
+							  return Number{ std::remainder(lhs_value.get_d(), rhs_value) };
 						  },
 						  [](const double &lhs_value, const mpz_class &rhs_value) -> Number {
-							  return Number{ std::fmod(lhs_value, rhs_value.get_d()) };
+							  return Number{ std::remainder(lhs_value, rhs_value.get_d()) };
 						  },
 						  [](const double &lhs_value, const double &rhs_value) -> Number {
-							  return Number{ std::fmod(lhs_value, rhs_value) };
+							  return Number{ std::remainder(lhs_value, rhs_value) };
 						  },
 					  },
 		value,
