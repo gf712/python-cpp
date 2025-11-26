@@ -298,7 +298,7 @@ target_link_libraries(python-cpp
 )
 
 # LLVM backend
-find_package(LLVM CONFIG 20.0)
+find_package(LLVM CONFIG 20.1)
 if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
   message(FATAL_ERROR "Could not find LLVM in the local environment")
 elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
