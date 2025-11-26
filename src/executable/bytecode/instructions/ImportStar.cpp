@@ -28,7 +28,10 @@ PyResult<Value> ImportStar::execute(VirtualMachine &vm, Interpreter &interpreter
 		if (all_sequence_.is_err()) { return Err(all_sequence_.unwrap_err()); }
 		auto all_sequence = all_sequence_.unwrap();
 		for (int64_t i = 0;; ++i) {
-			auto el = all_sequence.getitem(i);
+			auto el = [&] {
+				[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+				return all_sequence.getitem(i);
+			}();
 			if (el.is_err()) {
 				if (el.unwrap_err()->type()->issubclass(IndexError::class_type())) { break; }
 				return Err(el.unwrap_err());

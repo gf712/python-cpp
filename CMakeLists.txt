@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(spdlog)
 FetchContent_Declare(
 	gtest
 	GIT_REPOSITORY https://github.com/google/googletest.git
-	GIT_TAG release-1.11.0
+	GIT_TAG v1.17.0
 	SYSTEM)
 FetchContent_MakeAvailable(gtest)
 
@@ -37,7 +37,7 @@ FetchContent_MakeAvailable(cpython)
 FetchContent_Declare(
 	tsl
 	GIT_REPOSITORY https://github.com/Tessil/ordered-map
-	GIT_TAG v1.1.0)
+	GIT_TAG v1.2.0)
 FetchContent_MakeAvailable(tsl)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -69,7 +69,7 @@ if (${ENABLE_SANITIZER_UNDEFINED_BEHAVIOR})
 endif()
 
 project_options(
-	WARNINGS_AS_ERRORS
+	# WARNINGS_AS_ERRORS
 	# ENABLE_COVERAGE
 	# ENABLE_CPPCHECK
 	# ENABLE_CLANG_TIDY
@@ -102,6 +102,11 @@ check_cxx_source_compiles(
   constexpr double f64v = 19880124.0;
   constexpr auto u64v = std::bit_cast<std::uint64_t>(f64v);"
 	STL_SUPPORTS_BIT_CAST)
+
+find_library(MATH_LIBRARY m)
+if(NOT MATH_LIBRARY)
+	message(FATAL_ERROR "Could not find math library")
+endif()
 
 add_subdirectory(src)
 add_subdirectory(integration)

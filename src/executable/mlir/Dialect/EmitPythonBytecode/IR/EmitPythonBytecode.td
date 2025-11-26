@@ -82,6 +82,10 @@ def EmitPythonBytecode_DeleteGlobalOp: EmitPythonBytecode_Op<"DELETE_GLOBAL"> {
     let arguments = (ins StrAttr:$name);
 }
 
+def EmitPythonBytecode_DeleteDerefOp: EmitPythonBytecode_Op<"DELETE_DEREF"> {
+    let arguments = (ins StrAttr:$name);
+}
+
 def EmitPythonBytecode_FunctionCallOp: EmitPythonBytecode_Op<"CALL"> {
     let arguments = (ins Python_PyObjectType:$callee, Variadic<Python_PyObjectType>:$args);
 
@@ -311,6 +315,13 @@ def EmitPythonBytecode_LoadAttribute: EmitPythonBytecode_Op<"LOAD_ATTRIBUTE"> {
                          StrAttr:$attr);
 
     let results = (outs Python_PyObjectType:$output);
+}
+
+def EmitPythonBytecode_DeleteAttribute: EmitPythonBytecode_Op<"DELETE_ATTRIBUTE"> {
+    let summary = "Delete an attribute";
+
+    let arguments = (ins Python_PyObjectType:$self,
+                         StrAttr:$attribute);
 }
 
 def EmitPythonBytecode_BinarySubscript: EmitPythonBytecode_Op<"BINARY_SUBSCRIPT"> {

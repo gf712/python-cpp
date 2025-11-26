@@ -1847,6 +1847,9 @@ struct StringPattern : PatternV2<StringPattern>
 			std::string_view value{ str.token.start().pointer_to_program,
 				str.token.end().pointer_to_program };
 
+			const auto is_raw_string = value.front() == 'r';
+			if (is_raw_string) { value = value.substr(1); }
+
 			const bool is_triple_quote = [value]() {
 				if (value.size() < 3) { return false; }
 				return (value[0] == '\"' || value[0] == '\'')
@@ -1858,6 +1861,11 @@ struct StringPattern : PatternV2<StringPattern>
 				value = value.substr(3, value.size() - 6);
 			} else {
 				value = value.substr(1, value.size() - 2);
+			}
+
+			if (is_raw_string) {
+				return std::make_shared<Constant>(String(std::string{ value }),
+					SourceLocation{ str.token.start(), str.token.end() });
 			}
 			return std::make_shared<Constant>(String::from_unescaped_string(std::string{ value }),
 				SourceLocation{ str.token.start(), str.token.end() });

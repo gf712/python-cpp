@@ -1,6 +1,7 @@
 #include "OSError.hpp"
 #include "MemoryError.hpp"
 #include "PyString.hpp"
+#include "runtime/PyType.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
@@ -26,19 +27,20 @@ OSError::OSError(PyTuple *args) : Exception(types::BuiltinTypes::the().os_error(
 
 OSError::OSError(PyType *t) : OSError(t, nullptr) {}
 
-PyResult<OSError *> OSError::create(PyTuple *args)
+PyResult<OSError *> OSError::create(PyType *type, PyTuple *args)
 {
 	auto &heap = VirtualMachine::the().heap();
-	auto result = heap.allocate<OSError>(args);
+	auto result = heap.allocate<OSError>(type, args);
 	if (!result) { return Err(memory_error(sizeof(OSError))); }
 	return Ok(result);
 }
 
+PyResult<OSError *> OSError::create(PyTuple *args) { return create(types::os_error(), args); }
+
 PyResult<PyObject *> OSError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == types::os_error());
 	ASSERT(!kwargs || kwargs->map().empty())
-	return OSError::create(args);
+	return OSError::create(const_cast<PyType *>(type), args);
 }
 
 PyType *OSError::static_type() const

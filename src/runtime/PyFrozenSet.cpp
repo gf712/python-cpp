@@ -41,7 +41,7 @@ PyResult<PyFrozenSet *> PyFrozenSet::create()
 {
 	if (!s_frozen_set) {
 		auto &heap = VirtualMachine::the().heap();
-		s_frozen_set = heap.allocate_static<PyFrozenSet>().get();
+		s_frozen_set = heap.allocate_static<PyFrozenSet>();
 		ASSERT(s_frozen_set);
 	}
 	return Ok(s_frozen_set);

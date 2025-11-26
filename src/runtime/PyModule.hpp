@@ -16,6 +16,10 @@ class PyModule : public PyBaseObject
 	PyDict *m_dict{ nullptr };
 
   private:
+	PyObject *m_module_context{ nullptr };
+
+
+  private:
 	friend class ::Heap;
 	friend class VM;
 
@@ -50,6 +54,9 @@ class PyModule : public PyBaseObject
 	void set_program(std::shared_ptr<Program> program);
 
 	const std::shared_ptr<Program> &program() const;
+
+	void set_context(PyObject *obj) { m_module_context = obj; }
+	PyObject *get_context() const { return m_module_context; }
 };
 
 }// namespace py

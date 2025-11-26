@@ -15,6 +15,7 @@ PyResult<Value> DeleteSubscript::execute(VirtualMachine &vm, Interpreter &) cons
 	auto index = PyObject::from(index_);
 	if (index.is_err()) return index;
 
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 	return value.unwrap()->delete_item(index.unwrap()).and_then([](auto) { return Ok(py_none()); });
 }
 

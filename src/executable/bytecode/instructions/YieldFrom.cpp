@@ -24,6 +24,7 @@ PyResult<Value> YieldFrom::execute(VirtualMachine &vm, Interpreter &interpreter)
 	if (v.is_err()) { return v; }
 
 	auto result = [receiver, v = v.unwrap()]() -> PyResult<Value> {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 		if (auto *generator = as<PyGenerator>(receiver)) {
 			return generator->send(v);
 		} else if (v == py_none()) {

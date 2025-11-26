@@ -14,7 +14,11 @@ class BaseException : public PyBaseObject
 
   protected:
 	PyTuple *m_args{ nullptr };
+	PyObject *m_dict{ nullptr };
 	PyTraceback *m_traceback{ nullptr };
+	PyObject *m_context{ nullptr };
+	PyObject *m_cause{ nullptr };
+	bool m_suppress_context{ false };
 
 	BaseException(PyType *type);
 
@@ -39,6 +43,9 @@ class BaseException : public PyBaseObject
 
 	PyTraceback *traceback() const { return m_traceback; }
 	void set_traceback(PyTraceback *tb) { m_traceback = tb; }
+
+	PyObject *cause() const { return m_cause; }
+	void set_cause(PyObject *cause) { m_cause = cause; }
 
 	std::string format_traceback() const;
 

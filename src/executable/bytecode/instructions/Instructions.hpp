@@ -1,6 +1,6 @@
 #pragma once
 
-#include "forward.hpp"
+#include "runtime/Value.hpp"
 #include "utilities.hpp"
 
 #include <span>
@@ -8,6 +8,18 @@
 
 class Instruction : NonCopyable
 {
+  protected:
+	// RAII type that restores r0 for intructions that are not treated as call instructions
+	// but may end up calling a Python function (e.g. LoadAttribute may end up calling a Python
+	// defined __getattr__ which then clobbers r0)
+	struct RAIIStoreNonCallInstructionData
+	{
+		RAIIStoreNonCallInstructionData();
+		~RAIIStoreNonCallInstructionData();
+
+		py::Value reg0;
+	};
+
   public:
 	virtual ~Instruction() = default;
 	virtual std::string to_string() const = 0;
@@ -95,6 +107,8 @@ static constexpr uint8_t DELETE_GLOBAL = 77;
 static constexpr uint8_t JUMP_IF_EXCEPTION_MATCH = 78;
 static constexpr uint8_t TO_BOOL = 79;
 static constexpr uint8_t SET_UPDATE = 80;
+static constexpr uint8_t DELETE_ATTR = 81;
 static constexpr uint8_t UNPACK_EXPAND = 82;
+static constexpr uint8_t DELETE_DEREF = 83;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);

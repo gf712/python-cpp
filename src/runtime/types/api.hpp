@@ -187,7 +187,7 @@ template<typename T> struct klass
 				const size_t arg_count = (args ? args->size() : 0) + (kwargs ? kwargs->size() : 0);
 				if (arg_count) {
 					return Err(
-						type_error("{}() takes no arguments ({} given)", name, args->size()));
+						type_error("{}() takes no arguments ({} given)", name, arg_count));
 				}
 				if (kwargs && kwargs->size() > 0) {
 					return Err(type_error("{}() takes no keyword arguments)", name));

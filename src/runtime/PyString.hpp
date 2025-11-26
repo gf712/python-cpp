@@ -110,6 +110,7 @@ class PyString
 	PyResult<PyObject *> rpartition(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> replace(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> translate(PyObject *table) const;
+	PyResult<PyObject *> encode(PyTuple *args, PyDict *kwargs) const;
 
 	PyResult<PyObject *> rstrip(PyTuple *args, PyDict *kwargs) const;
 	PyResult<PyObject *> strip(PyTuple *args, PyDict *kwargs) const;

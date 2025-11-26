@@ -13,6 +13,13 @@ Exception::Exception(PyTuple *args) : BaseException(types::BuiltinTypes::the().e
 
 Exception::Exception(const TypePrototype &type, PyTuple *args) : BaseException(type, args) {}
 
+PyResult<PyObject *> Exception::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(type == types::exception());
+	ASSERT(!kwargs || kwargs->map().empty())
+	return Ok(Exception::create(args));
+}
+
 PyType *Exception::static_type() const
 {
 	ASSERT(types::exception());

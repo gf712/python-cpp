@@ -18,6 +18,7 @@ PyResult<Value> StoreSubscript::execute(VirtualMachine &vm, Interpreter &) const
 	auto value = PyObject::from(value_value);
 	if (value.is_err()) return value;
 
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 	return object.unwrap()->setitem(subscript.unwrap(), value.unwrap()).and_then([](auto) {
 		return Ok(py_none());
 	});

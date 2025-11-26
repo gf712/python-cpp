@@ -12,39 +12,50 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 	const auto result = [&]() {
 		switch (m_operation) {
 		case Operation::PLUS: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return add(lhs, rhs, interpreter);
 		} break;
 		case Operation::MINUS: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return subtract(lhs, rhs, interpreter);
 		} break;
 		case Operation::MODULO: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return modulo(lhs, rhs, interpreter);
 		} break;
 		case Operation::MULTIPLY: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return multiply(lhs, rhs, interpreter);
 		} break;
 		case Operation::EXP: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return exp(lhs, rhs, interpreter);
 		} break;
 		case Operation::SLASH: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return true_divide(lhs, rhs, interpreter);
 		} break;
 		case Operation::FLOORDIV: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return floordiv(lhs, rhs, interpreter);
 		} break;
 		case Operation::MATMUL: {
 			TODO();
 		} break;
 		case Operation::LEFTSHIFT: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return lshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::RIGHTSHIFT: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return rshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::AND: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return and_(lhs, rhs, interpreter);
 		} break;
 		case Operation::OR: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return or_(lhs, rhs, interpreter);
 		} break;
 		case Operation::XOR: {

@@ -40,7 +40,7 @@ namespace emitpybytecode {
 		if (index == 0) {
 			return SuccessorOperands(1, mlir::MutableOperandRange{ getOperation(), 0, 0 });
 		}
-		return SuccessorOperands(mlir::MutableOperandRange{ getOperation(), 0, 0 });
+		return SuccessorOperands(0, mlir::MutableOperandRange{ getOperation(), 0, 0 });
 	}
 }// namespace emitpybytecode
 }// namespace mlir

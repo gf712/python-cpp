@@ -37,7 +37,12 @@ PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interp
 	auto result = exit_method_obj->call(args_tuple.unwrap(), nullptr);
 
 	if (result.is_ok()) {
-		if (auto r = truthy(result.unwrap(), interpreter); r.is_ok()) {
+		if (auto r =
+				[&] {
+					[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+					return truthy(result.unwrap(), interpreter);
+				}();
+			r.is_ok()) {
 			if (!r.unwrap()) {
 				const auto active_exception =
 					interpreter.execution_frame()->exception_info().has_value();

@@ -7,17 +7,22 @@ namespace py {
 static constexpr std::array builtin_modules{
 	std::tuple<std::string_view, PyModule *(*)()>{ "builtin", nullptr },
 	std::tuple<std::string_view, PyModule *(*)()>{ "sys", nullptr },
+	std::tuple<std::string_view, PyModule *(*)()>{ "_codecs", codecs_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_imp", imp_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_io", io_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "math", math_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "marshal", marshal_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "posix", posix_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_thread", thread_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_weakref", weakref_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_warnings", warnings_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "itertools", itertools_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "_sre", sre_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_collections", collections_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "time", time_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "_signal", signal_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "errno", errno_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "_struct", struct_module },
 };
 
 inline bool is_builtin(std::string_view name)

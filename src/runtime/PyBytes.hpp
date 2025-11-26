@@ -19,6 +19,9 @@ class PyBytes : public PyBaseObject
 	static PyResult<PyBytes *> create(Bytes number);
 	static PyResult<PyBytes *> create();
 
+	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
+	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
+
 	~PyBytes() = default;
 	std::string to_string() const override;
 
@@ -30,7 +33,13 @@ class PyBytes : public PyBaseObject
 
 	PyResult<PyObject *> __getitem__(int64_t index);
 
+	PyResult<PyObject *> __getitem__(PyObject *index);
+	// PyResult<std::monostate> __setitem__(PyObject *index, PyObject *value);
+
 	PyResult<PyObject *> __repr__() const;
+	PyResult<int64_t> __hash__() const;
+
+	PyResult<std::monostate> __getbuffer__(PyBuffer &, int);
 
 	const Bytes &value() const { return m_value; }
 

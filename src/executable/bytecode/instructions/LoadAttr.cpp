@@ -21,6 +21,7 @@ PyResult<Value> LoadAttr::execute(VirtualMachine &vm, Interpreter &interpreter) 
 			},
 			this_value));
 	auto result = [&]() -> PyResult<Value> {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 		if (auto *this_obj = std::get_if<PyObject *>(&this_value)) {
 			auto name = PyString::create(attribute_name);
 			if (auto r = (*this_obj)->get_attribute(name.unwrap()); r.is_ok()) {

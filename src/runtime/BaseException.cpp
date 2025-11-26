@@ -80,7 +80,10 @@ void BaseException::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
 	if (m_args) visitor.visit(*m_args);
+	if (m_dict) visitor.visit(*m_dict);
 	if (m_traceback) visitor.visit(*m_traceback);
+	if (m_context) visitor.visit(*m_context);
+	if (m_cause) visitor.visit(*m_cause);
 }
 
 std::string BaseException::to_string() const

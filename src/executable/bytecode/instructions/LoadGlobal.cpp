@@ -29,7 +29,10 @@ PyResult<Value> LoadGlobal::execute(VirtualMachine &vm, Interpreter &interpreter
 		auto name_ = PyString::create(object_name);
 		if (name_.is_err()) { return Err(name_.unwrap_err()); }
 		name = name_.unwrap();
-		auto it = globals->as_mapping().unwrap().getitem(name);
+		auto it = [&] {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return globals->as_mapping().unwrap().getitem(name);
+		}();
 		if (it.is_ok()) {
 			vm.reg(m_destination) = it.unwrap();
 			return Ok(it.unwrap());

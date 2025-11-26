@@ -1,5 +1,6 @@
 #include "PyIterator.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/StopIteration.hpp"
 #include "runtime/Value.hpp"
 #include "runtime/ValueError.hpp"
 #include "types/api.hpp"
@@ -35,7 +36,7 @@ PyResult<PyObject *> PyIterator::__next__()
 		&& (result.unwrap_err()->type()->issubclass(types::index_error())
 			|| result.unwrap_err()->type()->issubclass(types::stop_iteration()))) {
 		m_iterator = nullptr;
-		return result;
+		return Err(stop_iteration());
 	} else if (result.is_err()) {
 		return result;
 	}

@@ -7,13 +7,17 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyInteger.hpp"
 #include "runtime/PyObject.hpp"
+#include "runtime/PySlice.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/TypeError.hpp"
 #include "runtime/Value.hpp"
+#include "runtime/utilities.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
+
+#include <string_view>
 
 namespace py {
 
@@ -36,6 +40,71 @@ PyBytes::PyBytes(Bytes number)
 {}
 
 PyBytes::PyBytes() : PyBytes(Bytes{}) {}
+
+
+struct ByteBackInserter
+{
+	using iterator_category = std::output_iterator_tag;
+	using value_type = void;
+	using difference_type = std::ptrdiff_t;
+	using pointer = void;
+	using reference = void;
+	using container_type = std::vector<std::byte>;
+
+	container_type &m_bytes;
+	BaseException *m_exception{ nullptr };
+	ByteBackInserter(std::vector<std::byte> &bytes) : m_bytes(bytes) {}
+
+	BaseException *last_error() const { return m_exception; }
+
+	ByteBackInserter &operator=(PyObject *value)
+	{
+		if (auto int_obj = as<PyInteger>(value)) {
+			if (int_obj->as_i64() >= 0 && int_obj->as_i64() <= 255) {
+				m_bytes.push_back(static_cast<std::byte>(int_obj->as_i64()));
+			}
+		} else {
+			m_exception = type_error(
+				"'{}' object cannot be interpreted as an integer", value->type()->name());
+		}
+		return *this;
+	}
+};
+
+PyResult<int32_t> PyBytes::__init__(PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(!kwargs || kwargs->map().empty());
+
+	if (!args || args->elements().empty()) {
+		return Ok(0);
+	} else if (args->elements().size() == 1) {
+		auto arg0 = PyObject::from(args->elements()[0]);
+		if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
+		if (auto count = as<PyInteger>(arg0.unwrap())) {
+			m_value.b.resize(count->as_size_t());
+		} else if (auto bytes = as<PyBytes>(arg0.unwrap())) {
+			// FIXME: should this take the iterable path?
+			m_value.b.insert(m_value.b.end(), bytes->value().b.begin(), bytes->value().b.end());
+		} else if (arg0.unwrap()->iter().is_ok()) {
+			if (auto result = from_iterable(arg0.unwrap(), ByteBackInserter(m_value.b));
+				result.is_err()) {
+				return Err(result.unwrap_err());
+			}
+		} else {
+			TODO();
+		}
+	} else {
+		TODO();
+	}
+
+	return Ok(0);
+}
+
+PyResult<PyObject *> PyBytes::__new__(const PyType *type, PyTuple *, PyDict *)
+{
+	ASSERT(type == types::bytes());
+	return PyBytes::create();
+}
 
 PyResult<PyBytes *> PyBytes::create(Bytes value)
 {
@@ -129,6 +198,55 @@ PyResult<PyObject *> PyBytes::__getitem__(int64_t index)
 	}
 
 	return PyInteger::create(static_cast<int64_t>(m_value.b[index]));
+}
+
+PyResult<PyObject *> PyBytes::__getitem__(PyObject *index)
+{
+	if (index->type()->issubclass(types::integer())) {
+		const auto i = static_cast<const PyInteger &>(*index).as_i64();
+		return __getitem__(i);
+	} else if (auto slice = as<PySlice>(index)) {
+		auto indices_ = slice->unpack();
+		if (indices_.is_err()) return Err(indices_.unwrap_err());
+		const auto [start_, end_, step] = indices_.unwrap();
+
+		const auto [start, end, slice_length] =
+			PySlice::adjust_indices(start_, end_, step, m_value.b.size());
+
+		if (slice_length == 0) { return PyBytes::create(); }
+		if (start == 0 && end == static_cast<int64_t>(m_value.b.size()) && step == 1) {
+			return PyBytes::create(m_value);
+		}
+
+		Bytes new_bytes;
+		for (int64_t idx = start, i = 0; i < slice_length; idx += step, ++i) {
+			new_bytes.b.push_back(m_value.b[idx]);
+		}
+		return PyBytes::create(std::move(new_bytes));
+	} else {
+		return Err(
+			type_error("list indices must be integers or slices, not {}", index->type()->name()));
+	}
+}
+
+PyResult<std::monostate> PyBytes::__getbuffer__(PyBuffer &view, int /*flags*/)
+{
+	view.obj = this;
+	view.buf = std::make_unique<NonOwningStorage<std::byte>>(m_value.b.data());
+	view.len = m_value.b.size();
+	view.readonly = true;
+	view.itemsize = 1;
+	view.format = "B";
+	view.ndim = 1;
+	return Ok(std::monostate{});
+}
+
+PyResult<int64_t> PyBytes::__hash__() const
+{
+	// bytes and str have the same hash
+	// e.g. hash("123") == hash(b"123")
+	std::string_view sv{ bit_cast<char *>(m_value.b.data()), m_value.b.size() };
+	return Ok(static_cast<int64_t>(std::hash<std::string_view>{}(sv)));
 }
 
 PyType *PyBytes::static_type() const { return types::bytes(); }

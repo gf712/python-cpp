@@ -154,6 +154,7 @@ void PyModule::visit_graph(Visitor &visitor)
 	if (m_loader) visitor.visit(*m_loader);
 	if (m_spec) visitor.visit(*m_spec);
 	if (m_dict) visitor.visit(*m_dict);
+	if (m_module_context) { visitor.visit(*m_module_context); }
 	if (m_program) { m_program->visit_functions(visitor); }
 }
 

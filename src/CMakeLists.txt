@@ -21,6 +21,8 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/DictAdd.cpp
     executable/bytecode/instructions/DictMerge.cpp
     executable/bytecode/instructions/DictUpdate.cpp
+    executable/bytecode/instructions/DeleteAttr.cpp
+    executable/bytecode/instructions/DeleteDeref.cpp
     executable/bytecode/instructions/DeleteFast.cpp
     executable/bytecode/instructions/DeleteGlobal.cpp
     executable/bytecode/instructions/DeleteName.cpp
@@ -80,6 +82,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/StoreSubscript.cpp
     executable/bytecode/instructions/ToBool.cpp
     executable/bytecode/instructions/Unary.cpp
+    executable/bytecode/instructions/UnpackExpand.cpp
     executable/bytecode/instructions/UnpackSequence.cpp
     executable/bytecode/instructions/WithExceptStart.cpp
     executable/bytecode/instructions/YieldFrom.cpp
@@ -110,6 +113,7 @@ set(RUNTIME_SOURCE_FILES
     # cmake-format: sortable
     runtime/CustomPyObject.cpp
     runtime/modules/BuiltinsModule.cpp
+    runtime/modules/CodecsModule.cpp
     runtime/modules/ImpModule.cpp
     runtime/modules/IOModule.cpp
     runtime/modules/collections/module.cpp
@@ -118,18 +122,26 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/errno/module.cpp
     runtime/modules/itertools/module.cpp
     runtime/modules/itertools/Chain.cpp
+    runtime/modules/itertools/Count.cpp
     runtime/modules/itertools/ISlice.cpp
     runtime/modules/itertools/Permutations.cpp
     runtime/modules/itertools/Product.cpp
     runtime/modules/itertools/Repeat.cpp
     runtime/modules/itertools/StarMap.cpp
+    runtime/modules/math/module.cpp
+    runtime/modules/signal/module.cpp
     runtime/modules/thread/module.cpp
     runtime/modules/time/module.cpp
     runtime/modules/weakref/module.cpp
+    runtime/modules/weakref/PyCallableProxyType.cpp
     runtime/modules/weakref/PyWeakProxy.cpp
     runtime/modules/weakref/PyWeakRef.cpp
     runtime/modules/MarshalModule.cpp
     runtime/modules/PosixModule.cpp
+    runtime/modules/sre/module.cpp
+    runtime/modules/sre/Match.cpp
+    runtime/modules/sre/Pattern.cpp
+    runtime/modules/struct/module.cpp
     runtime/modules/SysModule.cpp
     runtime/modules/WarningsModule.cpp
     runtime/types/builtin.cpp
@@ -232,6 +244,7 @@ set(UNITTEST_SOURCES
     testing/main.cpp)
 
 set(PYTHON_LIB_PATH ${cpython_SOURCE_DIR}/Lib)
+set(PYTHON_INSTALL_PATH ${CMAKE_INSTALL_PREFIX})
 
 configure_file(runtime/modules/paths.hpp.in runtime/modules/paths.hpp)
 
@@ -285,7 +298,7 @@ target_link_libraries(python-cpp
 )
 
 # LLVM backend
-find_package(LLVM CONFIG 10.0)
+find_package(LLVM CONFIG 20.0)
 if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
   message(FATAL_ERROR "Could not find LLVM in the local environment")
 elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
@@ -335,12 +348,12 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
   target_link_libraries(unittests_ PRIVATE python-cpp-llvm)
 endif()
 
-target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings)
+target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings tsl::ordered_map)
 set_target_properties(unittests_ PROPERTIES OUTPUT_NAME "unittests")
 add_custom_target(run-unittests COMMAND $<TARGET_FILE:unittests_> DEPENDS unittests_)
 
 add_executable(python repl/repl.cpp)
-target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings)
+target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings stdc++)
 
 add_executable(freeze utilities/freeze.cpp)
 target_link_libraries(freeze PRIVATE python-cpp cxxopts project_options project_warnings)

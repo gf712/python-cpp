@@ -136,9 +136,8 @@ namespace py {
 		else if (point.getRegionOrNull() == &getBody()) {
 			regions.emplace_back(&getCondition(), getCondition().getArguments());
 		}
-		// Branching from orelse: go to parent.
+		// Branching from orelse - can't go anywhere else.
 		else if (point.getRegionOrNull() == &getOrelse()) {
-			regions.emplace_back(&getOrelse(), getOrelse().getArguments());
 		} else {
 			llvm_unreachable("unexpected branch origin");
 		}
@@ -164,9 +163,8 @@ namespace py {
 		else if (point.getRegionOrNull() == &getBody()) {
 			regions.emplace_back(&getStep(), getStep().getArguments());
 		}
-		// Branching from orelse: go to parent.
+		// Branching from orelse - can't go anywhere else.
 		else if (point.getRegionOrNull() == &getOrelse()) {
-			regions.emplace_back(&getOrelse(), getOrelse().getArguments());
 		} else {
 			llvm_unreachable("unexpected branch origin");
 		}
@@ -218,8 +216,6 @@ namespace py {
 		// Branch from finally: go to parent
 		else if (point.getRegionOrNull() == &getFinally()) {
 			regions.emplace_back(getOperation()->getParentRegion());
-		} else {
-			llvm_unreachable("unexpected branch origin");
 		}
 	}
 
@@ -244,7 +240,6 @@ namespace py {
 					} else if (getOperation()->getParentRegion() == &op.getBody()) {
 						regions.emplace_back(&op.getStep());
 					} else if (getOperation()->getParentRegion() == &op.getOrelse()) {
-						regions.emplace_back(op->getParentRegion());
 					} else {
 						llvm_unreachable("unexpected branch origin");
 					}
@@ -260,7 +255,6 @@ namespace py {
 					} else if (getOperation()->getParentRegion() == &op.getBody()) {
 						regions.emplace_back(&op.getCondition());
 					} else if (getOperation()->getParentRegion() == &op.getOrelse()) {
-						regions.emplace_back(op->getParentRegion());
 					} else {
 						llvm_unreachable("unexpected branch origin");
 					}

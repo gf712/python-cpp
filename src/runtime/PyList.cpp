@@ -188,6 +188,31 @@ PyResult<PyObject *> PyList::pop(PyObject *index)
 	}
 }
 
+
+PyResult<PyObject *> PyList::insert(PyTuple *args, PyDict *kwargs)
+{
+	auto result = PyArgsParser<PyInteger *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"insert",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+
+	if (result.is_err()) { return Err(result.unwrap_err()); }
+
+	auto [index_obj, object] = result.unwrap();
+
+	auto index = index_obj->as_big_int();
+	if (index < 0) {
+		index += m_elements.size();
+		if (index < 0) { index = 0; }
+	}
+	if (index > m_elements.size()) { index = m_elements.size(); }
+
+	m_elements.insert(m_elements.begin(), object);
+
+	return Ok(py_none());
+}
+
 std::string PyList::to_string() const
 {
 	auto r = __repr__();
@@ -533,6 +558,8 @@ PyResult<PyObject *> PyList::sort(PyTuple *args, PyDict *kwargs)
 		}
 	}
 
+	if (m_elements.empty()) { return Ok(py_none()); }
+
 	PyResult<PyObject *> err = Ok(py_none());
 	if (key && key != py_none()) {
 		auto cmp_list_ = PyList::create();
@@ -651,6 +678,7 @@ namespace {
 						});
 					})
 				.def("__reversed__", &PyList::__reversed__)
+				.def("insert", &PyList::insert)
 				.type);
 	}
 }// namespace

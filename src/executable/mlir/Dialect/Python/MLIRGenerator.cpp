@@ -308,17 +308,29 @@ ast::Value *MLIRGenerator::visit(const ast::Arguments *node)
 ast::Value *MLIRGenerator::visit(const ast::Attribute *node)
 {
 	auto self = static_cast<MLIRValue *>(node->value()->codegen(this))->value;
-	if (node->context() == ast::ContextType::LOAD) {
+	switch (node->context()) {
+	case ast::ContextType::LOAD: {
 		return new_value(m_context.builder().create<mlir::py::LoadAttributeOp>(
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			self,
 			m_context.builder().getStringAttr(node->attr())));
-	} else if (node->context() == ast::ContextType::STORE) {
+	} break;
+	case ast::ContextType::STORE: {
 		TODO();
-	} else {
+	} break;
+	case ast::ContextType::DELETE: {
+		m_context.builder().create<mlir::py::DeleteAttributeOp>(
+			loc(m_context.builder(), m_context.filename(), node->source_location()),
+			self,
+			m_context.builder().getStringAttr(node->attr()));
+		return nullptr;
+	} break;
+	case ast::ContextType::UNSET: {
 		TODO();
+	} break;
 	}
+	TODO();
 	return nullptr;
 }
 
@@ -538,7 +550,8 @@ void MLIRGenerator::delete_name(std::string_view name, const SourceLocation &loc
 	} break;
 	case VariablesResolver::Visibility::CELL:
 	case VariablesResolver::Visibility::FREE: {
-		TODO();
+		m_context.builder().create<mlir::py::DeleteDerefOp>(
+			loc(m_context.builder(), m_context.filename(), location), name);
 	} break;
 	case VariablesResolver::Visibility::HIDDEN: {
 		auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
@@ -1556,9 +1569,11 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		loc(m_context.builder(), m_context.filename(), node->source_location()), iterable);
 	auto &body_start = for_loop.getBody().emplaceBlock();
 
-	m_context.builder().setInsertionPointToStart(&for_loop.getStep().emplaceBlock());
-	auto &orelse = for_loop.getOrelse().emplaceBlock();
+	auto &orelse = for_loop.getOrelse();
+	auto *orelse_block =
+		node->orelse().empty() ? nullptr : m_context.builder().createBlock(&orelse);
 
+	m_context.builder().setInsertionPointToStart(&for_loop.getStep().emplaceBlock());
 	auto iterator = new_value(for_loop.getStep().addArgument(
 		m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
 
@@ -1575,14 +1590,14 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
 	}
 
-	m_context.builder().setInsertionPointToStart(&orelse);
-	for (const auto &el : node->orelse()) { el->codegen(this); }
-	if (m_context.builder().getInsertionBlock()->empty()
-		|| !m_context.builder()
-				.getInsertionBlock()
-				->back()
-				.hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
+	if (!node->orelse().empty()) {
+		m_context.builder().setInsertionPointToStart(orelse_block);
+		for (const auto &el : node->orelse()) { el->codegen(this); }
+		if (m_context.builder().getBlock()->empty()
+			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
+			m_context.builder().create<mlir::py::ControlFlowYield>(loc(
+				m_context.builder(), m_context.filename(), node->body().back()->source_location()));
+		}
 	}
 
 	m_context.builder().setInsertionPointAfter(for_loop);
@@ -2767,9 +2782,20 @@ ast::Value *MLIRGenerator::visit(const ast::Tuple *node)
 		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 	std::vector<bool> value_requires_expansion(node->elements().size(), false);
+	bool delete_context = false;
 	for (const auto &p : llvm::enumerate(node->elements())) {
 		values.push_back(static_cast<MLIRValue *>(p.value()->codegen(this)));
+		if (values.back() == nullptr) {
+			delete_context = true;
+			ASSERT(as<ast::Name>(p.value()));
+			ASSERT(as<ast::Name>(p.value())->context_type() == ast::ContextType::DELETE);
+		}
 		value_requires_expansion[p.index()] = requires_expansion(p.value());
+	}
+
+	if (delete_context) {
+		ASSERT(std::all_of(values.begin(), values.end(), [](auto *el) { return el == nullptr; }));
+		return nullptr;
 	}
 
 	return build_tuple(
@@ -2937,20 +2963,7 @@ ast::Value *MLIRGenerator::visit(const ast::WithItem *node)
 		false);
 
 	if (auto optional_vars = node->optional_vars()) {
-		if (auto name = as<ast::Name>(optional_vars)) {
-			ASSERT(as<ast::Name>(optional_vars)->ids().size() == 1)
-			store_name(as<ast::Name>(optional_vars)->ids()[0],
-				new_value(item_result),
-				name->source_location());
-		} else if (auto tuple = as<ast::Tuple>(optional_vars)) {
-			(void)tuple;
-			TODO();
-		} else if (auto list = as<ast::List>(optional_vars)) {
-			(void)list;
-			TODO();
-		} else {
-			ASSERT_NOT_REACHED();
-		}
+		assign(optional_vars, new_value(item_result), node->source_location());
 	}
 
 	return new_value(expr);

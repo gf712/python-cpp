@@ -13,6 +13,8 @@
 #include "executable/bytecode/instructions/BuildTuple.hpp"
 #include "executable/bytecode/instructions/ClearExceptionState.hpp"
 #include "executable/bytecode/instructions/CompareOperation.hpp"
+#include "executable/bytecode/instructions/DeleteAttr.hpp"
+#include "executable/bytecode/instructions/DeleteDeref.hpp"
 #include "executable/bytecode/instructions/DeleteFast.hpp"
 #include "executable/bytecode/instructions/DeleteGlobal.hpp"
 #include "executable/bytecode/instructions/DeleteName.hpp"
@@ -77,6 +79,8 @@
 #include "executable/bytecode/instructions/YieldLoad.hpp"
 #include "executable/bytecode/instructions/YieldValue.hpp"
 
+#include "mlir/Analysis/TopologicalSortUtils.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
@@ -88,14 +92,13 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
-#include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include <algorithm>
 #include <map>
 #include <optional>
 #include <ranges>
@@ -110,14 +113,22 @@ namespace {
 	{
 		return mlir::isa<mlir::emitpybytecode::FunctionCallOp>(value.getDefiningOp())
 			   || mlir::isa<mlir::emitpybytecode::FunctionCallExOp>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::FunctionCallWithKeywordsOp>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::WithExceptStart>(value.getDefiningOp());
+			   || mlir::isa<mlir::emitpybytecode::FunctionCallWithKeywordsOp>(
+				   value.getDefiningOp());
+	}
+
+	bool clobbers_r0(mlir::Value value)
+	{
+		return is_function_call(value)
+			   || mlir::isa<mlir::emitpybytecode::WithExceptStart>(value.getDefiningOp())
+			   || mlir::isa<mlir::emitpybytecode::Yield>(value.getDefiningOp())
+			   || mlir::isa<mlir::emitpybytecode::YieldFrom>(value.getDefiningOp());
 	}
 
 	std::vector<mlir::Block *> sortBlocks(mlir::Region &region)
 	{
-		auto result = mlir::getTopologicallySortedBlocks(region);
-		return std::vector<mlir::Block *>{ result.begin(), result.end() };
+		auto result = mlir::getBlocksSortedByDominance(region);
+		return { result.begin(), result.end() };
 	}
 }// namespace
 
@@ -181,6 +192,7 @@ struct LiveAnalysis
 			const auto start = alive_at_timestep.size();
 			if (!sortTopologically(block)) { std::abort(); }
 			// block->print(llvm::outs(), state);
+			// llvm::outs() << '\n';
 			for (auto &op : block->getOperations()) {
 				auto &alive = alive_at_timestep.emplace_back();
 				// ASSERT(op.getOpResults().size() <= 1);
@@ -343,6 +355,7 @@ struct LiveAnalysis
 		// 		}
 		// 		llvm::outs() << '\n';
 		// 	}
+		// llvm::outs().flush();
 	}
 };
 
@@ -536,7 +549,7 @@ struct LinearScanRegisterAllocation
 			// the result of all call operations
 			if (std::holds_alternative<mlir::Value>(interval.value)
 				&& (std::get<mlir::Value>(interval.value).getDefiningOp()
-					&& is_function_call(std::get<mlir::Value>(interval.value)))) {
+					&& clobbers_r0(std::get<mlir::Value>(interval.value)))) {
 				value2mem_map.insert_or_assign(
 					std::get<mlir::Value>(interval.value), Reg{ .idx = 0 });
 				inactive.insert(interval);
@@ -548,7 +561,7 @@ struct LinearScanRegisterAllocation
 				for (auto mapped_value : it->second) {
 					if (std::holds_alternative<ForwardedOutput>(mapped_value)) { continue; }
 					if ((std::get<mlir::Value>(mapped_value).getDefiningOp()
-							&& is_function_call(std::get<mlir::Value>(mapped_value)))) {
+							&& clobbers_r0(std::get<mlir::Value>(mapped_value)))) {
 						value2mem_map.insert_or_assign(interval.value, Reg{ .idx = 0 });
 						inactive.insert(interval);
 						break;
@@ -592,7 +605,7 @@ struct LinearScanRegisterAllocation
 					ASSERT(
 						(std::holds_alternative<mlir::Value>(interval.value)
 							&& std::get<mlir::Value>(interval.value).getDefiningOp()
-							&& is_function_call(std::get<mlir::Value>(interval.value)))
+							&& clobbers_r0(std::get<mlir::Value>(interval.value)))
 						|| (live_interval_analysis.block_input_mappings.contains(interval.value)
 							&& std::ranges::any_of(
 								live_interval_analysis.block_input_mappings.find(interval.value)
@@ -600,8 +613,7 @@ struct LinearScanRegisterAllocation
 								[](auto mapped_value) {
 									if (std::holds_alternative<mlir::Value>(mapped_value)) {
 										return std::get<mlir::Value>(mapped_value).getDefiningOp()
-											   && is_function_call(
-												   std::get<mlir::Value>(mapped_value));
+											   && clobbers_r0(std::get<mlir::Value>(mapped_value));
 									}
 									return false;
 								})));
@@ -653,6 +665,11 @@ struct LinearScanRegisterAllocation
 				std::optional<size_t> cur_reg;
 				if (auto it = value2mem_map.find(cur.value); it == value2mem_map.end()) {
 					for (size_t i = 0; i < f.size(); ++i) {
+						if (i == 0 && std::get<mlir::Value>(cur.value).getDefiningOp()
+							&& mlir::isa<mlir::emitpybytecode::GetIter>(
+								std::get<mlir::Value>(cur.value).getDefiningOp())) {
+							continue;
+						}
 						if (f.test(i)) {
 							value2mem_map.insert_or_assign(cur.value, Reg{ .idx = i });
 							cur_reg = i;
@@ -685,8 +702,7 @@ struct LinearScanRegisterAllocation
 								for (auto mapped_value : it->second) {
 									ASSERT(!std::holds_alternative<ForwardedOutput>(mapped_value));
 									if ((std::get<mlir::Value>(mapped_value).getDefiningOp()
-											&& is_function_call(
-												std::get<mlir::Value>(mapped_value)))) {
+											&& clobbers_r0(std::get<mlir::Value>(mapped_value)))) {
 										ASSERT(current_value.isa<mlir::BlockArgument>());
 										current_value = std::get<mlir::Value>(mapped_value);
 										break;
@@ -1148,6 +1164,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			mlir::emitpybytecode::DeleteFastOp,
 			mlir::emitpybytecode::DeleteNameOp,
 			mlir::emitpybytecode::DeleteGlobalOp,
+			mlir::emitpybytecode::DeleteDerefOp,
 			mlir::emitpybytecode::UnpackSequenceOp,
 			mlir::emitpybytecode::UnpackExpandOp>([this](auto op) {
 			if (emitOperation(op).failed()) { return failure(); };
@@ -1242,10 +1259,11 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			m_current_operation_index.top()++;
 			return success();
 		})
-		.Case<mlir::emitpybytecode::StoreAttribute>([this](auto op) {
-			if (emitOperation(op).failed()) { return failure(); };
-			return success();
-		})
+		.Case<mlir::emitpybytecode::StoreAttribute, emitpybytecode::DeleteAttribute>(
+			[this](auto op) {
+				if (emitOperation(op).failed()) { return failure(); };
+				return success();
+			})
 		.Case<mlir::emitpybytecode::Push, mlir::emitpybytecode::Pop, mlir::emitpybytecode::Move>(
 			[this](auto op) {
 				if (emitOperation(op).failed()) { return failure(); };
@@ -1625,6 +1643,13 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::StoreAt
 }
 
 template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteAttribute &op)
+{
+	emit<DeleteAttr>(get_register(op.getSelf()), add_name(op.getAttribute()));
+	return success();
+}
+
+template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::RaiseVarargs &op)
 {
 	if (auto cause = op.getCause()) {
@@ -1920,6 +1945,13 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteG
 }
 
 template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteDerefOp &op)
+{
+	emit<DeleteDeref>(get_cell_index(op.getName()));
+	return success();
+}
+
+template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::UnpackSequenceOp &op)
 {
 	std::vector<Register> unpacked_values;
@@ -2011,6 +2043,9 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 		std::cerr << "Invalid Python bytecode IR\n";
 		return nullptr;
 	}
+
+	// op->print(llvm::outs());
+	// llvm::outs().flush();
 
 	DialectRegistry registry;
 	registry.insert<emitpybytecode::EmitPythonBytecodeDialect>();

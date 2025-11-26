@@ -13,7 +13,7 @@ PyEllipsis::PyEllipsis() : PyBaseObject(types::BuiltinTypes::the().ellipsis()) {
 PyResult<PyEllipsis *> PyEllipsis::create()
 {
 	auto &heap = VirtualMachine::the().heap();
-	auto *obj = heap.allocate_static<PyEllipsis>().get();
+	auto *obj = heap.allocate_static<PyEllipsis>();
 	if (!obj) { return Err(memory_error(sizeof(PyEllipsis))); }
 	return Ok(obj);
 }

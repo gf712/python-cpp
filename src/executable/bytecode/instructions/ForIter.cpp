@@ -18,7 +18,10 @@ PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(m_body_offset.has_value())
 	auto iterator = vm.reg(m_src);
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
-		const auto &next_value = (*iterable_object)->next();
+		const auto next_value = [iterable_object]() {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return (*iterable_object)->next();
+		}();
 		if (next_value.is_err()) {
 			auto *last_exception = next_value.unwrap_err();
 			if (last_exception->type()->issubclass(stop_iteration()->type())) {

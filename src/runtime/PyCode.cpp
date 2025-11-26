@@ -16,6 +16,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
+#include <cstdint>
 
 namespace py {
 
@@ -182,6 +183,10 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 		nullptr);
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_function, function_frame);
+
+	if (m_name == "_combine_flags") {
+
+	}
 
 	for (size_t i = 0; i < cellvars_count(); ++i) {
 		auto cell = PyCell::create();

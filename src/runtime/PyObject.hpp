@@ -8,6 +8,7 @@
 #include "runtime/forward.hpp"
 #include "vm/VM.hpp"
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -93,19 +94,20 @@ using InitSlotFunctionType = std::function<PyResult<int32_t>(PyObject *, PyTuple
 using GetAttroFunctionType = std::function<PyResult<PyObject *>(const PyObject *, PyObject *)>;
 using SetAttroFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
+using DelAttroFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
 
 using GetSlotFunctionType =
 	std::function<PyResult<PyObject *>(const PyObject *, PyObject *, PyObject *)>;
 using SetSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
+using DeleteSlotFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
 
 using GetItemSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, PyObject *)>;
 using SetItemSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, PyObject *, PyObject *)>;
 using DelItemSlotFunctionType = std::function<PyResult<std::monostate>(PyObject *, PyObject *)>;
 
-using RepeatSequenceSlotFunctionType =
-	std::function<PyResult<PyObject *>(PyObject *, size_t)>;
+using RepeatSequenceSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, size_t)>;
 using GetItemSequenceSlotFunctionType = std::function<PyResult<PyObject *>(PyObject *, int64_t)>;
 using SetItemSequenceSlotFunctionType =
 	std::function<PyResult<std::monostate>(PyObject *, int64_t, PyObject *)>;
@@ -173,9 +175,60 @@ struct SequenceTypePrototype
 	std::optional<std::variant<ContainsSlotFunctionType, PyObject *>> __contains__;
 };
 
+template<typename T> struct OwningStorage;
+
+template<typename T> struct NonOwningStorage;
+
+struct Storage
+{
+	virtual ~Storage() = default;
+	virtual void *get_buffer() = 0;
+	virtual void set_buffer(void *) = 0;
+
+	virtual std::unique_ptr<Storage> view() = 0;
+};
+
+template<typename T> struct OwningStorage : Storage
+{
+	OwningStorage(T *buffer) : m_storage(buffer) {}
+	~OwningStorage()
+	{
+		if (m_storage) { delete m_storage; }
+	}
+
+	void *get_buffer() final { return static_cast<void *>(m_storage); }
+
+	void set_buffer(void *ptr) final { m_storage = static_cast<T *>(ptr); }
+
+	std::unique_ptr<Storage> view() final
+	{
+		return std::make_unique<NonOwningStorage<T>>(m_storage);
+	}
+
+	T *m_storage;
+};
+
+template<typename T> struct NonOwningStorage : Storage
+{
+	NonOwningStorage(T *buffer) : m_storage(buffer) {}
+
+	~NonOwningStorage() = default;
+
+	void *get_buffer() final { return static_cast<void *>(m_storage); }
+
+	void set_buffer(void *ptr) final { m_storage = static_cast<T *>(ptr); }
+
+	std::unique_ptr<Storage> view() final
+	{
+		return std::make_unique<NonOwningStorage<T>>(m_storage);
+	}
+
+	T *m_storage;
+};
+
 struct PyBuffer
 {
-	Bytes buf;
+	std::unique_ptr<Storage> buf;
 	PyObject *obj;
 	int64_t len;
 	int64_t itemsize;
@@ -240,9 +293,11 @@ struct TypePrototype
 
 	std::optional<std::variant<GetAttroFunctionType, PyObject *>> __getattribute__;
 	std::optional<std::variant<SetAttroFunctionType, PyObject *>> __setattribute__;
+	std::optional<std::variant<DelAttroFunctionType, PyObject *>> __delattribute__;
 
 	std::optional<std::variant<GetSlotFunctionType, PyObject *>> __get__;
 	std::optional<std::variant<SetSlotFunctionType, PyObject *>> __set__;
+	std::optional<std::variant<DeleteSlotFunctionType, PyObject *>> __delete__;
 
 	std::optional<std::variant<AddSlotFunctionType, PyObject *>> __add__;
 	std::optional<std::variant<SubtractSlotFunctionType, PyObject *>> __sub__;
@@ -382,6 +437,7 @@ class PyObject : public Cell
 
 	PyResult<PyObject *> getattribute(PyObject *attribute) const;
 	PyResult<std::monostate> setattribute(PyObject *attribute, PyObject *value);
+	PyResult<std::monostate> delattribute(PyObject *attribute);
 	PyResult<PyObject *> get(PyObject *instance, PyObject *owner) const;
 
 	PyResult<PyObject *> add(const PyObject *other) const;
@@ -437,6 +493,7 @@ class PyObject : public Cell
 
 	PyResult<PyObject *> __getattribute__(PyObject *attribute) const;
 	PyResult<std::monostate> __setattribute__(PyObject *attribute, PyObject *value);
+	PyResult<std::monostate> __delattribute__(PyObject *attribute);
 	PyResult<PyObject *> __eq__(const PyObject *other) const;
 	PyResult<PyObject *> __ne__(const PyObject *other) const;
 	PyResult<PyObject *> __repr__() const;
@@ -716,8 +773,7 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 	if constexpr (std::is_base_of_v<PySequence, Type> && HasRepeat<Type>) {
 		if (!type_prototype->sequence_type_protocol.has_value()) {
 			type_prototype->sequence_type_protocol = SequenceTypePrototype{
-				.__repeat__ =
-					+[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
+				.__repeat__ = +[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
 					return static_cast<const Type *>(self)->__mul__(count);
 				}
 			};
@@ -829,6 +885,12 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 			return static_cast<Type *>(self)->__setattribute__(attr, value);
 		};
 	}
+	if constexpr (HasDelAttro<Type>) {
+		type_prototype->__delattribute__ =
+			+[](PyObject *self, PyObject *attr) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__delattribute__(attr);
+		};
+	}
 	if constexpr (HasGet<Type>) {
 		type_prototype->__get__ =
 			+[](const PyObject *self, PyObject *instance, PyObject *owner) -> PyResult<PyObject *> {
@@ -841,10 +903,39 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 			return static_cast<Type *>(self)->__set__(attribute, value);
 		};
 	}
+	if constexpr (HasDelete<Type>) {
+		type_prototype->__delete__ =
+			+[](PyObject *self, PyObject *attribute) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__delete__(attribute);
+		};
+	}
 	if constexpr (HasStr<Type>) {
 		type_prototype->__str__ = +[](PyObject *self) -> PyResult<PyObject *> {
 			return static_cast<Type *>(self)->__str__();
 		};
+	}
+
+	if constexpr (HasGetBuffer<Type>) {
+		type_prototype->as_buffer = PyBufferProcs{
+			.getbuffer =
+				+[](PyObject *self, PyBuffer &view, int flags) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__getbuffer__(view, flags);
+			},
+		};
+	}
+	if constexpr (HasReleaseBuffer<Type>) {
+		if (!type_prototype->as_buffer.has_value()) {
+			type_prototype->as_buffer = PyBufferProcs{
+				.releasebuffer = +[](PyObject *self, PyBuffer &view) -> PyResult<std::monostate> {
+					return static_cast<Type *>(self)->__releasebuffer__(view);
+				},
+			};
+		} else {
+			type_prototype->as_buffer->releasebuffer =
+				+[](PyObject *self, PyBuffer &view) -> PyResult<std::monostate> {
+				return static_cast<Type *>(self)->__releasebuffer__(view);
+			};
+		}
 	}
 
 	type_prototype->traverse =
@@ -864,6 +955,11 @@ class PyBaseObject : public PyObject
 struct ValueHash
 {
 	size_t operator()(const Value &value) const;
+};
+
+struct ValueEq
+{
+	bool operator()(const Value &lhs, const Value &rhs) const;
 };
 
 }// namespace py

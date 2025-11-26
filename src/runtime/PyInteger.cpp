@@ -37,6 +37,11 @@ PyInteger::PyInteger(TypePrototype &type, BigIntType value)
 	: Interface(Number{ std::move(value) }, type)
 {}
 
+PyInteger::PyInteger(PyType *type, BigIntType value) : PyInteger(type)
+{
+	m_value = Number{ std::move(value) };
+}
+
 PyResult<PyInteger *> PyInteger::create(int64_t value)
 {
 	return PyInteger::create(BigIntType{ value });
@@ -50,13 +55,23 @@ PyResult<PyInteger *> PyInteger::create(BigIntType value)
 	return Ok(result);
 }
 
+PyResult<PyInteger *> PyInteger::create(PyType *type, BigIntType value)
+{
+	if (type == types::integer()) { return create(std::move(value)); }
+	ASSERT(type->issubclass(types::integer()));
+	auto result = type->underlying_type().__alloc__(type);
+	return result.and_then([value = std::move(value)](PyObject *obj) -> PyResult<PyInteger *> {
+		static_cast<PyInteger &>(*obj).m_value = Number{ std::move(value) };
+		return Ok(static_cast<PyInteger *>(obj));
+	});
+}
+
 PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == types::integer());
-
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	PyObject *value = nullptr;
 	PyObject *base = nullptr;
+	if (!args) { return PyInteger::create(0); }
 	if (args->elements().size() > 0) {
 		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
 			value = obj.unwrap();
@@ -65,24 +80,57 @@ PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDic
 		}
 	}
 
-	if (args->elements().size() > 1) {
-		(void)base;
-		TODO();
-	}
+	if (args->elements().size() > 1) { base = PyObject::from(args->elements()[1]).unwrap(); }
 
 	if (!value) {
-		return PyInteger::create(0);
-	} else if (auto *int_value = as<PyInteger>(value)) {
-		return PyInteger::create(int_value->as_size_t());
-	} else if (auto *float_value = as<PyFloat>(value)) {
-		return PyInteger::create(static_cast<int64_t>(float_value->as_f64()));
-	} else if (auto *str_value = as<PyString>(value)) {
-		size_t pos{ 0 };
-		auto str = str_value->value();
+		return PyInteger::create(const_cast<PyType *>(type), 0);
+	} else if (value->type()->issubclass(types::integer())) {
+		if (base) { return Err(type_error("int() can't convert non-string with explicit base")); }
+		return PyInteger::create(
+			const_cast<PyType *>(type), static_cast<const PyInteger &>(*value).as_big_int());
+	} else if (value->type()->issubclass(types::float_())) {
+		if (base) { return Err(type_error("int() can't convert non-string with explicit base")); }
+		return PyInteger::create(const_cast<PyType *>(type),
+			BigIntType{ static_cast<const PyFloat &>(*value).as_f64() });
+	} else if (value->type()->issubclass(types::bytes())
+			   || value->type()->issubclass(types::bytearray())
+			   || value->type()->issubclass(types::str())) {
+		std::string str;
+		if (value->type()->issubclass(types::str())) {
+			auto str_value = static_cast<PyString *>(value);
+			str = str_value->value();
+		} else {
+			Bytes bytes;
+			if (value->type()->issubclass(types::bytes())) {
+				bytes = static_cast<const PyBytes &>(*value).value();
+			} else {
+				bytes = static_cast<const PyByteArray &>(*value).value();
+			}
+			str = bytes.to_string();
+			// remove b' and trailing ' from byte string representation
+			str.erase(0, 2);
+			str.erase(str.size() - 1);
+		}
 		std::erase_if(str, [](const auto &c) { return std::isspace(c); });
-		double result = std::stod(str, &pos);
-		if (pos != str.size()) { return Err(type_error("invalid literal for int(): '{}'", str)); }
-		return PyInteger::create(static_cast<int64_t>(result));
+		if (base) {
+			if (!base->type()->issubclass(types::integer())) {
+				return Err(type_error(
+					"'{}' object cannot be interpreted as an integer", base->type()->name()));
+			}
+			auto b = static_cast<const PyInteger &>(*base).as_i64();
+			BigIntType result;
+			if (mpz_init_set_str(result.get_mpz_t(), str.c_str(), static_cast<int32_t>(b)) != 0) {
+				return Err(type_error("invalid literal for int(): '{}'", str));
+			}
+			return PyInteger::create(const_cast<PyType *>(type), std::move(result));
+		} else {
+			size_t pos{ 0 };
+			double result = std::stod(str, &pos);
+			if (pos != str.size()) {
+				return Err(type_error("invalid literal for int(): '{}'", str));
+			}
+			return PyInteger::create(const_cast<PyType *>(type), static_cast<int64_t>(result));
+		}
 	}
 	TODO();
 	return Err(nullptr);

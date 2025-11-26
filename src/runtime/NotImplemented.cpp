@@ -12,7 +12,7 @@ NotImplemented::NotImplemented() : PyBaseObject(types::BuiltinTypes::the().not_i
 PyResult<NotImplemented *> NotImplemented::create()
 {
 	auto &heap = VirtualMachine::the().heap();
-	auto *result = heap.allocate_static<NotImplemented>().get();
+	auto *result = heap.allocate_static<NotImplemented>();
 	if (!result) { return Err(memory_error(sizeof(NotImplemented))); }
 	return Ok(result);
 }

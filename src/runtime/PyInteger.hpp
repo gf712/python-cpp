@@ -17,6 +17,10 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 
 	PyInteger(TypePrototype &, BigIntType);
 
+	PyInteger(PyType *, BigIntType);
+
+	static PyResult<PyInteger *> create(PyType *, BigIntType);
+
   public:
 	static PyResult<PyInteger *> create(int64_t);
 
@@ -28,6 +32,7 @@ class PyInteger : public Interface<PyNumber, PyInteger>
 
 	PyResult<PyObject *> __and__(PyObject *obj);
 	PyResult<PyObject *> __or__(PyObject *obj);
+	PyResult<PyObject *> __xor__(PyObject *obj);
 
 	PyResult<PyObject *> __lshift__(const PyObject *other) const;
 	PyResult<PyObject *> __rshift__(const PyObject *other) const;

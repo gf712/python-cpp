@@ -14,10 +14,7 @@ using namespace py;
 
 PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 {
-	if (m_cause.has_value()) {
-		ASSERT(m_exception.has_value())
-		TODO();
-	} else if (m_exception.has_value()) {
+	if (m_exception.has_value()) {
 		const auto &exception = vm.reg(*m_exception);
 		ASSERT(std::holds_alternative<PyObject *>(exception))
 
@@ -31,6 +28,11 @@ PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 		}
 		if (!exception_obj->type()->issubclass(BaseException::class_type())) {
 			return Err(type_error("exceptions must derive from BaseException"));
+		}
+		if (m_cause.has_value()) {
+			auto cause = PyObject::from(vm.reg(*m_cause));
+			if (cause.is_err()) { return Err(cause.unwrap_err()); }
+			static_cast<BaseException *>(exception_obj)->set_cause(cause.unwrap());
 		}
 		return Err(static_cast<BaseException *>(exception_obj));
 	} else {

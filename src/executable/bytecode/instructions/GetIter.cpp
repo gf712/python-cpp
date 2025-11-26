@@ -8,6 +8,7 @@ PyResult<Value> GetIter::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto iterable_value = vm.reg(m_src);
 	auto result = [&]() {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 		if (auto *iterable_object = std::get_if<PyObject *>(&iterable_value)) {
 			return (*iterable_object)->iter();
 		} else {

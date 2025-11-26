@@ -10,6 +10,8 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTraceback.hpp"
+#include "utilities.hpp"
+#include <cstddef>
 #include <iterator>
 #include <spdlog/spdlog.h>
 
@@ -78,7 +80,7 @@ StackFrame StackFrame::clone() const
 StackFrame &StackFrame::restore()
 {
 	ASSERT(vm);
-	auto start = vm->m_stack_pointer;
+	auto start = stack_pointer;
 	for (const auto &el : locals_storage) { *start++ = el; }
 	vm->push_frame(*this);
 	return vm->stack().top();
@@ -202,28 +204,25 @@ void VirtualMachine::dump() const
 			register_);
 	}
 
-	// i = 0;
-	// std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
-	// for (const auto &register_ : registers()->get()) {
-	// 	std::visit(overloaded{ [&i](const auto &register_value) {
-	// 							  std::ostringstream os;
-	// 							  os << register_value;
-	// 							  std::cout << fmt::format("[{}]  {}\n", i++, os.str());
-	// 						  },
-	// 				   [&i](PyObject *obj) {
-	// 					   if (obj) {
-	// 						   //    std::cout << fmt::format("[{}]  {} ({})\n",
-	// 						   // 	   i++,
-	// 						   // 	   static_cast<const void *>(obj),
-	// 						   // 	   obj->to_string());
-	// 						   std::cout << fmt::format(
-	// 							   "[{}]  {}\n", i++, static_cast<const void *>(obj));
-	// 					   } else {
-	// 						   std::cout << fmt::format("[{}]  (Empty)\n", i++);
-	// 					   }
-	// 				   } },
-	// 		register_);
-	// }
+	std::cout << "Register state: " << (void *)(registers()->get().data()) << " \n";
+	for (size_t i = 0; const auto &register_ : registers()->get()) {
+		std::visit(
+			overloaded{ [&i](const auto &register_value) {
+						   std::ostringstream os;
+						   os << register_value;
+						   std::cout << fmt::format("[{}]  {}\n", i, os.str());
+					   },
+				[&i](PyObject *obj) {
+					if (obj) {
+						std::cout << fmt::format(
+							"[{}]  {} ({})\n", i, static_cast<const void *>(obj), obj->to_string());
+					} else {
+						std::cout << fmt::format("[{}]  (Empty)\n", i);
+					}
+				} },
+			register_);
+		++i;
+	}
 }
 
 
@@ -252,10 +251,13 @@ std::unique_ptr<StackFrame>
 {
 	auto new_frame =
 		m_stack_frames.empty()
-			? StackFrame::create(
-				register_count, locals_count, stack_size, InstructionVector::const_iterator{}, this)
+			? StackFrame::create(register_count,
+				  locals_count,
+				  stack_size,
+				  InstructionVector::const_iterator{},
+				  this)
 			: StackFrame::create(
-				register_count, locals_count, stack_size, m_instruction_pointer, this);
+				  register_count, locals_count, stack_size, m_instruction_pointer, this);
 	push_frame(*new_frame);
 
 	return new_frame;
@@ -275,8 +277,8 @@ void VirtualMachine::push_frame(StackFrame &frame)
 	auto &stack_objects = m_stack_objects.emplace_back();
 	if (r.has_value()) {
 		for (const auto &v : r->get()) { stack_objects.push_back(&v); }
-		for (const auto &v : stack_locals()) { stack_objects.push_back(&v); }
 	}
+	for (const auto &v : stack_locals()) { stack_objects.push_back(&v); }
 
 	ASSERT(std::distance(m_stack_pointer, frame.stack_pointer) >= 0);
 	ASSERT(std::distance(m_base_pointer, frame.base_pointer) >= 0);
@@ -306,6 +308,7 @@ void VirtualMachine::pop_frame(bool should_return_value)
 		ASSERT((*m_stack_frames.top().get().return_address).get());
 		m_instruction_pointer = m_stack_frames.top().get().return_address;
 		auto f = m_stack_frames.top();
+		f.get().stack_pointer = m_stack_pointer;
 		m_stack_frames.pop();
 		if (should_return_value) {
 			// returning a value may not be always desirable (e.g. leaving a function in an

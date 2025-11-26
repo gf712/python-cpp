@@ -123,7 +123,6 @@ class RLock : public PyBaseObject
 						 .def("acquire", &RLock::acquire)
 						 .def("__enter__", &RLock::__enter__)
 						 .def("__exit__", &RLock::__exit__)
-						 .disable_new()
 						 .finalize();
 		}
 		return s_rlock;

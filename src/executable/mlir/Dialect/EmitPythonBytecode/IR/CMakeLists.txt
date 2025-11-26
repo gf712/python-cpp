@@ -7,15 +7,16 @@ add_public_tablegen_target(MLIREmitPythonBytecodeIncGen)
 
 add_mlir_library(EmitPythonBytecodeDialect
                 EmitPythonBytecode.cpp
-                
+
                 DEPENDS
                 MLIREmitPythonBytecodeIncGen
+                MLIRPythonOpsIncGen
 
                 LINK_LIBS PUBLIC
                 MLIRIR
 )
 
-target_include_directories(EmitPythonBytecodeDialect PRIVATE 
-                            ${MLIR_INCLUDE_DIRS} 
-                            ${CMAKE_SOURCE_DIR}/src/executable/mlir/Dialect 
+target_include_directories(EmitPythonBytecodeDialect PRIVATE
+                            ${MLIR_INCLUDE_DIRS}
+                            ${CMAKE_SOURCE_DIR}/src/executable/mlir/Dialect
                             ${CMAKE_BINARY_DIR}/src/executable/mlir/Dialect)

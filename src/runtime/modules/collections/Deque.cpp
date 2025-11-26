@@ -76,6 +76,7 @@ PyResult<int32_t> Deque::__init__(PyTuple *args, PyDict *kwargs)
 	}
 	if (kwargs && !kwargs->map().empty()) { TODO(); }
 	m_maxlength = maxlen;
+	if (!iterable) { return Ok(0); }
 	return extend(iterable).and_then([](auto) -> PyResult<int32_t> { return Ok(0); });
 }
 

@@ -10,6 +10,7 @@ using namespace py;
 PyResult<Value> StoreName::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
 	const auto &value = vm.reg(m_source);
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 	return interpreter.store_object(m_object_name, value).and_then([](auto) {
 		return Ok(py_none());
 	});

@@ -92,6 +92,13 @@ size_t ValueHash::operator()(const Value &value) const
 	return result;
 }
 
+bool ValueEq::operator()(const Value &lhs, const Value &rhs) const
+{
+	auto result = equals(lhs, rhs).and_then([](const auto &result) { return truthy(result); });
+	if (result.is_err()) { return false; }
+	return result.unwrap();
+}
+
 namespace {
 
 	template<typename T> auto to_object(T &&value)
@@ -653,6 +660,28 @@ PyResult<std::monostate> PyObject::setattribute(PyObject *attribute, PyObject *v
 		return call_slot(*setattr_method, "", this, attribute, value);
 	}
 	if (type()->underlying_type().__getattribute__.has_value()) {
+		return Err(type_error("'{}' object has only read-only attributes (assign to {})",
+			type()->name(),
+			attribute->to_string()));
+	} else {
+		return Err(type_error("'{}' object has no attributes (assign to {})",
+			type()->name(),
+			attribute->to_string()));
+	}
+}
+
+PyResult<std::monostate> PyObject::delattribute(PyObject *attribute)
+{
+	if (!as<PyString>(attribute)) {
+		return Err(
+			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
+	}
+
+	if (auto delattr_method = type()->underlying_type().__delattribute__;
+		delattr_method.has_value()) {
+		return call_slot(*delattr_method, "", this, attribute);
+	}
+	if (type()->underlying_type().__delattribute__.has_value()) {
 		return Err(type_error("'{}' object has only read-only attributes (assign to {})",
 			type()->name(),
 			attribute->to_string()));
@@ -1296,6 +1325,39 @@ PyResult<std::monostate> PyObject::__setattribute__(PyObject *attribute, PyObjec
 	}
 
 	m_attributes->insert(attribute, value);
+
+	return Ok(std::monostate{});
+}
+
+
+PyResult<std::monostate> PyObject::__delattribute__(PyObject *attribute)
+{
+	if (!as<PyString>(attribute)) {
+		return Err(
+			type_error("attribute name must be string, not '{}'", attribute->type()->to_string()));
+	}
+
+	auto descriptor_ = type()->lookup(attribute);
+
+	if (descriptor_.has_value() && descriptor_->is_ok()) {
+		auto *descriptor = descriptor_->unwrap();
+		const auto &descriptor_delete = descriptor->type()->underlying_type().__delete__;
+		if (descriptor_delete.has_value()) {
+			return call_slot(*descriptor_delete, "", descriptor, this);
+		}
+	}
+
+	if (!m_attributes) {
+		if (descriptor_.has_value() && descriptor_->is_ok()) {
+			return Err(attribute_error(
+				"'{}' object attribute '{}' is read-only", type()->name(), attribute->to_string()));
+		} else {
+			return Err(attribute_error(
+				"'{}' object has no attribute '{}'", type()->name(), attribute->to_string()));
+		}
+	}
+
+	m_attributes->remove(attribute);
 
 	return Ok(std::monostate{});
 }

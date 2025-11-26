@@ -17,6 +17,7 @@ PyResult<Value> GetYieldFromIter::execute(VirtualMachine &vm, Interpreter &) con
 		(void)coro;
 		TODO();
 	} else {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 		return std::get<PyObject *>(iterable_value)->iter().and_then([this, &vm](PyObject *obj) {
 			vm.reg(m_dst) = obj;
 			return Ok(obj);

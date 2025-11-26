@@ -19,9 +19,15 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <memory>
 #include <numeric>
+#include <variant>
 
 namespace py {
+namespace {
+	static constexpr std::array<std::byte, 0> kEmptyByteArray = {};
+}
+
 template<> PyByteArray *as(PyObject *obj)
 {
 	if (obj->type() == types::bytearray()) { return static_cast<PyByteArray *>(obj); }
@@ -195,6 +201,76 @@ PyResult<PyObject *> PyByteArray::__getitem__(PyObject *index)
 			"bytearray indices must be integers or slices, not {}", index->type()->name()));
 	}
 }
+
+
+PyResult<std::monostate> PyByteArray::__setitem__(PyObject *index, PyObject *value)
+{
+	if (index->type()->issubclass(types::integer())) {
+		const auto i = static_cast<const PyInteger &>(*index).as_i64();
+		return __setitem__(i, value);
+	} else if (index->type()->issubclass(types::slice())) {
+		const auto &slice = static_cast<const PySlice &>(*index);
+		auto indices_ = slice.unpack();
+		const auto [start_, end_, step] = indices_.unwrap();
+
+		const auto [start, stop, slice_length] =
+			PySlice::adjust_indices(start_, end_, step, m_value.b.size());
+
+		if (step == 0) { return Err(value_error("slice step cannot be zero")); }
+		if (slice_length == 0) { return Ok(std::monostate{}); }
+		if (start > stop && step > 0) { return Ok(std::monostate{}); }
+		if (start > static_cast<int64_t>(m_value.b.size()) || start < 0) {
+			return Ok(std::monostate{});
+		}
+
+		if (step != 1) { TODO(); }
+
+		if (value->type()->issubclass(types::bytes())
+			|| value->type()->issubclass(types::bytearray())) {
+			Bytes bytes;
+			if (value->type()->issubclass(types::bytes())) {
+				bytes = static_cast<const PyBytes &>(*value).value();
+			} else {
+				bytes = static_cast<const PyByteArray &>(*value).value();
+			}
+
+			// naive implementation, we just remove values, and then insert new ones
+			auto it = m_value.b.erase(m_value.b.begin() + start, m_value.b.begin() + stop);
+			m_value.b.insert(it, bytes.b.begin(), bytes.b.end());
+
+			return Ok(std::monostate{});
+		}
+		auto value_iter = value->iter();
+		if (value_iter.is_err()) {
+			return Err(type_error(
+				"can assign only bytes, buffers, or iterables of ints in range(0, 256)"));
+		}
+
+		TODO();
+	}
+
+	return Err(
+		type_error("bytearray indices must be integers or slices, not {}", index->type()->name()));
+}
+
+PyResult<std::monostate> PyByteArray::__getbuffer__(PyBuffer &view, int)
+{
+	view.obj = this;
+	if (m_value.b.empty()) {
+		view.buf = std::make_unique<NonOwningStorage<std::byte>>(
+			const_cast<std::byte *>(kEmptyByteArray.data()));
+	} else {
+		view.buf = std::make_unique<NonOwningStorage<std::byte>>(m_value.b.data());
+	}
+	view.len = m_value.b.size();
+	view.readonly = false;
+	view.itemsize = 1;
+	view.format = "B";
+	view.ndim = 1;
+	return Ok(std::monostate{});
+}
+
+PyResult<std::monostate> PyByteArray::__releasebuffer__(PyBuffer &) { return Ok(std::monostate{}); }
 
 PyResult<PyObject *> PyByteArray::__add__(const PyObject *other) const
 {

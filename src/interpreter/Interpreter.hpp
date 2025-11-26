@@ -29,6 +29,9 @@ class Interpreter
 	py::PyModule *m_builtins{ nullptr };
 	py::PyModule *m_importlib{ nullptr };
 	py::PyObject *m_import_func{ nullptr };
+	py::PyDict *m_codec_error_registry{ nullptr };
+	py::PyList *m_codec_search_path{ nullptr };
+	py::PyDict *m_codec_search_path_cache{ nullptr };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
 
@@ -76,6 +79,12 @@ class Interpreter
 	py::PyModule *builtins() const { return m_builtins; }
 
 	py::PyModule *module() const { return m_module; }
+
+	py::PyDict *codec_error_registry() { return m_codec_error_registry; }
+
+	py::PyList *codec_search_path() { return m_codec_search_path; }
+
+	py::PyDict *codec_search_path_cache() { return m_codec_search_path_cache; }
 
 	void setup(std::shared_ptr<BytecodeProgram> &&program);
 	void setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program);

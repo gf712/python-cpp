@@ -12,11 +12,13 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/IR/Verifier.h"
@@ -362,6 +364,24 @@ namespace py {
 			}
 		};
 
+		struct DeleteDerefLowering : public mlir::OpRewritePattern<py::DeleteDerefOp>
+		{
+			using OpRewritePattern<py::DeleteDerefOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(py::DeleteDerefOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				auto parent = op.getOperation()->getParentOp();
+				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
+				ASSERT(fn);
+				auto object_name = op.getNameAttr();
+
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteDerefOp>(op, object_name);
+
+				return success();
+			}
+		};
+
 		struct CallFunctionLowering : public mlir::OpRewritePattern<py::FunctionCallOp>
 		{
 			using OpRewritePattern<py::FunctionCallOp>::OpRewritePattern;
@@ -404,7 +424,7 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::cf::CondBranchOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto cond = op.getCondition();
+				auto cond = (*op.getODSOperands(0).begin());
 				if (mlir::isa<mlir::py::CastToBoolOp>(cond.getDefiningOp())) {
 					auto bool_cast = mlir::cast<mlir::py::CastToBoolOp>(cond.getDefiningOp());
 					auto pycond = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::CastToBool>(
@@ -942,6 +962,21 @@ namespace py {
 			}
 		};
 
+		struct DeleteAttributeOpLowering
+			: public mlir::OpRewritePattern<mlir::py::DeleteAttributeOp>
+		{
+			using OpRewritePattern<mlir::py::DeleteAttributeOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::DeleteAttributeOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteAttribute>(
+					op, op.getSelf(), op.getAttr());
+
+				return success();
+			}
+		};
+
 		struct LoadMethodOpLowering : public mlir::OpRewritePattern<mlir::py::LoadMethodOp>
 		{
 			using OpRewritePattern<mlir::py::LoadMethodOp>::OpRewritePattern;
@@ -1230,7 +1265,61 @@ namespace py {
 
 		struct ForLoopOpLowering : public mlir::OpRewritePattern<mlir::py::ForLoopOp>
 		{
-			using OpRewritePattern<mlir::py::ForLoopOp>::OpRewritePattern;
+		  private:
+			std::function<WalkResult(mlir::Operation *)> yield_op_callback(
+				mlir::PatternRewriter &rewriter,
+				mlir::Block *condition_start,
+				mlir::Block *end_block) const
+			{
+				return [this, &rewriter, condition_start, end_block](mlir::Operation *operation) {
+					// llvm::outs() << "ForOpLowering 1:\n";
+					// operation->print(llvm::outs());
+					// llvm::outs() << '\n';
+					// llvm::outs().flush();
+
+					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
+						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
+						// llvm::outs() << "ForOpLowering - ForLoopOp or else\n";
+						// loop.getOrelse().front().print(llvm::outs());
+						// llvm::outs() << '\n';
+						// llvm::outs().flush();
+						loop.getOrelse().walk<WalkOrder::PreOrder>(
+							yield_op_callback(rewriter, condition_start, end_block));
+						return WalkResult::skip();
+					}
+					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
+						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
+						// llvm::outs() << "ForOpLowering - WhileOp or else\n";
+						loop.getOrelse().walk<WalkOrder::PreOrder>(
+							yield_op_callback(rewriter, condition_start, end_block));
+						return WalkResult::skip();
+					}
+
+					// llvm::outs() << "ForOpLowering 2:\n";
+					// operation->print(llvm::outs());
+					// llvm::outs() << '\n';
+					// llvm::outs().flush();
+
+					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
+						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
+									Impl>());
+						if (!yield_op.getKind().has_value()
+							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
+							return WalkResult::advance();
+						}
+						rewriter.setInsertionPoint(yield_op);
+						if (!yield_op.getKind().has_value()
+							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
+							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
+								yield_op, condition_start);
+						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
+							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, end_block);
+						}
+					}
+					return WalkResult::advance();
+				};
+			}
 
 			std::vector<mlir::Value> getIterators(mlir::py::ForLoopOp op,
 				mlir::emitpybytecode::GetIter current_iterator) const
@@ -1253,9 +1342,17 @@ namespace py {
 				return iterators;
 			}
 
+		  public:
+			using OpRewritePattern<mlir::py::ForLoopOp>::OpRewritePattern;
+
 			mlir::LogicalResult matchAndRewrite(mlir::py::ForLoopOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
+				// llvm::outs() << "ForLoopOp rewrite:\n";
+				// op->print(llvm::outs());
+				// llvm::outs() << "-------------------------\n";
+				// llvm::outs().flush();
+
 				auto *initBlock = rewriter.getInsertionBlock();
 				auto initPos = rewriter.getInsertionPoint();
 
@@ -1284,6 +1381,9 @@ namespace py {
 				ASSERT(!op.getStep().empty())
 				auto *iterator_exit_block = &op.getStep().back();
 				ASSERT(iterator_exit_block->getTerminator());
+				// iterator_exit_block->print(llvm::outs());
+				// llvm::outs() << '\n';
+				// llvm::outs().flush();
 				ASSERT(mlir::isa<mlir::py::ControlFlowYield>(iterator_exit_block->getTerminator()));
 
 				rewriter.setInsertionPointToEnd(iterator_exit_block);
@@ -1299,6 +1399,7 @@ namespace py {
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
 
+				ASSERT(op.getStep().getArguments().size() == 1);
 				rewriter.inlineRegionBefore(
 					op.getStep(), *op->getParentRegion(), endBlock->getIterator());
 
@@ -1306,30 +1407,9 @@ namespace py {
 				// 	op.getBody().addArgument(it.getType(), op.getStep().getLoc());
 				// }
 
-				op.getBody().walk<WalkOrder::PreOrder>([&](mlir::Operation *operation) {
-					if (mlir::isa<mlir::py::ForLoopOp, mlir::py::WhileOp>(operation)) {
-						return WalkResult::skip();
-					}
-					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
-						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
-									Impl>());
-						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
-							return WalkResult::advance();
-						}
+				op.getBody().walk<WalkOrder::PreOrder>(
+					yield_op_callback(rewriter, for_iter_block, endBlock));
 
-						rewriter.setInsertionPoint(yield_op);
-						if (!yield_op.getKind().has_value()
-							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-								yield_op, for_iter_block);
-						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, endBlock);
-						}
-					}
-					return WalkResult::advance();
-				});
 				ASSERT(!op.getBody().empty());
 				auto *body_exit_block = &op.getBody().back();
 				ASSERT(body_exit_block->getTerminator());
@@ -1349,12 +1429,67 @@ namespace py {
 					op.getOrelse(), *op->getParentRegion(), endBlock->getIterator());
 
 				rewriter.eraseOp(op);
+
+				// llvm::outs() << "ForLoopOp rewrite end\n";
+				// llvm::outs().flush();
+
 				return success();
 			}
 		};
 
 		struct WhileOpLowering : public mlir::OpRewritePattern<mlir::py::WhileOp>
 		{
+		  private:
+			std::function<WalkResult(mlir::Operation *)> yield_op_callback(
+				mlir::PatternRewriter &rewriter,
+				mlir::Block *condition_start,
+				mlir::Block *end_block) const
+			{
+				return [this, &rewriter, condition_start, end_block](mlir::Operation *operation) {
+					// llvm::outs() << "WhileOpLowering 1:\n";
+					// operation->print(llvm::outs());
+					// llvm::outs() << '\n';
+					// llvm::outs().flush();
+					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
+						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
+						// llvm::outs() << "WhileOpLowering - ForLoopOp or else\n";
+						loop.getOrelse().walk<WalkOrder::PreOrder>(
+							yield_op_callback(rewriter, condition_start, end_block));
+						return WalkResult::skip();
+					}
+					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
+						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
+						// llvm::outs() << "WhileOpLowering - WhileOp or else\n";
+						loop.getOrelse().walk<WalkOrder::PreOrder>(
+							yield_op_callback(rewriter, condition_start, end_block));
+						return WalkResult::skip();
+					}
+					// llvm::outs() << "WhileOpLowering 2:\n";
+					// operation->print(llvm::outs());
+					// llvm::outs() << '\n';
+					// llvm::outs().flush();
+					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
+						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
+									Impl>());
+						if (!yield_op.getKind().has_value()
+							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
+							return WalkResult::advance();
+						}
+						rewriter.setInsertionPoint(yield_op);
+						if (!yield_op.getKind().has_value()
+							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
+							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
+								yield_op, condition_start);
+						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
+							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, end_block);
+						}
+					}
+					return WalkResult::advance();
+				};
+			}
+
+		  public:
 			using OpRewritePattern<mlir::py::WhileOp>::OpRewritePattern;
 
 			mlir::LogicalResult matchAndRewrite(mlir::py::WhileOp op,
@@ -1392,40 +1527,20 @@ namespace py {
 				rewriter.eraseOp(condition_op);
 				rewriter.inlineRegionBefore(condition, endBlock);
 
-				op.getBody().walk<WalkOrder::PreOrder>([&](mlir::Operation *operation) {
-					if (mlir::isa<mlir::py::ForLoopOp, mlir::py::WhileOp>(operation)) {
-						return WalkResult::skip();
-					}
-					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
-						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
-									Impl>());
-						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
-							return WalkResult::advance();
-						}
-						rewriter.setInsertionPoint(yield_op);
-						if (!yield_op.getKind().has_value()
-							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-								yield_op, &condition_start);
-						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, endBlock);
-						}
-					}
-					return WalkResult::advance();
-				});
+				op.getBody().walk<WalkOrder::PreOrder>(
+					yield_op_callback(rewriter, &condition_start, endBlock));
+
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
-				if (!op.getOrelse().empty()) {
-					auto *orelse_exit_block = &op.getOrelse().back();
-					ASSERT(orelse_exit_block->getTerminator());
-					ASSERT(
-						mlir::isa<mlir::py::ControlFlowYield>(orelse_exit_block->getTerminator()));
-					rewriter.setInsertionPointToEnd(orelse_exit_block);
-					rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-						orelse_exit_block->getTerminator(), endBlock);
-				}
+				// if (!op.getOrelse().empty()) {
+				// 	auto *orelse_exit_block = &op.getOrelse().back();
+				// 	ASSERT(orelse_exit_block->getTerminator());
+				// 	if (mlir::isa<mlir::py::ControlFlowYield>(orelse_exit_block->getTerminator())) {
+				// 		rewriter.setInsertionPointToEnd(orelse_exit_block);
+				// 		rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
+				// 			orelse_exit_block->getTerminator(), endBlock);
+				// 	}
+				// }
 				rewriter.inlineRegionBefore(op.getOrelse(), endBlock);
 
 				rewriter.eraseOp(op);
@@ -1840,18 +1955,14 @@ namespace py {
 					})
 					.Case([](mlir::py::WithOp op) { return op->getParentOp()->getBlock(); })
 					.Case([&rewriter](mlir::func::FuncOp op) {
-						if (op.getBlocks().size() == 1) {
-							auto insertion_point = rewriter.getInsertionPoint();
-							auto *return_block = rewriter.createBlock(&op.getRegion());
-							auto value = rewriter.create<mlir::py::ConstantOp>(
-								op.getLoc(), rewriter.getNoneType());
-							rewriter.create<mlir::func::ReturnOp>(
-								op.getLoc(), mlir::ValueRange{ value });
-							rewriter.setInsertionPoint(
-								insertion_point->getBlock(), insertion_point);
-							return return_block;
-						}
-						return &op.back();
+						auto insertion_point = rewriter.getInsertionPoint();
+						auto *return_block = rewriter.createBlock(&op.getRegion());
+						auto value = rewriter.create<mlir::py::ConstantOp>(
+							op.getLoc(), rewriter.getNoneType());
+						rewriter.create<mlir::func::ReturnOp>(
+							op.getLoc(), mlir::ValueRange{ value });
+						rewriter.setInsertionPoint(insertion_point->getBlock(), insertion_point);
+						return return_block;
 					})
 					.Default([](mlir::Operation *op) {
 						TODO();
@@ -2049,7 +2160,9 @@ namespace py {
 			UnpackExpandOpLowering>(&getContext());
 		patterns.add<StoreFastLowering, StoreGlobalLowering, StoreNameLowering, StoreDerefLowering>(
 			&getContext());
-		patterns.add<DeleteFastLowering, DeleteGlobalLowering, DeleteNameLowering>(&getContext());
+		patterns
+			.add<DeleteFastLowering, DeleteGlobalLowering, DeleteNameLowering, DeleteDerefLowering>(
+				&getContext());
 		patterns.add<CallFunctionLowering, FuncOpLowering, MakeFunctionOpLowering>(&getContext());
 		patterns.add<BinaryAddOpLowering,
 			BinarySubtractOpLowering,
@@ -2082,9 +2195,10 @@ namespace py {
 			BuildStringOpLowering,
 			FormatValueOpLowering>(&getContext());
 		patterns.add<LoadAttributeOpLowering, LoadMethodOpLowering>(&getContext());
-		patterns
-			.add<BinarySubscriptOpLowering, StoreSubscriptOpLowering, DeleteSubscriptOpLowering>(
-				&getContext());
+		patterns.add<BinarySubscriptOpLowering,
+			StoreSubscriptOpLowering,
+			DeleteSubscriptOpLowering,
+			DeleteAttributeOpLowering>(&getContext());
 		patterns.add<StoreAttributeOpLowering, BuildSliceOpLowering>(&getContext());
 		patterns.add<ForLoopOpLowering, WhileOpLowering>(&getContext());
 		patterns.add<TryOpLowering,
@@ -2098,7 +2212,7 @@ namespace py {
 
 		GreedyRewriteConfig config;
 		config.strictMode = GreedyRewriteStrictness::AnyOp;
-		config.enableRegionSimplification = false;
+		config.enableRegionSimplification = GreedySimplifyRegionLevel::Disabled;
 		config.useTopDownTraversal = true;
 		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
 		// Currently ignoring the return value as it seems to always fail, even though the

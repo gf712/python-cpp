@@ -108,6 +108,12 @@ def DeleteGlobalOp : Python_Op<"delete_global"> {
     let arguments = (ins StrAttr:$name);
 }
 
+def DeleteDerefOp : Python_Op<"delete_deref"> {
+    let summary = "Delete value from a cell";
+
+    let arguments = (ins StrAttr:$name);
+}
+
 def MakeFunctionOp : Python_Op<"make_function", [AttrSizedOperandSegments]> {
     let summary = "Make a function using the local environment and code object";
 
@@ -388,6 +394,13 @@ def LoadAttributeOp: Python_Op<"load_attribute"> {
                          StrAttr:$attr);
 
     let results = (outs Python_PyObjectType:$output);
+}
+
+def DeleteAttributeOp: Python_Op<"delete_attribute"> {
+    let summary = "Delete an attribute";
+
+    let arguments = (ins Python_PyObjectType:$self,
+                         StrAttr:$attr);
 }
 
 def BinarySubscriptOp: Python_Op<"subscript"> {

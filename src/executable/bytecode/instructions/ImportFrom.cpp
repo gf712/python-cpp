@@ -16,7 +16,11 @@ PyResult<Value> ImportFrom::execute(VirtualMachine &vm, Interpreter &interpreter
 	ASSERT(as<PyModule>(PyObject::from(from).unwrap()));
 
 	auto module = as<PyModule>(PyObject::from(from).unwrap());
-	auto obj_ = module->get_attribute(PyString::create(name).unwrap());
+
+	auto obj_ = [&] {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+		return module->get_attribute(PyString::create(name).unwrap());
+	}();
 
 	return obj_
 		.and_then([&vm, this](PyObject *obj) {

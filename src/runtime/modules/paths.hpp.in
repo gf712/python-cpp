@@ -1,3 +1,4 @@
 #include <string_view>
 
 static constexpr std::string_view kPythonLibPath = "@PYTHON_LIB_PATH@";
+static constexpr std::string_view kPythonInstallPath = "@PYTHON_INSTALL_PATH@";

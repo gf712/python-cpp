@@ -180,7 +180,7 @@ std::string PyNativeFunction::to_string() const
 
 PyResult<PyObject *> PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 {
-	auto result_reg_value = VirtualMachine::the().reg(0);
+	// auto result_reg_value = VirtualMachine::the().reg(0);
 	auto result = [this, args, kwargs]() {
 		if (is_method()) {
 			ASSERT(m_self);
@@ -189,7 +189,7 @@ PyResult<PyObject *> PyNativeFunction::__call__(PyTuple *args, PyDict *kwargs)
 			return VirtualMachine::the().interpreter().call(this, args, kwargs);
 		}
 	}();
-	VirtualMachine::the().reg(0) = std::move(result_reg_value);
+	// VirtualMachine::the().reg(0) = std::move(result_reg_value);
 	return result;
 }
 

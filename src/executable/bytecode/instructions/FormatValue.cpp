@@ -19,9 +19,12 @@ PyResult<Value> FormatValue::execute(VirtualMachine &vm, Interpreter &) const
 				// return obj->ascii();
 			} break;
 			case PyString::ReplacementField::Conversion::REPR: {
+				[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+
 				return obj->repr();
 			} break;
 			case PyString::ReplacementField::Conversion::STR: {
+				[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 				return obj->str();
 			} break;
 			}

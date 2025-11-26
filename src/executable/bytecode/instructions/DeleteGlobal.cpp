@@ -13,6 +13,7 @@ PyResult<Value> DeleteGlobal::execute(VirtualMachine &, Interpreter &interpreter
 	auto name = interpreter.execution_frame()->consts(m_name);
 	auto name_str = PyObject::from(name);
 	if (name_str.is_err()) return name_str;
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 	return interpreter.execution_frame()
 		->globals()
 		->delete_item(name_str.unwrap())

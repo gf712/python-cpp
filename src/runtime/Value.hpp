@@ -43,7 +43,7 @@ struct Number
 	Number exp(const Number &rhs) const;
 
 	Number operator+(const Number &rhs) const;
-	Number& operator+=(const Number &rhs);
+	Number &operator+=(const Number &rhs);
 
 	Number operator-(const Number &rhs) const;
 
@@ -196,7 +196,7 @@ class BaseException;
 template<typename T> struct Ok
 {
 	T value;
-	constexpr Ok(T value_) : value(value_) {}
+	constexpr Ok(T value_) : value(std::move(value_)) {}
 };
 
 template<typename T> Ok(T) -> Ok<T>;
@@ -241,8 +241,8 @@ template<typename T> class PyResult
 	StorageType result;
 
   public:
-	PyResult(Ok<T> result_) : result(result_) {}
-	template<typename U> constexpr PyResult(Ok<U> result_) : result(Ok<T>(result_.value))
+	PyResult(Ok<T> result_) : result(std::move(result_)) {}
+	template<typename U> constexpr PyResult(Ok<U> result_) : result(Ok<T>(std::move(result_.value)))
 	{
 		static_assert(std::is_convertible_v<U, T>);
 	}
@@ -261,10 +261,22 @@ template<typename T> class PyResult
 	bool is_ok() const { return std::holds_alternative<Ok<T>>(result); }
 	bool is_err() const { return !is_ok(); }
 
-	T unwrap() const
+	const T &unwrap() const &
 	{
 		ASSERT(is_ok());
 		return std::get<Ok<T>>(result).value;
+	}
+
+	T &unwrap() &
+	{
+		ASSERT(is_ok());
+		return std::get<Ok<T>>(result).value;
+	}
+
+	T &&unwrap() &&
+	{
+		ASSERT(is_ok());
+		return std::move(std::get<Ok<T>>(result).value);
 	}
 
 	BaseException *unwrap_err() const
@@ -321,6 +333,7 @@ PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &interp
 PyResult<Value> lshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> rshift(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> equals(const Value &lhs, const Value &rhs);
 PyResult<Value> not_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> less_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> less_than(const Value &lhs, const Value &rhs, Interpreter &interpreter);
@@ -328,11 +341,13 @@ PyResult<Value> greater_than(const Value &lhs, const Value &rhs, Interpreter &in
 PyResult<Value> greater_than_equals(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> and_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<Value> or_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
+PyResult<Value> xor_(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
 PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &interpreter);
 
-PyResult<bool> truthy(const Value &lhs, Interpreter &interpreter);
+PyResult<bool> truthy(const Value &lhs, Interpreter &);
+PyResult<bool> truthy(const Value &lhs);
 
 bool operator==(const Value &lhs, const Value &rhs);
 

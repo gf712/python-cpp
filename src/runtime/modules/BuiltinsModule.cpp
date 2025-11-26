@@ -651,7 +651,7 @@ PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &inter
 		}
 	}
 
-	dir_list->sort();
+	dir_list->sort(nullptr, nullptr);
 	return Ok(static_cast<PyObject *>(dir_list_.unwrap()));
 }
 

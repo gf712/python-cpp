@@ -13,24 +13,31 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 	const auto result = [&]() -> PyResult<Value> {
 		switch (m_comparisson) {
 		case Comparisson::Eq: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::NotEq: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return not_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Lt: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return less_than(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::LtE: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return less_than_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Gt: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return greater_than(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::GtE: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return greater_than_equals(lhs, rhs, interpreter);
 		} break;
 		case Comparisson::Is: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			if (auto result = is(lhs, rhs, interpreter); result.is_ok()) {
 				return Ok(Value{ NameConstant{ result.unwrap() } });
 			} else {
@@ -38,6 +45,7 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 			}
 		} break;
 		case Comparisson::IsNot: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			if (auto result = is(lhs, rhs, interpreter); result.is_ok()) {
 				return Ok(Value{ NameConstant{ !result.unwrap() } });
 			} else {
@@ -45,6 +53,7 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 			}
 		} break;
 		case Comparisson::In: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			if (auto result = in(lhs, rhs, interpreter); result.is_ok()) {
 				return Ok(Value{ NameConstant{ result.unwrap() } });
 			} else {
@@ -52,6 +61,7 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 			}
 		} break;
 		case Comparisson::NotIn: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			if (auto result = in(lhs, rhs, interpreter); result.is_ok()) {
 				return Ok(Value{ NameConstant{ !result.unwrap() } });
 			} else {

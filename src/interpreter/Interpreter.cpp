@@ -8,10 +8,12 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyList.hpp"
 #include "runtime/PyNone.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/Value.hpp"
 #include "runtime/modules/Modules.hpp"
 #include "runtime/modules/config.hpp"
@@ -38,7 +40,6 @@ void initialize_types()
 	types::bytes_iterator();
 	types::bytearray();
 	types::bytearray_iterator();
-	types::memoryview();
 	types::ellipsis();
 	types::str();
 	types::str_iterator();
@@ -46,6 +47,7 @@ void initialize_types()
 	types::integer();
 	types::none();
 	types::module();
+	types::memoryview();
 	types::dict();
 	types::dict_items();
 	types::dict_items_iterator();
@@ -53,6 +55,7 @@ void initialize_types()
 	types::dict_key_iterator();
 	types::dict_values();
 	types::dict_value_iterator();
+	types::mappingproxy();
 	types::list();
 	types::list_iterator();
 	types::list_reverseiterator();
@@ -65,8 +68,10 @@ void initialize_types()
 	types::range_iterator();
 	types::reversed();
 	types::zip();
+	types::map();
 	types::enumerate();
 	types::slice();
+	types::iterator();
 	types::function();
 	types::native_function();
 	types::llvm_function();
@@ -89,8 +94,7 @@ void initialize_types()
 	types::generator();
 	types::coroutine();
 	types::async_generator();
-	types::mappingproxy();
-	types::map();
+	types::generic_alias();
 
 	types::base_exception();
 	types::exception();
@@ -112,6 +116,7 @@ void initialize_types()
 	types::syntax_error();
 	types::memory_error();
 	types::stop_iteration();
+	types::unbound_local_error();
 }
 
 Interpreter::Interpreter() {}
@@ -159,10 +164,24 @@ void Interpreter::internal_setup(const std::string &name,
 	m_current_frame = PyFrame::create(
 		nullptr, local_registers, 0, code.unwrap(), globals, locals, consts, names, nullptr);
 	m_global_frame = m_current_frame;
+	m_codec_error_registry = PyDict::create().unwrap();
+	m_codec_search_path = PyList::create().unwrap();
+	m_codec_search_path_cache = PyDict::create().unwrap();
 
 	for (const auto &[name, module_factory] : builtin_modules) {
 		if (module_factory) { m_modules->insert(String{ std::string{ name } }, module_factory()); }
 	}
+
+	{
+		auto open = io_module()->symbol_table()->map().at(String{ "open" });
+		m_builtins->add_symbol(PyString::create("open").unwrap(), open);
+	}
+	// {
+	// 	auto open = io_module()->symbol_table()->map().at(String{ "open" });
+	// 	m_builtins->add_symbol(PyString::create("open").unwrap(), open);
+	// 	sys->add_symbol(PyString::create("stderr").unwrap(),
+	// 		std::get<PyObject *>(open)->call(PyTuple::create().unwrap(), nullptr).unwrap());
+	// }
 
 	if (config.requires_importlib) {
 		auto *_imp = imp_module();
@@ -421,4 +440,7 @@ void Interpreter::visit_graph(::Cell::Visitor &visitor)
 	if (m_builtins) visitor.visit(*m_builtins);
 	if (m_importlib) visitor.visit(*m_importlib);
 	if (m_import_func) visitor.visit(*m_import_func);
+	if (m_codec_error_registry) visitor.visit(*m_codec_error_registry);
+	if (m_codec_search_path) visitor.visit(*m_codec_search_path);
+	if (m_codec_search_path_cache) visitor.visit(*m_codec_search_path_cache);
 }

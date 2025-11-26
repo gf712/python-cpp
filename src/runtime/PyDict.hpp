@@ -21,7 +21,7 @@ class PyDictValueIterator;
 class PyDict : public PyBaseObject
 {
   public:
-	using MapType = tsl::ordered_map<Value, Value, ValueHash>;
+	using MapType = tsl::ordered_map<Value, Value, ValueHash, ValueEq>;
 
   private:
 	friend class ::Heap;
@@ -33,9 +33,10 @@ class PyDict : public PyBaseObject
 	PyDict(MapType &&map);
 	PyDict(const MapType &map);
 	PyDict();
-	PyDict(PyType *);
 
   public:
+	PyDict(PyType *);
+
 	static PyResult<PyDict *> create();
 	static PyResult<PyDict *> create(MapType &&map);
 	static PyResult<PyDict *> create(const MapType &map);

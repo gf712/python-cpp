@@ -1,13 +1,13 @@
 #include "LoadAssertionError.hpp"
-#include "runtime/AssertionError.hpp"
 #include "runtime/PyType.hpp"
+#include "runtime/types/builtin.hpp"
 #include "vm/VM.hpp"
 
 using namespace py;
 
 PyResult<Value> LoadAssertionError::execute(VirtualMachine &vm, Interpreter &) const
 {
-	auto *result = AssertionError::this_type();
+	auto *result = types::assertion_error();
 	// TODO: return a meaningful error. If this is nullptr then it is a serious internal error...
 	if (!result) {
 		TODO();

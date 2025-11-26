@@ -1,4 +1,4 @@
-find_package(LLVM 18.1 REQUIRED CONFIG)
+find_package(LLVM 20.0 REQUIRED CONFIG)
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 find_package(MLIR CONFIG REQUIRED

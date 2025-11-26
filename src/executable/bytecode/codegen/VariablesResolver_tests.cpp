@@ -33,7 +33,7 @@ TEST(VariablesResolver, GlobalNamespace)
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
 	auto &main = visibility.at("_bytecode_generator_tests_");
-	ASSERT_EQ(main->symbol_map.symbols.size(), 6);
+	ASSERT_EQ(main->symbol_map.symbols.size(), 7);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
@@ -52,6 +52,8 @@ TEST(VariablesResolver, GlobalNamespace)
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("print").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("print")->get().visibility,
 		VariablesResolver::Visibility::NAME);
+	ASSERT_EQ(main->symbol_map.get_visible_symbol("__name__")->get().visibility,
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 }
 
 TEST(VariablesResolver, FunctionDefinition)
@@ -67,7 +69,7 @@ TEST(VariablesResolver, FunctionDefinition)
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
 	auto &main = visibility.at("_bytecode_generator_tests_");
-	ASSERT_EQ(main->symbol_map.symbols.size(), 2);
+	ASSERT_EQ(main->symbol_map.symbols.size(), 3);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
@@ -81,6 +83,8 @@ TEST(VariablesResolver, FunctionDefinition)
 	ASSERT_TRUE(foo->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(foo->symbol_map.get_visible_symbol("a")->get().visibility,
 		VariablesResolver::Visibility::LOCAL);
+	ASSERT_EQ(main->symbol_map.get_visible_symbol("__name__")->get().visibility,
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 }
 
 
@@ -101,12 +105,14 @@ TEST(VariablesResolver, Closure)
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
 	auto &main = visibility.at("_bytecode_generator_tests_");
-	ASSERT_EQ(main->symbol_map.symbols.size(), 2);
+	ASSERT_EQ(main->symbol_map.symbols.size(), 3);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("foo").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("foo")->get().visibility,
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
+	ASSERT_EQ(main->symbol_map.get_visible_symbol("__name__")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.foo.0:0"));
@@ -174,12 +180,14 @@ TEST(VariablesResolver, NonLocal)
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
 	auto &main = visibility.at("_bytecode_generator_tests_");
-	ASSERT_EQ(main->symbol_map.symbols.size(), 3);
+	ASSERT_EQ(main->symbol_map.symbols.size(), 4);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("b").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("b")->get().visibility,
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
+	ASSERT_EQ(main->symbol_map.get_visible_symbol("__name__")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.outer.2:0"));
@@ -215,9 +223,11 @@ TEST(VariablesResolver, LambdaDefinition)
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_"));
 	auto &main = visibility.at("_bytecode_generator_tests_");
-	ASSERT_EQ(main->symbol_map.symbols.size(), 1);
+	ASSERT_EQ(main->symbol_map.symbols.size(), 2);
 	ASSERT_TRUE(main->symbol_map.get_visible_symbol("a").has_value());
 	ASSERT_EQ(main->symbol_map.get_visible_symbol("a")->get().visibility,
+		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
+	ASSERT_EQ(main->symbol_map.get_visible_symbol("__name__")->get().visibility,
 		VariablesResolver::Visibility::IMPLICIT_GLOBAL);
 
 	ASSERT_TRUE(visibility.contains("_bytecode_generator_tests_.<lambda>.0:4"));

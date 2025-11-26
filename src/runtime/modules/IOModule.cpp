@@ -7,11 +7,19 @@
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyObject.hpp"
+#include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
 #include "runtime/StopIteration.hpp"
+#include "runtime/Value.hpp"
 #include "runtime/ValueError.hpp"
 #include "runtime/types/api.hpp"
+#include "runtime/types/builtin.hpp"
+#include "utilities.hpp"
 #include "vm/VM.hpp"
+#include <optional>
+#include <variant>
 
 #if defined(__GLIBCXX__) || defined(__GLIBCPP__)
 #include <ext/stdio_filebuf.h>
@@ -663,7 +671,9 @@ class BufferedIOBase : public IOBase
 					len));
 		}
 
-		buffer.buf.b.insert(buffer.buf.b.end(), data_bytes.begin(), data_bytes.end());
+		std::copy_n(data_bytes.begin(),
+			data_bytes.size(),
+			static_cast<std::byte *>(buffer.buf->get_buffer()));
 
 		return data;
 	}
@@ -1181,6 +1191,7 @@ class BufferedReader
 							}
 							return static_cast<Buffered<BufferedReader> *>(self)->read(n);
 						})
+					.def("readall", &BufferedReader::readall)
 					// .def("peek", &BufferedReader::peek)
 					// .def("read1", &BufferedReader::read1)
 					// .def("readinto", &BufferedReader::readinto)
@@ -2682,6 +2693,9 @@ class TextIOWrapper : public TextIOBase
 	bool m_line_buffering;
 	bool m_write_through;
 
+	std::optional<Bytes> m_buffer_bytes;
+	size_t m_position;
+
 	TextIOWrapper(PyType *type) : TextIOBase(type) {}
 
   public:
@@ -2719,11 +2733,22 @@ class TextIOWrapper : public TextIOBase
 		"If line_buffering is True, a call to flush is implied when a call to\n"
 		"write contains a newline character.";
 
-	static PyResult<TextIOWrapper *> create()
+	static PyResult<TextIOWrapper *> create(PyObject *buffer,
+		const std::optional<std::string> &encoding,
+		const std::optional<std::string> &errors,
+		const std::optional<std::string> &newline,
+		bool line_buffering,
+		bool write_through)
 	{
-		return StringIO::__new__(s_io_stringio, nullptr, nullptr).and_then([](auto *obj) {
-			return Ok(static_cast<TextIOWrapper *>(obj));
-		});
+		ASSERT(s_io_textiowrapper);
+		auto &heap = VirtualMachine::the().heap();
+		if (auto *obj = heap.allocate<TextIOWrapper>(s_io_textiowrapper)) {
+			auto result =
+				obj->init(buffer, encoding, errors, newline, line_buffering, write_through);
+			if (result.is_err()) { return Err(result.unwrap_err()); }
+			return Ok(obj);
+		}
+		return Err(memory_error(sizeof(TextIOWrapper)));
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
@@ -2802,13 +2827,66 @@ class TextIOWrapper : public TextIOBase
 			write_through == py_true());
 	}
 
+	PyResult<PyObject *> readline(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!args || args->size() == 0);
+		ASSERT(!kwargs || kwargs->map().empty());
+
+		if (auto err = setup_buffer(); err.is_err()) { return Err(err.unwrap_err()); }
+
+		// Lines in the input can end in \'\\n\', \'\\r\', or \'\\r\\n\'
+		auto is_line_end = [](std::string_view remaining) {
+			if (remaining.starts_with("\n") || remaining.starts_with("\r")) {
+				return 1;
+			} else if (remaining.starts_with("\r\n")) {
+				return 2;
+			}
+			return 0;
+		};
+
+		std::string_view remaining{ bit_cast<const char *>(m_buffer_bytes->b.data()) + m_position,
+			m_buffer_bytes->b.size() - m_position };
+
+		// TODO: use utf8 codepoints
+		std::string line;
+		while (!remaining.empty()) {
+			if (auto chars = is_line_end(remaining)) {
+				m_position += chars;
+				line.insert(line.end(), remaining.begin(), remaining.begin() + chars);
+				return PyString::create(line);
+			}
+			line.push_back(remaining[0]);
+			remaining = remaining.substr(1);
+			m_position++;
+		}
+
+		return PyString::create(std::move(line));
+	}
+
+	PyResult<PyObject *> readlines()
+	{
+		if (auto err = setup_buffer(); err.is_err()) { return Err(err.unwrap_err()); }
+		auto result_ = PyList::create();
+		if (result_.is_err()) { return result_; }
+		auto *result = result_.unwrap();
+		while (m_position < m_buffer_bytes->b.size()) {
+			auto line = readline(nullptr, nullptr);
+			if (line.is_err()) { return line; }
+			result->append(line.unwrap());
+		}
+
+		return Ok(result);
+	}
+
 	PyType *static_type() const override { return s_io_textiowrapper; }
 
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_textiowrapper) {
-			s_io_textiowrapper =
-				klass<TextIOWrapper>(module, "TextIOWrapper", s_io_textiobase).finalize();
+			s_io_textiowrapper = klass<TextIOWrapper>(module, "TextIOWrapper", s_io_textiobase)
+									 .def("readline", &TextIOWrapper::readline)
+									 .def("readlines", &TextIOWrapper::readlines)
+									 .finalize();
 		}
 		module->add_symbol(PyString::create("StringIO").unwrap(), s_io_textiowrapper);
 		return s_io_textiowrapper;
@@ -2828,13 +2906,34 @@ class TextIOWrapper : public TextIOBase
 		bool line_buffering,
 		bool write_through)
 	{
-		(void)buffer;
-		(void)encoding;
-		(void)errors;
-		(void)newline;
-		(void)line_buffering;
-		(void)write_through;
-		TODO();
+		m_buffer = buffer;
+		// TODO: get device encoding and/or check locale instead of utf-8
+		m_encoding = encoding.value_or("utf-8");
+
+		// TODO: validate errors
+		m_errors = errors.value_or("strict");
+
+		m_line_buffering = line_buffering;
+		m_write_through = write_through;
+		m_newline = newline.value_or("'\n");
+
+		return Ok(1);
+	}
+
+	PyResult<std::monostate> setup_buffer()
+	{
+		// TODO: read in chunks!
+		if (!m_buffer_bytes.has_value()) {
+			auto buffer_ =
+				m_buffer->get_method(PyString::create("readall").unwrap())
+					.and_then([](auto *readall) { return readall->call(nullptr, nullptr); });
+			if (buffer_.is_err()) { return Err(buffer_.unwrap_err()); }
+			auto *buffer = buffer_.unwrap();
+
+			ASSERT(buffer->type()->issubclass(types::bytes()));
+			m_buffer_bytes = Bytes{ static_cast<const PyBytes &>(*buffer).value() };
+		}
+		return Ok(std::monostate{});
 	}
 };
 
@@ -2865,7 +2964,8 @@ PyResult<PyObject *> open(PyObject *file, const std::string &mode)
 
 	if (flag.test(Mode::BINARY)) { return buffer; }
 
-	TODO();
+	return TextIOWrapper::create(
+		buffer.unwrap(), std::nullopt, std::nullopt, std::nullopt, true, true);
 }
 
 // TODO: move this to a header file since it is part of builtin module
@@ -2951,7 +3051,7 @@ PyModule *io_module()
 
 	s_io_module->add_symbol(PyString::create("open_code").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"open", [](PyTuple *args, PyDict *kwargs) {
+			"open_code", [](PyTuple *args, PyDict *kwargs) {
 				ASSERT(!kwargs || kwargs->map().empty());
 				ASSERT(args && args->elements().size() == 1);
 				auto arg0 = PyObject::from(args->elements()[0]).unwrap();

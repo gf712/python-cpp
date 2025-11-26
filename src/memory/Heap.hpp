@@ -399,12 +399,12 @@ class Heap
 		return *m_gc;
 	}
 
-	template<typename T, typename... Args> std::shared_ptr<T> allocate_static(Args &&...args)
+	template<typename T, typename... Args> T *allocate_static(Args &&...args)
 	{
 		if (m_static_offset + sizeof(T) >= m_static_memory_size) { TODO(); }
 		T *ptr = new (m_static_memory.get() + m_static_offset) T(std::forward<Args>(args)...);
 		m_static_offset += sizeof(T);
-		return std::shared_ptr<T>(ptr, [](T *) { return; });
+		return ptr;
 	}
 
 	const uint8_t *static_memory() const { return m_static_memory.get(); }

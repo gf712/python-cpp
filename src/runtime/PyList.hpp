@@ -45,6 +45,7 @@ class PyList
 	PyResult<PyObject *> append(PyObject *element);
 	PyResult<PyObject *> extend(PyObject *iterable);
 	PyResult<PyObject *> pop(PyObject *index);
+	PyResult<PyObject *> insert(PyTuple *args, PyDict *kwargs);
 
 	PyResult<PyObject *> __class_getitem__(PyType *cls, PyObject *args);
 	PyResult<PyObject *> __reversed__() const;

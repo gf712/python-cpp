@@ -24,6 +24,7 @@ PyResult<Value> StoreAttr::execute(VirtualMachine &vm, Interpreter &intepreter) 
 		if (other_obj.is_err()) return Err(other_obj.unwrap_err());
 		auto attr_name = PyString::create(attr_name_);
 		if (attr_name.is_err()) { return Err(attr_name.unwrap_err()); }
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 		if (auto result = (*this_obj)->setattribute(attr_name.unwrap(), other_obj.unwrap());
 			result.is_ok()) {
 			return Ok(py_none());

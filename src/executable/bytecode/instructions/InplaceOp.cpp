@@ -1,6 +1,7 @@
 #include "InplaceOp.hpp"
 #include "runtime/Value.hpp"
 #include "vm/VM.hpp"
+#include "runtime/PyObject.hpp"
 
 using namespace py;
 
@@ -11,21 +12,27 @@ PyResult<Value> InplaceOp::execute(VirtualMachine &vm, Interpreter &interpreter)
 	auto result = [this, &lhs, &rhs, &interpreter] {
 		switch (m_operation) {
 		case Operation::PLUS: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return add(lhs, rhs, interpreter);
 		} break;
 		case Operation::MINUS: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return subtract(lhs, rhs, interpreter);
 		} break;
 		case Operation::MODULO: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return modulo(lhs, rhs, interpreter);
 		} break;
 		case Operation::MULTIPLY: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return multiply(lhs, rhs, interpreter);
 		} break;
 		case Operation::EXP: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return exp(lhs, rhs, interpreter);
 		} break;
 		case Operation::SLASH: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return true_divide(lhs, rhs, interpreter);
 		} break;
 		case Operation::FLOORDIV: {
@@ -35,19 +42,23 @@ PyResult<Value> InplaceOp::execute(VirtualMachine &vm, Interpreter &interpreter)
 			TODO();
 		} break;
 		case Operation::LEFTSHIFT: {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
 			return lshift(lhs, rhs, interpreter);
 		} break;
 		case Operation::RIGHTSHIFT: {
 			TODO();
 		} break;
 		case Operation::AND: {
-			TODO();
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return and_(lhs, rhs, interpreter);
 		} break;
 		case Operation::OR: {
-			TODO();
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return or_(lhs, rhs, interpreter);
 		} break;
 		case Operation::XOR: {
-			TODO();
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return xor_(lhs, rhs, interpreter);
 		} break;
 		}
 		ASSERT_NOT_REACHED();

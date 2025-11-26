@@ -3,6 +3,7 @@
 #include "PyObject.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyTuple.hpp"
+#include <variant>
 
 namespace py {
 
@@ -34,6 +35,10 @@ class PyByteArray : public PyBaseObject
 	PyResult<std::monostate> __setitem__(int64_t index, PyObject *value);
 
 	PyResult<PyObject *> __getitem__(PyObject *index);
+	PyResult<std::monostate> __setitem__(PyObject *key, PyObject *value);
+
+	PyResult<std::monostate> __getbuffer__(PyBuffer &, int);
+	PyResult<std::monostate> __releasebuffer__(PyBuffer &);
 
 	const Bytes &value() const { return m_value; }
 

@@ -441,8 +441,22 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module->add_symbol(PyString::create("base_prefix").unwrap(),
 		PyString::create(std::string{ kPythonInstallPath }).unwrap());
 
+	s_sys_module->add_symbol(PyString::create("prefix").unwrap(),
+		PyString::create(std::string{ kPythonInstallPath }).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("exec_prefix").unwrap(),
+		PyString::create(std::string{ kPythonInstallPath }).unwrap());
+
+	s_sys_module->add_symbol(PyString::create("base_exec_prefix").unwrap(),
+		PyString::create(std::string{ kPythonInstallPath }).unwrap());
+
 	s_sys_module->add_symbol(PyString::create("executable").unwrap(),
 		PyString::create(std::filesystem::canonical("/proc/self/exe").string()).unwrap());
+
+	s_sys_module->add_symbol(
+		PyString::create("platlibdir").unwrap(), PyString::create("lib").unwrap());
+
+	s_sys_module->add_symbol(PyString::create("abiflags").unwrap(), PyString::create("").unwrap());
 
 	std::string py_version = std::format("3.9.0 (main) {}", COMPILER_VERSION);
 

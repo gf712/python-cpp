@@ -643,7 +643,7 @@ Value *VariablesResolver::visit(const Keyword *node)
 		} else if (auto attr = as<Attribute>(node->value())) {
 			attr->value()->codegen(this);
 		} else {
-			TODO();
+			node->value()->codegen(this);
 		}
 	}
 	// m_current_scope->get().visibility[*node->arg()] = Visibility::LOCAL;

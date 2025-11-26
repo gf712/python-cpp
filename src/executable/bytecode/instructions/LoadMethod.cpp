@@ -20,7 +20,10 @@ PyResult<Value> LoadMethod::execute(VirtualMachine &vm, Interpreter &interpreter
 	auto *this_obj = this_obj_.unwrap();
 	auto name = PyString::create(method_name);
 	return name
-		.and_then([this_obj](PyString *method_name) { return this_obj->get_method(method_name); })
+		.and_then([this_obj](PyString *method_name) {
+			[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+			return this_obj->get_method(method_name);
+		})
 		.and_then([&vm, this](PyObject *method_obj) {
 			vm.reg(m_destination) = method_obj;
 			return Ok(method_obj);

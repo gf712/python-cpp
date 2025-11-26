@@ -12,7 +12,6 @@
 #include "runtime/ValueError.hpp"
 #include "types/builtin.hpp"
 
-#include "interpreter/Interpreter.hpp"
 #include <cmath>
 #include <variant>
 

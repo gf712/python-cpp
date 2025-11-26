@@ -13,7 +13,10 @@ PyResult<Value> JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter
 	ASSERT(m_offset.has_value())
 	auto &result = vm.reg(m_test_register);
 
-	const auto test_result = truthy(result, interpreter);
+	const auto test_result = [&] {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+		return truthy(result, interpreter);
+	}();
 	if (test_result.is_ok()) {
 		if (test_result.unwrap()) {
 			const auto ip = vm.instruction_pointer() + *m_offset;

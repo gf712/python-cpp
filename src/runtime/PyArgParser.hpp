@@ -46,8 +46,10 @@ template<typename... ArgTypes> struct PyArgsParser
 				} else {
 					return Err(bool_arg.unwrap_err());
 				}
-			} else if constexpr (std::is_same_v<int64_t,
+			} else if constexpr (std::is_same_v<bool,
 									 std::remove_pointer_t<std::remove_cv_t<ExpectedType>>>) {
+				TODO();
+			} else if constexpr (std::is_integral_v<ExpectedType>) {
 				auto int_obj = PyObject::from(args[Idx]);
 				if (int_obj.is_err()) { return Err(int_obj.unwrap_err()); }
 				if (!as<PyInteger>(int_obj.unwrap())) {
@@ -57,11 +59,9 @@ template<typename... ArgTypes> struct PyArgsParser
 					std::get<Idx>(result) = as<PyInteger>(int_obj.unwrap())->as_i64();
 				}
 			} else {
-				[]<bool flag = false>()
-				{
+				[]<bool flag = false>() {
 					static_assert(flag, "unsupported Python to native conversion");
-				}
-				();
+				}();
 			}
 		} else {
 			if constexpr (Idx >= MinSize && (Idx - MinSize) < sizeof...(DefaultArgs)) {
@@ -94,12 +94,10 @@ template<typename... ArgTypes> struct PyArgsParser
 		DefaultArgs &&...default_values)
 	{
 		if constexpr (max_size() - min_size() > sizeof...(DefaultArgs)) {
-			[]<bool flag = false>() { static_assert(flag, "Not enough default values"); }
-			();
+			[]<bool flag = false>() { static_assert(flag, "Not enough default values"); }();
 		}
 		if constexpr (max_size() - min_size() < sizeof...(DefaultArgs)) {
-			[]<bool flag = false>() { static_assert(flag, "Too many default values"); }
-			();
+			[]<bool flag = false>() { static_assert(flag, "Too many default values"); }();
 		}
 
 		if (kwargs != nullptr && !kwargs->map().empty()) {

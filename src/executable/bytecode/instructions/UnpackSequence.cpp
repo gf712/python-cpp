@@ -49,7 +49,7 @@ PyResult<Value> UnpackSequence::execute(VirtualMachine &vm, Interpreter &) const
 					return Ok(Value{ py_none() });
 				}
 			} else {
-				const auto mapping = (*obj)->as_mapping();
+				auto mapping = (*obj)->as_mapping();
 				if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
 				const auto source_size = [&] {
 					[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;

@@ -13,6 +13,8 @@
 #include "interpreter/Interpreter.hpp"
 #include "vm/VM.hpp"
 
+#include <cstdlib>
+#include <iostream>
 #include <locale>
 #include <ranges>
 
@@ -795,22 +797,17 @@ PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &)
 
 PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &)
 {
+	return equals(lhs, rhs);
+}
+
+PyResult<Value> equals(const Value &lhs, const Value &rhs)
+{
 	return std::visit(
-		overloaded{ [](const NoneType &lhs_value, const auto &rhs_value) -> PyResult<Value> {
+		overloaded{ [](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
 					   return Ok(NameConstant{ lhs_value == rhs_value });
 				   },
-			[](const auto &lhs_value, const NoneType &rhs_value) -> PyResult<Value> {
-				return Ok(NameConstant{ lhs_value == rhs_value });
-			},
-			[](const Number &lhs_value, const Number &rhs_value) -> PyResult<Value> {
-				return Ok(NameConstant{ lhs_value == rhs_value });
-			},
-			[](const auto &lhs_value, const auto &rhs_value) -> PyResult<Value> {
-				const auto py_lhs = PyObject::from(lhs_value);
-				if (py_lhs.is_err()) return py_lhs;
-				const auto py_rhs = PyObject::from(rhs_value);
-				if (py_rhs.is_err()) return py_rhs;
-				return py_lhs.unwrap()->richcompare(py_rhs.unwrap(), RichCompare::Py_EQ);
+			[](PyObject *lhs_value, PyObject *rhs_value) -> PyResult<Value> {
+				return lhs_value->richcompare(rhs_value, RichCompare::Py_EQ);
 			} },
 		lhs,
 		rhs);
@@ -1033,16 +1030,17 @@ PyResult<bool> is(const Value &lhs, const Value &rhs, Interpreter &)
 
 PyResult<bool> in(const Value &lhs, const Value &rhs, Interpreter &)
 {
-	if (!std::holds_alternative<PyObject *>(rhs)) {
-		return Err(type_error("argument of type '{}' is not iterable",
-			PyObject::from(rhs).unwrap()->type()->to_string()));
-	}
-	auto value = PyObject::from(lhs);
-	if (value.is_err()) { return Err(value.unwrap_err()); }
-	return std::get<PyObject *>(rhs)->contains(value.unwrap());
+	auto lhs_ = PyObject::from(lhs);
+	if (lhs_.is_err()) return lhs_;
+	auto rhs_ = PyObject::from(rhs);
+	if (rhs_.is_err()) return rhs_;
+
+	return lhs_.unwrap()->contains(rhs_.unwrap());
 }
 
-PyResult<bool> truthy(const Value &value, Interpreter &)
+PyResult<bool> truthy(const Value &value, Interpreter &) { return truthy(value); }
+
+PyResult<bool> truthy(const Value &value)
 {
 	// Number, String, Bytes, Ellipsis, NameConstant, PyObject *
 	return std::visit(overloaded{ [](const NameConstant &c) -> PyResult<bool> {

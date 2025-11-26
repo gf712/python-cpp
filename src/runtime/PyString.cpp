@@ -1787,6 +1787,56 @@ PyResult<PyObject *> PyString::replace(PyTuple *args, PyDict *kwargs) const
 	return PyString::create(result_str);
 }
 
+PyResult<PyObject *> PyString::encode(PyTuple *args, PyDict *kwargs) const
+{
+	auto parse_result = PyArgsParser<PyString *, PyString *>::unpack_tuple(args,
+		kwargs,
+		"str.encode",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 2>{},
+		PyString::create("utf-8").unwrap(),
+		PyString::create("strict").unwrap());
+
+	if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
+
+	auto [encoding, errors] = parse_result.unwrap();
+
+	if (encoding->value() != "utf-8") {
+		return Err(not_implemented_error("encoding '{}' not implemented", encoding->value()));
+	}
+
+	// if (errors->value() != "strict") {
+	// 	return Err(not_implemented_error("errors '{}' not implemented", errors->value()));
+	// }
+
+	Bytes b;
+	b.b.reserve(m_value.size());
+	for (const auto &cp : codepoints()) {
+		switch (utf8::codepoint_length(cp)) {
+		case 1: {
+			b.b.push_back(static_cast<std::byte>(cp));
+		} break;
+		case 2: {
+			b.b.push_back(static_cast<std::byte>(0b11000000 | ((cp >> 6) & 0b00011111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | (cp & 0b00111111)));
+		} break;
+		case 3: {
+			b.b.push_back(static_cast<std::byte>(0b11100000 | ((cp >> 12) & 0b00001111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | ((cp >> 6) & 0b00111111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | (cp & 0b00111111)));
+		} break;
+		case 4: {
+			b.b.push_back(static_cast<std::byte>(0b11110000 | ((cp >> 18) & 0b00000111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | ((cp >> 12) & 0b00111111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | ((cp >> 6) & 0b00111111)));
+			b.b.push_back(static_cast<std::byte>(0b10000000 | (cp & 0b00111111)));
+		} break;
+		}
+	}
+	return PyBytes::create(std::move(b));
+}
+
+
 PyResult<PyObject *> PyString::translate(PyObject *table) const
 {
 	const auto &cps = codepoints();
@@ -1861,6 +1911,7 @@ namespace {
 							 .def("format", &PyString::format)
 							 .def("replace", &PyString::replace)
 							 .def("translate", &PyString::translate)
+							 .def("encode", &PyString::encode)
 							 .staticmethod("maketrans", &PyString::maketrans)
 							 .type);
 	}

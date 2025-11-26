@@ -7,6 +7,10 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/ViewOpGraph.h"
+#include "llvm/Support/GraphWriter.h"
+
 
 namespace compiler::mlir {
 
@@ -24,6 +28,20 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 
 	::mlir::PassManager pm{ &ctx.ctx() };
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
+	// pm.addPass(::mlir::createRemoveDeadValuesPass());
+	// {
+	// 	int fd;
+	// 	std::string filename = llvm::createGraphFilename("python", fd);
+	// 	{
+	// 		llvm::raw_fd_ostream os(fd, /*shouldClose=*/true);
+	// 		if (fd == -1) {
+	// 			llvm::errs() << "error opening file '" << filename << "' for writing\n";
+	// 			return nullptr;
+	// 		}
+	// 		pm.addPass(::mlir::createPrintOpGraphPass(os));
+	// 	}
+	// 	llvm::DisplayGraph(filename, /*wait=*/false, llvm::GraphProgram::DOT);
+	// }
 	if (pm.run(ctx.module()).failed()) {
 		std::cerr << "Python bytecode MLIR lowering failed\n";
 		ctx.module().dump();

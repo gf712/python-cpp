@@ -1,6 +1,14 @@
 #include "../Modules.hpp"
 #include "runtime/PyDict.hpp"
+#include "runtime/PyFloat.hpp"
+#include "runtime/PyFunction.hpp"
+#include "runtime/PyInteger.hpp"
+#include "runtime/PyString.hpp"
+#include "runtime/PyTuple.hpp"
 #include "runtime/PyType.hpp"
+
+#include <chrono>
+#include <ratio>
 
 namespace py {
 
@@ -37,6 +45,22 @@ PyModule *time_module()
 	auto doc = PyString::create(std::string{ kDoc }).unwrap();
 
 	auto *module = PyModule::create(symbols, name, doc).unwrap();
+
+	module->add_symbol(PyString::create("monotonic_ns").unwrap(),
+		PyNativeFunction::create("monotonic_ns", [](PyTuple *, PyDict *) {
+			auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::steady_clock::now().time_since_epoch())
+								  .count();
+			return PyInteger::create(ns);
+		}).unwrap());
+
+	module->add_symbol(PyString::create("monotonic").unwrap(),
+		PyNativeFunction::create("monotonic", [](PyTuple *, PyDict *) {
+			const double ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::steady_clock::now().time_since_epoch())
+								  .count();
+			return PyFloat::create(ns / std::nano::den);
+		}).unwrap());
 
 	return module;
 }

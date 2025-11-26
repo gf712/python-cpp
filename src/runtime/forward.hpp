@@ -29,6 +29,7 @@ class PyTuple;
 class PyTupleIterator;
 class PyType;
 struct TypePrototype;
+struct PyBuffer;
 
 template<typename T> T *as(PyObject *node);
 template<typename T> const T *as(const PyObject *node);
