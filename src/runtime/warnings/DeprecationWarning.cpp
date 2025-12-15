@@ -21,7 +21,7 @@ PyResult<DeprecationWarning *> DeprecationWarning::create(PyType *type, PyTuple 
 
 PyResult<PyObject *> DeprecationWarning::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return DeprecationWarning::create(const_cast<PyType *>(type), args);
 }
 

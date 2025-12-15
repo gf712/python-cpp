@@ -14,7 +14,7 @@ PyStaticMethod::PyStaticMethod(PyType *type) : PyBaseObject(type) {}
 
 PyResult<PyObject *> PyStaticMethod::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	ASSERT(args && args->elements().size() == 1);
 
 	return PyObject::from(args->elements()[0]).and_then([](PyObject *function) {
@@ -31,7 +31,7 @@ void PyStaticMethod::visit_graph(Visitor &visitor)
 
 PyResult<PyObject *> PyStaticMethod::call_static_method(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(m_static_method->is_callable())
+	ASSERT(m_static_method->is_callable());
 	return m_static_method->call(args, kwargs);
 }
 

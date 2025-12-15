@@ -1182,7 +1182,7 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 		mangle_namespace(m_scope), node->name(), node->source_location());
 
 	const auto &name_visibility_it = m_variable_visibility.find(class_mangled_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &class_scope = name_visibility_it->second;
 
 	std::vector<mlir::Value> bases;
@@ -1929,9 +1929,9 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 
 ast::Value *MLIRGenerator::visit(const ast::NamedExpr *node)
 {
-	ASSERT(as<ast::Name>(node->target()))
-	ASSERT(as<ast::Name>(node->target())->context_type() == ast::ContextType::STORE)
-	ASSERT(as<ast::Name>(node->target())->ids().size() == 1)
+	ASSERT(as<ast::Name>(node->target()));
+	ASSERT(as<ast::Name>(node->target())->context_type() == ast::ContextType::STORE);
+	ASSERT(as<ast::Name>(node->target())->ids().size() == 1);
 
 	auto *src = node->value()->codegen(this);
 	ASSERT(src);
@@ -2442,7 +2442,7 @@ MLIRGenerator::RAIIScope MLIRGenerator::setup_function(mlir::func::FuncOp &f,
 	auto function_scope = create_nested_scope(function_name, mangled_name);
 
 	const auto &name_visibility_it = m_variable_visibility.find(mangled_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	const bool is_generator = name_visibility_it->second->is_generator;
 
@@ -2609,7 +2609,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 	store_name(function_name, fn_obj, source_location);
 
 	if (!decorator_functions.empty()) {
-		ASSERT(!is_anon)
+		ASSERT(!is_anon);
 		mlir::Value arg = load_name(function_name, source_location)->value;
 		for (const auto &decorator_function : decorator_functions | std::ranges::views::reverse) {
 			arg = m_context.builder().create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),

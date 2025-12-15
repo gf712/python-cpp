@@ -527,9 +527,9 @@ PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
 		other_list->elements().begin(),
 		[&interpreter](const auto &lhs, const auto &rhs) -> bool {
 			const auto &result = equals(lhs, rhs, interpreter);
-			ASSERT(result.is_ok())
+			ASSERT(result.is_ok());
 			auto is_true = truthy(result.unwrap(), interpreter);
-			ASSERT(is_true.is_ok())
+			ASSERT(is_true.is_ok());
 			return is_true.unwrap();
 		});
 	return Ok(result ? py_true() : py_false());

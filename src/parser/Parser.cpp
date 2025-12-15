@@ -2344,7 +2344,7 @@ struct DictPattern : PatternV2<DictPattern>
 			std::vector<std::shared_ptr<ASTNode>> values;
 
 			if (kv_pairs.has_value()) {
-				ASSERT(!kv_pairs->empty())
+				ASSERT(!kv_pairs->empty());
 				keys.reserve(kv_pairs->size());
 				values.reserve(kv_pairs->size());
 				for (const auto &[k, v] : *kv_pairs) {

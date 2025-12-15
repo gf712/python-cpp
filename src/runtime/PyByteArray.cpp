@@ -289,8 +289,8 @@ PyResult<PyObject *> PyByteArray::__add__(const PyObject *other) const
 
 PyResult<PyObject *> PyByteArray::find(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
@@ -306,14 +306,14 @@ PyResult<PyObject *> PyByteArray::find(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	auto get_position_from_slice = [this](int64_t pos) -> PyResult<size_t> {

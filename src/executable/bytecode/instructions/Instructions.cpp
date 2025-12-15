@@ -397,7 +397,7 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		const auto src = deserialize<uint8_t>(instruction_buffer);
 		const auto op = deserialize<uint8_t>(instruction_buffer);
-		ASSERT(op < 4)
+		ASSERT(op < 4);
 		return std::make_unique<Unary>(dst, src, static_cast<Unary::Operation>(op));
 	}
 	case LOAD_DEREF: {

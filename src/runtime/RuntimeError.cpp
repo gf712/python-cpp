@@ -15,7 +15,7 @@ template<> RuntimeError *as(PyObject *obj)
 
 template<> const RuntimeError *as(const PyObject *obj)
 {
-	ASSERT(types::runtime_error())
+	ASSERT(types::runtime_error());
 	if (obj->type() == types::runtime_error()) { return static_cast<const RuntimeError *>(obj); }
 	return nullptr;
 }

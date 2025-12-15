@@ -15,8 +15,8 @@ PyResult<Value> FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 	auto args = [&]() -> PyResult<PyTuple *> {
 		if (m_expand_args) {
 			auto tuple = vm.reg(m_args);
-			ASSERT(std::holds_alternative<PyObject *>(tuple))
-			ASSERT(as<PyTuple>(std::get<PyObject *>(tuple)))
+			ASSERT(std::holds_alternative<PyObject *>(tuple));
+			ASSERT(as<PyTuple>(std::get<PyObject *>(tuple)));
 			return Ok(as<PyTuple>(std::get<PyObject *>(tuple)));
 		} else {
 			return PyTuple::create();
@@ -27,8 +27,8 @@ PyResult<Value> FunctionCallEx::execute(VirtualMachine &vm, Interpreter &) const
 	auto kwargs = [&]() -> PyResult<PyDict *> {
 		if (m_expand_kwargs) {
 			auto dict = vm.reg(m_kwargs);
-			ASSERT(std::holds_alternative<PyObject *>(dict))
-			ASSERT(as<PyDict>(std::get<PyObject *>(dict)))
+			ASSERT(std::holds_alternative<PyObject *>(dict));
+			ASSERT(as<PyDict>(std::get<PyObject *>(dict)));
 			return Ok(as<PyDict>(std::get<PyObject *>(dict)));
 		} else {
 			return PyDict::create();

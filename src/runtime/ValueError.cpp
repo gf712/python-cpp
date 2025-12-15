@@ -8,14 +8,14 @@ namespace py {
 
 template<> ValueError *as(PyObject *obj)
 {
-	ASSERT(types::value_error())
+	ASSERT(types::value_error());
 	if (obj->type() == types::value_error()) { return static_cast<ValueError *>(obj); }
 	return nullptr;
 }
 
 template<> const ValueError *as(const PyObject *obj)
 {
-	ASSERT(types::value_error())
+	ASSERT(types::value_error());
 	if (obj->type() == types::value_error()) { return static_cast<const ValueError *>(obj); }
 	return nullptr;
 }
@@ -35,7 +35,7 @@ PyResult<ValueError *> ValueError::create(PyTuple *args)
 PyResult<PyObject *> ValueError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::value_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return ValueError::create(args);
 }
 

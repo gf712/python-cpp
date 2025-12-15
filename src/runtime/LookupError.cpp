@@ -17,7 +17,7 @@ LookupError::LookupError(PyTuple *args) : Exception(types::BuiltinTypes::the().l
 PyResult<PyObject *> LookupError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::lookup_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = LookupError::create(args)) {
 		return Ok(static_cast<PyObject *>(result));
 	} else {

@@ -198,7 +198,7 @@ class Flags : public PyBaseObject
 
 	PyType *static_type() const final
 	{
-		ASSERT(s_sys_flags)
+		ASSERT(s_sys_flags);
 		return s_sys_flags;
 	}
 
@@ -287,7 +287,7 @@ class Version : public PyTuple
 
 	PyType *static_type() const final
 	{
-		ASSERT(s_sys_version)
+		ASSERT(s_sys_version);
 		return s_sys_version;
 	}
 
@@ -360,7 +360,7 @@ PyModule *sys_module(Interpreter &interpreter)
 	s_sys_module->add_symbol(PyString::create("platform").unwrap(),
 		PyString::create(std::string{ platform() }).unwrap());
 
-	ASSERT(interpreter.modules())
+	ASSERT(interpreter.modules());
 	s_sys_module->add_symbol(PyString::create("modules").unwrap(), interpreter.modules());
 
 	s_sys_module->add_symbol(PyString::create("path_hooks").unwrap(), PyList::create().unwrap());

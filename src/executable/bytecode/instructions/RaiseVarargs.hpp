@@ -17,7 +17,7 @@ class RaiseVarargs final : public Instruction
 	std::string to_string() const final
 	{
 		if (m_cause.has_value()) {
-			ASSERT(m_exception.has_value())
+			ASSERT(m_exception.has_value());
 			return fmt::format("RAISE_VARARGS   r{:<3} r{:<3}", *m_exception, *m_cause);
 		} else if (m_exception.has_value()) {
 			return fmt::format("RAISE_VARARGS   r{:<3}", *m_exception);

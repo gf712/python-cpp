@@ -246,7 +246,7 @@ class Lexer
 			if (m_cursor > m_program.size()) { return {}; }
 			if (!read_more_tokens()) { return {}; }
 		}
-		ASSERT(positions < m_tokens_to_emit.size())
+		ASSERT(positions < m_tokens_to_emit.size());
 		return m_tokens_to_emit[positions];
 	}
 

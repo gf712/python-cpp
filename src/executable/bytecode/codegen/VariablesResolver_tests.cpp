@@ -14,7 +14,7 @@ VariablesResolver::VisibilityMap generate_resolver(std::string_view program)
 	p.parse();
 
 	auto module = as<ast::Module>(p.module());
-	ASSERT(module)
+	ASSERT(module);
 
 	return VariablesResolver::resolve(module.get());
 }

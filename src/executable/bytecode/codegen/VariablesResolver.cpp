@@ -9,9 +9,7 @@ using namespace ast;
 
 namespace {
 bool captured_by_closure(VariablesResolver::Visibility v)
-{
-	return v == VariablesResolver::Visibility::CELL || v == VariablesResolver::Visibility::FREE;
-}
+{ return v == VariablesResolver::Visibility::CELL || v == VariablesResolver::Visibility::FREE; }
 }// namespace
 
 
@@ -43,13 +41,13 @@ void VariablesResolver::annotate_free_and_cell_variables(const std::string &name
 		return;
 	}
 	auto *parent = child->parent;
-	ASSERT(parent)
+	ASSERT(parent);
 
 	while (child != top_node) {
 		child->symbol_map.add_symbol(Symbol{ .name = name, .visibility = Visibility::FREE });
 		child->captures.insert(name);
 		child = child->parent;
-		ASSERT(child)
+		ASSERT(child);
 	}
 
 	ASSERT(top_node->symbol_map.get_visible_symbol(name).has_value());
@@ -347,7 +345,7 @@ Value *VariablesResolver::visit(const ClassDefinition *node)
 
 	auto ns = m_current_scope->get().namespace_ + "." + node->name();
 
-	ASSERT(!m_visibility.contains(class_name))
+	ASSERT(!m_visibility.contains(class_name));
 
 	m_visibility[class_name] = std::unique_ptr<Scope>(new Scope{ .name = class_name,
 		.namespace_ = std::move(ns),
@@ -390,7 +388,7 @@ Value *VariablesResolver::visit(const Delete *node)
 
 Value *VariablesResolver::visit(const Dict *node)
 {
-	ASSERT(node->keys().size() == node->values().size())
+	ASSERT(node->keys().size() == node->values().size());
 	for (size_t i = 0; i < node->keys().size(); ++i) {
 		if (auto key = node->keys()[i]) { key->codegen(this); }
 		auto value = node->values()[i];
@@ -501,7 +499,7 @@ Value *VariablesResolver::visit(const Lambda *node)
 		if (default_) { default_->codegen(this); }
 	}
 
-	ASSERT(!m_visibility.contains(function_name))
+	ASSERT(!m_visibility.contains(function_name));
 
 	if (caller->get().type == Scope::Type::FUNCTION || caller->get().type == Scope::Type::CLOSURE) {
 		m_visibility[function_name] = std::unique_ptr<Scope>(new Scope{ .name = function_name,
@@ -668,7 +666,7 @@ Value *VariablesResolver::visit(const Module *node)
 	const auto &module_name = fs::path(node->filename()).stem();
 	auto ns = module_name;
 
-	ASSERT(!m_visibility.contains(module_name))
+	ASSERT(!m_visibility.contains(module_name));
 
 	m_visibility[module_name] = std::unique_ptr<Scope>(new Scope{ .name = module_name,
 		.namespace_ = std::move(ns),
@@ -735,7 +733,7 @@ Value *VariablesResolver::visit(const Return *node)
 Value *VariablesResolver::visit(const Yield *node)
 {
 	ASSERT(m_current_scope->get().type == Scope::Type::FUNCTION
-		   || m_current_scope->get().type == Scope::Type::CLOSURE)
+		   || m_current_scope->get().type == Scope::Type::CLOSURE);
 	m_current_scope->get().is_generator = true;
 	node->value()->codegen(this);
 	return nullptr;
@@ -744,7 +742,7 @@ Value *VariablesResolver::visit(const Yield *node)
 Value *VariablesResolver::visit(const YieldFrom *node)
 {
 	ASSERT(m_current_scope->get().type == Scope::Type::FUNCTION
-		   || m_current_scope->get().type == Scope::Type::CLOSURE)
+		   || m_current_scope->get().type == Scope::Type::CLOSURE);
 	m_current_scope->get().is_generator = true;
 	node->value()->codegen(this);
 	return nullptr;

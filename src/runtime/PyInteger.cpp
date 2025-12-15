@@ -305,7 +305,7 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 		}
 	}
 
-	ASSERT(value < static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
+	ASSERT(value < static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
 
 	auto result = PyInteger::create(static_cast<int64_t>(value));
 	if (result.is_err()) return result;

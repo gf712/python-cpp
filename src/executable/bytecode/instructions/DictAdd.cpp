@@ -11,11 +11,11 @@ PyResult<Value> DictAdd::execute(VirtualMachine &vm, Interpreter &) const
 	auto &key = vm.reg(m_key);
 	auto &value = vm.reg(m_value);
 
-	ASSERT(std::holds_alternative<PyObject *>(dict))
+	ASSERT(std::holds_alternative<PyObject *>(dict));
 
 	auto *pydict = std::get<PyObject *>(dict);
-	ASSERT(pydict)
-	ASSERT(as<PyDict>(pydict))
+	ASSERT(pydict);
+	ASSERT(as<PyDict>(pydict));
 
 	as<PyDict>(pydict)->insert(key, value);
 

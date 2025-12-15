@@ -12,7 +12,7 @@ UnboundLocalError::UnboundLocalError(PyTuple *args) : Exception(types::BuiltinTy
 PyResult<PyObject *> UnboundLocalError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::unbound_local_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(UnboundLocalError::create(args));
 }
 

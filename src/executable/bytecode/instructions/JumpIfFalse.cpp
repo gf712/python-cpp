@@ -9,7 +9,7 @@ using namespace py;
 
 PyResult<Value> JumpIfFalse::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	ASSERT(m_offset.has_value())
+	ASSERT(m_offset.has_value());
 	auto &result = vm.reg(m_test_register);
 
 	const auto test_result = [&] {
@@ -33,7 +33,7 @@ void JumpIfFalse::relocate(size_t instruction_idx)
 
 std::vector<uint8_t> JumpIfFalse::serialize() const
 {
-	ASSERT(m_offset.has_value())
+	ASSERT(m_offset.has_value());
 
 	std::vector<uint8_t> result{
 		JUMP_IF_FALSE,

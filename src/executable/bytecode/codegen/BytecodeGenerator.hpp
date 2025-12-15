@@ -141,14 +141,14 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 		const std::shared_ptr<Label> &get_current_loop_start_label() const
 		{
-			ASSERT(m_current_loop_start_label)
+			ASSERT(m_current_loop_start_label);
 			return m_current_loop_start_label;
 		}
 
 		const std::shared_ptr<Label> &get_current_loop_end_label() const
 		{
 			// should only be used by ast::Break
-			ASSERT(m_current_loop_end_label)
+			ASSERT(m_current_loop_end_label);
 			return m_current_loop_end_label;
 		}
 	};
@@ -263,7 +263,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	template<typename OpType, typename... Args> void emit(Args &&...args)
 	{
-		ASSERT(m_current_block)
+		ASSERT(m_current_block);
 		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
 
@@ -275,7 +275,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	const InstructionVector &function(size_t idx) const
 	{
-		ASSERT(idx < m_functions.functions.size())
+		ASSERT(idx < m_functions.functions.size());
 		return std::next(m_functions.functions.begin(), idx)->blocks;
 	}
 
@@ -284,7 +284,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 		spdlog::debug("New label to be added: name={} function_id={}", name, function_id);
 		auto new_label = std::make_shared<Label>(name, function_id);
 
-		ASSERT(std::find(m_labels.begin(), m_labels.end(), new_label) == m_labels.end())
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), new_label) == m_labels.end());
 
 		m_labels.emplace_back(new_label);
 
@@ -295,7 +295,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	void bind(const std::shared_ptr<Label> &label)
 	{
-		ASSERT(std::find(m_labels.begin(), m_labels.end(), label) != m_labels.end())
+		ASSERT(std::find(m_labels.begin(), m_labels.end(), label) != m_labels.end());
 		auto &instructions = function(label->function_id());
 		const auto instructions_size = instructions.size();
 		const size_t current_instruction_position = instructions_size;

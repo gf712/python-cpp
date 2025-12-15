@@ -15,7 +15,7 @@ std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 	p.parse();
 
 	auto module = as<ast::Module>(p.module());
-	ASSERT(module)
+	ASSERT(module);
 
 	return std::static_pointer_cast<BytecodeProgram>(compiler::compile(
 		module, {}, compiler::Backend::BYTECODE_GENERATOR, compiler::OptimizationLevel::None));

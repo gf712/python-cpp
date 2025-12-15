@@ -78,7 +78,7 @@ class MLIRGenerator : ast::CodeGenerator
 		MLIRGenerator *this_;
 		~RAIIScope()
 		{
-			ASSERT(!this_->m_scope.empty())
+			ASSERT(!this_->m_scope.empty());
 			this_->m_scope.pop_back();
 		}
 	};

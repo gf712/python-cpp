@@ -13,7 +13,7 @@ SyntaxError::SyntaxError(PyTuple *args) : Exception(types::BuiltinTypes::the().s
 PyResult<PyObject *> SyntaxError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::syntax_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(SyntaxError::create(args));
 }
 

@@ -9,11 +9,13 @@
 		std::abort();                                               \
 	} while (0)
 
-#define ASSERT(condition)                                                           \
-	if (!(condition)) {                                                             \
-		spdlog::error("Assertion failed {} {}:{}", #condition, __FILE__, __LINE__); \
-		std::abort();                                                               \
-	}
+#define ASSERT(condition)                                                               \
+	do {                                                                                \
+		if (!(condition)) {                                                             \
+			spdlog::error("Assertion failed {} {}:{}", #condition, __FILE__, __LINE__); \
+			std::abort();                                                               \
+		}                                                                               \
+	} while (0)
 
 #define ASSERT_NOT_REACHED()                                                \
 	do {                                                                    \
@@ -62,9 +64,8 @@ struct member_pointer : detail::member_pointer_helper<typename std::remove_cv<T>
 
 #if !defined(STL_SUPPORTS_BIT_CAST)
 template<class To, class From>
-typename std::enable_if_t<
-	sizeof(To) == sizeof(From)
-		&& std::is_trivially_copyable_v<From> && std::is_trivially_copyable_v<To>,
+typename std::enable_if_t<sizeof(To) == sizeof(From) && std::is_trivially_copyable_v<From>
+							  && std::is_trivially_copyable_v<To>,
 	To>
 	// constexpr support needs compiler magic
 	bit_cast(const From &src) noexcept
@@ -78,7 +79,5 @@ typename std::enable_if_t<
 }
 #else
 template<class To, class From> constexpr To bit_cast(const From &from) noexcept
-{
-	return std::bit_cast<To>(from);
-}
+{ return std::bit_cast<To>(from); }
 #endif

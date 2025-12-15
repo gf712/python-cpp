@@ -8,7 +8,7 @@ using namespace py;
 
 PyResult<Value> StoreDeref::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	ASSERT(interpreter.execution_frame()->freevars().size() > m_dst)
+	ASSERT(interpreter.execution_frame()->freevars().size() > m_dst);
 	interpreter.execution_frame()->freevars()[m_dst]->set_cell(vm.reg(m_src));
 	return Ok(vm.reg(m_src));
 }

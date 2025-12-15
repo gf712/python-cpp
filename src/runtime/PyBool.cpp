@@ -32,9 +32,9 @@ bool PyBool::value() const
 
 PyResult<PyObject *> PyBool::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().size() == 0)
-	ASSERT(args && args->size() == 1)
-	ASSERT(type == types::bool_())
+	ASSERT(!kwargs || kwargs->map().size() == 0);
+	ASSERT(args && args->size() == 1);
+	ASSERT(type == types::bool_());
 
 	const auto &value = PyObject::from(args->elements()[0]);
 

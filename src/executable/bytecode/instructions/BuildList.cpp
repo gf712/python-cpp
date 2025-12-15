@@ -17,7 +17,7 @@ PyResult<Value> BuildList::execute(VirtualMachine &vm, Interpreter &) const
 
 std::vector<uint8_t> BuildList::serialize() const
 {
-	ASSERT(m_size < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_size < std::numeric_limits<uint8_t>::max());
 
 	return {
 		BUILD_LIST,

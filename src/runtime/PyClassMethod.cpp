@@ -25,15 +25,15 @@ template<> const PyClassMethod *as(const PyObject *obj)
 
 PyResult<PyObject *> PyClassMethod::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == types::classmethod())
+	ASSERT(type == types::classmethod());
 
 	return PyClassMethod::create();
 }
 
 PyResult<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(args && args->size() == 1);
+	ASSERT(!kwargs || kwargs->map().empty());
 
 	auto callable = PyObject::from(args->elements()[0]);
 	if (callable.is_err()) return Err(callable.unwrap_err());

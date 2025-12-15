@@ -27,7 +27,7 @@ MemoryError::MemoryError(PyTuple *args) : Exception(types::BuiltinTypes::the().m
 PyResult<PyObject *> MemoryError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::memory_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = MemoryError::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
 	} else {

@@ -29,7 +29,7 @@ PyObject *py_ellipsis()
 	static PyObject *ellipsis = nullptr;
 	if (!ellipsis) {
 		auto obj = PyEllipsis::create();
-		ASSERT(obj.is_ok())
+		ASSERT(obj.is_ok());
 		ellipsis = obj.unwrap();
 	}
 	return ellipsis;

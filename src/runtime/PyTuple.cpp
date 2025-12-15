@@ -133,7 +133,7 @@ std::string PyTuple::to_string() const
 			std::visit(overloaded{ [&os](const auto &value) { os << value; },
 						   [&os](PyObject *value) {
 							   auto r = value->repr();
-							   ASSERT(r.is_ok())
+							   ASSERT(r.is_ok());
 							   os << r.unwrap()->to_string();
 						   } },
 				*it);
@@ -143,7 +143,7 @@ std::string PyTuple::to_string() const
 		std::visit(overloaded{ [&os](const auto &value) { os << value; },
 					   [&os](PyObject *value) {
 						   auto r = value->repr();
-						   ASSERT(r.is_ok())
+						   ASSERT(r.is_ok());
 						   os << r.unwrap()->to_string();
 					   } },
 			*it);
@@ -230,9 +230,9 @@ PyResult<PyObject *> PyTuple::__eq__(const PyObject *other) const
 		other_tuple->elements().begin(),
 		[&interpreter](const auto &lhs, const auto &rhs) -> bool {
 			const auto &result = equals(lhs, rhs, interpreter);
-			ASSERT(result.is_ok())
+			ASSERT(result.is_ok());
 			auto is_true = truthy(result.unwrap(), interpreter);
-			ASSERT(is_true.is_ok())
+			ASSERT(is_true.is_ok());
 			return is_true.unwrap();
 		});
 	return Ok(result ? py_true() : py_false());

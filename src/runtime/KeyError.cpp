@@ -8,14 +8,14 @@ namespace py {
 
 template<> KeyError *as(PyObject *obj)
 {
-	ASSERT(types::key_error())
+	ASSERT(types::key_error());
 	if (obj->type() == types::key_error()) { return static_cast<KeyError *>(obj); }
 	return nullptr;
 }
 
 template<> const KeyError *as(const PyObject *obj)
 {
-	ASSERT(types::key_error())
+	ASSERT(types::key_error());
 	if (obj->type() == types::key_error()) { return static_cast<const KeyError *>(obj); }
 	return nullptr;
 }
@@ -34,20 +34,20 @@ PyResult<KeyError *> KeyError::create(PyTuple *args)
 
 PyResult<PyObject *> KeyError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == types::key_error())
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(type == types::key_error());
+	ASSERT(!kwargs || kwargs->map().empty());
 	return KeyError::create(args);
 }
 
 PyType *KeyError::static_type() const
 {
-	ASSERT(types::key_error())
+	ASSERT(types::key_error());
 	return types::key_error();
 }
 
 PyType *KeyError::class_type()
 {
-	ASSERT(types::key_error())
+	ASSERT(types::key_error());
 	return types::key_error();
 }
 

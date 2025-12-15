@@ -58,9 +58,9 @@ class PyString
 	static PyResult<PyString *> create(PyString *self, PyTuple *args, PyDict *kwargs)
 	{
 		// FIXME with proper error handling
-		ASSERT(self)
-		ASSERT(!args || (args->size() == 0))
-		ASSERT(!kwargs)
+		ASSERT(self);
+		ASSERT(!args || (args->size() == 0));
+		ASSERT(!kwargs);
 
 		return Ok(self);
 	}

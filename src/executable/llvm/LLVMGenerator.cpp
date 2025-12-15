@@ -64,13 +64,13 @@ struct LLVMGenerator::Context
 
 	void add_local(StringRef name, llvm::AllocaInst *value)
 	{
-		ASSERT(!scope_stack.empty())
+		ASSERT(!scope_stack.empty());
 		scope_stack.top().lookup_table[name] = value;
 	}
 
 	llvm::AllocaInst *get_variable(StringRef name)
 	{
-		ASSERT(!scope_stack.empty())
+		ASSERT(!scope_stack.empty());
 		// search in local scope
 		if (auto it = scope_stack.top().lookup_table.find(name);
 			it != scope_stack.top().lookup_table.end()) {
@@ -88,7 +88,7 @@ std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> no
 	compiler::OptimizationLevel lvl)
 {
 	auto module = ast::as<ast::Module>(node);
-	ASSERT(module)
+	ASSERT(module);
 
 	auto generator = LLVMGenerator();
 
@@ -130,7 +130,7 @@ ast::Value *LLVMGenerator::visit(const ast::Assign *node)
 	if (!value_to_store) { return nullptr; }
 	for (const auto &target : node->targets()) {
 		if (auto ast_name = ast::as<ast::Name>(target)) {
-			ASSERT(ast_name->ids().size() == 1)
+			ASSERT(ast_name->ids().size() == 1);
 			const auto &var_name = ast_name->ids()[0];
 			llvm::Function *f = m_ctx->builder->GetInsertBlock()->getParent();
 			Type *type = value_to_store->value()->getType();
@@ -226,7 +226,7 @@ ast::Value *LLVMGenerator::visit(const ast::Call *node)
 		return nullptr;
 	}
 	auto function_name_node = std::static_pointer_cast<ast::Name>(node->function());
-	ASSERT(function_name_node->ids().size() == 1)
+	ASSERT(function_name_node->ids().size() == 1);
 
 	const auto &function_name = function_name_node->ids()[0];
 
@@ -316,7 +316,7 @@ ast::Value *LLVMGenerator::visit(const ast::FunctionDefinition *node)
 		}
 	}
 
-	ASSERT(arg_types.size() == node->args()->args().size())
+	ASSERT(arg_types.size() == node->args()->args().size());
 
 	if (!node->returns()) {
 		// TODO: this would require type checking through the whole function
@@ -368,7 +368,7 @@ ast::Value *LLVMGenerator::visit(const ast::FunctionDefinition *node)
 	// 	raw_string_ostream out{ repr };
 	// 	auto success = verifyFunction(*F, &out);
 	// 	if (!success) { spdlog::error("Failed to compile to LLVM IR: {}", out.str()); }
-	// 	ASSERT(success)
+	// 	ASSERT(success);
 	// }
 
 	return create_value(F);
@@ -454,9 +454,9 @@ ast::Value *LLVMGenerator::visit(const ast::Module *node)
 ast::Value *LLVMGenerator::visit(const ast::Name *node)
 {
 	const auto &var_name = node->ids()[0];
-	ASSERT(m_ctx->builder->GetInsertBlock())
+	ASSERT(m_ctx->builder->GetInsertBlock());
 	auto *current_func = m_ctx->builder->GetInsertBlock()->getParent();
-	ASSERT(current_func)
+	ASSERT(current_func);
 	auto *var_alloca = m_ctx->get_variable(var_name);
 
 	if (!var_alloca) {

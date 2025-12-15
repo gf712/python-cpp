@@ -92,7 +92,7 @@ PyFrame *PyFrame::create(PyFrame *parent,
 
 void PyFrame::push_exception(BaseException *exception)
 {
-	ASSERT(exception)
+	ASSERT(exception);
 	spdlog::debug("PyFrame::push_exception: current exception count {}", m_exception_stack->size());
 	m_exception_stack->push_back(ExceptionStackItem{ .exception = exception,
 		.exception_type = exception->type(),
@@ -105,7 +105,7 @@ void PyFrame::push_exception(BaseException *exception)
 
 BaseException *PyFrame::pop_exception()
 {
-	ASSERT(!m_exception_stack->empty())
+	ASSERT(!m_exception_stack->empty());
 	auto *exception = m_exception_stack->back().exception;
 	spdlog::debug("PyFrame::pop_exception: @{}", static_cast<void*>(this));
 	spdlog::debug("PyFrame::pop_exception: current exception count {}", m_exception_stack->size());
@@ -244,14 +244,14 @@ void PyFrame::visit_graph(Visitor &visitor)
 
 Value PyFrame::consts(size_t index) const
 {
-	ASSERT(index < m_consts->size())
+	ASSERT(index < m_consts->size());
 	spdlog::debug("m_consts: {}", (void *)m_consts);
 	return m_consts->elements()[index];
 }
 
 const std::string &PyFrame::names(size_t index) const
 {
-	ASSERT(index < m_names.size())
+	ASSERT(index < m_names.size());
 	return m_names[index];
 }
 

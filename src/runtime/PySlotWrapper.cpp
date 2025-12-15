@@ -79,8 +79,8 @@ PySlotWrapper::PySlotWrapper(PyString *name, PyType *slot_type, Slot &base, Func
 PyResult<PySlotWrapper *>
 	PySlotWrapper::create(PyString *name, PyType *slot_type, Slot &base, FunctionType &&function)
 {
-	ASSERT(name)
-	ASSERT(slot_type)
+	ASSERT(name);
+	ASSERT(slot_type);
 	auto *obj = VirtualMachine::the().heap().allocate<PySlotWrapper>(
 		name, slot_type, base, std::move(function));
 	if (!obj) return Err(memory_error(sizeof(PySlotWrapper)));

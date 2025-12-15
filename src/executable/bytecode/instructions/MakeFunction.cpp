@@ -46,7 +46,7 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 
 	auto *func = interpreter.execution_frame()->code()->make_function(
 		function_name, default_values, kw_default_values, closure.unwrap());
-	ASSERT(func)
+	ASSERT(func);
 	// const std::string demangled_name =
 	// Mangler::default_mangler().function_demangle(function_name);
 	vm.reg(m_dst) = func;

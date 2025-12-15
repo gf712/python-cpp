@@ -14,8 +14,8 @@ using namespace py;
 
 PyResult<Value> ForIter::execute(VirtualMachine &vm, Interpreter &) const
 {
-	ASSERT(m_offset.has_value())
-	ASSERT(m_body_offset.has_value())
+	ASSERT(m_offset.has_value());
+	ASSERT(m_body_offset.has_value());
 	auto iterator = vm.reg(m_src);
 	if (auto *iterable_object = std::get_if<PyObject *>(&iterator)) {
 		const auto next_value = [iterable_object]() {

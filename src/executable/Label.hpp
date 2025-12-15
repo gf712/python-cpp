@@ -24,7 +24,7 @@ class Label
   protected:
 	void set_position(int64_t position) const
 	{
-		ASSERT(!m_position.has_value())
+		ASSERT(!m_position.has_value());
 		m_position = position;
 	}
 

@@ -125,7 +125,7 @@ class Lock : public PyBaseObject
 
 	PyType *static_type() const override
 	{
-		ASSERT(s_lock)
+		ASSERT(s_lock);
 		return s_lock;
 	}
 

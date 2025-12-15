@@ -32,7 +32,7 @@ PyResult<PyObject *> PyFloat::__new__(const PyType *type, PyTuple *args, PyDict 
 	// TODO: support inheriting from float
 	ASSERT(type == types::float_());
 
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	PyObject *value = nullptr;
 	if (args->elements().size() > 0) {
 		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {

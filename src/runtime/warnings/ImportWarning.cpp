@@ -19,7 +19,7 @@ PyResult<ImportWarning *> ImportWarning::create(PyType *type, PyTuple *args)
 
 PyResult<PyObject *> ImportWarning::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return ImportWarning::create(const_cast<PyType *>(type), args);
 }
 
@@ -31,7 +31,7 @@ PyType *ImportWarning::static_type() const
 
 PyType *ImportWarning::class_type()
 {
-	ASSERT(types::import_warning())
+	ASSERT(types::import_warning());
 	return types::import_warning();
 }
 

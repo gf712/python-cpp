@@ -74,7 +74,7 @@ std::string PyDict::to_string() const
 	while (std::next(it) != m_map.end()) {
 		std::visit(overloaded{ [&os](PyObject *key) {
 								  auto r = key->repr();
-								  ASSERT(r.is_ok())
+								  ASSERT(r.is_ok());
 								  os << r.unwrap()->to_string();
 							  },
 					   [&os](const auto &key) { os << key; } },
@@ -85,7 +85,7 @@ std::string PyDict::to_string() const
 									  os << "{...}";
 								  } else {
 									  auto r = value->repr();
-									  ASSERT(r.is_ok())
+									  ASSERT(r.is_ok());
 									  os << r.unwrap()->to_string();
 								  }
 							  },
@@ -97,7 +97,7 @@ std::string PyDict::to_string() const
 	}
 	std::visit(overloaded{ [&os](PyObject *key) {
 							  auto r = key->repr();
-							  ASSERT(r.is_ok())
+							  ASSERT(r.is_ok());
 							  os << r.unwrap()->to_string() << ": ";
 						  },
 				   [&os](const auto &key) { os << key << ": "; } },
@@ -107,7 +107,7 @@ std::string PyDict::to_string() const
 								  os << "{...}";
 							  } else {
 								  auto r = value->repr();
-								  ASSERT(r.is_ok())
+								  ASSERT(r.is_ok());
 								  os << r.unwrap()->to_string();
 							  }
 						  },
@@ -436,8 +436,8 @@ namespace {
 				.def(
 					"get",
 					+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-						ASSERT(args)
-						ASSERT(!kwargs || kwargs->size() == 0)
+						ASSERT(args);
+						ASSERT(!kwargs || kwargs->size() == 0);
 						auto key_ = PyObject::from(args->elements()[0]);
 						if (key_.is_err()) return key_;
 						PyObject *key = key_.unwrap();
@@ -452,8 +452,8 @@ namespace {
 				.def(
 					"pop",
 					+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-						ASSERT(args)
-						ASSERT(!kwargs || kwargs->size() == 0)
+						ASSERT(args);
+						ASSERT(!kwargs || kwargs->size() == 0);
 						auto key_ = PyObject::from(args->elements()[0]);
 						if (key_.is_err()) return key_;
 						PyObject *key = key_.unwrap();
@@ -468,8 +468,8 @@ namespace {
 				.def(
 					"update",
 					+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-						ASSERT(args)
-						ASSERT(!kwargs || kwargs->size() == 0)
+						ASSERT(args);
+						ASSERT(!kwargs || kwargs->size() == 0);
 						auto other_ = PyObject::from(args->elements()[0]);
 						if (other_.is_err()) return other_;
 						auto *other = other_.unwrap();

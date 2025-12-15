@@ -16,13 +16,13 @@ class InterpreterSession
   public:
 	Interpreter &interpreter()
 	{
-		ASSERT(!m_interpreters.empty())
+		ASSERT(!m_interpreters.empty());
 		return *m_interpreters.back();
 	}
 
 	const Interpreter &interpreter() const
 	{
-		ASSERT(!m_interpreters.empty())
+		ASSERT(!m_interpreters.empty());
 		return *m_interpreters.back();
 	}
 
@@ -32,7 +32,7 @@ class InterpreterSession
 	{
 		const size_t initial_size = m_interpreters.size();
 		m_interpreters.remove_if([&interpreter](const auto &i) { return &interpreter == i.get(); });
-		ASSERT(initial_size != m_interpreters.size())
+		ASSERT(initial_size != m_interpreters.size());
 	}
 
 	Interpreter &start_new_interpreter(const BytecodeProgram &program);

@@ -70,7 +70,7 @@ PyResult<PyObject *> PyClassMethodDescriptor::__call__(PyTuple *args, PyDict *kw
 	if (args_.is_err()) return args_;
 	args = args_.unwrap();
 
-	ASSERT(m_method)
+	ASSERT(m_method);
 	return m_method->get().method(cls, args, kwargs);
 }
 

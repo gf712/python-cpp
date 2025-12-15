@@ -14,9 +14,9 @@ using namespace py;
 
 PyResult<Value> JumpIfNotExceptionMatch::execute(VirtualMachine &vm, Interpreter &interpreter) const
 {
-	ASSERT(m_offset.has_value())
+	ASSERT(m_offset.has_value());
 	const auto &exception_type = vm.reg(m_exception_type_reg);
-	ASSERT(std::holds_alternative<PyObject *>(exception_type))
+	ASSERT(std::holds_alternative<PyObject *>(exception_type));
 	auto *exception_type_obj = std::get<PyObject *>(exception_type);
 
 	// there has to be at least one active exception in the current frame
@@ -61,7 +61,7 @@ void JumpIfNotExceptionMatch::relocate(size_t instruction_idx)
 
 std::vector<uint8_t> JumpIfNotExceptionMatch::serialize() const
 {
-	ASSERT(m_offset.has_value())
+	ASSERT(m_offset.has_value());
 
 	std::vector<uint8_t> result{
 		JUMP_IF_NOT_EXCEPTION_MATCH,

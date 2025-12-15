@@ -25,7 +25,7 @@ PySuper::PySuper(PyType *type, PyObject *object, PyType *object_type)
 
 PyResult<PyObject *> PySuper::__new__(const PyType *type, PyTuple *, PyDict *)
 {
-	ASSERT(type == types::super())
+	ASSERT(type == types::super());
 	auto &heap = VirtualMachine::the().heap();
 	auto *result = heap.allocate<PySuper>();
 	if (!result) { return Err(memory_error(sizeof(PySuper))); }

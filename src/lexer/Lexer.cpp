@@ -155,7 +155,7 @@ bool Lexer::try_read_comment()
 		// from a end of line ENDLINE
 		if (m_current_line_tokens.size() == 1) {
 			// just a comment in this line
-			ASSERT(m_current_line_tokens.back().token_type() == Token::TokenType::COMMENT)
+			ASSERT(m_current_line_tokens.back().token_type() == Token::TokenType::COMMENT);
 			push_empty_line();
 		} else {
 			push_new_line();
@@ -333,8 +333,8 @@ std::optional<size_t> Lexer::dec_number(size_t n) const
 		return n;
 	}
 
-	ASSERT(n == 0)
-	ASSERT(previous_is_underscore == false)
+	ASSERT(n == 0);
+	ASSERT(previous_is_underscore == false);
 	// [1-9](?:_?[0-9])*)
 	if (!std::isdigit(peek(n))) { return {}; }
 	n++;
@@ -1032,7 +1032,7 @@ bool Lexer::try_read_name()
 
 char Lexer::peek(size_t i) const
 {
-	ASSERT(m_cursor + i < m_program.size())
+	ASSERT(m_cursor + i < m_program.size());
 	return m_program[m_cursor + i];
 }
 

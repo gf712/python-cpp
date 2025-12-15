@@ -62,8 +62,8 @@ class DefaultMangler : public Mangler
 
 		std::string_view mangled_class{ mangled_name.c_str() + start, end - start };
 
-		ASSERT(mangled_class.starts_with("__class__"))
-		ASSERT(mangled_class.ends_with("__"))
+		ASSERT(mangled_class.starts_with("__class__"));
+		ASSERT(mangled_class.ends_with("__"));
 
 		// extract name from __class__{}__
 		return std::string{ mangled_class.begin() + 9, mangled_class.end() - 2 };

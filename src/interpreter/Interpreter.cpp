@@ -187,7 +187,7 @@ void Interpreter::internal_setup(const std::string &name,
 		auto *_imp = imp_module();
 		auto importlib_name = PyString::create("_frozen_importlib").unwrap();
 		auto importlib = import_frozen_module(importlib_name);
-		ASSERT(importlib.is_ok())
+		ASSERT(importlib.is_ok());
 		m_importlib = importlib.unwrap();
 		m_modules->insert(String{ "_frozen_importlib" }, m_importlib);
 
@@ -366,9 +366,9 @@ PyResult<std::monostate> Interpreter::store_object(const std::string &name, cons
 
 PyResult<Value> Interpreter::get_object(const std::string &name)
 {
-	ASSERT(execution_frame()->locals())
-	ASSERT(execution_frame()->globals())
-	ASSERT(execution_frame()->builtins())
+	ASSERT(execution_frame()->locals());
+	ASSERT(execution_frame()->globals());
+	ASSERT(execution_frame()->builtins());
 
 	auto *locals = execution_frame()->locals();
 	auto *globals = execution_frame()->globals();

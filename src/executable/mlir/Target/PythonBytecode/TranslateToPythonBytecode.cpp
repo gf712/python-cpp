@@ -1599,6 +1599,9 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::LoadAttribute &op)
 {
+	// LoadAttribute has side effects (can raise AttributeError, trigger descriptors)
+	// so we must emit it even if the result is unused. Liveness analysis ensures
+	// side-effecting operations always get register assignments.
 	emit<LoadAttr>(
 		get_register(op.getOutput()), get_register(op.getSelf()), add_name(op.getAttr()));
 	return success();

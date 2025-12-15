@@ -19,7 +19,7 @@ PyResult<Warning *> Warning::create(PyType *type, PyTuple *args)
 
 PyResult<PyObject *> Warning::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Warning::create(const_cast<PyType *>(type), args);
 }
 

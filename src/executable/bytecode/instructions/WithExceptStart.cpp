@@ -20,7 +20,7 @@ PyResult<Value> WithExceptStart::execute(VirtualMachine &vm, Interpreter &interp
 	if (!std::holds_alternative<PyObject *>(exit_method)) { TODO(); }
 
 	auto *exit_method_obj = std::get<PyObject *>(exit_method);
-	ASSERT(exit_method_obj)
+	ASSERT(exit_method_obj);
 
 	auto args_tuple = [&]() {
 		if (auto exc = interpreter.execution_frame()->exception_info()) {

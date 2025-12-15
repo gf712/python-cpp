@@ -13,7 +13,7 @@ IndexError::IndexError(PyTuple *args) : LookupError(types::BuiltinTypes::the().i
 PyResult<PyObject *> IndexError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::index_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = IndexError::create(args)) {
 		return Ok(static_cast<PyObject *>(result));
 	} else {

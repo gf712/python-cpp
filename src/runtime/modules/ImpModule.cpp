@@ -32,8 +32,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("is_frozen").unwrap(),
 		PyNativeFunction::create("is_frozen",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 
 				auto arg0 = PyObject::from(args->elements()[0]);
 				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
@@ -51,8 +51,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("is_frozen_package").unwrap(),
 		PyNativeFunction::create("is_frozen_package",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 
 				auto arg0 = PyObject::from(args->elements()[0]);
 				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
@@ -74,8 +74,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("get_frozen_object").unwrap(),
 		PyNativeFunction::create("get_frozen_object",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 
 				auto arg0 = PyObject::from(args->elements()[0]);
 				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
@@ -99,8 +99,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("acquire_lock").unwrap(),
 		PyNativeFunction::create("acquire_lock",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 0)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 0);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				return Ok(py_none());
 			})
 			.unwrap());
@@ -108,8 +108,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("release_lock").unwrap(),
 		PyNativeFunction::create("release_lock",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 0)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 0);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				return Ok(py_none());
 			})
 			.unwrap());
@@ -117,10 +117,10 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("is_builtin").unwrap(),
 		PyNativeFunction::create("is_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				auto name = PyObject::from(args->elements()[0]).unwrap();
-				ASSERT(as<PyString>(name))
+				ASSERT(as<PyString>(name));
 
 				return is_builtin(as<PyString>(name)->value()) ? Ok(py_true()) : Ok(py_false());
 			})
@@ -129,8 +129,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("create_builtin").unwrap(),
 		PyNativeFunction::create("create_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				auto spec = PyObject::from(args->elements()[0]).unwrap();
 
 				return create_builtin(spec);
@@ -140,8 +140,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("exec_builtin").unwrap(),
 		PyNativeFunction::create("exec_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				auto mod = PyObject::from(args->elements()[0]).unwrap();
 				return exec_builtin(mod);
 			})
@@ -150,8 +150,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("exec_dynamic").unwrap(),
 		PyNativeFunction::create("exec_dynamic",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1)
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->size() == 1);
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				auto mod = PyObject::from(args->elements()[0]).unwrap();
 				return exec_builtin(mod);
 			})
@@ -160,8 +160,8 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("extension_suffixes").unwrap(),
 		PyNativeFunction::create("extension_suffixes",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->elements().empty())
-				ASSERT(!kwargs || kwargs->map().size() == 0)
+				ASSERT(!args || args->elements().empty());
+				ASSERT(!kwargs || kwargs->map().size() == 0);
 				return PyList::create();
 			})
 			.unwrap());

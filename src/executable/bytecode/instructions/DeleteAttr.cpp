@@ -15,7 +15,7 @@ PyResult<Value> DeleteAttr::execute(VirtualMachine &vm, Interpreter &intepreter)
 		std::visit(
 			[](const auto &val) {
 				auto obj = PyObject::from(val);
-				ASSERT(obj.is_ok())
+				ASSERT(obj.is_ok());
 				return obj.unwrap()->to_string();
 			},
 			this_value));

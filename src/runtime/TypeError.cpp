@@ -12,7 +12,7 @@ TypeError::TypeError(PyTuple *args) : Exception(types::BuiltinTypes::the().type_
 PyResult<PyObject *> TypeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::type_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(TypeError::create(args));
 }
 
