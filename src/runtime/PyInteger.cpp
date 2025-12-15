@@ -13,6 +13,8 @@
 
 #include <gmpxx.h>
 
+#include <ranges>
+
 namespace py {
 
 template<> PyInteger *as(PyObject *obj)
@@ -38,14 +40,10 @@ PyInteger::PyInteger(TypePrototype &type, BigIntType value)
 {}
 
 PyInteger::PyInteger(PyType *type, BigIntType value) : PyInteger(type)
-{
-	m_value = Number{ std::move(value) };
-}
+{ m_value = Number{ std::move(value) }; }
 
 PyResult<PyInteger *> PyInteger::create(int64_t value)
-{
-	return PyInteger::create(BigIntType{ value });
-}
+{ return PyInteger::create(BigIntType{ value }); }
 
 PyResult<PyInteger *> PyInteger::create(BigIntType value)
 {
@@ -197,9 +195,7 @@ PyResult<PyObject *> PyInteger::__rshift__(const PyObject *obj) const
 }
 
 PyResult<PyObject *> PyInteger::bit_length() const
-{
-	return PyInteger::create(mpz_sizeinbase(as_big_int().get_mpz_t(), 2));
-}
+{ return PyInteger::create(mpz_sizeinbase(as_big_int().get_mpz_t(), 2)); }
 
 PyResult<PyObject *> PyInteger::bit_count() const
 {
@@ -299,9 +295,10 @@ PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *
 			value |= static_cast<uint64_t>(bytes->value().b[i]) << i * 8;
 		}
 	} else {
-		for (size_t i = 0; i < bytes->value().b.size(); ++i) {
-			value |= static_cast<uint64_t>(bytes->value().b[i])
-					 << ((sizeof(uint64_t) * 8) - ((i - 1) * 8));
+		const auto &bytes_ = bytes->value().b;
+		for (size_t i = 0; auto el : bytes_ | std::ranges::views::reverse) {
+			value |= static_cast<uint64_t>(el) << i * 8;
+			++i;
 		}
 	}
 
@@ -362,12 +359,12 @@ namespace {
 	std::unique_ptr<TypePrototype> register_int()
 	{
 		return std::move(klass<PyInteger>("int")
-							 .def("bit_length", &PyInteger::bit_length)
-							 .def("bit_count", &PyInteger::bit_count)
-							 .def("to_bytes", &PyInteger::to_bytes)
-							 .def("__round__", &PyInteger::__round__)
-							 .classmethod("from_bytes", &PyInteger::from_bytes)
-							 .type);
+				.def("bit_length", &PyInteger::bit_length)
+				.def("bit_count", &PyInteger::bit_count)
+				.def("to_bytes", &PyInteger::to_bytes)
+				.def("__round__", &PyInteger::__round__)
+				.classmethod("from_bytes", &PyInteger::from_bytes)
+				.type);
 	}
 }// namespace
 
