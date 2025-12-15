@@ -18,7 +18,7 @@ PyResult<Value> MethodCall::execute(VirtualMachine &vm, Interpreter &) const
 {
 	const auto &method = vm.reg(m_caller);
 	auto *method_obj = std::get<PyObject *>(method);
-	ASSERT(method_obj)
+	ASSERT(method_obj);
 
 	std::vector<Value> args;
 	for (const auto &arg_register : m_args) { args.push_back(vm.reg(arg_register)); }

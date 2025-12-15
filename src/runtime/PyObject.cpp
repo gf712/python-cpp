@@ -85,7 +85,7 @@ size_t ValueHash::operator()(const Value &value) const
 			[](const Tuple &t) -> size_t { return ::bit_cast<size_t>(t.elements.data()); },
 			[](PyObject *obj) -> size_t {
 				auto val = obj->hash();
-				ASSERT(val.is_ok())
+				ASSERT(val.is_ok());
 				return val.unwrap();
 			} },
 		value);
@@ -355,7 +355,7 @@ PyResult<PyObject *> PySequenceWrapper::concat(PyObject *value)
 
 template<> PyResult<PyObject *> PyObject::from(PyObject *const &value)
 {
-	ASSERT(value)
+	ASSERT(value);
 	return Ok(value);
 }
 
@@ -1289,7 +1289,7 @@ PyResult<PyObject *> PyObject::get_method(PyObject *name) const
 
 	if (descriptor_.has_value() && method_found) {
 		auto result = descriptor_->unwrap()->get(const_cast<PyObject *>(this), type());
-		ASSERT(result.is_ok())
+		ASSERT(result.is_ok());
 		return result;
 	}
 
@@ -1376,9 +1376,9 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 			const auto new_fn = get_address(*type->underlying_type().__new__);
 			ASSERT(new_fn);
 
-			ASSERT(types::object()->underlying_type().__new__)
+			ASSERT(types::object()->underlying_type().__new__);
 			const auto custom_new_fn = get_address(*types::object()->underlying_type().__new__);
-			ASSERT(custom_new_fn)
+			ASSERT(custom_new_fn);
 
 			if (new_fn != custom_new_fn) {
 				return Err(type_error(
@@ -1387,11 +1387,11 @@ PyResult<PyObject *> PyObject::__new__(const PyType *type, PyTuple *args, PyDict
 		}
 
 		if (!type->underlying_type().__init__.has_value()) {
-			ASSERT(type->underlying_type().__init__)
+			ASSERT(type->underlying_type().__init__);
 			const auto init_fn = get_address(*type->underlying_type().__init__);
 			ASSERT(init_fn);
 
-			ASSERT(types::object()->underlying_type().__init__)
+			ASSERT(types::object()->underlying_type().__init__);
 			const auto custom_init_fn = get_address(*types::object()->underlying_type().__init__);
 			if (init_fn == custom_init_fn) {
 				return Err(type_error("object() takes no arguments"));
@@ -1405,13 +1405,13 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 {
 	if ((args && !args->elements().empty()) || (kwargs && !kwargs->map().empty())) {
 		if (!type()->underlying_type().__new__.has_value()) {
-			ASSERT(type()->underlying_type().__new__)
+			ASSERT(type()->underlying_type().__new__);
 			const auto new_fn = get_address(*type()->underlying_type().__new__);
-			ASSERT(new_fn)
+			ASSERT(new_fn);
 
-			ASSERT(types::object()->underlying_type().__new__)
+			ASSERT(types::object()->underlying_type().__new__);
 			const auto custom_new_fn = get_address(*types::object()->underlying_type().__new__);
-			ASSERT(custom_new_fn)
+			ASSERT(custom_new_fn);
 
 			if (new_fn == custom_new_fn) {
 				return Err(type_error(
@@ -1420,13 +1420,13 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 		}
 
 		if (!type()->underlying_type().__init__.has_value()) {
-			ASSERT(type()->underlying_type().__init__)
+			ASSERT(type()->underlying_type().__init__);
 			const auto init_fn = get_address(*type()->underlying_type().__init__);
-			ASSERT(init_fn)
+			ASSERT(init_fn);
 
-			ASSERT(types::object()->underlying_type().__init__)
+			ASSERT(types::object()->underlying_type().__init__);
 			const auto custom_init_fn = get_address(*types::object()->underlying_type().__init__);
-			ASSERT(custom_init_fn)
+			ASSERT(custom_init_fn);
 
 			if (init_fn != custom_init_fn) {
 				return Err(type_error("object() takes no arguments"));

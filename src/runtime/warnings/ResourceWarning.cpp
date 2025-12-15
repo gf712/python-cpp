@@ -20,7 +20,7 @@ PyResult<ResourceWarning *> ResourceWarning::create(PyType *type, PyTuple *args)
 
 PyResult<PyObject *> ResourceWarning::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return ResourceWarning::create(const_cast<PyType *>(type), args);
 }
 

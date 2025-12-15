@@ -27,7 +27,7 @@ PyResult<Value> FunctionCallWithKeywords::execute(VirtualMachine &vm,
 
 	PyDict::MapType map;
 
-	ASSERT(m_kwargs.size() == m_keywords.size())
+	ASSERT(m_kwargs.size() == m_keywords.size());
 
 	for (size_t i = 0; i < m_kwargs.size(); ++i) {
 		const auto &keyword = interpreter.execution_frame()->names(m_keywords[i]);

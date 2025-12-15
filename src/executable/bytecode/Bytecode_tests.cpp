@@ -17,7 +17,7 @@
 // 	p.parse();
 
 // 	auto module = as<ast::Module>(p.module());
-// 	ASSERT(module)
+// 	ASSERT(module);
 
 // 	auto bytecode =
 // 		codegen::BytecodeGenerator::compile(module, {}, compiler::OptimizationLevel::None);

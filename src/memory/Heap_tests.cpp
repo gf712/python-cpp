@@ -60,7 +60,7 @@ TEST_F(TestHeap, AllocatesInOldBlockWhenPossible)
 	}
 
 	static constexpr size_t index = 100;
-	ASSERT(index < n_chunks * chunk_size)
+	ASSERT(index < n_chunks * chunk_size);
 	auto *old_ptr = data[index];
 	m_heap->slab().block_32()->deallocate(bit_cast<uint8_t *>(old_ptr) - sizeof(GarbageCollected));
 

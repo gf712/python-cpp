@@ -107,7 +107,7 @@ PyResult<PyCode *> PyCode::create(std::shared_ptr<Program> program)
 	auto main_function = program->main_function();
 	ASSERT(main_function);
 	auto *code = as<PyCode>(main_function);
-	ASSERT(code)
+	ASSERT(code);
 	code->m_program = std::move(program);
 	return Ok(code);
 }
@@ -159,7 +159,7 @@ PyObject *PyCode::make_function(const std::string &function_name,
 	PyTuple *closure) const
 {
 	auto *f = m_program->as_pyfunction(function_name, default_values, kw_default_values, closure);
-	ASSERT(f)
+	ASSERT(f);
 	return f;
 }
 
@@ -251,7 +251,7 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	if (kwargs) {
 		const auto &argnames = m_varnames;
 		for (const auto &[key, value] : kwargs->map()) {
-			ASSERT(std::holds_alternative<String>(key))
+			ASSERT(std::holds_alternative<String>(key));
 			auto key_str = std::get<String>(key);
 			auto arg_iter = std::find(m_varnames.begin(), m_varnames.end(), key_str.s);
 			if (arg_iter == m_varnames.end()) {

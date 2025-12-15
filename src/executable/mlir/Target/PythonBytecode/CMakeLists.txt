@@ -8,8 +8,8 @@ add_mlir_translation_library(TargetPythonBytecode
     PUBLIC
       EmitPythonBytecodeDialect
       MLIRIR
-    PRIVATE
       spdlog
+    PRIVATE
       python-cpp
       MLIRTargetLLVMIRExport
 )

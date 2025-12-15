@@ -16,7 +16,7 @@ PyResult<Value> LoadAttr::execute(VirtualMachine &vm, Interpreter &interpreter) 
 		std::visit(
 			[](const auto &val) {
 				auto obj = PyObject::from(val);
-				ASSERT(obj.is_ok())
+				ASSERT(obj.is_ok());
 				return obj.unwrap()->to_string();
 			},
 			this_value));

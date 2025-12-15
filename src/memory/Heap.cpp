@@ -124,7 +124,7 @@ void Block::deallocate(uint8_t *ptr)
 		if (bit_cast<uintptr_t>(ptr) < start || bit_cast<uintptr_t>(ptr) >= end) { continue; }
 
 		const size_t chunk_idx = (bit_cast<uintptr_t>(ptr) - start) / (64 * object_size);
-		ASSERT(chunk_idx < m_chunks.size())
+		ASSERT(chunk_idx < m_chunks.size());
 
 		m_chunks[chunk_idx].deallocate(ptr);
 

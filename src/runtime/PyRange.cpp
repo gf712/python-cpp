@@ -20,9 +20,9 @@ PyRange::PyRange(PyType *type) : PyBaseObject(type) {}
 
 PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().size() == 0)
-	ASSERT(args && args->size() > 0 && args->size() < 4)
-	ASSERT(type == types::range())
+	ASSERT(!kwargs || kwargs->map().size() == 0);
+	ASSERT(args && args->size() > 0 && args->size() < 4);
+	ASSERT(type == types::range());
 
 	auto obj = [&]() -> std::variant<PyRange *, PyResult<PyRange *>> {
 		if (args->size() == 1) {

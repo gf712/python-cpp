@@ -46,9 +46,9 @@ std::string PyCallableProxyType::to_string() const
 
 PyResult<PyObject *> PyCallableProxyType::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(type == s_weak_callableproxy)
-	ASSERT(args && args->size() > 0)
-	ASSERT(!kwargs || kwargs->size() == 0)
+	ASSERT(type == s_weak_callableproxy);
+	ASSERT(args && args->size() > 0);
+	ASSERT(!kwargs || kwargs->size() == 0);
 
 	auto *obj = PyObject::from(args->elements()[0]).unwrap();
 	auto *callback = [args]() -> PyObject * {

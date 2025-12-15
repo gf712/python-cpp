@@ -16,7 +16,7 @@ Exception::Exception(const TypePrototype &type, PyTuple *args) : BaseException(t
 PyResult<PyObject *> Exception::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::exception());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(Exception::create(args));
 }
 

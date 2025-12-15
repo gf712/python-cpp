@@ -16,7 +16,7 @@ PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 {
 	if (m_exception.has_value()) {
 		const auto &exception = vm.reg(*m_exception);
-		ASSERT(std::holds_alternative<PyObject *>(exception))
+		ASSERT(std::holds_alternative<PyObject *>(exception));
 
 		auto *exception_obj = std::get<PyObject *>(exception);
 		if (as<PyType>(exception_obj)) {

@@ -13,7 +13,7 @@ template<> int64_t from_args(PyTuple *args, size_t index)
 {
 	ASSERT(index < args->elements().size());
 	const auto &el = args->elements()[index];
-	ASSERT(std::holds_alternative<Number>(el) || std::holds_alternative<PyObject *>(el))
+	ASSERT(std::holds_alternative<Number>(el) || std::holds_alternative<PyObject *>(el));
 	if (std::holds_alternative<Number>(el)) {
 		auto n = std::get<Number>(el);
 		if (std::holds_alternative<int64_t>(n.value)) {
@@ -23,14 +23,14 @@ template<> int64_t from_args(PyTuple *args, size_t index)
 		}
 	}
 	auto *obj = std::get<PyObject *>(el);
-	ASSERT(obj->type() == integer())
+	ASSERT(obj->type() == integer());
 	return as<PyInteger>(obj)->as_i64();
 }
 
 template<> PyObject *from(int64_t value)
 {
 	auto obj = PyObject::from(Number{ value });
-	ASSERT(obj.is_ok())
+	ASSERT(obj.is_ok());
 	return obj.unwrap();
 }
 
@@ -38,7 +38,7 @@ PyObject *create_llvm_function(const std::string &name,
 	std::function<PyObject *(PyTuple *, PyDict *)> &&func)
 {
 	auto obj = PyLLVMFunction::create(name, std::move(func));
-	ASSERT(obj.is_ok())
+	ASSERT(obj.is_ok());
 	return obj.unwrap();
 }
 

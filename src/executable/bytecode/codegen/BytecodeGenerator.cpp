@@ -295,7 +295,7 @@ void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 	case VariablesResolver::Visibility::LOCAL: {
 		auto *value = [&] {
 			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
-				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second));
 				return std::get<BytecodeStackValue *>(it->second);
 			} else {
 				auto *value = create_stack_value();
@@ -309,7 +309,7 @@ void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 	case VariablesResolver::Visibility::FREE: {
 		auto *value = [&]() -> BytecodeFreeValue * {
 			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(it->second))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(it->second));
 				return std::get<BytecodeFreeValue *>(it->second);
 			} else {
 				auto *value = create_free_value(name);
@@ -354,7 +354,7 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	case VariablesResolver::Visibility::LOCAL: {
 		auto *value = [&]() -> BytecodeStackValue * {
 			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
-				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second));
 				return std::get<BytecodeStackValue *>(it->second);
 			} else {
 				auto *value = create_stack_value();
@@ -368,7 +368,7 @@ BytecodeValue *BytecodeGenerator::load_var(const std::string &name)
 	case VariablesResolver::Visibility::FREE: {
 		ASSERT(m_stack.top().locals.contains(name));
 		const auto &l = m_stack.top().locals.at(name);
-		ASSERT(std::holds_alternative<BytecodeFreeValue *>(l))
+		ASSERT(std::holds_alternative<BytecodeFreeValue *>(l));
 		ASSERT(std::get<BytecodeFreeValue *>(l)->get_name() == name);
 		emit<LoadDeref>(
 			dst->get_register(), std::get<BytecodeFreeValue *>(l)->get_free_var_index());
@@ -414,7 +414,7 @@ void BytecodeGenerator::delete_var(const std::string &name)
 	case VariablesResolver::Visibility::LOCAL: {
 		auto *value = [&]() -> BytecodeStackValue * {
 			if (auto it = m_stack.top().locals.find(name); it != m_stack.top().locals.end()) {
-				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second))
+				ASSERT(std::holds_alternative<BytecodeStackValue *>(it->second));
 				return std::get<BytecodeStackValue *>(it->second);
 			} else {
 				auto *value = create_stack_value();
@@ -466,7 +466,7 @@ BytecodeNameValue *BytecodeGenerator::load_name(const std::string &name, size_t 
 
 Value *BytecodeGenerator::visit(const Name *node)
 {
-	ASSERT(node->ids().size() == 1)
+	ASSERT(node->ids().size() == 1);
 	if (node->context_type() == ContextType::LOAD) {
 		return load_var(node->ids()[0]);
 	} else if (node->context_type() == ContextType::DELETE) {
@@ -583,7 +583,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	decorator_functions.reserve(node->decorator_list().size());
 	for (const auto &decorator_function : node->decorator_list()) {
 		auto *f = generate(decorator_function.get(), m_function_id);
-		ASSERT(f)
+		ASSERT(f);
 		decorator_functions.push_back(f);
 	}
 
@@ -595,7 +595,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	auto *f = create_function(function_name);
 
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	const bool is_generator = name_visibility_it->second->is_generator;
 
@@ -772,7 +772,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -844,7 +844,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	auto *f = create_function(function_name);
 
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	const bool is_generator = name_visibility_it->second->is_generator;
 
@@ -1023,7 +1023,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -1168,7 +1168,7 @@ Value *BytecodeGenerator::visit(const ast::YieldFrom *node)
 Value *BytecodeGenerator::visit(const Assign *node)
 {
 	auto *src = generate(node->value().get(), m_function_id);
-	ASSERT(node->targets().size() > 0)
+	ASSERT(node->targets().size() > 0);
 
 	for (const auto &target : node->targets()) {
 		if (auto ast_name = as<Name>(target)) {
@@ -1278,7 +1278,7 @@ Value *BytecodeGenerator::visit(const Call *node)
 			for (const auto &el : node->keywords()) {
 				if (is_kwargs_expansion(el)) {
 					if (first_kwargs_expansion) {
-						ASSERT(key_registers.size() == value_registers.size())
+						ASSERT(key_registers.size() == value_registers.size());
 						dict_value = build_dict(key_registers, value_registers);
 						key_registers.clear();
 						value_registers.clear();
@@ -1301,8 +1301,8 @@ Value *BytecodeGenerator::visit(const Call *node)
 					}
 				}
 			}
-			ASSERT(first_kwargs_expansion == false)
-			ASSERT(dict_value)
+			ASSERT(first_kwargs_expansion == false);
+			ASSERT(dict_value);
 			keyword_values.push_back(dict_value);
 		} else {
 			// dummy value that will be ignore at runtime, since requires_kwargs_expansion is false
@@ -1326,8 +1326,8 @@ Value *BytecodeGenerator::visit(const Call *node)
 	}
 
 	if (requires_args_expansion || requires_kwargs_expansion) {
-		ASSERT(arg_values.size() == 1)
-		ASSERT(keyword_values.size() == 1)
+		ASSERT(arg_values.size() == 1);
+		ASSERT(keyword_values.size() == 1);
 
 		emit<FunctionCallEx>(func->get_register(),
 			arg_values[0]->get_register(),
@@ -1384,7 +1384,7 @@ Value *BytecodeGenerator::visit(const If *node)
 {
 	static size_t if_count = 0;
 
-	ASSERT(!node->body().empty())
+	ASSERT(!node->body().empty());
 
 	auto orelse_start_label = make_label(fmt::format("ORELSE_{}", if_count), m_function_id);
 	auto end_label = make_label(fmt::format("IF_END_{}", if_count++), m_function_id);
@@ -1411,7 +1411,7 @@ Value *BytecodeGenerator::visit(const For *node)
 {
 	static size_t for_loop_count = 0;
 
-	ASSERT(!node->body().empty())
+	ASSERT(!node->body().empty());
 
 	auto forloop_start_label =
 		make_label(fmt::format("FOR_START_{}", for_loop_count), m_function_id);
@@ -1498,7 +1498,7 @@ Value *BytecodeGenerator::visit(const While *node)
 {
 	static size_t while_loop_count = 0;
 
-	ASSERT(!node->body().empty())
+	ASSERT(!node->body().empty());
 
 	auto while_loop_start_label =
 		make_label(fmt::format("WHILE_START_{}", while_loop_count), m_function_id);
@@ -1653,7 +1653,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 		mangle_namespace(m_stack), node->name(), node->source_location());
 
 	const auto &name_visibility_it = m_variable_visibility.find(class_mangled_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &class_scope = name_visibility_it->second;
 
 	auto *class_builder_func = create_function(class_mangled_name);
@@ -1750,7 +1750,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -1816,7 +1816,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 
 Value *BytecodeGenerator::visit(const Dict *node)
 {
-	ASSERT(node->keys().size() == node->values().size())
+	ASSERT(node->keys().size() == node->values().size());
 
 	std::vector<std::optional<Register>> key_registers;
 	std::vector<Register> value_registers;
@@ -1880,7 +1880,7 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 {
 	auto *lhs = [this, node]() {
 		if (auto named_target = as<Name>(node->target())) {
-			ASSERT(named_target->context_type() == ContextType::STORE)
+			ASSERT(named_target->context_type() == ContextType::STORE);
 			if (named_target->ids().size() != 1) { TODO(); }
 			return load_var(named_target->ids()[0]);
 		} else if (auto attr = as<Attribute>(node->target())) {
@@ -2132,7 +2132,7 @@ Value *BytecodeGenerator::visit(const Subscript *node)
 Value *BytecodeGenerator::visit(const Raise *node)
 {
 	if (node->cause()) {
-		ASSERT(node->exception())
+		ASSERT(node->exception());
 		const auto *exception = generate(node->exception().get(), m_function_id);
 		const auto *cause = generate(node->cause().get(), m_function_id);
 		emit<RaiseVarargs>(exception->get_register(), cause->get_register());
@@ -2221,7 +2221,7 @@ Value *BytecodeGenerator::visit(const WithItem *node)
 
 	if (auto optional_vars = node->optional_vars()) {
 		if (auto name = as<Name>(optional_vars)) {
-			ASSERT(as<Name>(optional_vars)->ids().size() == 1)
+			ASSERT(as<Name>(optional_vars)->ids().size() == 1);
 			store_name(as<Name>(optional_vars)->ids()[0], enter_result);
 		} else if (auto tuple = as<Tuple>(optional_vars)) {
 			(void)tuple;
@@ -2250,7 +2250,7 @@ Value *BytecodeGenerator::visit(const IfExpr *node)
 	auto *test_result = generate(node->test().get(), m_function_id);
 	emit<JumpIfFalse>(test_result->get_register(), orelse_start_label);
 	auto *if_result = generate(node->body().get(), m_function_id);
-	ASSERT(if_result)
+	ASSERT(if_result);
 	emit<Move>(return_value->get_register(), if_result->get_register());
 	emit<Jump>(end_label);
 
@@ -2308,7 +2308,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 		emit<LeaveExceptionHandling>();
 
 		if (!node->orelse().empty()) {
-			ASSERT(orelse_label)
+			ASSERT(orelse_label);
 			emit<Jump>(orelse_label);
 		} else {
 			emit<Jump>(finally_label);
@@ -2490,9 +2490,9 @@ Value *BytecodeGenerator::visit(const Pass *) { return nullptr; }
 
 Value *BytecodeGenerator::visit(const NamedExpr *node)
 {
-	ASSERT(as<Name>(node->target()))
-	ASSERT(as<Name>(node->target())->context_type() == ContextType::STORE)
-	ASSERT(as<Name>(node->target())->ids().size() == 1)
+	ASSERT(as<Name>(node->target()));
+	ASSERT(as<Name>(node->target())->context_type() == ContextType::STORE);
+	ASSERT(as<Name>(node->target())->ids().size() == 1);
 
 	auto *dst = create_value();
 	auto *src = generate(node->value().get(), m_function_id);
@@ -2594,7 +2594,7 @@ std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Labe
 		emit<ForIter>(dst->get_register(), it->get_register(), end_label);
 		if (node->target()->node_type() == ASTNodeType::Name) {
 			const auto name = std::static_pointer_cast<Name>(node->target());
-			ASSERT(name->ids().size() == 1)
+			ASSERT(name->ids().size() == 1);
 			store_name(name->ids()[0], dst);
 		} else if (auto target = as<Tuple>(node->target())) {
 			std::vector<Register> unpack_dst;
@@ -2660,7 +2660,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	auto *list = build_list({});
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *element = generate(node->elt().get(), m_function_id);
-	ASSERT(element)
+	ASSERT(element);
 	emit<ListAppend>(list->get_register(), element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
 	while (!start_labels.empty()) {
@@ -2685,7 +2685,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -2701,7 +2701,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 		"comprehension_iterator",
 	};
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	for (const auto &symbol : symbol_map.symbols) {
 		const auto &varname = symbol.name;
@@ -2788,7 +2788,7 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -2804,7 +2804,7 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 		"comprehension_iterator",
 	};
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	for (const auto &symbol : symbol_map.symbols) {
 		const auto &varname = symbol.name;
@@ -2893,7 +2893,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -2909,7 +2909,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 		"comprehension_iterator",
 	};
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	for (const auto &symbol : symbol_map.symbols) {
 		const auto &varname = symbol.name;
@@ -2969,7 +2969,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	auto *set = build_set({});
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
 	auto *element = generate(node->elt().get(), m_function_id);
-	ASSERT(element)
+	ASSERT(element);
 	emit<SetAdd>(set->get_register(), element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
 	while (!start_labels.empty()) {
@@ -2994,7 +2994,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 			for (const auto &[name, el] : captures) {
 				ASSERT(m_stack.top().locals.contains(name));
 				const auto &value = m_stack.top().locals.at(name);
-				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value))
+				ASSERT(std::holds_alternative<BytecodeFreeValue *>(value));
 				emit<LoadClosure>(el->get_free_var_index(),
 					std::get<BytecodeFreeValue *>(value)->get_free_var_index());
 				capture_regs.push_back(el->get_free_var_index());
@@ -3010,7 +3010,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 		"comprehension_iterator",
 	};
 	const auto &name_visibility_it = m_variable_visibility.find(function_name);
-	ASSERT(name_visibility_it != m_variable_visibility.end())
+	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
 	for (const auto &symbol : symbol_map.symbols) {
 		const auto &varname = symbol.name;
@@ -3080,7 +3080,7 @@ BytecodeGenerator::~BytecodeGenerator() {}
 
 void BytecodeGenerator::exit_function(size_t function_id)
 {
-	ASSERT(function_id < m_functions.functions.size())
+	ASSERT(function_id < m_functions.functions.size());
 	auto function = std::next(m_functions.functions.begin(), function_id);
 	function->metadata.register_count = register_count();
 	function->metadata.stack_size = stack_variable_count() + free_variable_count();
@@ -3116,15 +3116,15 @@ void BytecodeGenerator::relocate_labels(const FunctionBlocks &functions)
 std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string filename,
 	std::vector<std::string> argv)
 {
-	ASSERT(m_frame_stack_value_count.size() == 2)
-	ASSERT(m_frame_free_var_count.size() == 2)
+	ASSERT(m_frame_stack_value_count.size() == 2);
+	ASSERT(m_frame_free_var_count.size() == 2);
 	relocate_labels(m_functions);
 	return BytecodeProgram::create(std::move(m_functions), filename, argv);
 }
 
 InstructionVector *BytecodeGenerator::allocate_block(size_t function_id)
 {
-	ASSERT(function_id < m_functions.functions.size())
+	ASSERT(function_id < m_functions.functions.size());
 
 	auto function = std::next(m_functions.functions.begin(), function_id);
 	return &function->blocks;
@@ -3135,7 +3135,7 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::Module>
 	compiler::OptimizationLevel lvl)
 {
 	auto module = as<ast::Module>(node);
-	ASSERT(module)
+	ASSERT(module);
 
 	if (lvl > compiler::OptimizationLevel::None) { ast::optimizer::constant_folding(node); }
 

@@ -41,7 +41,7 @@ class Block
 				spdlog::trace(
 					"mark_next_free_chunk -> chunk bit mask: {}", m_occupied_chunks.to_string());
 				if (auto chunk_idx = next_free_chunk()) {
-					ASSERT(!m_occupied_chunks[*chunk_idx])
+					ASSERT(!m_occupied_chunks[*chunk_idx]);
 					spdlog::trace("marking next free chunk -> old chunk bit mask: {}",
 						m_occupied_chunks.to_string());
 					m_occupied_chunks.flip(*chunk_idx);
@@ -56,7 +56,7 @@ class Block
 
 			void mark_chunk_as_free(size_t idx)
 			{
-				ASSERT(m_occupied_chunks[idx])
+				ASSERT(m_occupied_chunks[idx]);
 				m_occupied_chunks.flip(idx);
 			}
 
@@ -100,11 +100,11 @@ class Block
 			uintptr_t start = bit_cast<uintptr_t>(m_memory);
 			uintptr_t end =
 				bit_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
-			ASSERT(bit_cast<uintptr_t>(ptr) >= start && bit_cast<uintptr_t>(ptr) < end)
-			ASSERT((bit_cast<uintptr_t>(ptr) - start) % m_object_size == 0)
+			ASSERT(bit_cast<uintptr_t>(ptr) >= start && bit_cast<uintptr_t>(ptr) < end);
+			ASSERT((bit_cast<uintptr_t>(ptr) - start) % m_object_size == 0);
 
 			size_t ptr_idx = (bit_cast<uintptr_t>(ptr) - start) / m_object_size;
-			ASSERT(ptr_idx < ChunkView<>::ChunkCount)
+			ASSERT(ptr_idx < ChunkView<>::ChunkCount);
 			m_chunk_view.mark_chunk_as_free(ptr_idx);
 			spdlog::debug("Marking memory at index {} as free, address {}",
 				ptr_idx,

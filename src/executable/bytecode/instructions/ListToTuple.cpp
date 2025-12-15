@@ -9,10 +9,10 @@ PyResult<Value> ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
 {
 	auto &list = vm.reg(m_list);
 
-	ASSERT(std::holds_alternative<PyObject *>(list))
+	ASSERT(std::holds_alternative<PyObject *>(list));
 
 	auto *pylist = std::get<PyObject *>(list);
-	ASSERT(as<PyList>(pylist))
+	ASSERT(as<PyList>(pylist));
 
 	auto result = PyTuple::create(as<PyList>(pylist)->elements());
 	if (result.is_ok()) {

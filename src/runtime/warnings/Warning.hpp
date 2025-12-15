@@ -33,9 +33,9 @@ class Warning : public Exception
 template<typename... Args> inline BaseException *warning(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
-	ASSERT(msg.is_ok())
+	ASSERT(msg.is_ok());
 	auto args_tuple = PyTuple::create(msg.unwrap());
-	ASSERT(args_tuple.is_ok())
+	ASSERT(args_tuple.is_ok());
 	return Warning::create(Warning::class_type(), args_tuple.unwrap()).unwrap();
 }
 

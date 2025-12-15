@@ -14,7 +14,7 @@ std::shared_ptr<Program> generate_llvm_module(std::string_view program)
 	p.parse();
 
 	auto module = as<ast::Module>(p.module());
-	ASSERT(module)
+	ASSERT(module);
 	return codegen::LLVMGenerator::compile(module, {}, compiler::OptimizationLevel::None);
 }
 }// namespace

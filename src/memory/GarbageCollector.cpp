@@ -316,13 +316,13 @@ void MarkSweepGC::run(Heap &heap) const
 
 void MarkSweepGC::resume()
 {
-	ASSERT(!is_active())
+	ASSERT(!is_active());
 	m_pause = false;
 }
 
 void MarkSweepGC::pause()
 {
-	ASSERT(is_active())
+	ASSERT(is_active());
 	m_pause = true;
 }
 

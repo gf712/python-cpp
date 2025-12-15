@@ -88,7 +88,7 @@ template<typename T> void assert_interpreter_object_value(std::string name, T ex
 			auto key_ = p->operator[](0);
 			auto value_ = p->operator[](1);
 			// only support string keys for now
-			ASSERT(key_.unwrap())
+			ASSERT(key_.unwrap());
 			auto key_string = as<PyString>(key_.unwrap())->value();
 			check_value(value_.unwrap(), expected_value[key_string]);
 		}

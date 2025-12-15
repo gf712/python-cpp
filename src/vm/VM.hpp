@@ -90,16 +90,16 @@ class VirtualMachine
 	py::Value &reg(size_t idx)
 	{
 		auto r = registers();
-		ASSERT(r.has_value())
-		ASSERT(idx < r->get().size())
+		ASSERT(r.has_value());
+		ASSERT(idx < r->get().size());
 		return r->get()[idx];
 	}
 
 	const py::Value &reg(size_t idx) const
 	{
 		auto r = registers();
-		ASSERT(r.has_value())
-		ASSERT(idx < r->get().size())
+		ASSERT(r.has_value());
+		ASSERT(idx < r->get().size());
 		return r->get()[idx];
 	}
 

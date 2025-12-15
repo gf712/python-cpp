@@ -111,7 +111,7 @@ class RLock : public PyBaseObject
 
 	PyType *static_type() const override
 	{
-		ASSERT(s_rlock)
+		ASSERT(s_rlock);
 		return s_rlock;
 	}
 

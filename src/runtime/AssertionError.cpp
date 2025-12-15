@@ -14,7 +14,7 @@ AssertionError::AssertionError(PyTuple *args)
 PyResult<PyObject *> AssertionError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::assertion_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = AssertionError::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
 	} else {

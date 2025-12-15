@@ -28,13 +28,13 @@ StopIteration::StopIteration(PyTuple *args)
 PyResult<PyObject *> StopIteration::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::stop_iteration());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(StopIteration::create(args));
 }
 
 PyType *StopIteration::static_type() const
 {
-	ASSERT(types::stop_iteration())
+	ASSERT(types::stop_iteration());
 	return types::stop_iteration();
 }
 

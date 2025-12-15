@@ -34,8 +34,8 @@ PyResult<Value> FunctionCall::execute(VirtualMachine &vm, Interpreter &) const
 
 std::vector<uint8_t> FunctionCall::serialize() const
 {
-	ASSERT(m_size < std::numeric_limits<uint8_t>::max())
-	ASSERT(m_stack_offset < std::numeric_limits<uint8_t>::max())
+	ASSERT(m_size < std::numeric_limits<uint8_t>::max());
+	ASSERT(m_stack_offset < std::numeric_limits<uint8_t>::max());
 
 	return {
 		FUNCTION_CALL,

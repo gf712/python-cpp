@@ -67,8 +67,8 @@ PyResult<Value> BinaryOperation::execute(VirtualMachine &vm, Interpreter &interp
 
 	if (result.is_err()) return Err(result.unwrap_err());
 	if (result.is_ok()) {
-		ASSERT(vm.registers().has_value())
-		ASSERT(m_destination < vm.registers()->get().size())
+		ASSERT(vm.registers().has_value());
+		ASSERT(m_destination < vm.registers()->get().size());
 		vm.reg(m_destination) = result.unwrap();
 	}
 	return result;

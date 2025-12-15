@@ -124,7 +124,7 @@ void VirtualMachine::ret()
 		m_state->cleanup.pop();
 		ret();
 	} else {
-		ASSERT(m_state->cleanup.size() == 1)
+		ASSERT(m_state->cleanup.size() == 1);
 		pop_frame(true);
 	}
 }
@@ -242,7 +242,7 @@ void VirtualMachine::set_cleanup(State::CleanupLogic cleanup_type,
 
 void VirtualMachine::leave_cleanup_handling()
 {
-	ASSERT(m_state->cleanup.size() > 1)
+	ASSERT(m_state->cleanup.size() > 1);
 	m_state->cleanup.pop();
 }
 

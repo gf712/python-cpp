@@ -104,14 +104,14 @@ size_t BytecodeProgram::main_stack_size() const { return m_main_function->regist
 InstructionVector::const_iterator BytecodeProgram::begin() const
 {
 	// FIXME: assumes all functions are bytecode
-	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
+	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE);
 	return static_cast<Bytecode *>(m_main_function->function().get())->begin();
 }
 
 InstructionVector::const_iterator BytecodeProgram::end() const
 {
 	// FIXME: assumes all functions are bytecode
-	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE)
+	ASSERT(m_main_function->function()->backend() == FunctionExecutionBackend::BYTECODE);
 	return static_cast<Bytecode *>(m_main_function->function().get())->end();
 }
 
@@ -136,7 +136,7 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 
 	if (result.is_err()) {
 		auto *exception = interpreter.execution_frame()->pop_exception();
-		ASSERT(exception == result.unwrap_err())
+		ASSERT(exception == result.unwrap_err());
 		std::cout << exception->format_traceback() << std::endl;
 
 		// if (interpreter.execution_frame()->exception_info().has_value()) {
@@ -214,7 +214,7 @@ std::vector<uint8_t> BytecodeProgram::serialize() const
 	}
 
 	// TODO: Add support to serialize functions from different backends
-	ASSERT(m_backends.empty())
+	ASSERT(m_backends.empty());
 
 	return result;
 }
@@ -226,14 +226,14 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<
 
 	auto span = std::span{ buffer };
 	auto deserialized_result = PyCode::deserialize(span, program);
-	ASSERT(deserialized_result.first.is_ok())
+	ASSERT(deserialized_result.first.is_ok());
 	program->m_main_function = deserialized_result.first.unwrap();
 	spdlog::debug(
 		"Deserialized main function:\n{}\n\n", program->m_main_function->function()->to_string());
 
 	while (!span.empty()) {
 		deserialized_result = PyCode::deserialize(span, program);
-		ASSERT(deserialized_result.first.is_ok())
+		ASSERT(deserialized_result.first.is_ok());
 		program->m_functions.push_back(deserialized_result.first.unwrap());
 		spdlog::debug("Deserialized function {}:\n{}\n\n",
 			program->m_functions.back()->function()->function_name(),

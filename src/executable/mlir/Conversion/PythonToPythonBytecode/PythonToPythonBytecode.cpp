@@ -436,7 +436,7 @@ namespace py {
 						op.getFalseDest(),
 						op.getFalseDestOperands());
 				} else {
-					ASSERT(mlir::isa<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp()))
+					ASSERT(mlir::isa<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp()));
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
 						mlir::cast<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp())
 							.getValue(),
@@ -1378,7 +1378,7 @@ namespace py {
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
 
-				ASSERT(!op.getStep().empty())
+				ASSERT(!op.getStep().empty());
 				auto *iterator_exit_block = &op.getStep().back();
 				ASSERT(iterator_exit_block->getTerminator());
 				// iterator_exit_block->print(llvm::outs());

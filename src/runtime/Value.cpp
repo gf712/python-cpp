@@ -1066,7 +1066,7 @@ bool operator==(const Value &lhs_value, const Value &rhs_value)
 	const auto result =
 		std::visit(overloaded{ [](PyObject *const lhs, PyObject *const rhs) {
 								  auto r = lhs->richcompare(rhs, RichCompare::Py_EQ);
-								  ASSERT(r.is_ok())
+								  ASSERT(r.is_ok());
 								  return r.unwrap() == py_true();
 							  },
 					   [](PyObject *const lhs, const auto &rhs) { return lhs == rhs; },

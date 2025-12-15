@@ -89,9 +89,9 @@ PyResult<PyProperty *>
 
 PyResult<PyObject *> PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty())
-	ASSERT(args)
-	ASSERT(args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().empty());
+	ASSERT(args);
+	ASSERT(args->size() == 1);
 
 	auto getter_ = PyObject::from(args->elements()[0]);
 
@@ -105,9 +105,9 @@ PyResult<PyObject *> PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyProperty::setter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty())
-	ASSERT(args)
-	ASSERT(args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().empty());
+	ASSERT(args);
+	ASSERT(args->size() == 1);
 
 	auto setter_ = PyObject::from(args->elements()[0]);
 
@@ -121,9 +121,9 @@ PyResult<PyObject *> PyProperty::setter(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty())
-	ASSERT(args)
-	ASSERT(args->size() == 1)
+	ASSERT(!kwargs || kwargs->map().empty());
+	ASSERT(args);
+	ASSERT(args->size() == 1);
 
 	auto deleter_ = PyObject::from(args->elements()[0]);
 

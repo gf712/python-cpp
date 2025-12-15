@@ -20,7 +20,8 @@ template<> const PyCell *as(const PyObject *obj)
 
 PyCell::PyCell(PyType *type) : PyBaseObject(type) {}
 
-PyCell::PyCell(const Value &content) : PyBaseObject(types::BuiltinTypes::the().cell()), m_content(content)
+PyCell::PyCell(const Value &content)
+	: PyBaseObject(types::BuiltinTypes::the().cell()), m_content(content)
 {}
 
 PyResult<PyCell *> PyCell::create()
@@ -32,7 +33,7 @@ PyResult<PyCell *> PyCell::create()
 
 PyResult<PyCell *> PyCell::create(const Value &content)
 {
-	if (std::holds_alternative<PyObject *>(content)) { ASSERT(std::get<PyObject *>(content)) }
+	if (std::holds_alternative<PyObject *>(content)) { ASSERT(std::get<PyObject *>(content)); }
 	auto *obj = VirtualMachine::the().heap().allocate<PyCell>(content);
 	if (!obj) { return Err(memory_error(sizeof(PyCell))); }
 	return Ok(obj);

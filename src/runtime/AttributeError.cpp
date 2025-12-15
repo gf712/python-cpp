@@ -14,7 +14,7 @@ AttributeError::AttributeError(PyTuple *args)
 PyResult<PyObject *> AttributeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::attribute_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	return Ok(AttributeError::create(args));
 }
 
@@ -26,7 +26,7 @@ PyType *AttributeError::static_type() const
 
 PyType *AttributeError::class_type()
 {
-	ASSERT(types::attribute_error())
+	ASSERT(types::attribute_error());
 	return types::attribute_error();
 }
 

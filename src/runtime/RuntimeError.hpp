@@ -30,11 +30,11 @@ template<typename... Args>
 inline BaseException *runtime_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
-	ASSERT(msg.is_ok())
+	ASSERT(msg.is_ok());
 	auto args_tuple = PyTuple::create(msg.unwrap());
-	ASSERT(args_tuple.is_ok())
+	ASSERT(args_tuple.is_ok());
 	auto obj = RuntimeError::create(args_tuple.unwrap());
-	ASSERT(obj.is_ok())
+	ASSERT(obj.is_ok());
 	return obj.unwrap();
 }
 

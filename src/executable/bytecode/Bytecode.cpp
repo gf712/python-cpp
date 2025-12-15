@@ -125,14 +125,14 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 	const auto end_instruction_it = end();
 	for (; vm.instruction_pointer() != end_instruction_it;
 		 vm.set_instruction_pointer(std::next(vm.instruction_pointer()))) {
-		ASSERT((*vm.instruction_pointer()).get())
+		ASSERT((*vm.instruction_pointer()).get());
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;
 		spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
 		auto result = instruction->execute(vm, vm.interpreter());
 		// we left the current stack frame in the previous instruction
 		if (vm.stack().size() != stack_depth) {
-			ASSERT(result.is_ok())
+			ASSERT(result.is_ok());
 			return result;
 		}
 		// vm.dump();
@@ -143,7 +143,7 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 			PyTraceback *tb_next = exception->traceback();
 			auto traceback =
 				PyTraceback::create(interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);
-			ASSERT(traceback.is_ok())
+			ASSERT(traceback.is_ok());
 			exception->set_traceback(traceback.unwrap());
 
 			interpreter.raise_exception(exception);
@@ -165,6 +165,6 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		}
 	}
 
-	ASSERT(value.has_value())
+	ASSERT(value.has_value());
 	return Ok(*value);
 }

@@ -35,10 +35,10 @@ namespace {
 			return Err(value_error("'__spec__' not in globals"));
 		}
 		auto package_ = PyObject::from(globals->map().at(String{ "__package__" }));
-		ASSERT(package_.is_ok())
+		ASSERT(package_.is_ok());
 		auto *package = package_.unwrap();
 		auto spec_ = PyObject::from(globals->map().at(String{ "__spec__" }));
-		ASSERT(spec_.is_ok())
+		ASSERT(spec_.is_ok());
 		auto *spec = spec_.unwrap();
 
 		if (package != py_none()) {
@@ -89,7 +89,7 @@ namespace {
 			}
 		}
 
-		ASSERT(as<PyString>(package))
+		ASSERT(as<PyString>(package));
 
 		size_t last_dot = as<PyString>(package)->size();
 
@@ -318,7 +318,7 @@ PyResult<PyModule *> import_frozen_module(PyString *name)
 
 	auto result = [&vm, &program, module]() {
 		auto *code = as<PyCode>(static_cast<BytecodeProgram &>(*program).main_function());
-		ASSERT(code)
+		ASSERT(code);
 		auto *function_frame =
 			PyFrame::create(VirtualMachine::the().interpreter().execution_frame(),
 				code->register_count(),

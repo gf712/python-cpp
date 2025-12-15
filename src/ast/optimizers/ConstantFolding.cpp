@@ -11,8 +11,8 @@ namespace optimizer {
 			&& node->rhs()->node_type() == ASTNodeType::Constant) {
 			const auto &lhs = as<Constant>(node->lhs())->value();
 			const auto &rhs = as<Constant>(node->rhs())->value();
-			ASSERT(lhs)
-			ASSERT(rhs)
+			ASSERT(lhs);
+			ASSERT(rhs);
 			switch (node->op_type()) {
 			case BinaryOpType::PLUS: {
 				auto result = std::visit(

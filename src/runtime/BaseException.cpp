@@ -47,7 +47,7 @@ PyResult<BaseException *> BaseException::create(PyTuple *args)
 PyResult<PyObject *> BaseException::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::base_exception());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = BaseException::create(args); result.is_ok()) {
 		return Ok(static_cast<PyObject *>(result.unwrap()));
 	} else {
@@ -57,7 +57,8 @@ PyResult<PyObject *> BaseException::__new__(const PyType *type, PyTuple *args, P
 
 PyResult<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty())// takes no keyword arguments
+	// takes no keyword arguments
+	ASSERT(!kwargs || kwargs->map().empty());
 	m_args = args;
 	return Ok(0);
 }
@@ -70,7 +71,7 @@ PyType *BaseException::static_type() const
 
 PyType *BaseException::class_type()
 {
-	ASSERT(types::base_exception())
+	ASSERT(types::base_exception());
 	return types::base_exception();
 }
 
@@ -91,7 +92,7 @@ std::string BaseException::to_string() const
 	if (m_args) {
 		if (m_args->size() == 1) {
 			auto obj_ = PyObject::from(m_args->elements()[0]);
-			ASSERT(obj_.is_ok())
+			ASSERT(obj_.is_ok());
 			return obj_.unwrap()->to_string();
 		} else {
 			return m_args->to_string();
@@ -133,9 +134,7 @@ namespace {
 	std::once_flag base_exception_flag;
 
 	std::unique_ptr<TypePrototype> register_base_exception()
-	{
-		return std::move(klass<BaseException>("BaseException").type);
-	}
+	{ return std::move(klass<BaseException>("BaseException").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> BaseException::type_factory()

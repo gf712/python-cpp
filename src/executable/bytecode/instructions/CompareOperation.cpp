@@ -73,8 +73,8 @@ PyResult<Value> CompareOperation::execute(VirtualMachine &vm, Interpreter &inter
 	}();
 
 	if (result.is_ok()) {
-		ASSERT(vm.registers().has_value())
-		ASSERT(vm.registers()->get().size() > m_dst)
+		ASSERT(vm.registers().has_value());
+		ASSERT(vm.registers()->get().size() > m_dst);
 		vm.reg(m_dst) = result.unwrap();
 	}
 	return result;

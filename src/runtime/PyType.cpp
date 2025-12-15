@@ -375,10 +375,10 @@ std::optional<PyResult<PyObject *>> PyType::lookup(PyObject *name) const
 	auto mro = mro_internal();
 	if (mro.is_err()) { return mro; }
 	for (const auto &t_ : mro.unwrap()->elements()) {
-		ASSERT(std::holds_alternative<PyObject *>(t_))
+		ASSERT(std::holds_alternative<PyObject *>(t_));
 		auto *t = as<PyType>(std::get<PyObject *>(t_));
-		ASSERT(t)
-		ASSERT(t->underlying_type().__dict__)
+		ASSERT(t);
+		ASSERT(t->underlying_type().__dict__);
 		const auto &dict = t->underlying_type().__dict__->map();
 		if (auto it = dict.find(name); it != dict.end()) { return PyObject::from(it->second); }
 	}
@@ -1423,8 +1423,8 @@ void PyType::fixup_slots()
 
 PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args && args->size() == 3)
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(args && args->size() == 3);
+	ASSERT(!kwargs || kwargs->map().empty());
 
 	auto *name = as<PyString>(PyObject::from(args->elements()[0]).unwrap());
 	ASSERT(name);

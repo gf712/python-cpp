@@ -195,9 +195,9 @@ PyResult<PyObject *> PyString::__new__(const PyType *type, PyTuple *args, PyDict
 	// FIXME: handle bytes_or_buffer argument
 	// FIXME: handle encoding argument
 	// FIXME: handle errors argument
-	ASSERT(!kwargs || kwargs->map().size() == 0)
-	ASSERT(args && args->size() <= 2)
-	ASSERT(type == types::str())
+	ASSERT(!kwargs || kwargs->map().size() == 0);
+	ASSERT(args && args->size() <= 2);
+	ASSERT(type == types::str());
 
 	std::string encoding;
 
@@ -233,14 +233,10 @@ PyString::PyString(std::string s)
 {}
 
 PyResult<int64_t> PyString::__hash__() const
-{
-	return Ok(static_cast<int64_t>(std::hash<std::string>{}(m_value)));
-}
+{ return Ok(static_cast<int64_t>(std::hash<std::string>{}(m_value))); }
 
 PyResult<PyObject *> PyString::__repr__() const
-{
-	return PyString::create(fmt::format("'{}'", m_value));
-}
+{ return PyString::create(fmt::format("'{}'", m_value)); }
 
 PyResult<PyObject *> PyString::__str__() const { return Ok(const_cast<PyString *>(this)); }
 
@@ -429,7 +425,7 @@ size_t PyString::get_position_from_slice(int64_t pos) const
 	if (pos < 0) {
 		pos = m_value.size() - pos;
 		// TODO: handle case where the negative start index is less than size of string
-		ASSERT(pos > 0)
+		ASSERT(pos > 0);
 	}
 	return pos;
 }
@@ -437,8 +433,8 @@ size_t PyString::get_position_from_slice(int64_t pos) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
@@ -452,14 +448,14 @@ PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	if (!start && !end) {
@@ -512,8 +508,8 @@ PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
@@ -526,14 +522,14 @@ PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	size_t start_idx = 0;
@@ -594,8 +590,8 @@ PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	auto pattern_ = PyObject::from(args->elements()[0]);
 	if (pattern_.is_err()) return pattern_;
@@ -609,14 +605,14 @@ PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	const size_t start_ = [start, this]() {
@@ -679,8 +675,8 @@ PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	auto prefix_ = PyObject::from(args->elements()[0]);
 	if (prefix_.is_err()) return prefix_;
@@ -713,14 +709,14 @@ PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	if (prefixes_.is_err()) return Err(prefixes_.unwrap_err());
@@ -779,8 +775,8 @@ PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() <= 3 && args->size() > 0);
+	ASSERT(!kwargs);
 
 	PyInteger *start = nullptr;
 	PyInteger *end = nullptr;
@@ -790,14 +786,14 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 		if (start_.is_err()) return start_;
 		start = as<PyInteger>(start_.unwrap());
 		// TODO: raise exception when start in not a number
-		ASSERT(start)
+		ASSERT(start);
 	}
 	if (args->size() == 3) {
 		auto end_ = PyObject::from(args->elements()[2]);
 		if (end_.is_err()) return end_;
 		end = as<PyInteger>(end_.unwrap());
 		// TODO: raise exception when end in not a number
-		ASSERT(end)
+		ASSERT(end);
 	}
 
 	std::optional<size_t> start_;
@@ -865,8 +861,8 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs)
+	ASSERT(args && args->size() == 1);
+	ASSERT(!kwargs);
 
 	auto iterable = PyObject::from(args->elements()[0]);
 	if (iterable.is_err()) return iterable;
@@ -943,13 +939,13 @@ PyResult<PyObject *> PyString::partition(PyObject *sep) const
 
 PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() == 1)
-	ASSERT(!kwargs || kwargs->size() == 0)
+	ASSERT(args && args->size() == 1);
+	ASSERT(!kwargs || kwargs->size() == 0);
 
 	auto sep_ = PyObject::from(args->elements()[0]);
 	if (sep_.is_err()) return sep_;
 	auto *sep_obj = as<PyString>(sep_.unwrap());
-	ASSERT(sep_obj)
+	ASSERT(sep_obj);
 
 	const auto &sep = sep_obj->value();
 
@@ -968,7 +964,7 @@ PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->size() == 0)
+	ASSERT(!kwargs || kwargs->size() == 0);
 
 	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
 		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
@@ -1027,7 +1023,7 @@ PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->size() == 0)
+	ASSERT(!kwargs || kwargs->size() == 0);
 
 	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
 		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
@@ -1886,34 +1882,34 @@ namespace {
 	std::unique_ptr<TypePrototype> register_string()
 	{
 		return std::move(klass<PyString>("str")
-							 .def("isalnum", &PyString::isalnum)
-							 .def("isalpha", &PyString::isalpha)
-							 .def("isascii", &PyString::isascii)
-							 .def("isdigit", &PyString::isdigit)
-							 .def("islower", &PyString::islower)
-							 .def("isupper", &PyString::isupper)
-							 .def("isidentifier", &PyString::isidentifier)
-							 .def("capitalize", &PyString::capitalize)
-							 .def("casefold", &PyString::casefold)
-							 .def("count", &PyString::count)
-							 .def("startswith", &PyString::startswith)
-							 .def("endswith", &PyString::endswith)
-							 .def("find", &PyString::find)
-							 .def("rfind", &PyString::rfind)
-							 .def("join", &PyString::join)
-							 .def("lower", &PyString::lower)
-							 .def("upper", &PyString::upper)
-							 .def("partition", &PyString::partition)
-							 .def("rpartition", &PyString::rpartition)
-							 .def("strip", &PyString::strip)
-							 .def("rstrip", &PyString::rstrip)
-							 .def("split", &PyString::split)
-							 .def("format", &PyString::format)
-							 .def("replace", &PyString::replace)
-							 .def("translate", &PyString::translate)
-							 .def("encode", &PyString::encode)
-							 .staticmethod("maketrans", &PyString::maketrans)
-							 .type);
+				.def("isalnum", &PyString::isalnum)
+				.def("isalpha", &PyString::isalpha)
+				.def("isascii", &PyString::isascii)
+				.def("isdigit", &PyString::isdigit)
+				.def("islower", &PyString::islower)
+				.def("isupper", &PyString::isupper)
+				.def("isidentifier", &PyString::isidentifier)
+				.def("capitalize", &PyString::capitalize)
+				.def("casefold", &PyString::casefold)
+				.def("count", &PyString::count)
+				.def("startswith", &PyString::startswith)
+				.def("endswith", &PyString::endswith)
+				.def("find", &PyString::find)
+				.def("rfind", &PyString::rfind)
+				.def("join", &PyString::join)
+				.def("lower", &PyString::lower)
+				.def("upper", &PyString::upper)
+				.def("partition", &PyString::partition)
+				.def("rpartition", &PyString::rpartition)
+				.def("strip", &PyString::strip)
+				.def("rstrip", &PyString::rstrip)
+				.def("split", &PyString::split)
+				.def("format", &PyString::format)
+				.def("replace", &PyString::replace)
+				.def("translate", &PyString::translate)
+				.def("encode", &PyString::encode)
+				.staticmethod("maketrans", &PyString::maketrans)
+				.type);
 	}
 }// namespace
 
@@ -1931,9 +1927,7 @@ PyStringIterator::PyStringIterator(const PyString &pystring)
 {}
 
 std::string PyStringIterator::to_string() const
-{
-	return fmt::format("<str_iterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<str_iterator at {}>", static_cast<const void *>(this)); }
 
 void PyStringIterator::visit_graph(Visitor &visitor)
 {
@@ -1963,9 +1957,7 @@ namespace {
 	std::once_flag str_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_str_iterator()
-	{
-		return std::move(klass<PyStringIterator>("str_iterator").type);
-	}
+	{ return std::move(klass<PyStringIterator>("str_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyStringIterator::type_factory()

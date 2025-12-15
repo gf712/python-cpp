@@ -1187,7 +1187,7 @@ class Subscript : public ASTNode
 	const std::shared_ptr<ASTNode> &value() const { return m_value; }
 	const SliceType &slice() const
 	{
-		ASSERT(m_slice)
+		ASSERT(m_slice);
 		return *m_slice;
 	}
 	ContextType context() const { return m_ctx; }
@@ -1304,7 +1304,7 @@ class Assert : public ASTNode
 		: ASTNode(ASTNodeType::Assert, source_location), m_test(std::move(test)),
 		  m_msg(std::move(msg))
 	{
-		ASSERT(m_test)
+		ASSERT(m_test);
 	}
 
 	const std::shared_ptr<ASTNode> &test() const { return m_test; }

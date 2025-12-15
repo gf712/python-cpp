@@ -67,7 +67,7 @@ PyResult<PyObject *> PyModule::__new__(const PyType *type, PyTuple *args, PyDict
 
 PyResult<int32_t> PyModule::__init__(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args)
+	ASSERT(args);
 	ASSERT(!kwargs || kwargs->map().empty());
 
 	auto *name = args->size() > 0 ? PyObject::from(args->elements()[0]).unwrap() : nullptr;
@@ -95,7 +95,7 @@ namespace {
 	bool is_initializing(PyObject *spec)
 	{
 		auto _initializing_str = PyString::create("_initializing");
-		ASSERT(_initializing_str.is_ok())
+		ASSERT(_initializing_str.is_ok());
 		auto value = spec->get_attribute(_initializing_str.unwrap());
 		if (value.is_err()) { return false; }
 		auto is_true = truthy(value.unwrap(), VirtualMachine::the().interpreter());
@@ -114,18 +114,18 @@ PyResult<PyObject *> PyModule::__getattribute__(PyObject *attribute) const
 
 	if (auto it = m_attributes->map().find(getattr_str); it != m_attributes->map().end()) {
 		auto getattr = PyObject::from(it->second);
-		ASSERT(getattr.is_ok())
+		ASSERT(getattr.is_ok());
 		auto args = PyTuple::create(attribute);
-		ASSERT(args.is_ok())
+		ASSERT(args.is_ok());
 		return getattr.unwrap()->call(args.unwrap(), nullptr);
 	} else if (auto it = m_attributes->map().find(name_str); it != m_attributes->map().end()) {
 		auto module_name = PyObject::from(it->second);
-		ASSERT(module_name.is_ok())
+		ASSERT(module_name.is_ok());
 		if (auto name = as<PyString>(module_name.unwrap())) {
 			String spec_str{ "__spec__" };
 			if (auto it = m_attributes->map().find(spec_str); it != m_attributes->map().end()) {
 				auto spec = PyObject::from(it->second);
-				ASSERT(spec.is_ok())
+				ASSERT(spec.is_ok());
 				if (is_initializing(spec.unwrap())) {
 					return Err(
 						attribute_error("partially initialized "

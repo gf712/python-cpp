@@ -104,7 +104,7 @@ namespace {
 
 		PyType *static_type() const final
 		{
-			ASSERT(s_stat_result)
+			ASSERT(s_stat_result);
 			return s_stat_result;
 		}
 

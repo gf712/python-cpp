@@ -134,7 +134,7 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 
 PyResult<PyObject *> iter(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	const auto &arg = args->operator[](0);
 	if (kwargs) { return Err(type_error("iter() takes no keyword arguments")); }
 	return arg.and_then([](auto *obj) { return obj->iter(); });
@@ -142,7 +142,7 @@ PyResult<PyObject *> iter(const PyTuple *args, const PyDict *kwargs, Interpreter
 
 PyResult<PyObject *> hash(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	const auto &arg = args->operator[](0);
 	if (kwargs) { return Err(type_error("hash() takes no keyword arguments")); }
 	return arg.and_then([](auto *obj) { return obj->hash(); }).and_then([](const size_t h) {
@@ -152,7 +152,7 @@ PyResult<PyObject *> hash(const PyTuple *args, const PyDict *kwargs, Interpreter
 
 PyResult<PyObject *> next(const PyTuple *args, const PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	if (kwargs) { return Err(type_error("next() takes no keyword arguments")); }
 	const auto &arg = args->operator[](0);
 	return arg.and_then([](auto *obj) { return obj->next(); });
@@ -204,7 +204,7 @@ PyResult<PyObject *>
 			// FIXME: what should be the module for this?
 			auto *f = interpreter.execution_frame()->code()->make_function(
 				mangled_class_name_as_string, {}, {}, {});
-			ASSERT(as<PyFunction>(f))
+			ASSERT(as<PyFunction>(f));
 			return Ok(as<PyFunction>(f));
 		} else if (auto *pyfunc = as<PyFunction>(maybe_function_location)) {
 			return Ok(pyfunc);
@@ -378,7 +378,7 @@ PyResult<PyObject *> len(const PyTuple *args, const PyDict *kwargs, Interpreter 
 
 PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	auto obj = args->operator[](0);
 	if (obj.is_err()) return obj;
 	return PyInteger::create(bit_cast<intptr_t>(obj.unwrap()));
@@ -387,7 +387,7 @@ PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
 PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
 {
 	// TODO: support globals, locals, fromlist and level
-	ASSERT(args->size() > 0)
+	ASSERT(args->size() > 0);
 	auto arg0 = args->operator[](0);
 	if (arg0.is_err()) return arg0;
 	auto *name = arg0.unwrap();
@@ -552,7 +552,7 @@ PyResult<PyObject *> setattr(const PyTuple *args, const PyDict *, Interpreter &)
 
 PyResult<PyObject *> hex(const PyTuple *args, const PyDict *, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	auto obj_ = args->operator[](0);
 	if (obj_.is_err()) return obj_;
 	auto *obj = obj_.unwrap();
@@ -574,7 +574,7 @@ PyResult<PyObject *> hex(const PyTuple *args, const PyDict *, Interpreter &)
 
 PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	auto obj_ = args->operator[](0);
 	if (obj_.is_err()) return obj_;
 	auto *obj = obj_.unwrap();
@@ -597,7 +597,7 @@ PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
 
 PyResult<PyObject *> chr(const PyTuple *args, const PyDict *, Interpreter &)
 {
-	ASSERT(args->size() == 1)
+	ASSERT(args->size() == 1);
 	auto obj_ = args->operator[](0);
 	if (obj_.is_err()) return obj_;
 	auto *obj = obj_.unwrap();
@@ -615,7 +615,7 @@ PyResult<PyObject *> chr(const PyTuple *args, const PyDict *, Interpreter &)
 
 PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
-	ASSERT(args->size() < 2)
+	ASSERT(args->size() < 2);
 	auto dir_list_ = PyList::create();
 	if (dir_list_.is_err()) return Err(dir_list_.unwrap_err());
 	auto *dir_list = dir_list_.unwrap();
@@ -904,7 +904,7 @@ PyResult<PyObject *> any(const PyTuple *args, const PyDict *kwargs, Interpreter 
 
 PyResult<PyObject *> exec(const PyTuple *args, const PyDict *, Interpreter &interpreter)
 {
-	ASSERT(args)
+	ASSERT(args);
 	if (args->size() < 1) {
 		return Err(type_error("exec expected at least 1 argument, got {}", args->size()));
 	}
@@ -1035,7 +1035,7 @@ PyResult<PyObject *> eval(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 
 PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 {
-	ASSERT(args)
+	ASSERT(args);
 	if (args->size() < 1) {
 		return Err(type_error("compile() missing required argument 'source' (pos 0)"));
 	}

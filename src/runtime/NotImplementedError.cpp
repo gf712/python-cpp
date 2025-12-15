@@ -14,7 +14,7 @@ NotImplementedError::NotImplementedError(PyTuple *args)
 PyResult<PyObject *> NotImplementedError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::not_implemented_error());
-	ASSERT(!kwargs || kwargs->map().empty())
+	ASSERT(!kwargs || kwargs->map().empty());
 	if (auto result = NotImplementedError::create(args)) {
 		return Ok(static_cast<PyObject *>(result));
 	} else {
