@@ -466,13 +466,13 @@ class LinearScanRegisterAllocation
 			auto current_value = std::get<mlir::Value>(cur.value);
 
 			// Resolve block arguments to their defining operations
-			if (current_value.isa<mlir::BlockArgument>()) {
+			if (mlir::isa<mlir::BlockArgument>(current_value)) {
 				if (auto it = live_interval_analysis.block_input_mappings.find(cur.value);
 					it != live_interval_analysis.block_input_mappings.end()) {
 					for (auto mapped_value : it->second) {
 						ASSERT(!std::holds_alternative<ForwardedOutput>(mapped_value));
 						if (clobbers_r0(std::get<mlir::Value>(mapped_value))) {
-							ASSERT(current_value.isa<mlir::BlockArgument>());
+							ASSERT(mlir::isa<mlir::BlockArgument>(current_value));
 							current_value = std::get<mlir::Value>(mapped_value);
 							break;
 						}
@@ -480,7 +480,7 @@ class LinearScanRegisterAllocation
 				}
 			}
 
-			ASSERT(!current_value.isa<mlir::BlockArgument>());
+			ASSERT(!mlir::isa<mlir::BlockArgument>(current_value));
 			auto loc = current_value.getLoc();
 
 			// Insert: push r{cur_reg}, move r{scratch}, r{cur_reg}, pop r{cur_reg}

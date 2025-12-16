@@ -11,6 +11,7 @@
 
 #include <csignal>
 #include <cstdint>
+#include <limits>
 #include <variant>
 
 namespace py {
@@ -83,7 +84,10 @@ PyResult<PyObject *> signal(PyTuple *args, PyDict *kwargs)
 		previous_handler = std::get<PyObject *>(it->second);
 	}
 
-	if (std::signal(signalnum, sighandler) == SIG_ERR) {
+	if (signalnum >= NSIG) { return Err(value_error("signal number out of range")); }
+
+	static_assert(NSIG < std::numeric_limits<int>::max());
+	if (std::signal(static_cast<int>(signalnum), sighandler) == SIG_ERR) {
 		return Err(value_error("error setting signal handler"));
 	}
 

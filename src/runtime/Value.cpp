@@ -455,8 +455,8 @@ bool Bytes::operator==(const PyObject *other) const
 constexpr unsigned char to_digit_value(char value)
 {
 	if (value >= 0 && value <= 9) { return value; }
-	if (value >= 'a' && value <= 'z') { return (value - 'a') + 10; }
-	if (value >= 'A' && value <= 'Z') { return (value - 'A') + 10; }
+	if (value >= 'a' && value <= 'z') { return static_cast<unsigned char>((value - 'a') + 10); }
+	if (value >= 'A' && value <= 'Z') { return static_cast<unsigned char>((value - 'A') + 10); }
 	return 37;
 }
 
@@ -611,12 +611,6 @@ bool NameConstant::operator==(const NameConstant &other) const
 		[](const auto &rhs, const auto &lhs) { return rhs == lhs; }, value, other.value);
 }
 
-std::ostream &py::operator<<(std::ostream &os, const Tuple &tuple)
-{
-	os << tuple.to_string();
-	return os;
-}
-
 std::string Tuple::to_string() const
 {
 	std::ostringstream os;
@@ -641,6 +635,12 @@ std::string Tuple::to_string() const
 }
 
 namespace py {
+
+std::ostream &operator<<(std::ostream &os, const Tuple &tuple)
+{
+	os << tuple.to_string();
+	return os;
+}
 
 PyResult<Value> add(const Value &lhs, const Value &rhs, Interpreter &)
 {

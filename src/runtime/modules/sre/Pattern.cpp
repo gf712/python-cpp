@@ -8,11 +8,13 @@
 #include "runtime/PyObject.hpp"
 #include "runtime/PyTuple.hpp"
 #include "runtime/TypeError.hpp"
+#include "runtime/ValueError.hpp"
 #include "runtime/types/api.hpp"
 #include "runtime/types/builtin.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
 #include <cstdint>
+#include <limits>
 
 using namespace py;
 using namespace py::sre;
@@ -49,7 +51,14 @@ PyResult<Pattern *> Pattern::create(PyObject *pattern,
 		auto el_ = PyObject::from(el);
 		if (el_.is_err()) { return Err(el_.unwrap_err()); }
 		if (!el_.unwrap()->type()->issubclass(types::integer())) { TODO(); }
-		code_vec.push_back(static_cast<const PyInteger &>(*el_.unwrap()).as_size_t());
+		auto value = static_cast<const PyInteger &>(*el_.unwrap()).as_size_t();
+		if (!fits_in<uint32_t>(value)) {
+			return Err(value_error("code value {} does not fit in [{}, {}]",
+				value,
+				std::numeric_limits<uint32_t>::min(),
+				std::numeric_limits<uint32_t>::max()));
+		}
+		code_vec.push_back(static_cast<uint32_t>(value));
 	}
 
 	std::optional<bool> isbytes;

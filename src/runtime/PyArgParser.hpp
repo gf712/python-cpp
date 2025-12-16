@@ -8,6 +8,8 @@
 #include "TypeError.hpp"
 #include "vm/VM.hpp"
 
+#include <limits>
+
 namespace py {
 
 template<typename... ArgTypes> struct PyArgsParser
@@ -56,7 +58,15 @@ template<typename... ArgTypes> struct PyArgsParser
 					return Err(type_error("'{}' object cannot be interpreted as an integer",
 						int_obj.unwrap()->type()->name()));
 				} else {
-					std::get<Idx>(result) = as<PyInteger>(int_obj.unwrap())->as_i64();
+					auto value = as<PyInteger>(int_obj.unwrap())->as_i64();
+					static_assert(sizeof(ExpectedType) <= 8);
+					if (!fits_in<ExpectedType>(value)) {
+						return Err(type_error("{} not within range ({}, {})",
+							value,
+							std::numeric_limits<ExpectedType>::min(),
+							std::numeric_limits<ExpectedType>::max()));
+					}
+					std::get<Idx>(result) = static_cast<ExpectedType>(value);
 				}
 			} else {
 				[]<bool flag = false>() {

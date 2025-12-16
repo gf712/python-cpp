@@ -49,7 +49,7 @@ if (${ENABLE_SANITIZER_UNDEFINED_BEHAVIOR})
 endif()
 
 project_options(
-	# WARNINGS_AS_ERRORS
+	WARNINGS_AS_ERRORS
 	# ENABLE_COVERAGE
 	# ENABLE_CPPCHECK
 	# ENABLE_CLANG_TIDY
@@ -74,7 +74,7 @@ project_options(
 
 # TODO: Address all the warning below. This should be only temporary...
 target_compile_options(project_warnings
-  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shorten-64-to-32;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-implicit-int-conversion;-Wno-old-style-cast;-Wno-gnu-zero-variadic-macro-arguments;-Wno-implicit-int-float-conversion;-Wno-deprecated-copy;-Wno-missing-field-initializers>
+  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-old-style-cast;-Wno-deprecated-copy;-Wno-missing-field-initializers;-Wno-null-dereference;-Wno-maybe-uninitialized>
 )
 
 check_cxx_source_compiles(
