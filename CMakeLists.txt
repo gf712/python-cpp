@@ -88,8 +88,6 @@ if(NOT MATH_LIBRARY)
 	message(FATAL_ERROR "Could not find math library")
 endif()
 
+enable_testing()
 add_subdirectory(src)
 add_subdirectory(integration)
-
-add_custom_target(test)
-add_dependencies(test run-unittests integration-tests)
