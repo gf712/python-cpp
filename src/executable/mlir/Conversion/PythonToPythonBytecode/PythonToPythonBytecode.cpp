@@ -1819,7 +1819,7 @@ namespace py {
 								op, BlockRange{ cleanup_block });
 						}
 					} else if (auto op = mlir::dyn_cast<mlir::py::ControlFlowYield>(childOp);
-							   op && !op.getKind().has_value()) {
+						op && !op.getKind().has_value()) {
 						auto *current = op->getBlock();
 						auto *next = rewriter.splitBlock(current, op->getIterator());
 						rewriter.setInsertionPointToEnd(current);

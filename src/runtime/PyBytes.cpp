@@ -257,8 +257,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_bytes()
 	{
-		return std::move(
-			klass<PyBytes>("bytes")
+		return std::move(klass<PyBytes>("bytes")
 				.def("decode",
 					[](PyBytes *obj, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 						std::optional<std::string> encoding;

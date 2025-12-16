@@ -342,13 +342,13 @@ namespace {
 	std::unique_ptr<TypePrototype> register_memoryview()
 	{
 		return std::move(klass<PyMemoryView>("memoryview")
-							 .def("cast", &PyMemoryView::cast)
-							 .def("tolist", &PyMemoryView::tolist)
-							 .property_readonly("itemsize",
-								 [](PyMemoryView *view) -> PyResult<PyObject *> {
-									 return PyInteger::create(view->itemsize());
-								 })
-							 .type);
+				.def("cast", &PyMemoryView::cast)
+				.def("tolist", &PyMemoryView::tolist)
+				.property_readonly("itemsize",
+					[](PyMemoryView *view) -> PyResult<PyObject *> {
+						return PyInteger::create(view->itemsize());
+					})
+				.type);
 	}
 }// namespace
 

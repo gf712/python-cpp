@@ -129,31 +129,31 @@ std::function<std::unique_ptr<TypePrototype>()> PyFunction::type_factory()
 		static std::unique_ptr<TypePrototype> type = nullptr;
 		std::call_once(function_flag, []() {
 			type = std::move(klass<PyFunction>("function")
-								 .attr("__code__", &PyFunction::m_code)
-								 .attr("__globals__", &PyFunction::m_globals)
-								 .attr("__dict__", &PyFunction::m_dict)
-								 .attr("__name__", &PyFunction::m_name)
-								 .attr("__qualname__", &PyFunction::m_qualname)
-								 .attr("__doc__", &PyFunction::m_doc)
-								 .property_readonly("__closure__",
-									 [](PyFunction *self) { return Ok(self->m_closure); })
-								 .property(
-									 "__doc__",
-									 [](PyFunction *self) { return Ok(self->m_doc); },
-									 [](PyFunction *self, PyObject *d) {
-										 self->m_doc = d;
-										 return Ok(std::monostate{});
-									 })
-								 .property_readonly("__globals__",
-									 [](PyFunction *self) { return Ok(self->m_globals); })
-								 .property(
-									 "__module__",
-									 [](PyFunction *self) { return Ok(self->m_module); },
-									 [](PyFunction *self, PyObject *m) {
-										 self->m_module = m;
-										 return Ok(std::monostate{});
-									 })
-								 .type);
+					.attr("__code__", &PyFunction::m_code)
+					.attr("__globals__", &PyFunction::m_globals)
+					.attr("__dict__", &PyFunction::m_dict)
+					.attr("__name__", &PyFunction::m_name)
+					.attr("__qualname__", &PyFunction::m_qualname)
+					.attr("__doc__", &PyFunction::m_doc)
+					.property_readonly(
+						"__closure__", [](PyFunction *self) { return Ok(self->m_closure); })
+					.property(
+						"__doc__",
+						[](PyFunction *self) { return Ok(self->m_doc); },
+						[](PyFunction *self, PyObject *d) {
+							self->m_doc = d;
+							return Ok(std::monostate{});
+						})
+					.property_readonly(
+						"__globals__", [](PyFunction *self) { return Ok(self->m_globals); })
+					.property(
+						"__module__",
+						[](PyFunction *self) { return Ok(self->m_module); },
+						[](PyFunction *self, PyObject *m) {
+							self->m_module = m;
+							return Ok(std::monostate{});
+						})
+					.type);
 		});
 		return std::move(type);
 	};

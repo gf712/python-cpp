@@ -23,7 +23,7 @@ class PyIterator : public PyBaseObject
 
 	PyResult<size_t> __len__() const;
 
-    PyType *static_type() const override;
+	PyType *static_type() const override;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 };

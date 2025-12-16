@@ -39,9 +39,7 @@ class PyMemoryView : public PyBaseObject
 	void visit_graph(Visitor &) override;
 	std::string to_string() const override;
 
-	size_t itemsize() const {
-		return m_view.itemsize;
-	}
+	size_t itemsize() const { return m_view.itemsize; }
 
   private:
 	static PyResult<PyBuffer> create_view(PyBuffer &main_view);

@@ -184,9 +184,7 @@ PyResult<PyObject *> PyCode::eval(PyObject *globals,
 	[[maybe_unused]] auto scoped_stack =
 		VirtualMachine::the().interpreter().setup_call_stack(m_function, function_frame);
 
-	if (m_name == "_combine_flags") {
-
-	}
+	if (m_name == "_combine_flags") {}
 
 	for (size_t i = 0; i < cellvars_count(); ++i) {
 		auto cell = PyCell::create();

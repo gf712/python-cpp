@@ -39,7 +39,8 @@ struct ValueMappingComparator
 
 // Map from MLIR values to some type T (used for register assignments, etc.)
 template<typename ValueT>
-using ValueMapping = std::map<std::variant<mlir::Value, ForwardedOutput>, ValueT, ValueMappingComparator>;
+using ValueMapping =
+	std::map<std::variant<mlir::Value, ForwardedOutput>, ValueT, ValueMappingComparator>;
 
 // Comparator for BlockArgument sets
 inline constexpr auto block_arg_comparator = [](const mlir::BlockArgument &lhs,

@@ -55,7 +55,8 @@ class PySet : public PyBaseObject
 	PyType *static_type() const override;
 
   private:
-	PyResult<std::monostate> union_helper(const PyObject *other, SetType &result, bool strict) const;
+	PyResult<std::monostate>
+		union_helper(const PyObject *other, SetType &result, bool strict) const;
 
 	PySet();
 	PySet(SetType elements);

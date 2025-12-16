@@ -38,7 +38,8 @@ class Exception : public BaseException
 };
 
 
-template<typename... Args> inline BaseException *exception(const std::string &message, Args &&...args)
+template<typename... Args>
+inline BaseException *exception(const std::string &message, Args &&...args)
 {
 	auto *args_tuple =
 		PyTuple::create(PyString::create(fmt::format(message, std::forward<Args>(args)...)));

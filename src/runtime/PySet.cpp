@@ -374,15 +374,15 @@ namespace {
 	std::unique_ptr<TypePrototype> register_set()
 	{
 		return std::move(klass<PySet>("set")
-							 .def("add", &PySet::add)
-							 .def("discard", &PySet::discard)
-							 .def("remove", &PySet::remove)
-							 .def("intersection", &PySet::intersection)
-							 .def("update", &PySet::update)
-							 .def("pop", &PySet::pop)
-							 .def("issubset", &PySet::issubset)
-							 .def("union", &PySet::union_)
-							 .type);
+				.def("add", &PySet::add)
+				.def("discard", &PySet::discard)
+				.def("remove", &PySet::remove)
+				.def("intersection", &PySet::intersection)
+				.def("update", &PySet::update)
+				.def("pop", &PySet::pop)
+				.def("issubset", &PySet::issubset)
+				.def("union", &PySet::union_)
+				.type);
 	}
 }// namespace
 

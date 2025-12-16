@@ -119,11 +119,11 @@ class RLock : public PyBaseObject
 	{
 		if (!s_rlock) {
 			s_rlock = klass<RLock>(module, "RLock")
-						 .def("release", &RLock::release)
-						 .def("acquire", &RLock::acquire)
-						 .def("__enter__", &RLock::__enter__)
-						 .def("__exit__", &RLock::__exit__)
-						 .finalize();
+						  .def("release", &RLock::release)
+						  .def("acquire", &RLock::acquire)
+						  .def("__enter__", &RLock::__enter__)
+						  .def("__exit__", &RLock::__exit__)
+						  .finalize();
 		}
 		return s_rlock;
 	}

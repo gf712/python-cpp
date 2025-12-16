@@ -1,7 +1,7 @@
 #include "InplaceOp.hpp"
+#include "runtime/PyObject.hpp"
 #include "runtime/Value.hpp"
 #include "vm/VM.hpp"
-#include "runtime/PyObject.hpp"
 
 using namespace py;
 

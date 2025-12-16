@@ -262,8 +262,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_type_()
 	{
-		return std::move(
-			klass<PyType>("type")
+		return std::move(klass<PyType>("type")
 				.def("mro", &PyType::mro)
 				.attr("__mro__", &PyType::__mro__)
 				.classmethod("__prepare__",
@@ -1371,7 +1370,7 @@ namespace {
 							  .unwrap();
 				use_generic = true;
 			} else if (auto s = slot.get_member(slot_wrapper->base_type()->underlying_type());
-					   !s.has_value()) {
+				!s.has_value()) {
 				// if we don't have a specific slot we get the wrapper from descriptor we found
 				// in the MRO
 				generic = slot_wrapper->base().get().get_member(
@@ -1382,8 +1381,8 @@ namespace {
 				use_generic = false;
 			}
 		} else if (auto fn = as<PyNativeFunction>(descr);
-				   fn && (fn->method_pointer().has_value() && *fn->method_pointer() == &new_wrapper)
-				   && slot.name == "__new__") {
+			fn && (fn->method_pointer().has_value() && *fn->method_pointer() == &new_wrapper)
+			&& slot.name == "__new__") {
 			auto &new_slot = type->underlying_type().__new__;
 			ASSERT(new_slot.has_value());
 			if (std::holds_alternative<NewSlotFunctionType>(*new_slot)) {

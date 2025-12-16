@@ -11,7 +11,7 @@ namespace itertools {
 		PyList *m_pool{ nullptr };
 		size_t m_length;
 		size_t m_iterator_length;
-        size_t m_inner_iteration;
+		size_t m_inner_iteration;
 		std::vector<size_t> m_indices;
 		std::vector<size_t> m_cycles;
 		bool m_done;

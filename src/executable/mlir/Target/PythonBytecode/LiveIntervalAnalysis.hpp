@@ -118,15 +118,16 @@ class LiveIntervalAnalysis
 
 		sorted_live_intervals = std::move(unsorted_live_intervals);
 
-		logger->info("Live interval analysis complete. Found {} intervals",
-			sorted_live_intervals.size());
+		logger->info(
+			"Live interval analysis complete. Found {} intervals", sorted_live_intervals.size());
 
 		// Log intervals at debug level (temporarily for debugging)
 		for (const auto &interval : sorted_live_intervals) {
 			// Log all intervals, especially GET_ITER
 			if (std::holds_alternative<mlir::Value>(interval.value)) {
 				auto val = std::get<mlir::Value>(interval.value);
-				if (val.getDefiningOp() && mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp())) {
+				if (val.getDefiningOp()
+					&& mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp())) {
 					logger->info("GET_ITER LiveInterval: start={}, end={}, {} sub-intervals",
 						interval.start(),
 						interval.end(),
@@ -163,19 +164,21 @@ class LiveIntervalAnalysis
 			values_to_track.push_back(std::get<ForwardedOutput>(alive_value));
 		} else {
 			// BlockArgumentInputs: track all the inputs
-			const auto &inputs = std::get<1>(std::get<LiveAnalysis::BlockArgumentInputs>(alive_value));
+			const auto &inputs =
+				std::get<1>(std::get<LiveAnalysis::BlockArgumentInputs>(alive_value));
 			values_to_track.insert(values_to_track.end(), inputs.begin(), inputs.end());
 		}
 
 		// Update interval for each value
 		for (auto value : values_to_track) {
-			auto it = std::find_if(intervals.begin(), intervals.end(), [&value](const auto &interval) {
-				return interval.value == value;
-			});
+			auto it = std::find_if(intervals.begin(),
+				intervals.end(),
+				[&value](const auto &interval) { return interval.value == value; });
 
 			if (it == intervals.end()) {
 				// Create new interval
-				intervals.emplace_back(std::vector{ std::make_tuple(timestep, timestep + 1) }, value);
+				intervals.emplace_back(
+					std::vector{ std::make_tuple(timestep, timestep + 1) }, value);
 			} else {
 				// Extend existing interval
 				auto &value_intervals = it->intervals;

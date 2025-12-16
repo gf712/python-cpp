@@ -28,12 +28,12 @@ PyCoroutine::PyCoroutine(PyFrame *frame,
 	PyString *name,
 	PyString *qualname)
 	: GeneratorInterface(types::BuiltinTypes::the().coroutine(),
-		frame,
-		std::move(stack_frame),
-		is_running,
-		code,
-		name,
-		qualname)
+		  frame,
+		  std::move(stack_frame),
+		  is_running,
+		  code,
+		  name,
+		  qualname)
 {}
 
 PyResult<PyCoroutine *> PyCoroutine::create(PyFrame *frame,
@@ -55,8 +55,8 @@ namespace {
 	std::unique_ptr<TypePrototype> register_coroutine()
 	{
 		return std::move(klass<PyCoroutine>(PyCoroutine::GeneratorTypeName)
-							 .def("close", &PyCoroutine::close)
-							 .type);
+				.def("close", &PyCoroutine::close)
+				.type);
 	}
 }// namespace
 

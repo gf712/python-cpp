@@ -2,8 +2,8 @@
 #include "executable/bytecode/codegen/BytecodeGenerator.hpp"
 #include "executable/llvm/LLVMGenerator.hpp"
 #include "executable/mlir/Dialect/Python/MLIRGenerator.hpp"
-#include "utilities.hpp"
 #include "mlir/compile.hpp"
+#include "utilities.hpp"
 
 
 Program::Program(std::string &&filename, std::vector<std::string> &&argv)
@@ -34,4 +34,4 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	}
 	ASSERT_NOT_REACHED();
 }
-}
+}// namespace compiler

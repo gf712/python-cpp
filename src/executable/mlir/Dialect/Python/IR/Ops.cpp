@@ -195,7 +195,7 @@ namespace py {
 					 getHandlers().end(),
 					 [&point](
 						 mlir::Region &handler) { return point.getRegionOrNull() == &handler; });
-				 it != getHandlers().end()) {
+			it != getHandlers().end()) {
 			if (std::next(it) != getHandlers().end()) {
 				it++;
 				regions.emplace_back(&*it, it->getArguments());

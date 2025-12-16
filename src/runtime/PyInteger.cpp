@@ -40,10 +40,14 @@ PyInteger::PyInteger(TypePrototype &type, BigIntType value)
 {}
 
 PyInteger::PyInteger(PyType *type, BigIntType value) : PyInteger(type)
-{ m_value = Number{ std::move(value) }; }
+{
+	m_value = Number{ std::move(value) };
+}
 
 PyResult<PyInteger *> PyInteger::create(int64_t value)
-{ return PyInteger::create(BigIntType{ value }); }
+{
+	return PyInteger::create(BigIntType{ value });
+}
 
 PyResult<PyInteger *> PyInteger::create(BigIntType value)
 {
@@ -195,7 +199,9 @@ PyResult<PyObject *> PyInteger::__rshift__(const PyObject *obj) const
 }
 
 PyResult<PyObject *> PyInteger::bit_length() const
-{ return PyInteger::create(mpz_sizeinbase(as_big_int().get_mpz_t(), 2)); }
+{
+	return PyInteger::create(mpz_sizeinbase(as_big_int().get_mpz_t(), 2));
+}
 
 PyResult<PyObject *> PyInteger::bit_count() const
 {

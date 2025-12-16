@@ -22,7 +22,7 @@ class PyComplex : public PyBaseObject
 
 	PyComplex(PyType *, std::complex<BigIntType>);
 
-public:
+  public:
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 	PyType *static_type() const override;
 };

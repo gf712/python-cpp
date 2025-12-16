@@ -11,9 +11,7 @@ namespace py {
 namespace detail {
 	template<typename T>
 	concept has_output_iterator_error = requires(const T iterator) {
-		{
-			iterator.last_error()
-		} -> std::convertible_to<BaseException *>;
+		{ iterator.last_error() } -> std::convertible_to<BaseException *>;
 	};
 }// namespace detail
 

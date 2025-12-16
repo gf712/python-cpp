@@ -50,7 +50,7 @@ PyModule *time_module()
 		PyNativeFunction::create("monotonic_ns", [](PyTuple *, PyDict *) {
 			auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::steady_clock::now().time_since_epoch())
-								  .count();
+						  .count();
 			return PyInteger::create(ns);
 		}).unwrap());
 

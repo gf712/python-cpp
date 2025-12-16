@@ -13,13 +13,17 @@ namespace py {
 
 template<> PyGetSetDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == types::getset_descriptor()) { return static_cast<PyGetSetDescriptor *>(obj); }
+	if (obj->type() == types::getset_descriptor()) {
+		return static_cast<PyGetSetDescriptor *>(obj);
+	}
 	return nullptr;
 }
 
 template<> const PyGetSetDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == types::getset_descriptor()) { return static_cast<const PyGetSetDescriptor *>(obj); }
+	if (obj->type() == types::getset_descriptor()) {
+		return static_cast<const PyGetSetDescriptor *>(obj);
+	}
 	return nullptr;
 }
 

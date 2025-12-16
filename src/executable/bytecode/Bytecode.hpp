@@ -31,7 +31,8 @@ class Bytecode : public Function
 
 	std::vector<uint8_t> serialize() const override;
 
-	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer, std::shared_ptr<Program> program);
+	static std::unique_ptr<Bytecode> deserialize(std::span<const uint8_t> &buffer,
+		std::shared_ptr<Program> program);
 
 	py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const override;
 	py::PyResult<py::Value> call_without_setup(VirtualMachine &, Interpreter &) const override;

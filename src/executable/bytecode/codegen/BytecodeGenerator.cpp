@@ -34,9 +34,9 @@
 #include "executable/bytecode/instructions/Instructions.hpp"
 #include "executable/bytecode/instructions/Jump.hpp"
 #include "executable/bytecode/instructions/JumpForward.hpp"
+#include "executable/bytecode/instructions/JumpIfExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfFalse.hpp"
 #include "executable/bytecode/instructions/JumpIfFalseOrPop.hpp"
-#include "executable/bytecode/instructions/JumpIfExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
 #include "executable/bytecode/instructions/JumpIfTrue.hpp"
 #include "executable/bytecode/instructions/JumpIfTrueOrPop.hpp"
@@ -277,7 +277,7 @@ void BytecodeGenerator::store_name(const std::string &name, BytecodeValue *src)
 			ASSERT(visibility->second->type == VariablesResolver::Scope::Type::CLASS);
 			return *it;
 		} else if (auto it = visibility->second->symbol_map.get_visible_symbol(name);
-				   it.has_value()) {
+			it.has_value()) {
 			return *it;
 		} else {
 			TODO();
@@ -396,7 +396,7 @@ void BytecodeGenerator::delete_var(const std::string &name)
 			ASSERT(visibility->second->type == VariablesResolver::Scope::Type::CLASS);
 			return *it;
 		} else if (auto it = visibility->second->symbol_map.get_visible_symbol(name);
-				   it.has_value()) {
+			it.has_value()) {
 			return *it;
 		} else {
 			TODO();
@@ -699,7 +699,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 		idx++;
 	}
 	for (size_t idx = node->args()->argument_names().size();
-		 const auto &arg_name : node->args()->kw_only_argument_names()) {
+		const auto &arg_name : node->args()->kw_only_argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(symbol_map.get_visible_symbol(arg_name).has_value());
 		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {
@@ -950,7 +950,7 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 		idx++;
 	}
 	for (size_t idx = node->args()->argument_names().size();
-		 const auto &arg_name : node->args()->kw_only_argument_names()) {
+		const auto &arg_name : node->args()->kw_only_argument_names()) {
 		varnames.push_back(arg_name);
 		ASSERT(symbol_map.get_visible_symbol(arg_name).has_value());
 		if (std::find(cellvars.begin(), cellvars.end(), arg_name) != cellvars.end()) {

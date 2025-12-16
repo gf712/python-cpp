@@ -14,7 +14,7 @@ PyResult<Value> MakeFunction::execute(VirtualMachine &vm, Interpreter &interpret
 	std::vector<Value> default_values;
 	default_values.reserve(m_defaults_size);
 	auto *start = vm.sp() - m_defaults_size - m_kw_defaults_size;
-	while (start != (vm.sp()- m_kw_defaults_size)) {
+	while (start != (vm.sp() - m_kw_defaults_size)) {
 		default_values.push_back(*start);
 		start = std::next(start);
 	}

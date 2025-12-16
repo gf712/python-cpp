@@ -107,7 +107,7 @@ BaseException *PyFrame::pop_exception()
 {
 	ASSERT(!m_exception_stack->empty());
 	auto *exception = m_exception_stack->back().exception;
-	spdlog::debug("PyFrame::pop_exception: @{}", static_cast<void*>(this));
+	spdlog::debug("PyFrame::pop_exception: @{}", static_cast<void *>(this));
 	spdlog::debug("PyFrame::pop_exception: current exception count {}", m_exception_stack->size());
 	spdlog::debug("PyFrame::pop_exception: Popped exception {}", exception->to_string());
 	m_exception_stack->pop_back();

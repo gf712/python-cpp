@@ -17,11 +17,11 @@ Bytecode::Bytecode(size_t register_count,
 	InstructionVector instructions,
 	std::shared_ptr<Program> program)
 	: Function(register_count,
-		locals_count,
-		stack_size,
-		function_name,
-		FunctionExecutionBackend::BYTECODE,
-		std::move(program)),
+		  locals_count,
+		  stack_size,
+		  function_name,
+		  FunctionExecutionBackend::BYTECODE,
+		  std::move(program)),
 	  m_instructions(std::move(instructions))
 {}
 
@@ -78,8 +78,12 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 		instructions.push_back(std::move(instruction));
 	}
 
-	return std::make_unique<Bytecode>(
-		register_count, locals_count, stack_size, function_name, std::move(instructions), std::move(program));
+	return std::make_unique<Bytecode>(register_count,
+		locals_count,
+		stack_size,
+		function_name,
+		std::move(instructions),
+		std::move(program));
 }
 
 PyResult<Value> Bytecode::call(VirtualMachine &vm, Interpreter &interpreter) const
@@ -124,7 +128,7 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 
 	const auto end_instruction_it = end();
 	for (; vm.instruction_pointer() != end_instruction_it;
-		 vm.set_instruction_pointer(std::next(vm.instruction_pointer()))) {
+		vm.set_instruction_pointer(std::next(vm.instruction_pointer()))) {
 		ASSERT((*vm.instruction_pointer()).get());
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;

@@ -11,7 +11,7 @@ class KeyError : public Exception
 {
 	friend class ::Heap;
 	template<typename... Args>
-	friend BaseException *key_error(const std::string &message, Args &&... args);
+	friend BaseException *key_error(const std::string &message, Args &&...args);
 
   private:
 	KeyError(PyType *type);
@@ -29,7 +29,7 @@ class KeyError : public Exception
 };
 
 template<typename... Args>
-inline BaseException *key_error(const std::string &message, Args &&... args)
+inline BaseException *key_error(const std::string &message, Args &&...args)
 {
 	auto msg = PyString::create(fmt::format(message, std::forward<Args>(args)...));
 	ASSERT(msg.is_ok());

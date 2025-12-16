@@ -237,10 +237,10 @@ std::function<std::unique_ptr<TypePrototype>()> PySuper::type_factory()
 		static std::unique_ptr<TypePrototype> type = nullptr;
 		std::call_once(super_flag, []() {
 			type = std::move(klass<PySuper>("super")
-								 .attribute_readonly("__thisclass__", &PySuper::m_type)
-								 .attribute_readonly("__self__", &PySuper::m_object)
-								 .attribute_readonly("__self_class__", &PySuper::m_object_type)
-								 .type);
+					.attribute_readonly("__thisclass__", &PySuper::m_type)
+					.attribute_readonly("__self__", &PySuper::m_object)
+					.attribute_readonly("__self_class__", &PySuper::m_object_type)
+					.type);
 		});
 		return std::move(type);
 	};

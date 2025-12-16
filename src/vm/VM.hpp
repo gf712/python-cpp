@@ -171,9 +171,8 @@ class VirtualMachine
 
 	void dump() const;
 
-	[[nodiscard]] std::unique_ptr<StackFrame> setup_call_stack(size_t register_count,
-		size_t locals_count,
-		size_t stack_size);
+	[[nodiscard]] std::unique_ptr<StackFrame>
+		setup_call_stack(size_t register_count, size_t locals_count, size_t stack_size);
 
 	void ret();
 	void set_cleanup(State::CleanupLogic cleanup_type,

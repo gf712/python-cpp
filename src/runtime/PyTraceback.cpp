@@ -24,8 +24,8 @@ void PyTraceback::visit_graph(Visitor &visitor)
 PyResult<PyObject *> PyTraceback::__repr__() const { return PyString::create(to_string()); }
 
 PyTraceback::PyTraceback(PyFrame *tb_frame, size_t tb_lasti, size_t tb_lineno, PyTraceback *tb_next)
-	: PyBaseObject(types::BuiltinTypes::the().traceback()), m_tb_frame(tb_frame), m_tb_lasti(tb_lasti),
-	  m_tb_lineno(tb_lineno), m_tb_next(tb_next)
+	: PyBaseObject(types::BuiltinTypes::the().traceback()), m_tb_frame(tb_frame),
+	  m_tb_lasti(tb_lasti), m_tb_lineno(tb_lineno), m_tb_next(tb_next)
 {}
 
 PyResult<PyTraceback *>
@@ -46,9 +46,9 @@ namespace {
 	std::unique_ptr<TypePrototype> register_traceback()
 	{
 		return std::move(klass<PyTraceback>("traceback")
-							 .attr("tb_frame", &PyTraceback::m_tb_frame)
-							 .attr("tb_next", &PyTraceback::m_tb_next)
-							 .type);
+				.attr("tb_frame", &PyTraceback::m_tb_frame)
+				.attr("tb_next", &PyTraceback::m_tb_next)
+				.type);
 	}
 }// namespace
 

@@ -761,13 +761,11 @@ TEST(Lexer, BreakupLine)
 		"a = \\\n"
 		"    1\n";
 
-	std::vector<Token::TokenType> expected_tokens{
-		Token::TokenType::NAME,
+	std::vector<Token::TokenType> expected_tokens{ Token::TokenType::NAME,
 		Token::TokenType::EQUAL,
 		Token::TokenType::NUMBER,
 		Token::TokenType::NEWLINE,
-		Token::TokenType::ENDMARKER
-	};
+		Token::TokenType::ENDMARKER };
 
 	assert_generates_tokens(program, expected_tokens);
 }

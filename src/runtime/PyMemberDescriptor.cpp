@@ -12,13 +12,17 @@ namespace py {
 
 template<> PyMemberDescriptor *as(PyObject *obj)
 {
-	if (obj->type() == types::member_descriptor()) { return static_cast<PyMemberDescriptor *>(obj); }
+	if (obj->type() == types::member_descriptor()) {
+		return static_cast<PyMemberDescriptor *>(obj);
+	}
 	return nullptr;
 }
 
 template<> const PyMemberDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == types::member_descriptor()) { return static_cast<const PyMemberDescriptor *>(obj); }
+	if (obj->type() == types::member_descriptor()) {
+		return static_cast<const PyMemberDescriptor *>(obj);
+	}
 	return nullptr;
 }
 
