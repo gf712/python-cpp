@@ -390,10 +390,9 @@ struct LiveIntervalAnalysis
 		bool overlaps(const LiveInterval &other) const
 		{
 			// naive quadratic search
-			for (const auto &[start, end] : intervals) {
-				for (const auto &[other_start, other_end] : other.intervals) {
-					if (other_start >= start && other_start <= end) { return true; }
-					if (other_end >= start && other_end <= end) { return true; }
+			for (const auto &[a, b] : intervals) {
+				for (const auto &[c, d] : other.intervals) {
+					if (a < d && c < b) { return true; }
 				}
 			}
 
