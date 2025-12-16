@@ -505,7 +505,7 @@ PyResult<PyObject *> PyList::__mul__(size_t count) const
 	if (count <= 0) { return PyList::create(); }
 	std::vector<Value> values;
 	values.reserve(count * m_elements.size());
-	for (auto _ : std::views::iota(size_t{ 0 }, count)) {
+	for ([[maybe_unused]] auto _ : std::views::iota(size_t{ 0 }, count)) {
 		values.insert(values.end(), m_elements.begin(), m_elements.end());
 	}
 

@@ -150,8 +150,11 @@ PyResult<PyString *> PyString::create(const Bytes &bytes, const std::string &enc
 			if (byte < std::byte{ 128 }) {
 				result.push_back(static_cast<char>(byte));
 			} else {
-				result.push_back(0xc2 + (static_cast<unsigned char>(byte) > 0xbf));
-				result.push_back((static_cast<char>(byte) & 0x3f) + 0x80);
+				result.push_back(
+					static_cast<unsigned char>(0xc2) + static_cast<unsigned char>(byte) > 0xbf);
+				result.push_back(static_cast<char>(
+					(static_cast<unsigned char>(byte) & static_cast<unsigned char>(0x3f))
+					+ static_cast<unsigned char>(0x80)));
 			}
 		}
 		return PyString::create(result);
@@ -1864,9 +1867,14 @@ PyResult<PyObject *> PyString::translate(PyObject *table) const
 			if (mapped_cp > 0x110000 || mapped_cp < 0) {
 				return Err(value_error("character mapping must be in range(0x110000)"));
 			}
-			auto el = utf8::utf8chr(mapped_cp.get_ui());
+			auto mapped_cp_ui = mapped_cp.get_ui();
+			if (!fits_in<uint32_t>(mapped_cp_ui)) {
+				return Err(value_error(
+					"character mapping value {} does not fit in uint32_t", mapped_cp_ui));
+			}
+			auto el = utf8::utf8chr(static_cast<uint32_t>(mapped_cp_ui));
 			if (!el.has_value()) {}
-			cache[mapped_cp.get_ui()] = *el;
+			cache[static_cast<uint32_t>(mapped_cp_ui)] = *el;
 			result.append(*el);
 		} else if (mapped_value.unwrap()->type()->issubclass(types::str())) {
 			auto mapped_str = static_cast<const PyString &>(*mapped_value.unwrap()).value();

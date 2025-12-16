@@ -56,10 +56,10 @@ PyModule *time_module()
 
 	module->add_symbol(PyString::create("monotonic").unwrap(),
 		PyNativeFunction::create("monotonic", [](PyTuple *, PyDict *) {
-			const double ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+			auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::steady_clock::now().time_since_epoch())
-								  .count();
-			return PyFloat::create(ns / std::nano::den);
+						  .count();
+			return PyFloat::create(static_cast<double>(ns) / std::nano::den);
 		}).unwrap());
 
 	return module;

@@ -95,7 +95,7 @@ PyResult<PyObject *> ascii_iscased(PyTuple *args, PyDict *kwargs)
 
 	auto ch = character->as_big_int().get_si();
 	if (ch >= 128) { return Ok(py_false()); }
-	return Ok(std::isalpha(ch) ? py_true() : py_false());
+	return Ok(std::isalpha(static_cast<int>(ch)) ? py_true() : py_false());
 }
 
 PyResult<PyObject *> ascii_tolower(PyTuple *args, PyDict *kwargs)
@@ -111,7 +111,7 @@ PyResult<PyObject *> ascii_tolower(PyTuple *args, PyDict *kwargs)
 
 	auto ch = character->as_big_int().get_si();
 	if (ch >= 128) { return Ok(character); }
-	return PyInteger::create(std::tolower(ch));
+	return PyInteger::create(std::tolower(static_cast<int>(ch)));
 }
 
 

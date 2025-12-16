@@ -83,3 +83,30 @@ template<class To, class From> constexpr To bit_cast(const From &from) noexcept
 	return std::bit_cast<To>(from);
 }
 #endif
+
+
+template<typename T>
+concept Integral = std::is_integral_v<T>;
+
+template<Integral Target, Integral Source> bool fits_in(Source value)
+{
+	constexpr bool source_is_signed = std::is_signed<Source>::value;
+	constexpr bool target_is_signed = std::is_signed<Target>::value;
+
+	// Case 1: Source is signed, Target is unsigned
+	if constexpr (source_is_signed && !target_is_signed) {
+		if (value < 0) { return false; }
+		// Now we know value is non-negative, safe to cast and compare
+		return static_cast<std::make_unsigned_t<Source>>(value)
+			   <= std::numeric_limits<Target>::max();
+	}
+	// Case 2: Source is unsigned, Target is signed
+	else if constexpr (!source_is_signed && target_is_signed) {
+		return value
+			   <= static_cast<std::make_unsigned_t<Target>>(std::numeric_limits<Target>::max());
+	} else {
+		// Case 3: Both signed or both unsigned
+		return value >= std::numeric_limits<Target>::min()
+			   && value <= std::numeric_limits<Target>::max();
+	}
+}
