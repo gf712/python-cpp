@@ -1,0 +1,52 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "generator": "Ninja",
+      "binaryDir": "build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CPM_SOURCE_CACHE": ".cache/CPM"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "generator": "Ninja",
+      "binaryDir": "build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CPM_SOURCE_CACHE": ".cache/CPM"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug Build",
+      "configurePreset": "debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Release Build",
+      "configurePreset": "release",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "displayName": "Test all in Debug mode",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Test all in Release mode",
+      "configurePreset": "release"
+    }
+  ]
+
+}

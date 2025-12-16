@@ -349,8 +349,7 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
 endif()
 
 target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings tsl::ordered_map)
-set_target_properties(unittests_ PROPERTIES OUTPUT_NAME "unittests")
-add_custom_target(run-unittests COMMAND $<TARGET_FILE:unittests_> DEPENDS unittests_)
+gtest_discover_tests(unittests_)
 
 add_executable(python repl/repl.cpp)
 target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings stdc++)

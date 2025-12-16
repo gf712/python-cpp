@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 env:
-  BUILD_TYPE: Release
+  CMAKE_PRESET: release
 
 jobs:
   build:
@@ -26,12 +26,15 @@ jobs:
         sudo apt install libmlir-20-dev mlir-20-tools
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_CACHE=OFF
+      run: cmake --preset ${{env.CMAKE_PRESET}}
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: cmake --build --preset ${{env.CMAKE_PRESET}}
 
     - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target test
+      run: |
+        ctest --preset ${{env.CMAKE_PRESET}} -E integration-tests
+        # only run the integration-tests with verbose so we can see the
+        # whole output which includes which python scripts passed
+        ctest --preset ${{env.CMAKE_PRESET}} -R integration-tests -V
 
