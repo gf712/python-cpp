@@ -25,6 +25,11 @@ jobs:
         sudo ./llvm.sh 20
         sudo apt install libmlir-20-dev mlir-20-tools
 
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        create-symlink: true
+
     - name: Configure CMake
       run: cmake --preset ${{env.CMAKE_PRESET}}
 
