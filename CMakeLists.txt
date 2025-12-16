@@ -7,49 +7,29 @@ project(python++)
 
 set(CMAKE_CXX_STANDARD 20)
 
-FetchContent_Declare(
-	spdlog
-	GIT_REPOSITORY https://github.com/gabime/spdlog.git
-	GIT_TAG v1.8.5
-	SYSTEM)
-FetchContent_MakeAvailable(spdlog)
+include(cmake/CPM.cmake)
 
-FetchContent_Declare(
-	gtest
-	GIT_REPOSITORY https://github.com/google/googletest.git
-	GIT_TAG v1.17.0
-	SYSTEM)
-FetchContent_MakeAvailable(gtest)
+CPMAddPackage("gh:gabime/spdlog@1.8.5")
+CPMAddPackage("gh:google/googletest@1.17.0")
+CPMAddPackage("gh:jarro2783/cxxopts@3.0.0")
+CPMAddPackage("gh:Tessil/ordered-map@1.2.0")
+CPMAddPackage("gh:python/cpython@3.9.25")
+CPMAddPackage("gh:antirez/linenoise#1.0")
+CPMAddPackage("gh:aminya/project_options@0.41.0")
 
-FetchContent_Declare(
-	cxxopts
-	GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-	GIT_TAG v3.0.0
-	SYSTEM)
-FetchContent_MakeAvailable(cxxopts)
-
-FetchContent_Declare(
-	cpython
-	GIT_REPOSITORY https://github.com/python/cpython.git
-	GIT_TAG v3.9.13)
-FetchContent_MakeAvailable(cpython)
-
-FetchContent_Declare(
-	tsl
-	GIT_REPOSITORY https://github.com/Tessil/ordered-map
-	GIT_TAG v1.2.0)
-FetchContent_MakeAvailable(tsl)
+if(linenoise_ADDED)
+  add_library(linenoise ${linenoise_SOURCE_DIR}/linenoise.c)
+  target_include_directories(linenoise SYSTEM PUBLIC ${linenoise_SOURCE_DIR})
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-find_package(GMP REQUIRED)
 
+find_package(GMP REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc data)
 
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::GMock ALIAS gmock)
 add_library(GTest::Main ALIAS gtest_main)
-include(cmake/linenoise.cmake)
-include(cmake/project_options.cmake)
 
 option(ENABLE_CACHE "Enable build cache" ON)
 option(ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" OFF)
