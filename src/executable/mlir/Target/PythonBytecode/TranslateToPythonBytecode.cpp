@@ -80,7 +80,6 @@
 #include "executable/bytecode/instructions/YieldValue.hpp"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
-#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"

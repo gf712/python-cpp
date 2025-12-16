@@ -15,7 +15,9 @@ template<> PyAsyncGenerator *as(PyObject *obj)
 
 template<> const PyAsyncGenerator *as(const PyObject *obj)
 {
-	if (obj->type() == types::async_generator()) { return static_cast<const PyAsyncGenerator *>(obj); }
+	if (obj->type() == types::async_generator()) {
+		return static_cast<const PyAsyncGenerator *>(obj);
+	}
 	return nullptr;
 }
 
@@ -28,12 +30,12 @@ PyAsyncGenerator::PyAsyncGenerator(PyFrame *frame,
 	PyString *name,
 	PyString *qualname)
 	: GeneratorInterface(types::BuiltinTypes::the().async_generator(),
-		frame,
-		std::move(stack_frame),
-		is_running,
-		code,
-		name,
-		qualname)
+		  frame,
+		  std::move(stack_frame),
+		  is_running,
+		  code,
+		  name,
+		  qualname)
 {}
 
 PyResult<PyAsyncGenerator *> PyAsyncGenerator::create(PyFrame *frame,
@@ -55,8 +57,8 @@ namespace {
 	std::unique_ptr<TypePrototype> register_async_generator()
 	{
 		return std::move(klass<PyAsyncGenerator>(PyAsyncGenerator::GeneratorTypeName)
-							 .def("close", &PyAsyncGenerator::close)
-							 .type);
+				.def("close", &PyAsyncGenerator::close)
+				.type);
 	}
 }// namespace
 

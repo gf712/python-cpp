@@ -501,10 +501,10 @@ namespace {
 	std::unique_ptr<TypePrototype> register_bytearray()
 	{
 		return std::move(klass<PyByteArray>("bytearray")
-							 .def("find", &PyByteArray::find)
-							 .def("translate", &PyByteArray::translate)
-							 .staticmethod("maketrans", &PyByteArray::maketrans)
-							 .type);
+				.def("find", &PyByteArray::find)
+				.def("translate", &PyByteArray::translate)
+				.staticmethod("maketrans", &PyByteArray::maketrans)
+				.type);
 	}
 }// namespace
 

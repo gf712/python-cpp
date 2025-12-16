@@ -160,7 +160,9 @@ class RegisterAllocationTest : public ::testing::Test
 
 	// Parse the MLIR IR that reproduces the FOR_ITER bug
 	mlir::OwningOpRef<mlir::ModuleOp> parseForIterBugIR()
-	{ return mlir::parseSourceString<mlir::ModuleOp>(FORITER_BUG_MLIR, &m_context); }
+	{
+		return mlir::parseSourceString<mlir::ModuleOp>(FORITER_BUG_MLIR, &m_context);
+	}
 };
 
 /**
@@ -220,9 +222,7 @@ TEST_F(RegisterAllocationTest, ForIterIteratorRegisterNotReusedInLoopBody)
 
 	while (!worklist.empty()) {
 		auto *block = worklist.pop_back_val();
-		if (block == loop_exit || loopBlocks.contains(block)) {
-			continue;
-		}
+		if (block == loop_exit || loopBlocks.contains(block)) { continue; }
 		loopBlocks.insert(block);
 
 		// Add successors to worklist
@@ -240,9 +240,7 @@ TEST_F(RegisterAllocationTest, ForIterIteratorRegisterNotReusedInLoopBody)
 
 	func.walk([&](mlir::emitpybytecode::LoadNameOp op) {
 		// Only collect LOAD_NAME operations that are in loop body blocks
-		if (loopBlocks.contains(op->getBlock())) {
-			loopBodyLoadNames.push_back(op.getResult());
-		}
+		if (loopBlocks.contains(op->getBlock())) { loopBodyLoadNames.push_back(op.getResult()); }
 	});
 
 	ASSERT_FALSE(loopBodyLoadNames.empty()) << "No LOAD_NAME operations found in loop body";

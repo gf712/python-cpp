@@ -108,8 +108,7 @@ template<typename T> struct klass
 						return PyInteger::create(static_cast<int64_t>(value));
 					}
 				} else {
-					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }
-					();
+					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }();
 				}
 				TODO();
 			},
@@ -130,8 +129,7 @@ template<typename T> struct klass
 							value->type()->name()));
 					}
 				} else {
-					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }
-					();
+					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }();
 				}
 				return Ok(std::monostate{});
 			},
@@ -166,8 +164,7 @@ template<typename T> struct klass
 				} else if constexpr (std::is_same_v<MemberType, std::string>) {
 					return PyString::create(static_cast<T *>(self)->*member);
 				} else {
-					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }
-					();
+					[]<bool flag = false>() { static_assert(flag, "unsupported member type"); }();
 				}
 				TODO();
 			},
@@ -186,8 +183,7 @@ template<typename T> struct klass
 						  PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 				const size_t arg_count = (args ? args->size() : 0) + (kwargs ? kwargs->size() : 0);
 				if (arg_count) {
-					return Err(
-						type_error("{}() takes no arguments ({} given)", name, arg_count));
+					return Err(type_error("{}() takes no arguments ({} given)", name, arg_count));
 				}
 				if (kwargs && kwargs->size() > 0) {
 					return Err(type_error("{}() takes no keyword arguments)", name));

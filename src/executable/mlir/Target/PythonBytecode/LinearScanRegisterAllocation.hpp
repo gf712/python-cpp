@@ -106,8 +106,8 @@ class LinearScanRegisterAllocation
 			expire_old_intervals(cur, active, inactive, handled, free, logger);
 
 			// Collect available registers for this interval
-			auto available_regs =
-				collect_available_registers(cur, free, inactive, unhandled, *live_interval_analysis);
+			auto available_regs = collect_available_registers(
+				cur, free, inactive, unhandled, *live_interval_analysis);
 
 			if (available_regs.none()) {
 				logger->error("No available registers for {}", to_string(cur.value));
@@ -402,25 +402,31 @@ class LinearScanRegisterAllocation
 						if (std::holds_alternative<ForwardedOutput>(input)) {
 							auto forwarded = std::get<ForwardedOutput>(input);
 
-							if (auto for_iter = mlir::dyn_cast<mlir::emitpybytecode::ForIter>(forwarded.first)) {
+							if (auto for_iter = mlir::dyn_cast<mlir::emitpybytecode::ForIter>(
+									forwarded.first)) {
 								logger->debug("Block argument is FOR_ITER loop variable");
 								auto iterator = for_iter.getIterator();
 								logger->debug("Iterator value: {}", to_string(iterator));
 
 								// Find the iterator's register
-								if (auto iter_it = value2mem_map.find(iterator); iter_it != value2mem_map.end()) {
+								if (auto iter_it = value2mem_map.find(iterator);
+									iter_it != value2mem_map.end()) {
 									if (std::holds_alternative<Reg>(iter_it->second)) {
 										auto iterator_reg = std::get<Reg>(iter_it->second).idx;
 										logger->debug("Found iterator register: r{}", iterator_reg);
 
-										// Reserve this register for the duration of the loop variable's lifetime
+										// Reserve this register for the duration of the loop
+										// variable's lifetime
 										foriter_reserved_regs[cur.value] = iterator_reg;
 
 										// Mark the iterator register as busy
 										free.set(iterator_reg, false);
 
-										logger->info("FOR_ITER FIX: Reserved r{} (iterator) for loop variable {}",
-											iterator_reg, to_string(cur.value));
+										logger->info(
+											"FOR_ITER FIX: Reserved r{} (iterator) for loop "
+											"variable {}",
+											iterator_reg,
+											to_string(cur.value));
 									} else {
 										logger->warn("Iterator register is not a Reg!");
 									}
@@ -507,7 +513,8 @@ class LinearScanRegisterAllocation
 		logger->trace("Freed r{} from {}", reg_idx, to_string(interval.value));
 
 		// If this was a FOR_ITER loop variable with a reserved iterator register, free it too
-		if (auto it = foriter_reserved_regs.find(interval.value); it != foriter_reserved_regs.end()) {
+		if (auto it = foriter_reserved_regs.find(interval.value);
+			it != foriter_reserved_regs.end()) {
 			auto reserved_reg = it->second;
 			free.set(reserved_reg, true);
 			logger->info("FOR_ITER FIX: Freed reserved iterator register r{}", reserved_reg);
@@ -530,10 +537,12 @@ class LinearScanRegisterAllocation
 		logger->trace("Marked r{} as used for {}", reg_idx, to_string(interval.value));
 
 		// If this is a FOR_ITER loop variable, also mark the iterator register as used
-		if (auto it = foriter_reserved_regs.find(interval.value); it != foriter_reserved_regs.end()) {
+		if (auto it = foriter_reserved_regs.find(interval.value);
+			it != foriter_reserved_regs.end()) {
 			auto reserved_reg = it->second;
 			free.set(reserved_reg, false);
-			logger->trace("FOR_ITER FIX: Marked reserved iterator register r{} as used", reserved_reg);
+			logger->trace(
+				"FOR_ITER FIX: Marked reserved iterator register r{} as used", reserved_reg);
 		}
 	}
 
@@ -596,25 +605,19 @@ class LinearScanRegisterAllocation
 
 		// Print header
 		llvm::outs() << "Value                                                   | ";
-		for (size_t t = 0; t < max_timestep; ++t) {
-			llvm::outs() << llvm::format("%3d", t);
-		}
+		for (size_t t = 0; t < max_timestep; ++t) { llvm::outs() << llvm::format("%3d", t); }
 		llvm::outs() << "\n";
 
 		// Print separator
 		llvm::outs() << "--------------------------------------------------------+-";
-		for (size_t t = 0; t < max_timestep; ++t) {
-			llvm::outs() << "---";
-		}
+		for (size_t t = 0; t < max_timestep; ++t) { llvm::outs() << "---"; }
 		llvm::outs() << "\n";
 
 		// Print each value's liveness
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
 			std::string value_str = to_string(interval.value);
-			if (value_str.length() > 55) {
-				value_str = value_str.substr(0, 52) + "...";
-			}
+			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 
 			// Print liveness for each timestep
@@ -652,25 +655,19 @@ class LinearScanRegisterAllocation
 
 		// Print header
 		llvm::outs() << "Value                                                   | ";
-		for (size_t t = 0; t < max_timestep; ++t) {
-			llvm::outs() << llvm::format("%3d", t);
-		}
+		for (size_t t = 0; t < max_timestep; ++t) { llvm::outs() << llvm::format("%3d", t); }
 		llvm::outs() << "\n";
 
 		// Print separator
 		llvm::outs() << "--------------------------------------------------------+-";
-		for (size_t t = 0; t < max_timestep; ++t) {
-			llvm::outs() << "---";
-		}
+		for (size_t t = 0; t < max_timestep; ++t) { llvm::outs() << "---"; }
 		llvm::outs() << "\n";
 
 		// Print each value's register assignment
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
 			std::string value_str = to_string(interval.value);
-			if (value_str.length() > 55) {
-				value_str = value_str.substr(0, 52) + "...";
-			}
+			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 
 			// Find register for this value

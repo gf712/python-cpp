@@ -134,7 +134,9 @@ namespace {
 	std::once_flag base_exception_flag;
 
 	std::unique_ptr<TypePrototype> register_base_exception()
-	{ return std::move(klass<BaseException>("BaseException").type); }
+	{
+		return std::move(klass<BaseException>("BaseException").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> BaseException::type_factory()

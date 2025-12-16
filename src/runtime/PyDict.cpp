@@ -431,8 +431,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_dict()
 	{
-		return std::move(
-			klass<PyDict>("dict")
+		return std::move(klass<PyDict>("dict")
 				.def(
 					"get",
 					+[](PyDict *self, PyTuple *args, PyDict *kwargs) {

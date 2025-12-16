@@ -1,9 +1,9 @@
 #include "ConstantFolding.hpp"
 #include "ast/AST.hpp"
+#include "executable/Program.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
-#include "executable/Program.hpp"
 
 #include "gtest/gtest.h"
 
@@ -502,7 +502,7 @@ TEST(Optimizer, ConstantFoldIntegerAddition)
 	expected_ast->emplace(
 		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
 									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(BigIntType{2}, SourceLocation{}),
+			std::make_shared<Constant>(BigIntType{ 2 }, SourceLocation{}),
 			"",
 			SourceLocation{}));
 

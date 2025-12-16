@@ -198,13 +198,13 @@ namespace {
 	std::unique_ptr<TypePrototype> register_property()
 	{
 		return std::move(klass<PyProperty>("property")
-							 .def("getter", &PyProperty::getter)
-							 .def("deleter", &PyProperty::deleter)
-							 .def("setter", &PyProperty::setter)
-							 .attr("fget", &PyProperty::m_getter)
-							 .attr("fset", &PyProperty::m_setter)
-							 .attr("fdel", &PyProperty::m_deleter)
-							 .type);
+				.def("getter", &PyProperty::getter)
+				.def("deleter", &PyProperty::deleter)
+				.def("setter", &PyProperty::setter)
+				.attr("fget", &PyProperty::m_getter)
+				.attr("fset", &PyProperty::m_setter)
+				.attr("fdel", &PyProperty::m_deleter)
+				.type);
 	}
 }// namespace
 

@@ -307,10 +307,10 @@ namespace {
 	std::unique_ptr<TypePrototype> register_slice()
 	{
 		return std::move(klass<PySlice>("slice")
-							 .attr("start", &PySlice::m_start)
-							 .attr("stop", &PySlice::m_stop)
-							 .attr("step", &PySlice::m_step)
-							 .type);
+				.attr("start", &PySlice::m_start)
+				.attr("stop", &PySlice::m_stop)
+				.attr("step", &PySlice::m_step)
+				.type);
 	}
 }// namespace
 

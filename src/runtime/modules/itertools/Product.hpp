@@ -11,8 +11,8 @@ namespace itertools {
 
 		PyList *m_pools{ nullptr };
 		size_t m_repeat;
-        std::vector<std::vector<Value>> m_result;
-        size_t m_iteration_count{0};
+		std::vector<std::vector<Value>> m_result;
+		size_t m_iteration_count{ 0 };
 
 		Product(PyType *);
 		Product(PyList *pools, size_t repeat);

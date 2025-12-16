@@ -346,7 +346,7 @@ void MLIRGenerator::store_name(std::string_view name,
 			ASSERT(visibility_map->type == VariablesResolver::Scope::Type::CLASS);
 			return it->get().visibility;
 		} else if (auto it = visibility_map->symbol_map.get_visible_symbol(std::string{ name });
-				   it.has_value()) {
+			it.has_value()) {
 			return it->get().visibility;
 		} else {
 			TODO();
@@ -434,7 +434,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 			ASSERT(visibility_map->type == VariablesResolver::Scope::Type::CLASS);
 			return it->get().visibility;
 		} else if (auto it = visibility_map->symbol_map.get_visible_symbol(std::string{ name });
-				   it.has_value()) {
+			it.has_value()) {
 			return it->get().visibility;
 		} else {
 			TODO();
@@ -516,7 +516,7 @@ void MLIRGenerator::delete_name(std::string_view name, const SourceLocation &loc
 			ASSERT(visibility_map->type == VariablesResolver::Scope::Type::CLASS);
 			return it->get().visibility;
 		} else if (auto it = visibility_map->symbol_map.get_visible_symbol(std::string{ name });
-				   it.has_value()) {
+			it.has_value()) {
 			return it->get().visibility;
 		} else {
 			TODO();
@@ -1103,7 +1103,7 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 			}
 			arg_values.push_back(static_cast<MLIRValue *>(
 				build_tuple(args, arg_requires_expansion, node->source_location()))
-									 ->value);
+					->value);
 		}
 		if (!node->keywords().empty()) { requires_kwargs_expansion = true; }
 		{
@@ -1131,7 +1131,7 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 			}
 			keyword_values.push_back(static_cast<MLIRValue *>(
 				build_dict(keys, values, kwarg_requires_expansion, node->source_location()))
-										 ->value);
+					->value);
 		}
 	} else {
 		arg_values.reserve(node->args().size());
@@ -1584,9 +1584,9 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getInsertionBlock()->empty()
 		|| !m_context.builder()
-				.getInsertionBlock()
-				->back()
-				.hasTrait<mlir::OpTrait::IsTerminator>()) {
+			.getInsertionBlock()
+			->back()
+			.hasTrait<mlir::OpTrait::IsTerminator>()) {
 		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
 	}
 
@@ -2738,9 +2738,9 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 			for (auto el : handler->body()) { el->codegen(this); }
 			if (m_context.builder().getBlock()->empty()
 				|| !m_context.builder()
-						.getBlock()
-						->back()
-						.hasTrait<mlir::OpTrait::IsTerminator>()) {
+					.getBlock()
+					->back()
+					.hasTrait<mlir::OpTrait::IsTerminator>()) {
 				m_context.builder().create<mlir::py::ControlFlowYield>(
 					loc(m_context.builder(), m_context.filename(), node->source_location()));
 			}

@@ -113,11 +113,11 @@ namespace {
 	std::unique_ptr<TypePrototype> mappingproxy_reversed()
 	{
 		return std::move(klass<PyMappingProxy>("mappingproxy")
-							 .def("get", &PyMappingProxy::get)
-							 .def("items", &PyMappingProxy::items)
-							 .def("keys", &PyMappingProxy::keys)
-							 .def("value", &PyMappingProxy::values)
-							 .type);
+				.def("get", &PyMappingProxy::get)
+				.def("items", &PyMappingProxy::items)
+				.def("keys", &PyMappingProxy::keys)
+				.def("value", &PyMappingProxy::values)
+				.type);
 	}
 }// namespace
 

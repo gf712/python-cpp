@@ -233,10 +233,14 @@ PyString::PyString(std::string s)
 {}
 
 PyResult<int64_t> PyString::__hash__() const
-{ return Ok(static_cast<int64_t>(std::hash<std::string>{}(m_value))); }
+{
+	return Ok(static_cast<int64_t>(std::hash<std::string>{}(m_value)));
+}
 
 PyResult<PyObject *> PyString::__repr__() const
-{ return PyString::create(fmt::format("'{}'", m_value)); }
+{
+	return PyString::create(fmt::format("'{}'", m_value));
+}
 
 PyResult<PyObject *> PyString::__str__() const { return Ok(const_cast<PyString *>(this)); }
 
@@ -1927,7 +1931,9 @@ PyStringIterator::PyStringIterator(const PyString &pystring)
 {}
 
 std::string PyStringIterator::to_string() const
-{ return fmt::format("<str_iterator at {}>", static_cast<const void *>(this)); }
+{
+	return fmt::format("<str_iterator at {}>", static_cast<const void *>(this));
+}
 
 void PyStringIterator::visit_graph(Visitor &visitor)
 {
@@ -1957,7 +1963,9 @@ namespace {
 	std::once_flag str_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_str_iterator()
-	{ return std::move(klass<PyStringIterator>("str_iterator").type); }
+	{
+		return std::move(klass<PyStringIterator>("str_iterator").type);
+	}
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyStringIterator::type_factory()

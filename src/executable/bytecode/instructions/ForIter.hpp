@@ -26,9 +26,7 @@ class ForIter final : public Instruction
 		  m_exit_label(std::move(exit_label))
 	{}
 
-	ForIter(Register dst, Register src, int32_t offset)
-		: ForIter(dst, src, offset, int32_t{ 0 })
-	{}
+	ForIter(Register dst, Register src, int32_t offset) : ForIter(dst, src, offset, int32_t{ 0 }) {}
 
 	ForIter(Register dst, Register src, int32_t offset, int32_t body_offset)
 		: m_dst(dst), m_src(src), m_offset(offset), m_body_offset(body_offset)

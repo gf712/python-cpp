@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace ast {
-    class Module;
+class Module;
 }
 
 namespace compiler::mlir {

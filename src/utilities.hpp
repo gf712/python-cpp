@@ -79,5 +79,7 @@ typename std::enable_if_t<sizeof(To) == sizeof(From) && std::is_trivially_copyab
 }
 #else
 template<class To, class From> constexpr To bit_cast(const From &from) noexcept
-{ return std::bit_cast<To>(from); }
+{
+	return std::bit_cast<To>(from);
+}
 #endif

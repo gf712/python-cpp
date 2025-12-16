@@ -224,11 +224,9 @@ constexpr void Slot::initialize(
 					} else if constexpr (std::is_integral_v<typename ResultType::OkType>) {
 						return result.and_then([](auto value) { return PyInteger::create(value); });
 					} else {
-						[]<bool flag = false>()
-						{
+						[]<bool flag = false>() {
 							static_assert(flag, "unsupported native return type");
-						}
-						();
+						}();
 					}
 				};
 				auto get_parameter = [&args]<typename T, size_t Idx>() -> PyResult<T> {
@@ -251,11 +249,9 @@ constexpr void Slot::initialize(
 							TODO();
 						}
 					} else {
-						[]<bool flag = false>()
-						{
+						[]<bool flag = false>() {
 							static_assert(flag, "unsupported native parameter type");
-						}
-						();
+						}();
 					}
 				};
 				if constexpr (flags_ == Flags::Keywords) {
@@ -284,8 +280,7 @@ constexpr void Slot::initialize(
 						if (arg1.is_err()) { return Err(arg1.unwrap_err()); }
 						return wrap_result(native_fn(self, arg0.unwrap(), arg1.unwrap()));
 					} else {
-						[]<bool flag = false>() { static_assert(flag, "unsupported arity"); }
-						();
+						[]<bool flag = false>() { static_assert(flag, "unsupported arity"); }();
 					}
 				}
 			};

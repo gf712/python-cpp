@@ -651,8 +651,7 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_list()
 	{
-		return std::move(
-			klass<PyList>("list")
+		return std::move(klass<PyList>("list")
 				.def("append", &PyList::append)
 				.def("extend", &PyList::extend)
 				.def(

@@ -416,7 +416,7 @@ void PyObject::visit_graph(Visitor &visitor)
 {
 	if (m_attributes) { visitor.visit(*m_attributes); }
 	for (size_t i = 0, offset = type()->underlying_type().basicsize; i < type()->__slots__.size();
-		 ++i, offset += sizeof(PyObject *)) {
+		++i, offset += sizeof(PyObject *)) {
 		auto *slot = *bit_cast<PyObject **>(bit_cast<uint8_t *>(this) + offset);
 		if (slot) { visitor.visit(*slot); }
 	}
@@ -491,7 +491,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = eq(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->eq(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -499,7 +499,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = ge(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->le(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -507,7 +507,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = gt(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->lt(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -515,7 +515,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = le(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->ge(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -523,7 +523,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = lt(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->gt(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -531,7 +531,7 @@ PyResult<PyObject *> PyObject::richcompare(const PyObject *other, RichCompare op
 		if (auto result = ne(other); result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		} else if (auto result = other->ne(this);
-				   result.is_ok() && (result.unwrap() != not_implemented())) {
+			result.is_ok() && (result.unwrap() != not_implemented())) {
 			return result;
 		}
 	} break;
@@ -982,11 +982,11 @@ PyResult<bool> PyObject::true_()
 	if (type_prototype().__bool__.has_value()) {
 		return call_slot(*type_prototype().__bool__, "__bool__ should return bool", this);
 	} else if (auto mapping = as_mapping();
-			   mapping.is_ok() && type_prototype().mapping_type_protocol->__len__.has_value()) {
+		mapping.is_ok() && type_prototype().mapping_type_protocol->__len__.has_value()) {
 		return mapping.unwrap().len().and_then(
 			[](size_t l) -> PyResult<bool> { return Ok(l > 0); });
 	} else if (auto sequence = as_sequence();
-			   sequence.is_ok() && type_prototype().sequence_type_protocol->__len__.has_value()) {
+		sequence.is_ok() && type_prototype().sequence_type_protocol->__len__.has_value()) {
 		return sequence.unwrap().len().and_then(
 			[](size_t l) -> PyResult<bool> { return Ok(l > 0); });
 	} else {
@@ -1465,15 +1465,15 @@ namespace {
 	std::unique_ptr<TypePrototype> register_type()
 	{
 		return std::move(klass<PyObject>("object")
-							 .property(
-								 "__class__",
-								 [](PyObject *self) { return Ok(self->type()); },
-								 [](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
-									 (void)self;
-									 (void)value;
-									 TODO();
-								 })
-							 .type);
+				.property(
+					"__class__",
+					[](PyObject *self) { return Ok(self->type()); },
+					[](PyObject *self, PyObject *value) -> PyResult<std::monostate> {
+						(void)self;
+						(void)value;
+						TODO();
+					})
+				.type);
 	}
 }// namespace
 

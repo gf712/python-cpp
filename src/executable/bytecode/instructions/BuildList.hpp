@@ -9,14 +9,11 @@ class BuildList final : public Instruction
 	size_t m_size;
 
   public:
-	BuildList(Register dst, size_t size)
-		: m_dst(dst), m_size(size)
-	{}
+	BuildList(Register dst, size_t size) : m_dst(dst), m_size(size) {}
 
 	std::string to_string() const final
 	{
-		return fmt::format(
-			"BUILD_LIST      r{:<3} (size={})", m_dst, m_size);
+		return fmt::format("BUILD_LIST      r{:<3} (size={})", m_dst, m_size);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;

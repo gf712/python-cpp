@@ -1,8 +1,8 @@
 #pragma once
 
 #include "GarbageCollector.hpp"
-#include "utilities.hpp"
 #include "runtime/forward.hpp"
+#include "utilities.hpp"
 
 #include <bitset>
 #include <cstdint>

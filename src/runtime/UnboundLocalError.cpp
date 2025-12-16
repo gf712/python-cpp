@@ -7,7 +7,9 @@ namespace py {
 
 UnboundLocalError::UnboundLocalError(PyType *type) : Exception(type) {}
 
-UnboundLocalError::UnboundLocalError(PyTuple *args) : Exception(types::BuiltinTypes::the().unbound_local_error(), args) {}
+UnboundLocalError::UnboundLocalError(PyTuple *args)
+	: Exception(types::BuiltinTypes::the().unbound_local_error(), args)
+{}
 
 PyResult<PyObject *> UnboundLocalError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
@@ -28,7 +30,8 @@ namespace {
 
 	std::unique_ptr<TypePrototype> register_unbound_local_error()
 	{
-		return std::move(klass<UnboundLocalError>("UnboundLocalError", Exception::class_type()).type);
+		return std::move(
+			klass<UnboundLocalError>("UnboundLocalError", Exception::class_type()).type);
 	}
 }// namespace
 

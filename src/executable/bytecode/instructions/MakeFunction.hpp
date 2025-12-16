@@ -21,7 +21,10 @@ class MakeFunction : public Instruction
 		  m_kw_defaults_size(kw_defaults_size), m_captures_tuple(std::move(captures_tuple))
 	{}
 
-	std::string to_string() const final { return fmt::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name); }
+	std::string to_string() const final
+	{
+		return fmt::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name);
+	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

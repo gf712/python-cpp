@@ -96,8 +96,8 @@ namespace {
 	std::unique_ptr<TypePrototype> register_namespace()
 	{
 		return std::move(klass<PyNamespace>("types.SimpleNamespace")
-							 .attribute_readonly("__dict__", &PyNamespace::m_dict)
-							 .type);
+				.attribute_readonly("__dict__", &PyNamespace::m_dict)
+				.type);
 	}
 }// namespace
 

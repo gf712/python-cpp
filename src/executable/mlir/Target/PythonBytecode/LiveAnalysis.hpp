@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "RegisterAllocationLogger.hpp"
 #include "RegisterAllocationTypes.hpp"
-#include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
@@ -57,7 +57,8 @@ class LiveAnalysis
 	void analyse(mlir::func::FuncOp &fn)
 	{
 		auto logger = get_regalloc_logger();
-		logger->info("Starting backward dataflow live analysis for function: {}", fn.getName().str());
+		logger->info(
+			"Starting backward dataflow live analysis for function: {}", fn.getName().str());
 
 		auto &region = fn.getRegion();
 		auto sorted_blocks = sortBlocks(region);
@@ -134,15 +135,11 @@ class LiveAnalysis
 
 			// Add operands to Use (if not already defined)
 			for (const auto &operand : op.getOperands()) {
-				if (!info.def.contains(operand)) {
-					info.use.insert(operand);
-				}
+				if (!info.def.contains(operand)) { info.use.insert(operand); }
 			}
 
 			// Add results to Def
-			for (const auto &result : op.getResults()) {
-				info.def.insert(result);
-			}
+			for (const auto &result : op.getResults()) { info.def.insert(result); }
 		}
 
 		// Handle terminators specially
@@ -171,8 +168,7 @@ class LiveAnalysis
 		}
 	}
 
-	void handle_conditional_branch(
-		mlir::emitpybytecode::JumpIfFalse branch,
+	void handle_conditional_branch(mlir::emitpybytecode::JumpIfFalse branch,
 		std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>, mlir::BlockArgument>>
 			&block_parameters_to_args)
 	{
@@ -189,13 +185,13 @@ class LiveAnalysis
 		}
 	}
 
-	void handle_unconditional_branch(
-		mlir::cf::BranchOp branch,
+	void handle_unconditional_branch(mlir::cf::BranchOp branch,
 		std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>, mlir::BlockArgument>>
 			&block_parameters_to_args)
 	{
 		auto *jmp_block = branch.getDest();
-		for (const auto &[p, arg] : llvm::zip(branch.getDestOperands(), jmp_block->getArguments())) {
+		for (const auto &[p, arg] :
+			llvm::zip(branch.getDestOperands(), jmp_block->getArguments())) {
 			block_parameters_to_args.emplace_back(p, arg);
 		}
 	}
@@ -258,21 +254,15 @@ class LiveAnalysis
 				// LiveIn[B] = Use[B] ∪ (LiveOut[B] - Def[B])
 				info.live_in = info.use;
 				for (const auto &val : info.live_out) {
-					if (!info.def.contains(val)) {
-						info.live_in.insert(val);
-					}
+					if (!info.def.contains(val)) { info.live_in.insert(val); }
 				}
 
 				// Add ForwardedOutputs to LiveIn (they're "defined" by the terminator but need
 				// to be live for the successor)
-				for (const auto &fwd : info.forwarded_outputs) {
-					info.live_in.insert(fwd);
-				}
+				for (const auto &fwd : info.forwarded_outputs) { info.live_in.insert(fwd); }
 
 				// Check if LiveIn changed
-				if (info.live_in != old_live_in) {
-					changed = true;
-				}
+				if (info.live_in != old_live_in) { changed = true; }
 			}
 		}
 
@@ -320,14 +310,10 @@ class LiveAnalysis
 				alive_before_op[i] = alive_after;
 
 				// Remove values defined by this operation (they die here going backward)
-				for (auto result : op->getResults()) {
-					alive_before_op[i].erase(result);
-				}
+				for (auto result : op->getResults()) { alive_before_op[i].erase(result); }
 
 				// Add values used by this operation (they need to be alive going backward)
-				for (auto operand : op->getOperands()) {
-					alive_before_op[i].insert(operand);
-				}
+				for (auto operand : op->getOperands()) { alive_before_op[i].insert(operand); }
 
 				// Propagate backward for next iteration
 				alive_after = alive_before_op[i];
@@ -344,9 +330,7 @@ class LiveAnalysis
 				// Non-pure operations must be emitted even if results are unused
 				if (!mlir::isPure(op)) {
 					// Re-add any results to ensure they get register assignments
-					for (auto result : op->getResults()) {
-						alive_before_op[i].insert(result);
-					}
+					for (auto result : op->getResults()) { alive_before_op[i].insert(result); }
 				}
 			}
 
@@ -354,16 +338,16 @@ class LiveAnalysis
 			// (they're "defined" by the terminator but need to be live for the successor)
 			if (!info.operations.empty()) {
 				for (const auto &fwd : info.forwarded_outputs) {
-					if (info.live_in.contains(fwd)) {
-						alive_before_op[0].insert(fwd);
-					}
+					if (info.live_in.contains(fwd)) { alive_before_op[0].insert(fwd); }
 				}
 			}
 
 			// Sanity check: alive_before[0] should equal LiveIn
 			// (We computed it backward from LiveOut, should match forward computation)
 			if (!alive_before_op.empty() && alive_before_op[0] != info.live_in) {
-				logger->warn("Block {} liveness mismatch: alive_before[0] has {} values, LiveIn has {} values",
+				logger->warn(
+					"Block {} liveness mismatch: alive_before[0] has {} values, LiveIn has {} "
+					"values",
 					static_cast<void *>(block),
 					alive_before_op[0].size(),
 					info.live_in.size());
@@ -377,9 +361,7 @@ class LiveAnalysis
 				}
 				logger->debug("  Values in alive_before[0] but not LiveIn:");
 				for (const auto &val : alive_before_op[0]) {
-					if (!info.live_in.contains(val)) {
-						logger->debug("    {}", to_string(val));
-					}
+					if (!info.live_in.contains(val)) { logger->debug("    {}", to_string(val)); }
 				}
 			}
 
@@ -403,7 +385,8 @@ class LiveAnalysis
 				end,
 				info.operations.size(),
 				info.live_in.size());
-			if (block->getTerminator() && mlir::isa<mlir::emitpybytecode::ForIter>(block->getTerminator())) {
+			if (block->getTerminator()
+				&& mlir::isa<mlir::emitpybytecode::ForIter>(block->getTerminator())) {
 				logger->debug("  ^ FOR_ITER block");
 			}
 		}
@@ -413,8 +396,8 @@ class LiveAnalysis
 	 * Propagate block argument values through liveness information
 	 */
 	void propagate_block_arguments(
-		const std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>, mlir::BlockArgument>>
-			&block_parameters_to_args,
+		const std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>,
+			mlir::BlockArgument>> &block_parameters_to_args,
 		const std::map<mlir::Block *, std::pair<size_t, size_t>> &blocks_span)
 	{
 		for (const auto &[param, arg] : block_parameters_to_args) {
@@ -451,22 +434,23 @@ class LiveAnalysis
 					value = std::get<0>(std::get<BlockArgumentInputs>(value));
 				}
 
-				auto start = std::visit(
-					overloaded{
-						[this](const auto &v) { return block_input_mappings.find(v); },
-						[this](const BlockArgumentInputs &) {
-							TODO();
-							return block_input_mappings.end();
-						},
-					},
-					value);
+				auto start =
+					std::visit(overloaded{
+								   [this](const auto &v) { return block_input_mappings.find(v); },
+								   [this](const BlockArgumentInputs &) {
+									   TODO();
+									   return block_input_mappings.end();
+								   },
+							   },
+						value);
 
 				auto it = start;
 				while (it != block_input_mappings.end()) {
 					ASSERT(it->second.size() == 1);
 					value = *it->second.begin();
 					start->second.erase(start->second.begin());
-					start->second.insert(mlir::cast<mlir::BlockArgument>(std::get<mlir::Value>(value)));
+					start->second.insert(
+						mlir::cast<mlir::BlockArgument>(std::get<mlir::Value>(value)));
 					it = block_input_mappings.find(std::get<mlir::Value>(value));
 				}
 			}

@@ -1,5 +1,5 @@
-#include "vm/VM.hpp"
 #include "interpreter/Interpreter.hpp"
+#include "vm/VM.hpp"
 
 #include "gtest/gtest.h"
 

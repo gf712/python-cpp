@@ -17,7 +17,9 @@ template<> PyMethodDescriptor *as(PyObject *obj)
 
 template<> const PyMethodDescriptor *as(const PyObject *obj)
 {
-	if (obj->type() == types::method_wrapper()) { return static_cast<const PyMethodDescriptor *>(obj); }
+	if (obj->type() == types::method_wrapper()) {
+		return static_cast<const PyMethodDescriptor *>(obj);
+	}
 	return nullptr;
 }
 

@@ -28,12 +28,12 @@ PyGenerator::PyGenerator(PyFrame *frame,
 	PyString *name,
 	PyString *qualname)
 	: GeneratorInterface(types::BuiltinTypes::the().generator(),
-		frame,
-		std::move(stack_frame),
-		is_running,
-		code,
-		name,
-		qualname)
+		  frame,
+		  std::move(stack_frame),
+		  is_running,
+		  code,
+		  name,
+		  qualname)
 {}
 
 PyResult<PyGenerator *> PyGenerator::create(PyFrame *frame,
@@ -55,9 +55,9 @@ namespace {
 	std::unique_ptr<TypePrototype> register_generator()
 	{
 		return std::move(klass<PyGenerator>(PyGenerator::GeneratorTypeName)
-							 .def("close", &PyGenerator::close)
-							 .def("send", &PyGenerator::send)
-							 .type);
+				.def("close", &PyGenerator::close)
+				.def("send", &PyGenerator::send)
+				.type);
 	}
 }// namespace
 
