@@ -1272,6 +1272,11 @@ namespace py {
 				mlir::Block *end_block) const
 			{
 				return [this, &rewriter, condition_start, end_block](mlir::Operation *operation) {
+					auto parent_is_orelse = [](mlir::Operation *operation) {
+						auto forloop_op = operation->getParentOfType<mlir::py::ForLoopOp>();
+						if (!forloop_op) { return false; }
+						return &forloop_op.getOrelse() == operation->getParentRegion();
+					};
 					// llvm::outs() << "ForOpLowering 1:\n";
 					// operation->print(llvm::outs());
 					// llvm::outs() << '\n';
@@ -1308,6 +1313,9 @@ namespace py {
 							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
 							return WalkResult::advance();
 						}
+						// is this hacky? maybe there is a better way of ignoring the else branch of
+						// a for loop
+						if (parent_is_orelse(operation)) { return WalkResult::advance(); }
 						rewriter.setInsertionPoint(yield_op);
 						if (!yield_op.getKind().has_value()
 							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
@@ -2215,6 +2223,11 @@ namespace py {
 		config.enableRegionSimplification = GreedySimplifyRegionLevel::Disabled;
 		config.useTopDownTraversal = true;
 		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
+
+		// getOperation()->print(llvm::outs());
+		// llvm::outs() << "-----------------------------------------------\n\n\n";
+		// llvm::outs().flush();
+
 		// Currently ignoring the return value as it seems to always fail, even though the
 		// transformation seems to generate the expected output
 		(void)applyPatternsAndFoldGreedily(getOperation(), frozen_patterns, config);
