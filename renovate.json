@@ -2,5 +2,25 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)CMakeLists\\.txt$", "\\.cmake$"],
+      "matchStrings": [
+        "CPMAddPackage\\(\"(?<depName>[^@]+)@(?<currentValue>[^\"#]+)\"\\)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)CMakeLists\\.txt$", "\\.cmake$"],
+      "matchStrings": [
+        "CPMAddPackage\\(\"(?<depName>[^@#]+)#(?<currentValue>[^\"]+)\"\\)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    }
   ]
 }
