@@ -8,6 +8,7 @@ add_mlir_conversion_library(PythonToPythonBytecode
     MLIRIR
     MLIRPass
     PythonMLIRDialect
+    EmitPythonBytecodeDialect
 )
 
 target_include_directories(PythonToPythonBytecode SYSTEM PUBLIC
