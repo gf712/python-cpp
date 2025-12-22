@@ -1,7 +1,9 @@
 #pragma once
 
 #include "runtime/PyTuple.hpp"
+#include "utilities.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -37,11 +39,11 @@ enum class ValueType {
 
 template<typename T> inline void serialize(const T &value, std::vector<uint8_t> &result)
 {
-	result.reserve(result.size() + sizeof(T));
-	for (size_t i = 0; i < sizeof(T); ++i) {
-		result.push_back(reinterpret_cast<const uint8_t *>(&value)[i]);
-	}
+	auto *data = bit_cast<const uint8_t *>(&value);
+	result.insert(result.end(), data, data + sizeof(T));
 }
+
+template<> inline void serialize<Value>(const Value &value, std::vector<uint8_t> &result);
 
 template<> inline void serialize<bool>(const bool &value, std::vector<uint8_t> &result)
 {
@@ -67,56 +69,62 @@ inline void serialize(const VectorType &value, std::vector<uint8_t> &result)
 	for (const auto &el : value) { serialize(el, result); }
 }
 
+template<> inline void serialize<Tuple>(const Tuple &value, std::vector<uint8_t> &result)
+{
+	serialize(value.elements.size(), result);
+	for (const auto &el : value.elements) { serialize(el, result); }
+}
+
 template<> inline void serialize<PyTuple *>(PyTuple *const &value, std::vector<uint8_t> &result)
 {
 	serialize(value->size(), result);
-	for (const auto &el : value->elements()) {
-		std::visit(
-			overloaded{
-				[&](const Number &val) {
-					std::visit(overloaded{
-								   [&](const BigIntType &v) {
-									   ASSERT(v.fits_ulong_p());
-									   const auto int_value = v.get_ui();
-									   serialize(static_cast<uint8_t>(ValueType::INT64), result);
-									   serialize(int_value, result);
-								   },
-								   [&](const double &v) {
-									   serialize(static_cast<uint8_t>(ValueType::F64), result);
-									   serialize(v, result);
-								   },
+	for (const auto &el : value->elements()) { serialize(el, result); }
+}
+
+template<> inline void serialize<Value>(const Value &value, std::vector<uint8_t> &result)
+{
+	std::visit(
+		overloaded{
+			[&](const Number &val) {
+				std::visit(overloaded{
+							   [&](const BigIntType &v) {
+								   ASSERT(v.fits_ulong_p());
+								   const auto int_value = v.get_ui();
+								   serialize(static_cast<uint8_t>(ValueType::INT64), result);
+								   serialize(int_value, result);
 							   },
-						val.value);
-				},
-				[&](const String &val) {
-					serialize(static_cast<uint8_t>(ValueType::STRING), result);
-					serialize(val.s, result);
-				},
-				[&](const Bytes &bytes) {
-					serialize(static_cast<uint8_t>(ValueType::BYTES), result);
-					serialize(bytes.b, result);
-				},
-				[&](const Ellipsis &) {
-					serialize(static_cast<uint8_t>(ValueType::ELLIPSIS), result);
-				},
-				[&](const NameConstant &val) {
-					std::visit(overloaded{ [&](const bool &v) {
-											  serialize(
-												  static_cast<uint8_t>(ValueType::BOOL), result);
-											  serialize(v, result);
-										  },
-								   [&](const NoneType &) {
-									   serialize(static_cast<uint8_t>(ValueType::NONE), result);
-								   } },
-						val.value);
-				},
-				[&](const Tuple &tuple) {
-					serialize(static_cast<uint8_t>(ValueType::TUPLE), result);
-					serialize(tuple.elements, result);
-				},
-				[&](PyObject *const &) { TODO(); },
+							   [&](const double &v) {
+								   serialize(static_cast<uint8_t>(ValueType::F64), result);
+								   serialize(v, result);
+							   },
+						   },
+					val.value);
 			},
-			el);
-	}// namespace py
+			[&](const String &val) {
+				serialize(static_cast<uint8_t>(ValueType::STRING), result);
+				serialize(val.s, result);
+			},
+			[&](const Bytes &bytes) {
+				serialize(static_cast<uint8_t>(ValueType::BYTES), result);
+				serialize(bytes.b, result);
+			},
+			[&](const Ellipsis &) { serialize(static_cast<uint8_t>(ValueType::ELLIPSIS), result); },
+			[&](const NameConstant &val) {
+				std::visit(overloaded{ [&](const bool &v) {
+										  serialize(static_cast<uint8_t>(ValueType::BOOL), result);
+										  serialize(v, result);
+									  },
+							   [&](const NoneType &) {
+								   serialize(static_cast<uint8_t>(ValueType::NONE), result);
+							   } },
+					val.value);
+			},
+			[&](const Tuple &tuple) {
+				serialize(static_cast<uint8_t>(ValueType::TUPLE), result);
+				serialize(tuple, result);
+			},
+			[&](PyObject *const &) { TODO(); },
+		},
+		value);
 }
 }// namespace py

@@ -74,7 +74,7 @@ project_options(
 
 # TODO: Address all the warning below. This should be only temporary...
 target_compile_options(project_warnings
-  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-old-style-cast;-Wno-deprecated-copy;-Wno-missing-field-initializers;-Wno-null-dereference;-Wno-maybe-uninitialized>
+  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-old-style-cast;-Wno-deprecated-copy;-Wno-missing-field-initializers;-Wno-null-dereference;-Wno-maybe-uninitialized;-Wno-stringop-overflow>
 )
 
 check_cxx_source_compiles(

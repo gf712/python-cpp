@@ -3,6 +3,7 @@
 #include "forward.hpp"
 #include "runtime/Value.hpp"
 #include "serialize.hpp"
+#include "utilities.hpp"
 
 #include <span>
 #include <string>
