@@ -15,7 +15,7 @@ CPMAddPackage("gh:jarro2783/cxxopts@3.3.1")
 CPMAddPackage("gh:Tessil/ordered-map@1.2.0")
 CPMAddPackage("gh:python/cpython@3.9.25")
 CPMAddPackage("gh:antirez/linenoise#2.0")
-CPMAddPackage("gh:aminya/project_options@0.41.0")
+CPMAddPackage("gh:aminya/project_options@0.41.1")
 
 if(linenoise_ADDED)
   add_library(linenoise ${linenoise_SOURCE_DIR}/linenoise.c)
