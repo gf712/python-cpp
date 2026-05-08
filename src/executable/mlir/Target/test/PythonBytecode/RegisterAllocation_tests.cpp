@@ -4,7 +4,6 @@
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "Dialect/Python/IR/Dialect.hpp"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -13,7 +12,6 @@
 #include "mlir/Parser/Parser.h"
 
 #include "gtest/gtest.h"
-#include <llvm-20/llvm/Support/raw_ostream.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/IR/Visitors.h>
 #include <spdlog/spdlog.h>
@@ -289,6 +287,224 @@ TEST_F(RegisterAllocationTest, RegisterAllocationRunsWithoutCrashing)
 
 	// Should have allocated registers for some values
 	EXPECT_FALSE(regalloc.value2mem_map.empty());
+}
+
+/**
+ * Test that spilling works when register pressure transiently exceeds the 32-register limit.
+ *
+ * Pattern: one long-lived value (%x = LOAD_NAME) defined early, then 32 short-lived
+ * constants (%v0..%v31), then a reduction chain of BINARY_OPs that quickly consumes
+ * all the short-lived values, then a CALL using only %x.
+ *
+ * Without spilling: when %v31 is processed, all of %x + %v0..%v30 = 32 active, plus
+ * the new %v31 makes 33 — no register available → would crash.
+ *
+ * With spilling: %x (furthest end) is spilled right after its definition, freeing its
+ * register for the short-lived values. At peak only %v0..%v31 = 32 values are active.
+ * %x is reloaded before the CALL. Each allocation pass terminates with ≤32 live values.
+ */
+constexpr const char *SPILL_PRESSURE_MLIR = R"(
+module {
+  func.func private @spill_test() -> !python.object attributes {locals = [], names = ["x"]} {
+    // Long-lived value — will be spilled to make room for the 32 short-lived constants
+    %x   = "emitpybytecode.LOAD_NAME"() <{name = "x"}> : () -> !python.object
+    // 32 short-lived constants
+    %v0  = "emitpybytecode.LOAD_CONST"() <{value = 0  : ui6}> : () -> !python.object
+    %v1  = "emitpybytecode.LOAD_CONST"() <{value = 1  : ui6}> : () -> !python.object
+    %v2  = "emitpybytecode.LOAD_CONST"() <{value = 2  : ui6}> : () -> !python.object
+    %v3  = "emitpybytecode.LOAD_CONST"() <{value = 3  : ui6}> : () -> !python.object
+    %v4  = "emitpybytecode.LOAD_CONST"() <{value = 4  : ui6}> : () -> !python.object
+    %v5  = "emitpybytecode.LOAD_CONST"() <{value = 5  : ui6}> : () -> !python.object
+    %v6  = "emitpybytecode.LOAD_CONST"() <{value = 6  : ui6}> : () -> !python.object
+    %v7  = "emitpybytecode.LOAD_CONST"() <{value = 7  : ui6}> : () -> !python.object
+    %v8  = "emitpybytecode.LOAD_CONST"() <{value = 8  : ui6}> : () -> !python.object
+    %v9  = "emitpybytecode.LOAD_CONST"() <{value = 9  : ui6}> : () -> !python.object
+    %v10 = "emitpybytecode.LOAD_CONST"() <{value = 10 : ui6}> : () -> !python.object
+    %v11 = "emitpybytecode.LOAD_CONST"() <{value = 11 : ui6}> : () -> !python.object
+    %v12 = "emitpybytecode.LOAD_CONST"() <{value = 12 : ui6}> : () -> !python.object
+    %v13 = "emitpybytecode.LOAD_CONST"() <{value = 13 : ui6}> : () -> !python.object
+    %v14 = "emitpybytecode.LOAD_CONST"() <{value = 14 : ui6}> : () -> !python.object
+    %v15 = "emitpybytecode.LOAD_CONST"() <{value = 15 : ui6}> : () -> !python.object
+    %v16 = "emitpybytecode.LOAD_CONST"() <{value = 16 : ui6}> : () -> !python.object
+    %v17 = "emitpybytecode.LOAD_CONST"() <{value = 17 : ui6}> : () -> !python.object
+    %v18 = "emitpybytecode.LOAD_CONST"() <{value = 18 : ui6}> : () -> !python.object
+    %v19 = "emitpybytecode.LOAD_CONST"() <{value = 19 : ui6}> : () -> !python.object
+    %v20 = "emitpybytecode.LOAD_CONST"() <{value = 20 : ui6}> : () -> !python.object
+    %v21 = "emitpybytecode.LOAD_CONST"() <{value = 21 : ui6}> : () -> !python.object
+    %v22 = "emitpybytecode.LOAD_CONST"() <{value = 22 : ui6}> : () -> !python.object
+    %v23 = "emitpybytecode.LOAD_CONST"() <{value = 23 : ui6}> : () -> !python.object
+    %v24 = "emitpybytecode.LOAD_CONST"() <{value = 24 : ui6}> : () -> !python.object
+    %v25 = "emitpybytecode.LOAD_CONST"() <{value = 25 : ui6}> : () -> !python.object
+    %v26 = "emitpybytecode.LOAD_CONST"() <{value = 26 : ui6}> : () -> !python.object
+    %v27 = "emitpybytecode.LOAD_CONST"() <{value = 27 : ui6}> : () -> !python.object
+    %v28 = "emitpybytecode.LOAD_CONST"() <{value = 28 : ui6}> : () -> !python.object
+    %v29 = "emitpybytecode.LOAD_CONST"() <{value = 29 : ui6}> : () -> !python.object
+    %v30 = "emitpybytecode.LOAD_CONST"() <{value = 30 : ui6}> : () -> !python.object
+    %v31 = "emitpybytecode.LOAD_CONST"() <{value = 31 : ui6}> : () -> !python.object
+    // Reduction chain: consume all %vi in a left-fold, each step frees two values and
+    // produces one. By the end all short-lived values are gone.
+    %r0  = "emitpybytecode.BINARY_OP"(%v0,  %v1)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r1  = "emitpybytecode.BINARY_OP"(%r0,  %v2)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r2  = "emitpybytecode.BINARY_OP"(%r1,  %v3)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r3  = "emitpybytecode.BINARY_OP"(%r2,  %v4)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r4  = "emitpybytecode.BINARY_OP"(%r3,  %v5)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r5  = "emitpybytecode.BINARY_OP"(%r4,  %v6)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r6  = "emitpybytecode.BINARY_OP"(%r5,  %v7)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r7  = "emitpybytecode.BINARY_OP"(%r6,  %v8)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r8  = "emitpybytecode.BINARY_OP"(%r7,  %v9)  <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r9  = "emitpybytecode.BINARY_OP"(%r8,  %v10) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r10 = "emitpybytecode.BINARY_OP"(%r9,  %v11) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r11 = "emitpybytecode.BINARY_OP"(%r10, %v12) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r12 = "emitpybytecode.BINARY_OP"(%r11, %v13) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r13 = "emitpybytecode.BINARY_OP"(%r12, %v14) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r14 = "emitpybytecode.BINARY_OP"(%r13, %v15) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r15 = "emitpybytecode.BINARY_OP"(%r14, %v16) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r16 = "emitpybytecode.BINARY_OP"(%r15, %v17) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r17 = "emitpybytecode.BINARY_OP"(%r16, %v18) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r18 = "emitpybytecode.BINARY_OP"(%r17, %v19) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r19 = "emitpybytecode.BINARY_OP"(%r18, %v20) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r20 = "emitpybytecode.BINARY_OP"(%r19, %v21) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r21 = "emitpybytecode.BINARY_OP"(%r20, %v22) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r22 = "emitpybytecode.BINARY_OP"(%r21, %v23) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r23 = "emitpybytecode.BINARY_OP"(%r22, %v24) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r24 = "emitpybytecode.BINARY_OP"(%r23, %v25) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r25 = "emitpybytecode.BINARY_OP"(%r24, %v26) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r26 = "emitpybytecode.BINARY_OP"(%r25, %v27) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r27 = "emitpybytecode.BINARY_OP"(%r26, %v28) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r28 = "emitpybytecode.BINARY_OP"(%r27, %v29) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r29 = "emitpybytecode.BINARY_OP"(%r28, %v30) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    %r30 = "emitpybytecode.BINARY_OP"(%r29, %v31) <{operation_type = 0 : ui8}> : (!python.object, !python.object) -> !python.object
+    // Now only %x (reloaded from spill slot) and %r30 are live — well within 32 regs
+    %result = "emitpybytecode.CALL"(%x, %r30) : (!python.object, !python.object) -> !python.object
+    return %result : !python.object
+  }
+}
+)";
+
+TEST(SpillTest, SpillingHandlesTransientRegisterPressureAbove32)
+{
+	mlir::MLIRContext ctx;
+	ctx.getOrLoadDialect<mlir::func::FuncDialect>();
+	ctx.getOrLoadDialect<mlir::cf::ControlFlowDialect>();
+	ctx.getOrLoadDialect<mlir::emitpybytecode::EmitPythonBytecodeDialect>();
+	ctx.getOrLoadDialect<mlir::py::PythonDialect>();
+
+	auto module = mlir::parseSourceString<mlir::ModuleOp>(SPILL_PRESSURE_MLIR, &ctx);
+	ASSERT_TRUE(module) << "Failed to parse spill-pressure MLIR IR";
+
+	auto funcs = module->getOps<mlir::func::FuncOp>();
+	ASSERT_FALSE(funcs.empty());
+	auto func = *funcs.begin();
+
+	mlir::OpBuilder builder(module->getContext());
+	LinearScanRegisterAllocation regalloc;
+
+	// Must not crash — spilling must handle the transient pressure
+	ASSERT_NO_THROW(regalloc.analyse(func, builder));
+
+	// After the final pass every value must map to a Reg (StackLocation is only transient)
+	EXPECT_FALSE(regalloc.value2mem_map.empty());
+	for (const auto &[value, location] : regalloc.value2mem_map) {
+		EXPECT_TRUE(std::holds_alternative<LinearScanRegisterAllocation::Reg>(location))
+			<< "After the final allocation pass every value must map to a Reg, not StackLocation";
+	}
+
+	// Verify that at least one __spill_ slot was actually created
+	auto locals_attr = func->getAttr("locals");
+	ASSERT_TRUE(locals_attr) << "Function must have a 'locals' attribute after spilling";
+	auto locals = mlir::cast<mlir::ArrayAttr>(locals_attr);
+	bool found_spill_slot = false;
+	for (auto attr : locals) {
+		if (mlir::cast<mlir::StringAttr>(attr).getValue().starts_with("__spill_")) {
+			found_spill_slot = true;
+			break;
+		}
+	}
+	EXPECT_TRUE(found_spill_slot) << "At least one __spill_N slot must have been created";
+}
+
+/**
+ * Unit test for LiveInterval::alive_at() precision.
+ *
+ * Verifies that alive_at() correctly uses sub-interval membership rather than a
+ * conservative full-span check. A value with intervals [2,5) and [8,11) must be
+ * reported as dead during the gap [5,8).
+ */
+TEST(LiveIntervalTest, AliveAtUsesSubIntervalMembershipNotConservativeSpan)
+{
+	codegen::LiveIntervalAnalysis::LiveInterval interval;
+	// Add two non-contiguous sub-intervals: [2,5) and [8,11)
+	interval.intervals = { { 2, 5 }, { 8, 11 } };
+	// Dummy value — not used by alive_at()
+	interval.value = mlir::Value{};
+
+	// Inside first sub-interval
+	EXPECT_TRUE(interval.alive_at(2));
+	EXPECT_TRUE(interval.alive_at(3));
+	EXPECT_TRUE(interval.alive_at(4));
+
+	// In the gap between sub-intervals — must be false (not conservative span)
+	EXPECT_FALSE(interval.alive_at(5));
+	EXPECT_FALSE(interval.alive_at(6));
+	EXPECT_FALSE(interval.alive_at(7));
+
+	// Inside second sub-interval
+	EXPECT_TRUE(interval.alive_at(8));
+	EXPECT_TRUE(interval.alive_at(9));
+	EXPECT_TRUE(interval.alive_at(10));
+
+	// Beyond the end
+	EXPECT_FALSE(interval.alive_at(11));
+	EXPECT_FALSE(interval.alive_at(100));
+}
+
+/**
+ * Test that GET_ITER live intervals are collapsed to a single contiguous span
+ * by extend_iterator_liveness().
+ *
+ * Parses the FOR_ITER bug IR (which has a loop), runs live interval analysis,
+ * and verifies the GET_ITER value has exactly one sub-interval.
+ */
+TEST_F(RegisterAllocationTest, GetIterIntervalIsContiguousAfterLivenessExtension)
+{
+	auto module = parseForIterBugIR();
+	ASSERT_TRUE(module);
+
+	auto funcs = module->getOps<mlir::func::FuncOp>();
+	ASSERT_FALSE(funcs.empty());
+	auto func = *funcs.begin();
+
+	// Run only live interval analysis (not full register allocation)
+	codegen::LiveIntervalAnalysis live_analysis;
+	live_analysis.analyse(func);
+
+	// Find the GET_ITER interval
+	const codegen::LiveIntervalAnalysis::LiveInterval *get_iter_interval = nullptr;
+	for (const auto &interval : live_analysis.sorted_live_intervals) {
+		if (!std::holds_alternative<mlir::Value>(interval.value)) { continue; }
+		auto val = std::get<mlir::Value>(interval.value);
+		if (val.getDefiningOp()
+			&& mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp())) {
+			get_iter_interval = &interval;
+			break;
+		}
+	}
+
+	ASSERT_NE(get_iter_interval, nullptr) << "GET_ITER interval not found";
+
+	// After extend_iterator_liveness(), the GET_ITER must have exactly one sub-interval
+	EXPECT_EQ(get_iter_interval->intervals.size(), 1u)
+		<< "GET_ITER interval must be collapsed to a single contiguous span; "
+		<< "found " << get_iter_interval->intervals.size() << " sub-intervals";
+
+	// And it must be alive throughout the entire loop span
+	const size_t start = get_iter_interval->start();
+	const size_t end = get_iter_interval->end();
+	for (size_t t = start; t < end; ++t) {
+		EXPECT_TRUE(get_iter_interval->alive_at(t))
+			<< "GET_ITER must be alive at every timestep in [" << start << ", " << end
+			<< ") but alive_at(" << t << ") returned false";
+	}
 }
 
 }// namespace

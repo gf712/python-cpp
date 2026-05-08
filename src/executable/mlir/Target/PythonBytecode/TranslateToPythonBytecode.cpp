@@ -78,6 +78,7 @@
 #include "executable/bytecode/instructions/YieldFrom.hpp"
 #include "executable/bytecode/instructions/YieldLoad.hpp"
 #include "executable/bytecode/instructions/YieldValue.hpp"
+#include "executable/mlir/Target/PythonBytecode/LinearScanRegisterAllocation.hpp"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -94,688 +95,16 @@
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
 #include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include <algorithm>
 #include <map>
 #include <optional>
 #include <ranges>
-#include <set>
 
 using namespace mlir;
 
 namespace codegen {
-
-namespace {
-	bool is_function_call(mlir::Value value)
-	{
-		return mlir::isa<mlir::emitpybytecode::FunctionCallOp>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::FunctionCallExOp>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::FunctionCallWithKeywordsOp>(
-				   value.getDefiningOp());
-	}
-
-	bool clobbers_r0(mlir::Value value)
-	{
-		return is_function_call(value)
-			   || mlir::isa<mlir::emitpybytecode::WithExceptStart>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::Yield>(value.getDefiningOp())
-			   || mlir::isa<mlir::emitpybytecode::YieldFrom>(value.getDefiningOp());
-	}
-
-	std::vector<mlir::Block *> sortBlocks(mlir::Region &region)
-	{
-		auto result = mlir::getBlocksSortedByDominance(region);
-		return { result.begin(), result.end() };
-	}
-}// namespace
-
-using ForwardedOutput = std::pair<mlir::Operation *, size_t>;
-
-template<typename ValueT>
-using ValueMapping = std::map<std::variant<mlir::Value, ForwardedOutput>,
-	ValueT,
-	decltype([](const std::variant<mlir::Value, ForwardedOutput> &lhs,
-				 const std::variant<mlir::Value, ForwardedOutput> &rhs) {
-		if (rhs.valueless_by_exception()) {
-			return false;
-		} else if (lhs.valueless_by_exception()) {
-			return true;
-		} else if (lhs.index() < rhs.index()) {
-			return true;
-		} else if (lhs.index() > rhs.index()) {
-			return false;
-		}
-		if (std::holds_alternative<mlir::Value>(lhs)) {
-			return std::get<mlir::Value>(lhs).getImpl() < std::get<mlir::Value>(rhs).getImpl();
-		}
-		return std::get<ForwardedOutput>(lhs) < std::get<ForwardedOutput>(rhs);
-	})>;
-
-struct LiveAnalysis
-{
-	using BlockArgumentInputs =
-		std::tuple<mlir::BlockArgument, std::vector<std::variant<mlir::Value, ForwardedOutput>>>;
-	using AliveAtTimestepT =
-		std::vector<std::variant<mlir::Value, ForwardedOutput, BlockArgumentInputs>>;
-	std::vector<AliveAtTimestepT> alive_at_timestep;
-
-	ValueMapping<std::set<mlir::BlockArgument,
-		decltype([](const mlir::BlockArgument &lhs, const mlir::BlockArgument &rhs) {
-			return static_cast<mlir::Value>(lhs).getImpl()
-				   < static_cast<mlir::Value>(rhs).getImpl();
-		})>>
-		block_input_mappings;
-
-	void analyse(mlir::func::FuncOp &fn)
-	{
-		auto &region = fn.getRegion();
-
-		auto sorted_blocks = sortBlocks(region);
-
-		auto add_value = [](AliveAtTimestepT::value_type value, AliveAtTimestepT &alive) {
-			auto it = std::find_if(alive.begin(), alive.end(), [&value](const auto &el) {
-				ASSERT(std::holds_alternative<Value>(el)
-					   || std::holds_alternative<ForwardedOutput>(el));
-				return el == value;
-			});
-			if (it == alive.end()) { alive.push_back(std::move(value)); }
-		};
-
-		AsmState state{ fn.getOperation() };
-		std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>, mlir::BlockArgument>>
-			block_parameters_to_args;
-		std::map<Block *, std::pair<size_t, size_t>> blocks_span;
-		for (auto *block : sorted_blocks) {
-			const auto start = alive_at_timestep.size();
-			if (!sortTopologically(block)) { std::abort(); }
-			// block->print(llvm::outs(), state);
-			// llvm::outs() << '\n';
-			for (auto &op : block->getOperations()) {
-				auto &alive = alive_at_timestep.emplace_back();
-				// ASSERT(op.getOpResults().size() <= 1);
-				for (const auto &result : op.getResults()) { add_value(result, alive); }
-				for (const auto &operand : op.getOperands()) { add_value(operand, alive); }
-				// if (!op.getResults().empty()) {
-				// 	llvm::outs() << "@" << (void *)Value{ op.getResults().back() }.getImpl()
-				// 				 << ": ";
-				// 	op.print(llvm::outs(), state);
-				// 	llvm::outs() << '\n';
-				// }
-			}
-			if (block->getTerminator()) {
-				if (auto branch =
-						dyn_cast<mlir::emitpybytecode::JumpIfFalse>(block->getTerminator())) {
-					auto *true_block = branch.getTrueDest();
-					ASSERT(
-						branch.getTrueDestOperands().size() == true_block->getArguments().size());
-					for (const auto &[p, arg] :
-						llvm::zip(branch.getTrueDestOperands(), true_block->getArguments())) {
-						block_parameters_to_args.emplace_back(p, arg);
-					}
-					auto *false_block = branch.getFalseDest();
-					ASSERT(
-						branch.getFalseDestOperands().size() == false_block->getArguments().size());
-					for (const auto &[p, arg] :
-						llvm::zip(branch.getFalseDestOperands(), false_block->getArguments())) {
-						block_parameters_to_args.emplace_back(p, arg);
-					}
-				} else if (auto branch = dyn_cast<mlir::cf::BranchOp>(block->getTerminator())) {
-					auto *jmp_block = branch.getDest();
-					ASSERT(branch.getDestOperands().size() == jmp_block->getArguments().size());
-					for (const auto &[p, arg] :
-						llvm::zip(branch.getDestOperands(), jmp_block->getArguments())) {
-						block_parameters_to_args.emplace_back(p, arg);
-					}
-				} else if (auto for_iter =
-							   dyn_cast<mlir::emitpybytecode::ForIter>(block->getTerminator())) {
-					ASSERT(for_iter.getBody()->getArguments().size() == 1);
-					ASSERT(for_iter.getSuccessorOperands(0).getProducedOperandCount() == 1);
-					block_parameters_to_args.emplace_back(
-						ForwardedOutput{ for_iter, 0 }, for_iter.getBody()->getArgument(0));
-					// start the lifetime of the for_iter returned value
-					auto &alive = alive_at_timestep.back();
-					add_value(ForwardedOutput{ for_iter, 0 }, alive);
-				}
-			}
-			blocks_span.emplace(block, std::pair{ start, alive_at_timestep.size() });
-		}
-
-		for (const auto &[param, arg] : block_parameters_to_args) {
-			auto *bb = arg.getOwner();
-			const auto [start, end] = blocks_span.at(bb);
-			auto block_timesteps =
-				std::span{ alive_at_timestep.begin() + start, alive_at_timestep.begin() + end };
-			for (auto &ts : block_timesteps) {
-				for (auto &val : ts) {
-					if (std::holds_alternative<mlir::Value>(val)
-						&& std::get<mlir::Value>(val).isa<BlockArgument>()
-						&& std::get<mlir::Value>(val).cast<BlockArgument>() == arg) {
-						val = BlockArgumentInputs{ arg, { param } };
-						block_input_mappings[param].insert(arg);
-					} else if (std::holds_alternative<BlockArgumentInputs>(val)
-							   && std::get<0>(std::get<BlockArgumentInputs>(val)) == arg) {
-						std::get<1>(std::get<BlockArgumentInputs>(val)).push_back(param);
-						block_input_mappings[param].insert(arg);
-					}
-				}
-			}
-		}
-
-		// auto printv = [](Value v) {
-		// 	llvm::outs() << v.getImpl() << '[';
-		// 	v.print(llvm::outs());
-		// 	llvm::outs() << "]";
-		// };
-		// auto printo = [](ForwardedOutput o) {
-		// 	llvm::outs() << static_cast<void *>(o.first) << '[';
-		// 	o.first->print(llvm::outs());
-		// 	llvm::outs() << ", " << o.second << "]";
-		// };
-
-		// for (size_t idx = 0; const auto &values : alive_at_timestep) {
-		// 	llvm::outs() << idx++ << ": ";
-		// 	for (auto value : values) {
-		// 		std::visit(
-		// 			overloaded{
-		// 				printv,
-		// 				printo,
-		// 				[printv, printo](const BlockArgumentInputs &b) {
-		// 					llvm::outs() << static_cast<Value>(std::get<0>(b)).getImpl() << '{';
-		// 					for (const auto &v : std::get<1>(b)) {
-		// 						std::visit(overloaded{ printv, printo }, v);
-		// 						llvm::outs() << ", ";
-		// 					}
-		// 					llvm::outs() << "}";
-		// 				},
-		// 			},
-		// 			value);
-		// 		llvm::outs() << ", ";
-		// 	}
-		// 	llvm::outs() << '\n';
-		// }
-
-		// for (const auto &[k, v] : block_input_mappings) {
-		// 	std::visit(overloaded{ printv, printo }, k);
-		// 	llvm::outs() << ": ";
-		// 	for (const auto &el : v) {
-		// 		printv(el);
-		// 		llvm::outs() << ", ";
-		// 	}
-		// 	llvm::outs() << '\n';
-		// }
-
-		for (auto &values : alive_at_timestep | std::ranges::views::reverse) {
-			for (auto &value : values | std::ranges::views::reverse) {
-				auto original_value = value;
-				if (std::holds_alternative<BlockArgumentInputs>(value)) {
-					value = std::get<0>(std::get<BlockArgumentInputs>(value));
-				}
-				auto start =
-					std::visit(overloaded{
-								   [this](const auto &v) { return block_input_mappings.find(v); },
-								   [this](const BlockArgumentInputs &) {
-									   TODO();
-									   return block_input_mappings.end();
-								   },
-							   },
-						value);
-				// std::stack<
-				auto it = start;
-				while (it != block_input_mappings.end()) {
-					ASSERT(it->second.size() == 1);
-					value = *it->second.begin();
-					start->second.erase(start->second.begin());
-					start->second.insert(mlir::cast<mlir::BlockArgument>(std::get<Value>(value)));
-					it = block_input_mappings.find(std::get<Value>(value));
-				}
-			}
-		}
-
-		// 	for (size_t idx = 0; const auto &values : alive_at_timestep) {
-		// 		llvm::outs() << idx++ << ": ";
-		// 		for (auto value : values) {
-		// 			std::visit(
-		// 				overloaded{
-		// 					printv,
-		// 					printo,
-		// 					[printv, printo](const BlockArgumentInputs &b) {
-		// 						llvm::outs() << static_cast<Value>(std::get<0>(b)).getImpl() << '{';
-		// 						for (const auto &v : std::get<1>(b)) {
-		// 							std::visit(overloaded{ printv, printo }, v);
-		// 							llvm::outs() << ", ";
-		// 						}
-		// 						llvm::outs() << "}";
-		// 					},
-		// 				},
-		// 				value);
-		// 			llvm::outs() << ", ";
-		// 		}
-		// 		llvm::outs() << '\n';
-		// 	}
-		// llvm::outs().flush();
-	}
-};
-
-struct LiveIntervalAnalysis
-{
-	struct LiveInterval
-	{
-		// start, end
-		using Interval = std::tuple<size_t, size_t>;
-		std::vector<Interval> intervals;
-		std::variant<mlir::Value, ForwardedOutput> value;
-
-		size_t start() const { return std::get<0>(intervals.front()); }
-
-		size_t end() const { return std::get<1>(intervals.back()); }
-
-		bool alive_at(size_t pos) const
-		{
-			// FIXME: the commented code is correct, but currently there is no logic
-			//        to populate a register when an interval goes from inactive to active
-			//        ie. the register is potentially clobbered
-			// return std::find_if(intervals.begin(),
-			// 		   intervals.end(),
-			// 		   [pos](const Interval &interval) {
-			// 			   auto [start, end] = interval;
-			// 			   return pos >= start && pos < end;
-			// 		   })
-			// 	   != intervals.end();
-			return pos >= start() && pos < end();
-		}
-
-		bool overlaps(const LiveInterval &other) const
-		{
-			// naive quadratic search
-			for (const auto &[a, b] : intervals) {
-				for (const auto &[c, d] : other.intervals) {
-					if (a < d && c < b) { return true; }
-				}
-			}
-
-			return false;
-		}
-	};
-
-	std::vector<LiveInterval> sorted_live_intervals;
-	ValueMapping<std::vector<std::variant<mlir::Value, ForwardedOutput>>> block_input_mappings;
-
-	void analyse(mlir::func::FuncOp &func)
-	{
-		LiveAnalysis live_analysis{};
-		live_analysis.analyse(func);
-		for (auto [key, value] : live_analysis.block_input_mappings) {
-			for (const auto &el : value) { block_input_mappings[el].push_back(key); }
-		}
-
-		// auto printv = [](Value v) {
-		// 	llvm::outs() << v.getImpl() << '[';
-		// 	v.print(llvm::outs());
-		// 	llvm::outs() << "]";
-		// };
-		// auto printo = [](ForwardedOutput o) {
-		// 	llvm::outs() << static_cast<void *>(o.first) << '[';
-		// 	o.first->print(llvm::outs());
-		// 	llvm::outs() << ", " << o.second << "]";
-		// };
-
-		// for (const auto &[k, v] : block_input_mappings) {
-		// 	std::visit(overloaded{ printv, printo }, k);
-		// 	llvm::outs() << ": {";
-		// 	for (const auto &el : v) {
-		// 		std::visit(overloaded{ printv, printo }, el);
-		// 		llvm::outs() << ", ";
-		// 	}
-		// 	llvm::outs() << "}\n";
-		// }
-
-		std::vector<LiveInterval> unsorted_live_intervals;
-		auto update_interval =
-			[this, &unsorted_live_intervals](
-				const std::variant<Value, ForwardedOutput, LiveAnalysis::BlockArgumentInputs>
-					&inputs,
-				size_t current) {
-				std::vector<std::variant<mlir::Value, ForwardedOutput>>
-					compute_live_interval_values;
-				if (std::holds_alternative<Value>(inputs)) {
-					compute_live_interval_values.push_back(std::get<Value>(inputs));
-				} else if (std::holds_alternative<ForwardedOutput>(inputs)) {
-					compute_live_interval_values.push_back(std::get<ForwardedOutput>(inputs));
-				} else {
-					compute_live_interval_values.insert(compute_live_interval_values.end(),
-						std::get<1>(std::get<LiveAnalysis::BlockArgumentInputs>(inputs)).begin(),
-						std::get<1>(std::get<LiveAnalysis::BlockArgumentInputs>(inputs)).end());
-				}
-
-				for (auto value : compute_live_interval_values) {
-					if (auto it = std::find_if(unsorted_live_intervals.begin(),
-							unsorted_live_intervals.end(),
-							[&value](const auto &el) { return el.value == value; });
-						it == unsorted_live_intervals.end()) {
-						unsorted_live_intervals.emplace_back(
-							std::vector{ std::make_tuple(current, current + 1) }, value);
-					} else {
-						auto &intervals = it->intervals;
-						const size_t end = std::get<1>(intervals.back());
-						if (current == end) {
-							std::get<1>(intervals.back())++;
-						} else {
-							intervals.emplace_back(current, current + 1);
-						}
-					}
-				}
-			};
-
-		for (size_t i = 0; const auto &vals : live_analysis.alive_at_timestep) {
-			for (const auto &val : vals) { update_interval(val, i); }
-			i++;
-		}
-
-		std::sort(unsorted_live_intervals.begin(),
-			unsorted_live_intervals.end(),
-			[](const LiveIntervalAnalysis::LiveInterval &lhs,
-				const LiveIntervalAnalysis::LiveInterval &rhs) {
-				return lhs.start() < rhs.start();
-			});
-		sorted_live_intervals = std::move(unsorted_live_intervals);
-
-		// for (const auto &live_interval : sorted_live_intervals) {
-		// 	auto [intervals, value] = live_interval;
-		// 	if (std::holds_alternative<mlir::Value>(value)) {
-		// 		llvm::outs() << "@"
-		// 					 << static_cast<const void *>(std::get<mlir::Value>(value).getImpl())
-		// 					 << " ";
-		// 	} else {
-		// 		llvm::outs() << "[@"
-		// 					 << static_cast<const void *>(std::get<ForwardedOutput>(value).first)
-		// 					 << ", " << std::get<ForwardedOutput>(value).second << "] ";
-		// 	}
-		// 	for (const auto &interval : intervals) {
-		// 		auto [start, end] = interval;
-		// 		llvm::outs() << fmt::format("[{}, {}[ ", start, end);
-		// 	}
-		// 	llvm::outs() << '\n';
-		// }
-	}
-};
-
-struct LinearScanRegisterAllocation
-{
-	struct Reg
-	{
-		size_t idx;
-	};
-	struct StackLocation
-	{
-		size_t idx;
-	};
-	using ValueLocation = std::variant<Reg, StackLocation>;
-	ValueMapping<ValueLocation> value2mem_map;
-
-	void analyse(mlir::func::FuncOp &func, mlir::OpBuilder builder)
-	{
-		LiveIntervalAnalysis live_interval_analysis;
-		live_interval_analysis.analyse(func);
-
-		auto unhandled = std::span(live_interval_analysis.sorted_live_intervals.begin(),
-			live_interval_analysis.sorted_live_intervals.end());
-		ASSERT(std::is_sorted(unhandled.begin(),
-			unhandled.end(),
-			[](const LiveIntervalAnalysis::LiveInterval &lhs,
-				const LiveIntervalAnalysis::LiveInterval &rhs) {
-				return lhs.start() < rhs.start();
-			}));
-
-		auto increasing_endpoint_cmp = [](const LiveIntervalAnalysis::LiveInterval &lhs,
-										   const LiveIntervalAnalysis::LiveInterval &rhs) {
-			return lhs.end() < rhs.end();
-		};
-
-		std::multiset<LiveIntervalAnalysis::LiveInterval, decltype(increasing_endpoint_cmp)> active;
-		std::multiset<LiveIntervalAnalysis::LiveInterval, decltype(increasing_endpoint_cmp)>
-			inactive;
-		std::multiset<LiveIntervalAnalysis::LiveInterval, decltype(increasing_endpoint_cmp)>
-			handled;
-
-		std::bitset<32> free;
-		free.set();
-
-		for (const auto &interval : unhandled) {
-			// the result of a function call is always in Reg{0}, so we start by claiming Reg{0} for
-			// the result of all call operations
-			if (std::holds_alternative<mlir::Value>(interval.value)
-				&& (std::get<mlir::Value>(interval.value).getDefiningOp()
-					&& clobbers_r0(std::get<mlir::Value>(interval.value)))) {
-				value2mem_map.insert_or_assign(
-					std::get<mlir::Value>(interval.value), Reg{ .idx = 0 });
-				inactive.insert(interval);
-			}
-
-			// account for block arguments that could be the result of a function call
-			if (auto it = live_interval_analysis.block_input_mappings.find(interval.value);
-				it != live_interval_analysis.block_input_mappings.end()) {
-				for (auto mapped_value : it->second) {
-					if (std::holds_alternative<ForwardedOutput>(mapped_value)) { continue; }
-					if ((std::get<mlir::Value>(mapped_value).getDefiningOp()
-							&& clobbers_r0(std::get<mlir::Value>(mapped_value)))) {
-						value2mem_map.insert_or_assign(interval.value, Reg{ .idx = 0 });
-						inactive.insert(interval);
-						break;
-					}
-				}
-			}
-		}
-
-		while (!unhandled.empty()) {
-			// llvm::outs() << "free: " << free << '\n';
-			const auto &cur = *unhandled.begin();
-			unhandled = unhandled.subspan(1, unhandled.size() - 1);
-
-			// const_cast<mlir::Value &>(cur.value).print(llvm::outs());
-			// llvm::outs() << '\n';
-
-			// check for active intervals that expired
-			for (auto it = active.begin(); it != active.end();) {
-				const auto &interval = *it;
-				ASSERT(interval.value != cur.value);
-				if (interval.end() < cur.start()) {
-					handled.insert(interval);
-					it = active.erase(it);
-					const auto reg = value2mem_map.at(interval.value);
-					ASSERT(std::holds_alternative<Reg>(reg));
-					free.set(std::get<Reg>(reg).idx, true);
-				} else if (!interval.alive_at(cur.start())) {
-					inactive.insert(interval);
-					it = active.erase(it);
-					const auto reg = value2mem_map.at(interval.value);
-					ASSERT(std::holds_alternative<Reg>(reg));
-					free.set(std::get<Reg>(reg).idx, true);
-				} else {
-					++it;
-				}
-			}
-			// check for inactive intervals that expired or become reactivated
-			for (auto it = inactive.begin(); it != inactive.end();) {
-				const auto &interval = *it;
-				if (interval.value == cur.value) {
-					ASSERT(
-						(std::holds_alternative<mlir::Value>(interval.value)
-							&& std::get<mlir::Value>(interval.value).getDefiningOp()
-							&& clobbers_r0(std::get<mlir::Value>(interval.value)))
-						|| (live_interval_analysis.block_input_mappings.contains(interval.value)
-							&& std::ranges::any_of(
-								live_interval_analysis.block_input_mappings.find(interval.value)
-									->second,
-								[](auto mapped_value) {
-									if (std::holds_alternative<mlir::Value>(mapped_value)) {
-										return std::get<mlir::Value>(mapped_value).getDefiningOp()
-											   && clobbers_r0(std::get<mlir::Value>(mapped_value));
-									}
-									return false;
-								})));
-					active.insert(interval);
-					it = inactive.erase(it);
-				} else if (interval.end() < cur.start()) {
-					handled.insert(interval);
-					it = inactive.erase(it);
-				} else if (interval.alive_at(cur.start())) {
-					active.insert(interval);
-					const auto reg = value2mem_map.at(interval.value);
-					ASSERT(std::holds_alternative<Reg>(reg));
-					ASSERT(free.test(std::get<Reg>(reg).idx));
-					free.set(std::get<Reg>(reg).idx, false);
-				} else {
-					++it;
-				}
-			}
-
-			auto f = free;
-			// collect available registers
-			auto overlaps =
-				std::views::filter([&cur](const auto &interval) { return interval.overlaps(cur); });
-			for (const auto &interval : inactive | overlaps) {
-				if (auto it = value2mem_map.find(interval.value); it != value2mem_map.end()) {
-					const auto reg = it->second;
-					ASSERT(std::holds_alternative<Reg>(reg));
-
-					// if it is still inactive it should be ok if this register is still being used
-					// we just don't want it to be used when the interval becomes active
-					f.set(std::get<Reg>(reg).idx, false);
-				}
-			}
-
-			for (const auto &interval : unhandled | overlaps) {
-				if (auto it = value2mem_map.find(interval.value); it != value2mem_map.end()) {
-					const auto reg = it->second;
-					ASSERT(std::holds_alternative<Reg>(reg));
-
-					// if it is unhandled it should be ok if this register is still being used
-					// we just don't want it to be used when the interval becomes active
-					f.set(std::get<Reg>(reg).idx, false);
-				}
-			}
-
-			if (f.none()) {
-				TODO();
-			} else {
-				std::optional<size_t> cur_reg;
-				if (auto it = value2mem_map.find(cur.value); it == value2mem_map.end()) {
-					for (size_t i = 0; i < f.size(); ++i) {
-						if (i == 0 && std::get<mlir::Value>(cur.value).getDefiningOp()
-							&& mlir::isa<mlir::emitpybytecode::GetIter>(
-								std::get<mlir::Value>(cur.value).getDefiningOp())) {
-							continue;
-						}
-						if (f.test(i)) {
-							value2mem_map.insert_or_assign(cur.value, Reg{ .idx = i });
-							cur_reg = i;
-							break;
-						}
-					}
-				} else {
-					ASSERT(std::holds_alternative<Reg>(it->second));
-					cur_reg = std::get<Reg>(it->second).idx;
-				}
-
-				ASSERT(cur_reg.has_value());
-				// const_cast<mlir::Value &>(cur.value).print(llvm::outs());
-				// llvm::outs() << '\n';
-				if (!free.test(*cur_reg)) {
-					std::optional<size_t> scratch_reg;
-					for (size_t i = 1; i < f.size(); ++i) {
-						if (f.test(i)) {
-							scratch_reg = i;
-							break;
-						}
-					}
-					ASSERT(scratch_reg.has_value());
-					if (std::holds_alternative<mlir::Value>(cur.value)) {
-						auto current_value = std::get<mlir::Value>(cur.value);
-						if (current_value.isa<mlir::BlockArgument>()) {
-							if (auto it =
-									live_interval_analysis.block_input_mappings.find(cur.value);
-								it != live_interval_analysis.block_input_mappings.end()) {
-								for (auto mapped_value : it->second) {
-									ASSERT(!std::holds_alternative<ForwardedOutput>(mapped_value));
-									if ((std::get<mlir::Value>(mapped_value).getDefiningOp()
-											&& clobbers_r0(std::get<mlir::Value>(mapped_value)))) {
-										ASSERT(current_value.isa<mlir::BlockArgument>());
-										current_value = std::get<mlir::Value>(mapped_value);
-										break;
-									}
-								}
-							}
-						}
-						ASSERT(!current_value.isa<mlir::BlockArgument>());
-						auto loc = current_value.getLoc();
-						builder.setInsertionPoint(current_value.getDefiningOp());
-						builder.create<mlir::emitpybytecode::Push>(loc, *cur_reg);
-						builder.setInsertionPointAfter(current_value.getDefiningOp());
-						builder.create<mlir::emitpybytecode::Move>(loc, *scratch_reg, *cur_reg);
-						builder.create<mlir::emitpybytecode::Pop>(loc, *cur_reg);
-						value2mem_map.insert_or_assign(
-							std::get<mlir::Value>(cur.value), Reg{ .idx = *scratch_reg });
-						free.set(*scratch_reg, false);
-					}
-				} else {
-					free.set(*cur_reg, false);
-				}
-				active.insert(cur);
-			}
-		}
-
-		decltype(value2mem_map) value2mem_map_additional;
-		for (auto [value, reg] : value2mem_map) {
-			if (auto it = live_interval_analysis.block_input_mappings.find(value);
-				it != live_interval_analysis.block_input_mappings.end()) {
-				for (auto mapped_value : it->second) {
-					value2mem_map_additional[mapped_value] = reg;
-				}
-			}
-		}
-		value2mem_map.merge(std::move(value2mem_map_additional));
-
-		{
-			// const auto end =
-			// std::max_element(live_interval_analysis.sorted_live_intervals.begin(),
-			// 	live_interval_analysis.sorted_live_intervals.end(),
-			// 	[](const auto &lhs, const auto &rhs) {
-			// 		return lhs.end() < rhs.end();
-			// 	})->end();
-
-			// std::vector<std::vector<void *>> values_by_timestep;
-			// for (size_t i = 0; i < end; ++i) {
-			// 	values_by_timestep.emplace_back(free.size(), nullptr);
-			// }
-
-			// for (const auto &interval : live_interval_analysis.sorted_live_intervals) {
-			// 	for (auto [start, end] : interval.intervals) {
-			// 		for (; start < end; ++start) {
-			// 			auto reg = value2mem_map[interval.value];
-			// 			if (std::holds_alternative<Reg>(reg)) {
-			// 				values_by_timestep[start][std::get<Reg>(reg).idx] =
-			// 					std::get<mlir::Value>(interval.value).getImpl();
-			// 			} else {
-			// 				TODO();
-			// 			}
-			// 		}
-			// 	}
-			// }
-
-			// for (size_t i = 0; const auto &ts : values_by_timestep) {
-			// 	llvm::outs() << i++ << ' ';
-			// 	for (auto *val : ts) { llvm::outs() << val << ' '; }
-			// 	llvm::outs() << '\n';
-			// }
-		}
-
-		// llvm::outs() << "Register allocator modified function:\n";
-		// func.print(llvm::outs());
-		// llvm::outs() << '\n';
-	}
-};
 
 struct PythonBytecodeEmitter
 {
@@ -1766,6 +1095,14 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::Functio
 	for (const auto &arg : op.getArgs()) { push(get_register(arg)); }
 	emit<FunctionCall>(get_register(op.getCallee()), arg_size, 0);
 	for (size_t i = 0; i < arg_size; ++i) { emit<Pop>(); }
+
+	// CALL operations always put their result in r0.
+	// If the register allocator assigned a different register, emit a MOVE.
+	const auto result_reg = get_register(op.getOutput());
+	if (result_reg != 0) {
+		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+	}
+
 	return success();
 }
 
@@ -1792,6 +1129,14 @@ LogicalResult PythonBytecodeEmitter::emitOperation(
 		std::move(arg_registers),
 		std::move(kwarg_registers),
 		std::move(keywords_registers));
+
+	// CALL operations always put their result in r0.
+	// If the register allocator assigned a different register, emit a MOVE.
+	const auto result_reg = get_register(op.getOutput());
+	if (result_reg != 0) {
+		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+	}
+
 	return success();
 }
 
@@ -1803,6 +1148,14 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::Functio
 		op.getKwargs() ? get_register(op.getKwargs()) : Register{ 0 },
 		op.getArgs() != nullptr,
 		op.getKwargs() != nullptr);
+
+	// CALL operations always put their result in r0.
+	// If the register allocator assigned a different register, emit a MOVE.
+	const auto result_reg = get_register(op.getOutput());
+	if (result_reg != 0) {
+		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+	}
+
 	return success();
 }
 
@@ -2060,7 +1413,7 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 			.metadata =
 				FunctionMetaData{
 					.function_name = "__main__",
-					.register_count = 32,
+					.register_count = codegen::kNumRegisters,
 					.stack_size = emitter.m_module.m_stack_size,
 					.names = std::move(emitter.m_module.m_names),
 					.consts = std::move(emitter.m_module.m_consts),
@@ -2075,7 +1428,7 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 			.metadata =
 				FunctionMetaData{
 					.function_name = name,
-					.register_count = 32,
+					.register_count = codegen::kNumRegisters,
 					.stack_size = stack_size,
 					.cellvars = std::move(fn.m_cellvars),
 					.varnames = std::move(fn.m_varnames),

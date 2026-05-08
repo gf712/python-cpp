@@ -1,7 +1,10 @@
 #include "ListToTuple.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
 #include "vm/VM.hpp"
+
+#include <iostream>
 
 using namespace py;
 
@@ -12,6 +15,14 @@ PyResult<Value> ListToTuple::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(std::holds_alternative<PyObject *>(list));
 
 	auto *pylist = std::get<PyObject *>(list);
+	if (!as<PyList>(pylist)) {
+		std::cout << to_string() << std::endl;
+		if (!pylist) {
+			std::cout << "(null)" << std::endl;
+		} else {
+			std::cout << pylist->str().unwrap()->to_string() << std::endl;
+		}
+	}
 	ASSERT(as<PyList>(pylist));
 
 	auto result = PyTuple::create(as<PyList>(pylist)->elements());

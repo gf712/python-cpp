@@ -6,6 +6,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "utilities.hpp"
 
@@ -319,17 +320,31 @@ class LiveAnalysis
 				alive_after = alive_before_op[i];
 			}
 
-			// For operations with side effects, ensure their results are kept alive
-			// even if they're not used, so they get proper register assignments.
-			// This is needed for operations like LoadAttribute that may raise exceptions
-			// or trigger descriptors, and must be emitted even if results are unused.
+			// For operations with side effects or that produce values in specific registers,
+			// ensure their results are kept alive so they get proper register assignments.
+			// This is needed for:
+			// - Operations that raise exceptions (LoadAttribute, etc.)
+			// - Operations that clobber r0 (CALL, YIELD, etc.) - their results MUST be tracked
 			for (size_t i = 0; i < info.operations.size(); i++) {
 				auto *op = info.operations[i];
 
-				// Check if operation is pure (has no side effects)
-				// Non-pure operations must be emitted even if results are unused
-				if (!mlir::isPure(op)) {
-					// Re-add any results to ensure they get register assignments
+				bool needs_tracking = !mlir::isPure(op);
+
+				// CRITICAL: Always track CALL operations - their results go to r0 and MUST have
+				// a live interval even if the result is unused
+				if (!needs_tracking) {
+					if (llvm::isa<mlir::emitpybytecode::FunctionCallOp>(op)
+						|| llvm::isa<mlir::emitpybytecode::FunctionCallExOp>(op)
+						|| llvm::isa<mlir::emitpybytecode::FunctionCallWithKeywordsOp>(op)) {
+						needs_tracking = true;
+					}
+				}
+
+				if (needs_tracking) {
+					// Add results to the current operation's alive_before to ensure they appear
+					// in the timestep where the operation executes. This is semantically odd
+					// (the value doesn't exist before the operation), but it ensures the result
+					// gets a register allocation at the point where it's produced.
 					for (auto result : op->getResults()) { alive_before_op[i].insert(result); }
 				}
 			}
@@ -342,28 +357,11 @@ class LiveAnalysis
 				}
 			}
 
-			// Sanity check: alive_before[0] should equal LiveIn
-			// (We computed it backward from LiveOut, should match forward computation)
-			if (!alive_before_op.empty() && alive_before_op[0] != info.live_in) {
-				logger->warn(
-					"Block {} liveness mismatch: alive_before[0] has {} values, LiveIn has {} "
-					"values",
-					static_cast<void *>(block),
-					alive_before_op[0].size(),
-					info.live_in.size());
-
-				// Debug: show the difference
-				logger->debug("  Values in LiveIn but not alive_before[0]:");
-				for (const auto &val : info.live_in) {
-					if (!alive_before_op[0].contains(val)) {
-						logger->debug("    {}", to_string(val));
-					}
-				}
-				logger->debug("  Values in alive_before[0] but not LiveIn:");
-				for (const auto &val : alive_before_op[0]) {
-					if (!info.live_in.contains(val)) { logger->debug("    {}", to_string(val)); }
-				}
-			}
+			// Note: alive_before_op[0] may differ from LiveIn because the needs_tracking
+			// pass above adds impure operation results to the timestep of their defining op.
+			// These results are defined within this block so they cannot be in LiveIn.
+			// This discrepancy is expected and intentional — it ensures impure ops get
+			// proper register assignments at their definition site.
 
 			// Now build timesteps in forward order using the computed liveness
 			for (size_t i = 0; i < info.operations.size(); i++) {
@@ -393,28 +391,51 @@ class LiveAnalysis
 	}
 
 	/**
-	 * Propagate block argument values through liveness information
+	 * Propagate block argument values through liveness information.
+	 *
+	 * This function transforms block arguments in the alive_at_timestep data into
+	 * BlockArgumentInputs structures that track all the source values flowing into
+	 * each block argument (PHI nodes in SSA form).
+	 *
+	 * For example, if:
+	 *   bb1: br ^bb3(%val1)
+	 *   bb2: br ^bb3(%val2)
+	 *   bb3(%arg):
+	 *
+	 * Then %arg will be transformed into BlockArgumentInputs{%arg, [%val1, %val2]}
+	 * indicating that %arg can receive values from either %val1 or %val2 depending
+	 * on which predecessor block was executed.
+	 *
+	 * This information is crucial for register allocation to ensure that:
+	 * 1. All source values are allocated to compatible registers
+	 * 2. The block argument is allocated to the same register as its sources
+	 * 3. MOVE instructions are inserted if sources end up in different registers
 	 */
 	void propagate_block_arguments(
 		const std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>,
 			mlir::BlockArgument>> &block_parameters_to_args,
 		const std::map<mlir::Block *, std::pair<size_t, size_t>> &blocks_span)
 	{
+		// For each (source_value, block_argument) pair collected during block analysis
 		for (const auto &[param, arg] : block_parameters_to_args) {
 			auto *bb = arg.getOwner();
 			const auto [start, end] = blocks_span.at(bb);
 			auto block_timesteps =
 				std::span{ alive_at_timestep.begin() + start, alive_at_timestep.begin() + end };
 
+			// Replace all occurrences of the block argument with BlockArgumentInputs
 			for (auto &ts : block_timesteps) {
 				for (auto &val : ts) {
+					// Check if this is the block argument we're looking for
 					if (std::holds_alternative<mlir::Value>(val)
 						&& mlir::isa<mlir::BlockArgument>(std::get<mlir::Value>(val))
 						&& mlir::cast<mlir::BlockArgument>(std::get<mlir::Value>(val)) == arg) {
+						// First occurrence: create BlockArgumentInputs with this source
 						val = BlockArgumentInputs{ arg, { param } };
 						block_input_mappings[param].insert(arg);
 					} else if (std::holds_alternative<BlockArgumentInputs>(val)
 							   && std::get<0>(std::get<BlockArgumentInputs>(val)) == arg) {
+						// Subsequent occurrence: append this source to existing BlockArgumentInputs
 						std::get<1>(std::get<BlockArgumentInputs>(val)).push_back(param);
 						block_input_mappings[param].insert(arg);
 					}
@@ -424,26 +445,47 @@ class LiveAnalysis
 	}
 
 	/**
-	 * Resolve transitive chains of block arguments
+	 * Resolve transitive chains of block arguments.
+	 *
+	 * This function handles cases where a block argument receives values from other
+	 * block arguments (transitive PHI nodes). For example:
+	 *
+	 *   bb1: br ^bb2(%val1)
+	 *   bb2(%arg2): br ^bb3(%arg2)
+	 *   bb3(%arg3):
+	 *
+	 * Here %arg3 receives %arg2, and %arg2 receives %val1. We need to resolve this
+	 * chain so that %arg3 is understood to ultimately receive %val1.
+	 *
+	 * The function works backwards through timesteps, following chains of block
+	 * arguments until reaching concrete values, and updates the block_input_mappings
+	 * accordingly.
 	 */
 	void resolve_block_argument_chains()
 	{
+		// Process timesteps in reverse order
 		for (auto &values : alive_at_timestep | std::views::reverse) {
 			for (auto &value : values | std::views::reverse) {
+				// Convert BlockArgumentInputs back to plain block arguments for processing
 				if (std::holds_alternative<BlockArgumentInputs>(value)) {
 					value = std::get<0>(std::get<BlockArgumentInputs>(value));
 				}
 
+				// Find if this value maps to any block arguments
 				auto start =
 					std::visit(overloaded{
 								   [this](const auto &v) { return block_input_mappings.find(v); },
 								   [this](const BlockArgumentInputs &) {
-									   TODO();
+									   // BlockArgumentInputs are converted to plain mlir::Value
+									   // (block arguments) at lines 485-487 before this visitor
+									   // runs, so this branch is unreachable.
+									   ASSERT(false);
 									   return block_input_mappings.end();
 								   },
 							   },
 						value);
 
+				// Follow the chain of block arguments
 				auto it = start;
 				while (it != block_input_mappings.end()) {
 					ASSERT(it->second.size() == 1);

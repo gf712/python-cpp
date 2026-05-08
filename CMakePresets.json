@@ -20,6 +20,16 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CPM_SOURCE_CACHE": ".cache/CPM"
       }
+    },
+    {
+      "name": "release-with-debug-info",
+      "displayName": "Release with Debug Info",
+      "generator": "Ninja",
+      "binaryDir": "build/release-with-debug-info",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CPM_SOURCE_CACHE": ".cache/CPM"
+      }
     }
   ],
   "buildPresets": [
@@ -34,6 +44,12 @@
       "displayName": "Release Build",
       "configurePreset": "release",
       "configuration": "Release"
+    },
+    {
+      "name": "release-with-debug-info",
+      "displayName": "Release with Debug Info Build",
+      "configurePreset": "release-with-debug-info",
+      "configuration": "RelWithDebInfo"
     }
   ],
   "testPresets": [
@@ -46,6 +62,11 @@
       "name": "release",
       "displayName": "Test all in Release mode",
       "configurePreset": "release"
+    },
+    {
+      "name": "release-with-debug-info",
+      "displayName": "Test all in Release with Debug Info mode",
+      "configurePreset": "release-with-debug-info"
     }
   ]
 

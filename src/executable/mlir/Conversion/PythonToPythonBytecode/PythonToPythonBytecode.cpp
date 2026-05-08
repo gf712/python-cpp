@@ -425,26 +425,13 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				auto cond = (*op.getODSOperands(0).begin());
-				if (mlir::isa<mlir::py::CastToBoolOp>(cond.getDefiningOp())) {
-					auto bool_cast = mlir::cast<mlir::py::CastToBoolOp>(cond.getDefiningOp());
-					auto pycond = rewriter.replaceOpWithNewOp<mlir::emitpybytecode::CastToBool>(
-						bool_cast, bool_cast.getValue().getType(), bool_cast.getValue());
-					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
-						pycond.getValue(),
-						op.getTrueDest(),
-						op.getTrueDestOperands(),
-						op.getFalseDest(),
-						op.getFalseDestOperands());
-				} else {
-					ASSERT(mlir::isa<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp()));
-					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
-						mlir::cast<mlir::emitpybytecode::CastToBool>(cond.getDefiningOp())
-							.getValue(),
-						op.getTrueDest(),
-						op.getTrueDestOperands(),
-						op.getFalseDest(),
-						op.getFalseDestOperands());
-				}
+				ASSERT(cond.getDefiningOp());
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::JumpIfFalse>(op,
+					cond,
+					op.getTrueDest(),
+					op.getTrueDestOperands(),
+					op.getFalseDest(),
+					op.getFalseDestOperands());
 				return success();
 			}
 		};
@@ -748,10 +735,11 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				const auto &requires_expansion = op.getRequiresExpansion();
-				auto known_at_compiletime = [](mlir::Value element) -> bool {
-					ASSERT(element.getDefiningOp());
-					return mlir::isa<mlir::py::ConstantOp>(element.getDefiningOp())
-						   || mlir::isa<mlir::emitpybytecode::ConstantOp>(element.getDefiningOp());
+				auto known_at_compiletime = [op](mlir::Value element) -> bool {
+					return element.getDefiningOp()
+						   && (mlir::isa<mlir::py::ConstantOp>(element.getDefiningOp())
+							   || mlir::isa<mlir::emitpybytecode::ConstantOp>(
+								   element.getDefiningOp()));
 				};
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),

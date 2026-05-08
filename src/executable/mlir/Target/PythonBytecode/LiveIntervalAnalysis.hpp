@@ -5,6 +5,7 @@
 #include "RegisterAllocationTypes.hpp"
 
 #include <algorithm>
+#include <map>
 #include <tuple>
 #include <vector>
 
@@ -41,35 +42,31 @@ class LiveIntervalAnalysis
 		size_t end() const { return std::get<1>(intervals.back()); }
 
 		/**
-		 * Check if this interval is alive at the given position
+		 * Check if this interval is alive at the given position.
+		 * Uses precise sub-interval membership rather than a conservative span check.
+		 * GET_ITER intervals are collapsed to a single contiguous span by
+		 * extend_iterator_liveness() so they remain alive throughout the loop.
 		 */
 		bool alive_at(size_t pos) const
 		{
-			// FIXME: the commented code is correct, but currently there is no logic
-			//        to populate a register when an interval goes from inactive to active
-			//        (i.e., the register is potentially clobbered)
-			// return std::find_if(intervals.begin(),
-			// 		   intervals.end(),
-			// 		   [pos](const Interval &interval) {
-			// 			   auto [start, end] = interval;
-			// 			   return pos >= start && pos < end;
-			// 		   })
-			// 	   != intervals.end();
-
-			// Conservative approximation: check only the full span
-			return pos >= start() && pos < end();
+			return std::find_if(intervals.begin(),
+					   intervals.end(),
+					   [pos](const Interval &interval) {
+						   auto [start, end] = interval;
+						   return pos >= start && pos < end;
+					   })
+				   != intervals.end();
 		}
 
 		/**
-		 * Check if this interval overlaps with another
+		 * Check if this interval overlaps with another.
+		 * Intervals are half-open [start, end), so [a,b) and [c,d) overlap iff a < d && c < b.
 		 */
 		bool overlaps(const LiveInterval &other) const
 		{
-			// Naive quadratic search - could be optimized with interval tree
 			for (const auto &[start, end] : intervals) {
 				for (const auto &[other_start, other_end] : other.intervals) {
-					if (other_start >= start && other_start <= end) { return true; }
-					if (other_end >= start && other_end <= end) { return true; }
+					if (other_start < end && start < other_end) { return true; }
 				}
 			}
 			return false;
@@ -99,12 +96,15 @@ class LiveIntervalAnalysis
 			for (const auto &el : value) { block_input_mappings[el].push_back(key); }
 		}
 
-		// Build live intervals from liveness information
+		// Build live intervals from liveness information.
+		// An index map provides O(log n) lookup instead of O(n) linear scan per value.
 		std::vector<LiveInterval> unsorted_live_intervals;
+		std::map<std::variant<mlir::Value, ForwardedOutput>, size_t, ValueMappingComparator>
+			interval_index;
 
 		for (size_t timestep = 0; const auto &alive_values : live_analysis.alive_at_timestep) {
 			for (const auto &alive_value : alive_values) {
-				update_interval(alive_value, timestep, unsorted_live_intervals);
+				update_interval(alive_value, timestep, unsorted_live_intervals, interval_index);
 			}
 			timestep++;
 		}
@@ -118,28 +118,17 @@ class LiveIntervalAnalysis
 
 		sorted_live_intervals = std::move(unsorted_live_intervals);
 
+		// Collapse GET_ITER live intervals to contiguous spans.
+		// This ensures that iterator values stay permanently active throughout the loop,
+		// eliminating the need for inactive→active reload logic and simplifying the allocator.
+		extend_iterator_liveness();
+
 		logger->info(
 			"Live interval analysis complete. Found {} intervals", sorted_live_intervals.size());
 
-		// Log intervals at debug level (temporarily for debugging)
 		for (const auto &interval : sorted_live_intervals) {
-			// Log all intervals, especially GET_ITER
-			if (std::holds_alternative<mlir::Value>(interval.value)) {
-				auto val = std::get<mlir::Value>(interval.value);
-				if (val.getDefiningOp()
-					&& mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp())) {
-					logger->info("GET_ITER LiveInterval: start={}, end={}, {} sub-intervals",
-						interval.start(),
-						interval.end(),
-						interval.intervals.size());
-					for (size_t i = 0; i < interval.intervals.size(); ++i) {
-						auto [s, e] = interval.intervals[i];
-						logger->info("  Interval {}: [{}, {})", i, s, e);
-					}
-				}
-			}
 			logger->trace("LiveInterval for {}: start={}, end={}",
-				to_string(interval.value),
+				interval.value,
 				interval.start(),
 				interval.end());
 		}
@@ -147,13 +136,45 @@ class LiveIntervalAnalysis
 
   private:
 	/**
-	 * Update or create a live interval for the given value at the current timestep
+	 * Collapse GET_ITER live intervals to a single contiguous span.
+	 *
+	 * Backward dataflow may produce gaps in a GET_ITER value's live interval when loop
+	 * back-edges cause the iterator to appear as a separate sub-interval on each iteration.
+	 * With the now-precise alive_at() check, such gaps would allow the allocator to move
+	 * the iterator to inactive and potentially clobber its register.
+	 *
+	 * By collapsing [start, gap, end] → [start, end), the iterator remains permanently
+	 * active throughout the loop. This is semantically correct because the iterator MUST
+	 * survive for the entire duration of the FOR loop.
+	 */
+	void extend_iterator_liveness()
+	{
+		for (auto &interval : sorted_live_intervals) {
+			if (!std::holds_alternative<mlir::Value>(interval.value)) { continue; }
+			auto val = std::get<mlir::Value>(interval.value);
+			if (!val.getDefiningOp()) { continue; }
+			if (!mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp())) { continue; }
+
+			// Collapse all sub-intervals into one contiguous [start, end) span
+			const size_t first = interval.start();
+			const size_t last = interval.end();
+			interval.intervals.clear();
+			interval.intervals.emplace_back(first, last);
+		}
+	}
+
+	/**
+	 * Update or create a live interval for the given value at the current timestep.
+	 *
+	 * Uses an index map for O(log n) lookup rather than a linear scan over all intervals.
 	 */
 	void update_interval(
 		const std::variant<mlir::Value, ForwardedOutput, LiveAnalysis::BlockArgumentInputs>
 			&alive_value,
 		size_t timestep,
-		std::vector<LiveInterval> &intervals)
+		std::vector<LiveInterval> &intervals,
+		std::map<std::variant<mlir::Value, ForwardedOutput>, size_t, ValueMappingComparator>
+			&interval_index)
 	{
 		// Extract the actual values to track from alive_value
 		std::vector<std::variant<mlir::Value, ForwardedOutput>> values_to_track;
@@ -169,26 +190,26 @@ class LiveIntervalAnalysis
 			values_to_track.insert(values_to_track.end(), inputs.begin(), inputs.end());
 		}
 
-		// Update interval for each value
+		// Update interval for each value using the O(log n) index map
 		for (auto value : values_to_track) {
-			auto it = std::find_if(intervals.begin(),
-				intervals.end(),
-				[&value](const auto &interval) { return interval.value == value; });
+			auto idx_it = interval_index.find(value);
 
-			if (it == intervals.end()) {
-				// Create new interval
+			if (idx_it == interval_index.end()) {
+				// Create new interval and record its index
+				const size_t idx = intervals.size();
 				intervals.emplace_back(
 					std::vector{ std::make_tuple(timestep, timestep + 1) }, value);
+				interval_index.emplace(value, idx);
 			} else {
 				// Extend existing interval
-				auto &value_intervals = it->intervals;
+				auto &value_intervals = intervals[idx_it->second].intervals;
 				const size_t end = std::get<1>(value_intervals.back());
 
 				if (timestep == end) {
 					// Consecutive timestep: extend the current interval
 					std::get<1>(value_intervals.back())++;
 				} else {
-					// Gap detected: start a new interval
+					// Gap detected: start a new sub-interval
 					value_intervals.emplace_back(timestep, timestep + 1);
 				}
 			}

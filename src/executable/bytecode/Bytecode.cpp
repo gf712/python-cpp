@@ -132,7 +132,9 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		ASSERT((*vm.instruction_pointer()).get());
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;
-		spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
+		// spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
+		// std::cout << std::format("{} {}", (void *)instruction.get(), instruction->to_string())
+		// 		  << std::endl;
 		auto result = instruction->execute(vm, vm.interpreter());
 		// we left the current stack frame in the previous instruction
 		if (vm.stack().size() != stack_depth) {

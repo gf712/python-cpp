@@ -5,6 +5,7 @@
 #include "serialize.hpp"
 #include "utilities.hpp"
 
+#include <iostream>
 #include <span>
 #include <string>
 
