@@ -48,18 +48,18 @@ void add_name(mlir::OpBuilder &builder, mlir::StringRef name, mlir::Operation *f
 	if (fn->hasAttr("names")) {
 		auto names = fn->getAttr("names");
 		std::vector<mlir::StringRef> names_vec;
-		auto arr = names.cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 		if (std::find_if(arr.begin(),
 				arr.end(),
 				[name](mlir::Attribute attr) {
-					return attr.cast<mlir::StringAttr>().getValue() == name;
+					return mlir::cast<mlir::StringAttr>(attr).getValue() == name;
 				})
 			!= arr.end()) {
 			return;
 		}
 		std::transform(
 			arr.begin(), arr.end(), std::back_inserter(names_vec), [](mlir::Attribute attr) {
-				return attr.cast<mlir::StringAttr>().getValue();
+				return mlir::cast<mlir::StringAttr>(attr).getValue();
 			});
 		names_vec.emplace_back(name);
 		fn->setAttr("names", builder.getStrArrayAttr(names_vec));
@@ -75,18 +75,18 @@ void add_cell_variable(mlir::OpBuilder &builder, mlir::StringRef name, mlir::Ope
 	if (fn->hasAttr("cellvars")) {
 		auto names = fn->getAttr("cellvars");
 		std::vector<mlir::StringRef> names_vec;
-		auto arr = names.cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 		if (std::find_if(arr.begin(),
 				arr.end(),
 				[name](mlir::Attribute attr) {
-					return attr.cast<mlir::StringAttr>().getValue() == name;
+					return mlir::cast<mlir::StringAttr>(attr).getValue() == name;
 				})
 			!= arr.end()) {
 			return;
 		}
 		std::transform(
 			arr.begin(), arr.end(), std::back_inserter(names_vec), [](mlir::Attribute attr) {
-				return attr.cast<mlir::StringAttr>().getValue();
+				return mlir::cast<mlir::StringAttr>(attr).getValue();
 			});
 		names_vec.emplace_back(name);
 		fn->setAttr("cellvars", builder.getStrArrayAttr(names_vec));
@@ -102,18 +102,18 @@ void add_free_variable(mlir::OpBuilder &builder, mlir::StringRef name, mlir::Ope
 	if (fn->hasAttr("freevars")) {
 		auto names = fn->getAttr("freevars");
 		std::vector<mlir::StringRef> names_vec;
-		auto arr = names.cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 		if (std::find_if(arr.begin(),
 				arr.end(),
 				[name](mlir::Attribute attr) {
-					return attr.cast<mlir::StringAttr>().getValue() == name;
+					return mlir::cast<mlir::StringAttr>(attr).getValue() == name;
 				})
 			!= arr.end()) {
 			return;
 		}
 		std::transform(
 			arr.begin(), arr.end(), std::back_inserter(names_vec), [](mlir::Attribute attr) {
-				return attr.cast<mlir::StringAttr>().getValue();
+				return mlir::cast<mlir::StringAttr>(attr).getValue();
 			});
 		names_vec.emplace_back(name);
 		fn->setAttr("freevars", builder.getStrArrayAttr(names_vec));
@@ -390,9 +390,9 @@ void MLIRGenerator::store_name(std::string_view name,
 	case VariablesResolver::Visibility::CELL: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
-		auto arr = parent->getAttr("cellvars").cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(parent->getAttr("cellvars")).getValue();
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
-			return attr.cast<mlir::StringAttr>().getValue() == mlir::StringRef{ name };
+			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		m_context.builder().create<mlir::py::StoreDerefOp>(
 			loc(m_context.builder(), m_context.filename(), location),
@@ -403,9 +403,9 @@ void MLIRGenerator::store_name(std::string_view name,
 	case VariablesResolver::Visibility::FREE: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
-		auto arr = parent->getAttr("freevars").cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(parent->getAttr("freevars")).getValue();
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
-			return attr.cast<mlir::StringAttr>().getValue() == mlir::StringRef{ name };
+			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		m_context.builder().create<mlir::py::StoreDerefOp>(
 			loc(m_context.builder(), m_context.filename(), location),
@@ -473,9 +473,9 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 	case VariablesResolver::Visibility::CELL: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
-		auto arr = parent->getAttr("cellvars").cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(parent->getAttr("cellvars")).getValue();
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
-			return attr.cast<mlir::StringAttr>().getValue() == mlir::StringRef{ name };
+			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		return new_value(m_context.builder().create<mlir::py::LoadDerefOp>(
 			loc(m_context.builder(), m_context.filename(), location),
@@ -485,9 +485,9 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 	case VariablesResolver::Visibility::FREE: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
-		auto arr = parent->getAttr("freevars").cast<mlir::ArrayAttr>().getValue();
+		auto arr = mlir::cast<mlir::ArrayAttr>(parent->getAttr("freevars")).getValue();
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
-			return attr.cast<mlir::StringAttr>().getValue() == mlir::StringRef{ name };
+			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		return new_value(m_context.builder().create<mlir::py::LoadDerefOp>(
 			loc(m_context.builder(), m_context.filename(), location),

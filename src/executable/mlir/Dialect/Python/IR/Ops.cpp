@@ -19,6 +19,20 @@
 
 namespace mlir {
 namespace py {
+	namespace {
+		// MLIR 23 removed RegionBranchPoint::getRegionOrNull(). The new API exposes
+		// the terminator op via getTerminatorPredecessorOrNull(); the region is the
+		// terminator's parent region. Returns nullptr when the branch point is the
+		// parent op.
+		mlir::Region *predecessor_region(mlir::RegionBranchPoint point)
+		{
+			if (point.isParent()) { return nullptr; }
+			auto term = point.getTerminatorPredecessorOrNull();
+			if (!term) { return nullptr; }
+			return term.getOperation()->getParentRegion();
+		}
+	}// namespace
+
 	void PythonDialect::initialize()
 	{
 		addOperations<
@@ -121,23 +135,23 @@ namespace py {
 	{
 		// Branching to first region: go to condition.
 		if (point.isParent()) {
-			regions.emplace_back(&getCondition(), getCondition().getArguments());
+			regions.emplace_back(&getCondition());
 		}
 		// Branching from condition: go to body or, exit or orelse if non-empty.
-		else if (point.getRegionOrNull() == &getCondition()) {
+		else if (predecessor_region(point) == &getCondition()) {
 			if (getOrelse().empty()) {
-				regions.emplace_back(RegionSuccessor(getOperation()->getResults()));
+				regions.emplace_back(RegionSuccessor::parent());
 			} else {
-				regions.emplace_back(&getOrelse(), getOrelse().getArguments());
+				regions.emplace_back(&getOrelse());
 			}
-			regions.emplace_back(&getBody(), getBody().getArguments());
+			regions.emplace_back(&getBody());
 		}
 		// Branching from body: go to condition.
-		else if (point.getRegionOrNull() == &getBody()) {
-			regions.emplace_back(&getCondition(), getCondition().getArguments());
+		else if (predecessor_region(point) == &getBody()) {
+			regions.emplace_back(&getCondition());
 		}
 		// Branching from orelse - can't go anywhere else.
-		else if (point.getRegionOrNull() == &getOrelse()) {
+		else if (predecessor_region(point) == &getOrelse()) {
 		} else {
 			llvm_unreachable("unexpected branch origin");
 		}
@@ -148,23 +162,23 @@ namespace py {
 	{
 		// Branching to first region: go to step.
 		if (point.isParent()) {
-			regions.emplace_back(&getStep(), getStep().getArguments());
+			regions.emplace_back(&getStep());
 		}
 		// Branching from condition: go to body or, exit or orelse if non-empty.
-		else if (point.getRegionOrNull() == &getStep()) {
+		else if (predecessor_region(point) == &getStep()) {
 			if (getOrelse().empty()) {
-				regions.emplace_back(getOperation()->getResults());
+				regions.emplace_back(RegionSuccessor::parent());
 			} else {
-				regions.emplace_back(&getOrelse(), getOrelse().getArguments());
+				regions.emplace_back(&getOrelse());
 			}
-			regions.emplace_back(&getBody(), getBody().getArguments());
+			regions.emplace_back(&getBody());
 		}
 		// Branching from body: go to step.
-		else if (point.getRegionOrNull() == &getBody()) {
-			regions.emplace_back(&getStep(), getStep().getArguments());
+		else if (predecessor_region(point) == &getBody()) {
+			regions.emplace_back(&getStep());
 		}
 		// Branching from orelse - can't go anywhere else.
-		else if (point.getRegionOrNull() == &getOrelse()) {
+		else if (predecessor_region(point) == &getOrelse()) {
 		} else {
 			llvm_unreachable("unexpected branch origin");
 		}
@@ -175,46 +189,42 @@ namespace py {
 	{
 		// Branching to first region: go to try body.
 		if (point.isParent()) {
-			regions.emplace_back(&getBody(), getBody().getArguments());
+			regions.emplace_back(&getBody());
 		}
 		// Branching from try body: go to first handler and orelse block if non-empty, if there no
 		// handlers go to finally
-		else if (point.getRegionOrNull() == &getBody()) {
+		else if (predecessor_region(point) == &getBody()) {
 			if (!getHandlers().empty()) {
-				regions.emplace_back(&getHandlers().front(), getHandlers().front().getArguments());
-				if (!getOrelse().empty()) {
-					regions.emplace_back(&getOrelse(), getOrelse().getArguments());
-				}
+				regions.emplace_back(&getHandlers().front());
+				if (!getOrelse().empty()) { regions.emplace_back(&getOrelse()); }
 			} else {
 				assert(getOrelse().empty());
-				regions.emplace_back(&getFinally(), getFinally().getArguments());
+				regions.emplace_back(&getFinally());
 			}
 		}
 		// Branching from handler: go to next handler if there is one, if not go to finally.
 		else if (auto it = std::find_if(getHandlers().begin(),
 					 getHandlers().end(),
 					 [&point](
-						 mlir::Region &handler) { return point.getRegionOrNull() == &handler; });
+						 mlir::Region &handler) { return predecessor_region(point) == &handler; });
 			it != getHandlers().end()) {
 			if (std::next(it) != getHandlers().end()) {
 				it++;
-				regions.emplace_back(&*it, it->getArguments());
+				regions.emplace_back(&*it);
 			}
-			if (!getFinally().empty()) {
-				regions.emplace_back(&getFinally(), getFinally().getArguments());
-			}
+			if (!getFinally().empty()) { regions.emplace_back(&getFinally()); }
 			// regions.emplace_back(getOperation()->getParentRegion());
 		}
 		// Branch from orelse: go to finally or parent
-		else if (point.getRegionOrNull() == &getOrelse()) {
+		else if (predecessor_region(point) == &getOrelse()) {
 			if (!getFinally().empty()) {
-				regions.emplace_back(&getFinally(), getFinally().getArguments());
+				regions.emplace_back(&getFinally());
 			} else {
 				regions.emplace_back(getOperation()->getParentRegion());
 			}
 		}
 		// Branch from finally: go to parent
-		else if (point.getRegionOrNull() == &getFinally()) {
+		else if (predecessor_region(point) == &getFinally()) {
 			regions.emplace_back(getOperation()->getParentRegion());
 		}
 	}
@@ -276,9 +286,7 @@ namespace py {
 	void TryHandlerScope::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
-		if (point.getRegionOrNull() == &getCond()) {
-			regions.emplace_back(&getHandler(), getHandler().getArguments());
-		}
+		if (predecessor_region(point) == &getCond()) { regions.emplace_back(&getHandler()); }
 		regions.emplace_back(getOperation()->getParentRegion());
 	}
 }// namespace py

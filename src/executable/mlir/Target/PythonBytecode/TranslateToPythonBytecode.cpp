@@ -303,10 +303,10 @@ struct PythonBytecodeEmitter
 		// llvm::outs() << const_cast<mlir::func::FuncOp &>(m_parent_fn).getName() << '\n';
 		auto names = const_cast<mlir::func::FuncOp &>(m_parent_fn).getOperation()->getAttr("names");
 		ASSERT(names);
-		auto names_array = names.cast<mlir::ArrayAttr>();
+		auto names_array = mlir::cast<mlir::ArrayAttr>(names);
 		auto it =
 			std::find_if(names_array.begin(), names_array.end(), [&name](mlir::Attribute attr) {
-				return attr.cast<mlir::StringAttr>().getValue() == name;
+				return mlir::cast<mlir::StringAttr>(attr).getValue() == name;
 			});
 		ASSERT(it != names_array.end());
 		const auto idx = std::distance(names_array.begin(), it);
@@ -337,13 +337,13 @@ struct PythonBytecodeEmitter
 									 std::vector<std::string> &func_array) {
 			auto attr = op.getOperation()->getAttr(array_name);
 			if (attr) {
-				auto array = attr.cast<mlir::ArrayAttr>();
+				auto array = mlir::cast<mlir::ArrayAttr>(attr);
 				func_array.reserve(array.size());
 				std::transform(array.begin(),
 					array.end(),
 					std::back_inserter(func_array),
 					[](mlir::Attribute attr) {
-						return attr.cast<mlir::StringAttr>().getValue().str();
+						return mlir::cast<mlir::StringAttr>(attr).getValue().str();
 					});
 			}
 		};
@@ -358,8 +358,8 @@ struct PythonBytecodeEmitter
 			&& std::any_of(op.getAllArgAttrs().begin(),
 				op.getAllArgAttrs().end(),
 				[](mlir::Attribute arg_attr) {
-					auto vararg =
-						arg_attr.cast<mlir::DictionaryAttr>().getAs<mlir::BoolAttr>("llvm.vararg");
+					auto vararg = mlir::cast<mlir::DictionaryAttr>(arg_attr).getAs<mlir::BoolAttr>(
+						"llvm.vararg");
 					return vararg && vararg.getValue();
 				})) {
 			current_function().set_varargs();
@@ -369,8 +369,8 @@ struct PythonBytecodeEmitter
 			&& std::any_of(op.getAllArgAttrs().begin(),
 				op.getAllArgAttrs().end(),
 				[](mlir::Attribute arg_attr) {
-					auto vararg =
-						arg_attr.cast<mlir::DictionaryAttr>().getAs<mlir::BoolAttr>("llvm.kwarg");
+					auto vararg = mlir::cast<mlir::DictionaryAttr>(arg_attr).getAs<mlir::BoolAttr>(
+						"llvm.kwarg");
 					return vararg && vararg.getValue();
 				})) {
 			current_function().set_kwargs();
@@ -380,7 +380,7 @@ struct PythonBytecodeEmitter
 			auto kwonlyarg_count = std::count_if(op.getAllArgAttrs().begin(),
 				op.getAllArgAttrs().end(),
 				[](mlir::Attribute arg_attr) {
-					auto vararg = arg_attr.cast<mlir::DictionaryAttr>().getAs<mlir::BoolAttr>(
+					auto vararg = mlir::cast<mlir::DictionaryAttr>(arg_attr).getAs<mlir::BoolAttr>(
 						"llvm.kwonlyarg");
 					return vararg && vararg.getValue();
 				});
@@ -421,14 +421,15 @@ struct PythonBytecodeEmitter
 			}
 
 			if (current_function().m_flags.is_set(CodeFlags::Flag::VARARGS)) {
-				auto arg_name = std::find_if(op.getAllArgAttrs().begin(),
+				auto vararg_attr_it = std::find_if(op.getAllArgAttrs().begin(),
 					op.getAllArgAttrs().end(),
 					[](mlir::Attribute arg_attr) {
-						auto vararg = arg_attr.cast<mlir::DictionaryAttr>().getAs<mlir::BoolAttr>(
-							"llvm.vararg");
+						auto vararg =
+							mlir::cast<mlir::DictionaryAttr>(arg_attr).getAs<mlir::BoolAttr>(
+								"llvm.vararg");
 						return vararg && vararg.getValue();
-					})
-									->cast<mlir::DictionaryAttr>()
+					});
+				auto arg_name = mlir::cast<mlir::DictionaryAttr>(*vararg_attr_it)
 									.getAs<mlir::StringAttr>("llvm.name")
 									.getValue();
 				if (auto it = std::ranges::find(current_function().m_cellvars, arg_name);
@@ -439,14 +440,15 @@ struct PythonBytecodeEmitter
 			}
 
 			if (current_function().m_flags.is_set(CodeFlags::Flag::VARKEYWORDS)) {
-				auto arg_name = std::find_if(op.getAllArgAttrs().begin(),
+				auto kwarg_attr_it = std::find_if(op.getAllArgAttrs().begin(),
 					op.getAllArgAttrs().end(),
 					[](mlir::Attribute arg_attr) {
-						auto kwarg = arg_attr.cast<mlir::DictionaryAttr>().getAs<mlir::BoolAttr>(
-							"llvm.kwarg");
+						auto kwarg =
+							mlir::cast<mlir::DictionaryAttr>(arg_attr).getAs<mlir::BoolAttr>(
+								"llvm.kwarg");
 						return kwarg && kwarg.getValue();
-					})
-									->cast<mlir::DictionaryAttr>()
+					});
+				auto arg_name = mlir::cast<mlir::DictionaryAttr>(*kwarg_attr_it)
 									.getAs<mlir::StringAttr>("llvm.name")
 									.getValue();
 				if (auto it = std::ranges::find(current_function().m_cellvars, arg_name);
@@ -1100,7 +1102,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::Functio
 	// If the register allocator assigned a different register, emit a MOVE.
 	const auto result_reg = get_register(op.getOutput());
 	if (result_reg != 0) {
-		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+		emit<Move>(result_reg, 0);// Move from r0 to allocated register
 	}
 
 	return success();
@@ -1134,7 +1136,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(
 	// If the register allocator assigned a different register, emit a MOVE.
 	const auto result_reg = get_register(op.getOutput());
 	if (result_reg != 0) {
-		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+		emit<Move>(result_reg, 0);// Move from r0 to allocated register
 	}
 
 	return success();
@@ -1153,7 +1155,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::Functio
 	// If the register allocator assigned a different register, emit a MOVE.
 	const auto result_reg = get_register(op.getOutput());
 	if (result_reg != 0) {
-		emit<Move>(result_reg, 0);  // Move from r0 to allocated register
+		emit<Move>(result_reg, 0);// Move from r0 to allocated register
 	}
 
 	return success();
@@ -1344,9 +1346,11 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::ModuleOp &mo
 	m_filename = mlir::cast<mlir::FileLineColLoc>(module_.getLoc()).getFilename().str();
 	auto argv = module_->getAttr("llvm.argv");
 	ASSERT(argv);
-	auto argv_array = argv.cast<mlir::ArrayAttr>();
+	auto argv_array = mlir::cast<mlir::ArrayAttr>(argv);
 	m_argv.reserve(argv_array.size());
-	for (const auto &argv_ : argv_array) { m_argv.push_back(argv_.cast<mlir::StringAttr>().str()); }
+	for (const auto &argv_ : argv_array) {
+		m_argv.push_back(mlir::cast<mlir::StringAttr>(argv_).str());
+	}
 	auto &module_region = module_.getBodyRegion();
 	ASSERT(module_region.getBlocks().size() == 1);
 	auto fn = std::find_if(module_region.getBlocks().back().getOperations().begin(),

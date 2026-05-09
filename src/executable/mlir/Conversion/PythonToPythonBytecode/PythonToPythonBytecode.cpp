@@ -110,11 +110,11 @@ namespace py {
 				if (fn->hasAttr("locals")) {
 					auto names = fn->getAttr("locals");
 					std::vector<StringRef> names_vec;
-					auto arr = names.cast<mlir::ArrayAttr>().getValue();
+					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 					if (std::find_if(arr.begin(),
 							arr.end(),
 							[identifier](mlir::Attribute attr) {
-								return attr.cast<mlir::StringAttr>().getValue() == identifier;
+								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
 							})
 						!= arr.end()) {
 						return;
@@ -123,7 +123,7 @@ namespace py {
 						arr.end(),
 						std::back_inserter(names_vec),
 						[](mlir::Attribute attr) {
-							return attr.cast<mlir::StringAttr>().getValue();
+							return mlir::cast<mlir::StringAttr>(attr).getValue();
 						});
 					names_vec.emplace_back(identifier);
 					fn->setAttr("locals", builder.getStrArrayAttr(names_vec));
@@ -141,11 +141,11 @@ namespace py {
 				if (fn->hasAttr("names")) {
 					auto names = fn->getAttr("names");
 					std::vector<StringRef> names_vec;
-					auto arr = names.cast<mlir::ArrayAttr>().getValue();
+					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 					if (std::find_if(arr.begin(),
 							arr.end(),
 							[identifier](mlir::Attribute attr) {
-								return attr.cast<mlir::StringAttr>().getValue() == identifier;
+								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
 							})
 						!= arr.end()) {
 						return;
@@ -154,7 +154,7 @@ namespace py {
 						arr.end(),
 						std::back_inserter(names_vec),
 						[](mlir::Attribute attr) {
-							return attr.cast<mlir::StringAttr>().getValue();
+							return mlir::cast<mlir::StringAttr>(attr).getValue();
 						});
 					names_vec.emplace_back(identifier);
 					fn->setAttr("names", builder.getStrArrayAttr(names_vec));
@@ -1112,7 +1112,7 @@ namespace py {
 				for (size_t i = 0; i < op.getNumArguments(); ++i) {
 					auto arg_name = op.getArgAttr(i, "llvm.name");
 					ASSERT(arg_name);
-					add_local(op, arg_name.cast<mlir::StringAttr>().getValue(), builder);
+					add_local(op, mlir::cast<mlir::StringAttr>(arg_name).getValue(), builder);
 				}
 			}
 
@@ -1123,11 +1123,11 @@ namespace py {
 				if (fn->hasAttr("locals")) {
 					auto names = fn->getAttr("locals");
 					std::vector<StringRef> names_vec;
-					auto arr = names.cast<mlir::ArrayAttr>().getValue();
+					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
 					if (std::find_if(arr.begin(),
 							arr.end(),
 							[identifier](mlir::Attribute attr) {
-								return attr.cast<mlir::StringAttr>().getValue() == identifier;
+								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
 							})
 						!= arr.end()) {
 						return;
@@ -1136,7 +1136,7 @@ namespace py {
 						arr.end(),
 						std::back_inserter(names_vec),
 						[](mlir::Attribute attr) {
-							return attr.cast<mlir::StringAttr>().getValue();
+							return mlir::cast<mlir::StringAttr>(attr).getValue();
 						});
 					names_vec.emplace_back(identifier);
 					fn->setAttr("locals", builder.getStrArrayAttr(names_vec));
@@ -1172,7 +1172,7 @@ namespace py {
 					if (std::find_if(cell_names.begin(),
 							cell_names.end(),
 							[](mlir::Attribute name) {
-								return name.cast<mlir::StringAttr>() == "__class__";
+								return mlir::cast<mlir::StringAttr>(name) == "__class__";
 							})
 						!= cell_names.end()) {
 
@@ -2207,9 +2207,9 @@ namespace py {
 		patterns.add<GetAwaitableOpLowering>(&getContext());
 
 		GreedyRewriteConfig config;
-		config.strictMode = GreedyRewriteStrictness::AnyOp;
-		config.enableRegionSimplification = GreedySimplifyRegionLevel::Disabled;
-		config.useTopDownTraversal = true;
+		config.setStrictness(GreedyRewriteStrictness::AnyOp);
+		config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
+		config.setUseTopDownTraversal(true);
 		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
 
 		// getOperation()->print(llvm::outs());
@@ -2218,7 +2218,7 @@ namespace py {
 
 		// Currently ignoring the return value as it seems to always fail, even though the
 		// transformation seems to generate the expected output
-		(void)applyPatternsAndFoldGreedily(getOperation(), frozen_patterns, config);
+		(void)applyPatternsGreedily(getOperation(), frozen_patterns, config);
 	}
 
 	std::unique_ptr<Pass> createPythonToPythonBytecodePass()
