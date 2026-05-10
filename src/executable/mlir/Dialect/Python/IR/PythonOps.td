@@ -479,7 +479,7 @@ exception is thrown.
     let results = (outs Python_PyObjectType:$value);
 }
 
-def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "For loop representation";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -489,7 +489,7 @@ def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpIn
                           MinSizedRegion<1>:$orelse);
 }
 
-def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "While loop representation";
 
     let regions = (region AnyRegion:$condition, AnyRegion:$body, AnyRegion:$orelse);
@@ -504,12 +504,12 @@ def ConditionOp: Python_Op<"condition", [Terminator,
 
 def TryHandlerScope: Python_Op<"catch", [Terminator,
                                          HasParent<"TryOp">,
-                                         DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+                                         DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$cond,
                           AnyRegion:$handler);
 }
 
-def TryOp: Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def TryOp: Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$body,
                           AnyRegion:$orelse,
                           AnyRegion:$finally,

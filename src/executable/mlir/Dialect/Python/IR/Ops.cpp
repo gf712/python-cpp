@@ -129,6 +129,23 @@ namespace py {
 			index == 0 ? getTrueDestOperandsMutable() : getFalseDestOperandsMutable());
 	}
 
+	namespace {
+		// Static getSuccessorInputs implementation shared by all four
+		// RegionBranchOpInterface ops in this dialect (WhileOp, ForLoopOp,
+		// TryOp, TryHandlerScope). MLIR 23 split the (region, block-args) pair
+		// that used to be carried by RegionSuccessor: the region is now in
+		// RegionSuccessor and the inputs come from this method. None of these
+		// ops thread operands through the parent-branch successor (they all
+		// return PyObject results that are produced by the regions, not
+		// forwarded by the op itself), so the parent case returns empty.
+		mlir::ValueRange region_or_block_arguments(mlir::Operation *,
+			mlir::RegionSuccessor successor)
+		{
+			if (successor.isParent()) { return mlir::ValueRange{}; }
+			return successor.getSuccessor()->getArguments();
+		}
+	}// namespace
+
 	// Based on CIR loop interface implementation
 	void WhileOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
@@ -182,6 +199,16 @@ namespace py {
 		} else {
 			llvm_unreachable("unexpected branch origin");
 		}
+	}
+
+	mlir::ValueRange WhileOp::getSuccessorInputs(mlir::RegionSuccessor successor)
+	{
+		return region_or_block_arguments(getOperation(), successor);
+	}
+
+	mlir::ValueRange ForLoopOp::getSuccessorInputs(mlir::RegionSuccessor successor)
+	{
+		return region_or_block_arguments(getOperation(), successor);
 	}
 
 	void TryOp::getSuccessorRegions(mlir::RegionBranchPoint point,
@@ -281,6 +308,16 @@ namespace py {
 				});
 
 		assert(result.succeeded());
+	}
+
+	mlir::ValueRange TryOp::getSuccessorInputs(mlir::RegionSuccessor successor)
+	{
+		return region_or_block_arguments(getOperation(), successor);
+	}
+
+	mlir::ValueRange TryHandlerScope::getSuccessorInputs(mlir::RegionSuccessor successor)
+	{
+		return region_or_block_arguments(getOperation(), successor);
 	}
 
 	void TryHandlerScope::getSuccessorRegions(mlir::RegionBranchPoint point,
