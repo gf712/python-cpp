@@ -774,7 +774,7 @@ namespace py {
 					auto output_type = op.getOutput().getType();
 					auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
 						loc, output_type, ::mlir::ValueRange{});
-					auto tuple = rewriter.create<mlir::py::ConstantOp>(
+					auto tuple = rewriter.create<mlir::emitpybytecode::ConstantOp>(
 						loc, output_type, mlir::ArrayAttr::get(getContext(), elements));
 					rewriter.create<mlir::emitpybytecode::ListExtend>(loc, list, tuple);
 					rewriter.replaceOp(op, list);
