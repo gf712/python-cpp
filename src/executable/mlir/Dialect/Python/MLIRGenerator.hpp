@@ -38,13 +38,9 @@ class Context
 	ContextImpl *operator->() { return m_impl.get(); }
 };
 
-class SSABuilder;
-
 class MLIRGenerator : ast::CodeGenerator
 {
 	struct MLIRValue;
-
-	// std::unique_ptr<SSABuilder> m_builder;
 
   private:
 	struct Scope

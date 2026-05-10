@@ -169,31 +169,6 @@ template<typename... ParentTs> mlir::Operation *getParentOfType(mlir::Region *re
 namespace codegen {
 
 
-class SSABuilder
-{
-	std::unordered_map<std::string, std::map<mlir::Block *, mlir::Value>> m_current_def;
-
-  public:
-	void write_variable(std::string varname, mlir::Block *block, mlir::Value value)
-	{
-		m_current_def[varname][block] = std::move(value);
-	}
-
-	mlir::Value read_variable(std::string varname, mlir::Block *block)
-	{
-		if (auto var_block_it = m_current_def.find(varname); var_block_it != m_current_def.end()) {
-			if (auto it = var_block_it->second.find(block); it != var_block_it->second.end()) {
-				// local value numbering
-				return it->second;
-			}
-		}
-		return read_variable_recursive(std::move(varname), block);
-	}
-
-  private:
-	mlir::Value read_variable_recursive(std::string varname, mlir::Block *block) { TODO(); }
-};
-
 struct Context::ContextImpl
 {
 	mlir::MLIRContext m_ctx;
@@ -234,7 +209,6 @@ MLIRGenerator::MLIRGenerator(Context &ctx) : m_context(ctx)
 	m_context.ctx().loadDialect<mlir::cf::ControlFlowDialect>();
 	m_context.ctx().loadDialect<mlir::func::FuncDialect>();
 	m_context.ctx().loadDialect<mlir::scf::SCFDialect>();
-	// m_builder = std::make_unique<SSABuilder>();
 }
 
 bool MLIRGenerator::compile(std::shared_ptr<ast::Module> m,
