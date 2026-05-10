@@ -1000,18 +1000,28 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::JumpIfFalse &op)
 {
-	auto this_block = std::find(
-		m_sorted_blocks.top().begin(), m_sorted_blocks.top().end(), op.getOperation()->getBlock());
-	ASSERT(*(this_block + 1) == op.getFalseDest() || *(this_block + 1) == op.getTrueDest());
+	const auto &sorted = m_sorted_blocks.top();
+	auto this_block = std::find(sorted.begin(), sorted.end(), op.getOperation()->getBlock());
+	ASSERT(this_block != sorted.end());
+	auto next_it = this_block + 1;
+	mlir::Block *next_block = next_it == sorted.end() ? nullptr : *next_it;
 
-	if (*(this_block + 1) == op.getTrueDest()) {
-		auto *bb = op.getFalseDest();
-		auto &label = m_block_labels.emplace_back(bb, std::make_shared<Label>("", 0));
+	if (next_block == op.getTrueDest()) {
+		auto &label =
+			m_block_labels.emplace_back(op.getFalseDest(), std::make_shared<Label>("", 0));
 		emit<JumpIfFalse>(get_register(op.getCond()), label.m_label);
-	} else {
-		auto *bb = op.getTrueDest();
-		auto &label = m_block_labels.emplace_back(bb, std::make_shared<Label>("", 0));
+	} else if (next_block == op.getFalseDest()) {
+		auto &label = m_block_labels.emplace_back(op.getTrueDest(), std::make_shared<Label>("", 0));
 		emit<JumpIfTrue>(get_register(op.getCond()), label.m_label);
+	} else {
+		// Neither successor falls through: emit a conditional jump to the false
+		// dest followed by an unconditional jump to the true dest.
+		auto &false_label =
+			m_block_labels.emplace_back(op.getFalseDest(), std::make_shared<Label>("", 0));
+		emit<JumpIfFalse>(get_register(op.getCond()), false_label.m_label);
+		auto &true_label =
+			m_block_labels.emplace_back(op.getTrueDest(), std::make_shared<Label>("", 0));
+		emit<Jump>(true_label.m_label);
 	}
 	return success();
 }
@@ -1019,18 +1029,26 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::JumpIfNotException &op)
 {
-	auto this_block = std::find(
-		m_sorted_blocks.top().begin(), m_sorted_blocks.top().end(), op.getOperation()->getBlock());
-	ASSERT(*(this_block + 1) == op.getFalseDest() || *(this_block + 1) == op.getTrueDest());
+	const auto &sorted = m_sorted_blocks.top();
+	auto this_block = std::find(sorted.begin(), sorted.end(), op.getOperation()->getBlock());
+	ASSERT(this_block != sorted.end());
+	auto next_it = this_block + 1;
+	mlir::Block *next_block = next_it == sorted.end() ? nullptr : *next_it;
 
-	if (*(this_block + 1) == op.getTrueDest()) {
-		auto *bb = op.getFalseDest();
-		auto &label = m_block_labels.emplace_back(bb, std::make_shared<Label>("", 0));
+	if (next_block == op.getTrueDest()) {
+		auto &label =
+			m_block_labels.emplace_back(op.getFalseDest(), std::make_shared<Label>("", 0));
 		emit<JumpIfExceptionMatch>(get_register(op.getObjectType()), label.m_label);
-	} else {
-		auto *bb = op.getTrueDest();
-		auto &label = m_block_labels.emplace_back(bb, std::make_shared<Label>("", 0));
+	} else if (next_block == op.getFalseDest()) {
+		auto &label = m_block_labels.emplace_back(op.getTrueDest(), std::make_shared<Label>("", 0));
 		emit<JumpIfNotExceptionMatch>(get_register(op.getObjectType()), label.m_label);
+	} else {
+		auto &true_label =
+			m_block_labels.emplace_back(op.getTrueDest(), std::make_shared<Label>("", 0));
+		emit<JumpIfNotExceptionMatch>(get_register(op.getObjectType()), true_label.m_label);
+		auto &false_label =
+			m_block_labels.emplace_back(op.getFalseDest(), std::make_shared<Label>("", 0));
+		emit<Jump>(false_label.m_label);
 	}
 
 	return success();
