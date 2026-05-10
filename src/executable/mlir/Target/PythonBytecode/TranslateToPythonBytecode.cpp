@@ -300,7 +300,6 @@ struct PythonBytecodeEmitter
 
 	Register get_name_idx(StringRef name) const
 	{
-		// llvm::outs() << const_cast<mlir::func::FuncOp &>(m_parent_fn).getName() << '\n';
 		auto names = const_cast<mlir::func::FuncOp &>(m_parent_fn).getOperation()->getAttr("names");
 		ASSERT(names);
 		auto names_array = mlir::cast<mlir::ArrayAttr>(names);
@@ -677,10 +676,6 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::ForIter &op)
 {
-	// auto this_block = std::find(
-	// 	m_sorted_blocks.top().begin(), m_sorted_blocks.top().end(), op.getOperation()->getBlock());
-	// ASSERT(*(this_block + 1) == op.body());
-
 	auto exit_label =
 		m_block_labels.emplace_back(op.getContinuation(), std::make_shared<Label>("", 0)).m_label;
 	auto body_label =
@@ -765,11 +760,6 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::func::FuncOp
 	enter_function_op(op);
 
 	m_sorted_blocks.push(sortBlocks(region));
-	// llvm::outs() << "-----------------------------------------------\n";
-	// for (auto *block : m_sorted_blocks.top()) {
-	// 	block->print(llvm::outs());
-	// 	llvm::outs() << '\n';
-	// }
 	for (size_t op_idx = 0; auto *block : m_sorted_blocks.top()) {
 		m_block_offsets.emplace_back(block, op_idx);
 		if (!sortTopologically(block)) { std::abort(); }
@@ -1419,9 +1409,6 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 		std::cerr << "Invalid Python bytecode IR\n";
 		return nullptr;
 	}
-
-	// op->print(llvm::outs());
-	// llvm::outs().flush();
 
 	DialectRegistry registry;
 	registry.insert<emitpybytecode::EmitPythonBytecodeDialect>();

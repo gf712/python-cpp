@@ -1344,11 +1344,6 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::py::ForLoopOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				// llvm::outs() << "ForLoopOp rewrite:\n";
-				// op->print(llvm::outs());
-				// llvm::outs() << "-------------------------\n";
-				// llvm::outs().flush();
-
 				auto *initBlock = rewriter.getInsertionBlock();
 				auto initPos = rewriter.getInsertionPoint();
 
@@ -2211,10 +2206,6 @@ namespace py {
 		config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
 		config.setUseTopDownTraversal(true);
 		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
-
-		// getOperation()->print(llvm::outs());
-		// llvm::outs() << "-----------------------------------------------\n\n\n";
-		// llvm::outs().flush();
 
 		// Currently ignoring the return value as it seems to always fail, even though the
 		// transformation seems to generate the expected output
