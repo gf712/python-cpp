@@ -28,9 +28,12 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 
 	::mlir::PassManager pm{ &ctx.ctx() };
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
-	// Post-lowering CSE: dedupes the emitpybytecode.LOAD_CONST ops the
-	// lowering and MLIRGenerator emit. Idiomatic Python compiles to many
-	// equal None/0/True constants per function.
+	// Post-lowering canonicalize + CSE: dedupes the emitpybytecode.LOAD_CONST
+	// ops the lowering and MLIRGenerator emit. Idiomatic Python compiles to
+	// many equal None/0/True constants per function. Pre-lowering
+	// canonicalize is not run because the Python dialect's ops don't yet
+	// have full effect-trait coverage (Load* in particular), so canonicalize
+	// can reshape IR in ways the lowering patterns don't expect.
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
 	// pm.addPass(::mlir::createRemoveDeadValuesPass());
