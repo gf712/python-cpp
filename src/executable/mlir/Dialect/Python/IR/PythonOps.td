@@ -306,7 +306,7 @@ def Compare : Python_Op<"cmp"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadAssertionError : Python_Op<"load_assertion_error"> {
+def LoadAssertionError : Python_Op<"load_assertion_error", [Pure]> {
     let summary = [{
 Loads AssertionError type. This is guaranteed to be the builtin
 AssertionError.

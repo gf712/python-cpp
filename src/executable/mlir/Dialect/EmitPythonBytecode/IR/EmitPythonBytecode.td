@@ -15,7 +15,7 @@ def EmitPythonBytecode_ConstantOp: EmitPythonBytecode_Op<"LOAD_CONST", [Pure]> {
     let hasVerifier = 1;
 }
 
-def EmitPythonBytecode_LoadEllipsisOp: EmitPythonBytecode_Op<"LOAD_ELLIPSIS"> {
+def EmitPythonBytecode_LoadEllipsisOp: EmitPythonBytecode_Op<"LOAD_ELLIPSIS", [Pure]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
@@ -172,7 +172,7 @@ def EmitPythonBytecode_Compare: EmitPythonBytecode_Op<"COMPARE"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def EmitPythonBytecode_LoadAssertionError : EmitPythonBytecode_Op<"LOAD_ASSERTION_ERROR"> {
+def EmitPythonBytecode_LoadAssertionError : EmitPythonBytecode_Op<"LOAD_ASSERTION_ERROR", [Pure]> {
     let summary = [{
 Loads AssertionError type. This is guaranteed to be the builtin
 AssertionError.
@@ -472,7 +472,7 @@ def EmitPythonBytecode_CastToBool: EmitPythonBytecode_Op<"TO_BOOL"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def EmitPythonBytecode_LoadBuildClass: EmitPythonBytecode_Op<"LOAD_BUILD_CLASS"> {
+def EmitPythonBytecode_LoadBuildClass: EmitPythonBytecode_Op<"LOAD_BUILD_CLASS", [Pure]> {
     let summary = "Loads the builtin class builder factory function";
 
     let results = (outs Python_PyObjectType:$class_builder);
