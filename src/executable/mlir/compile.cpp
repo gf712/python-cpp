@@ -28,6 +28,11 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 
 	::mlir::PassManager pm{ &ctx.ctx() };
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
+	// Post-lowering CSE: dedupes the emitpybytecode.LOAD_CONST ops the
+	// lowering and MLIRGenerator emit. Idiomatic Python compiles to many
+	// equal None/0/True constants per function.
+	pm.addPass(::mlir::createCanonicalizerPass());
+	pm.addPass(::mlir::createCSEPass());
 	// pm.addPass(::mlir::createRemoveDeadValuesPass());
 	// {
 	// 	int fd;
