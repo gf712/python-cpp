@@ -122,6 +122,25 @@ namespace py {
 		return mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(context);
 	}
 
+	mlir::LogicalResult ConstantOp::verify()
+	{
+		mlir::Attribute attr = getValue();
+		// Accepted attribute kinds correspond to the constant kinds the
+		// ConstantOp builders can construct, plus EllipsisAttr (lowered to
+		// LoadEllipsisOp by the conversion pass).
+		if (mlir::isa<mlir::FloatAttr,
+				mlir::BoolAttr,
+				mlir::UnitAttr,
+				mlir::StringAttr,
+				mlir::IntegerAttr,
+				mlir::DenseIntElementsAttr,
+				mlir::ArrayAttr,
+				EllipsisAttr>(attr)) {
+			return mlir::success();
+		}
+		return emitOpError() << "value attribute has unsupported kind: " << attr;
+	}
+
 	SuccessorOperands CondBranchSubclassOp::getSuccessorOperands(unsigned index)
 	{
 		assert(index < getNumSuccessors() && "invalid successor index");

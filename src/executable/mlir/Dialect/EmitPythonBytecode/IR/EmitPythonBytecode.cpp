@@ -42,6 +42,25 @@ namespace emitpybytecode {
 		}
 		return SuccessorOperands(0, mlir::MutableOperandRange{ getOperation(), 0, 0 });
 	}
+
+	mlir::LogicalResult ConstantOp::verify()
+	{
+		mlir::Attribute attr = getValue();
+		// Accepted attribute kinds match the TypeSwitch in
+		// PythonBytecodeEmitter::emitOperation(emitpybytecode::ConstantOp).
+		// EllipsisAttr is not in the list - the conversion pass lowers it to
+		// LoadEllipsisOp instead.
+		if (mlir::isa<mlir::FloatAttr,
+				mlir::BoolAttr,
+				mlir::UnitAttr,
+				mlir::StringAttr,
+				mlir::IntegerAttr,
+				mlir::DenseIntElementsAttr,
+				mlir::ArrayAttr>(attr)) {
+			return mlir::success();
+		}
+		return emitOpError() << "value attribute has unsupported kind: " << attr;
+	}
 }// namespace emitpybytecode
 }// namespace mlir
 

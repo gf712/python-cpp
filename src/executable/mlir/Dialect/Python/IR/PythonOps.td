@@ -25,6 +25,8 @@ def ConstantOp : Python_Op<"constant", [Pure]> {
         OpBuilder<(ins "::mlir::py::PyEllipsisType":$value)>,
         OpBuilder<(ins "::mlir::ArrayRef<mlir::Attribute>":$elements)>,
     ];
+
+    let hasVerifier = 1;
 }
 
 def LoadNameOp : Python_Op<"load_name"> {

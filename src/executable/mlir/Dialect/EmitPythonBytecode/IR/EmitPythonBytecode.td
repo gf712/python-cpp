@@ -11,6 +11,8 @@ def EmitPythonBytecode_ConstantOp: EmitPythonBytecode_Op<"LOAD_CONST", [Pure]> {
     let arguments = (ins AnyAttr:$value);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def EmitPythonBytecode_LoadEllipsisOp: EmitPythonBytecode_Op<"LOAD_ELLIPSIS"> {
