@@ -2203,7 +2203,7 @@ namespace py {
 
 		GreedyRewriteConfig config;
 		config.setStrictness(GreedyRewriteStrictness::AnyOp);
-		config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
+		config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
 		config.setUseTopDownTraversal(true);
 		FrozenRewritePatternSet frozen_patterns{ std::move(patterns) };
 
