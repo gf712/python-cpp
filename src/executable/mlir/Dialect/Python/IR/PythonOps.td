@@ -61,7 +61,7 @@ def LoadDerefOp : Python_Op<"load_deref"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreNameOp : Python_Op<"store_name"> {
+def StoreNameOp : Python_Op<"store_name", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to the local environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -69,7 +69,7 @@ def StoreNameOp : Python_Op<"store_name"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreFastOp : Python_Op<"store_fast"> {
+def StoreFastOp : Python_Op<"store_fast", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to local bound variable";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -77,7 +77,7 @@ def StoreFastOp : Python_Op<"store_fast"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreGlobalOp : Python_Op<"store_global"> {
+def StoreGlobalOp : Python_Op<"store_global", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in the global environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -85,7 +85,7 @@ def StoreGlobalOp : Python_Op<"store_global"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreDerefOp : Python_Op<"store_deref"> {
+def StoreDerefOp : Python_Op<"store_deref", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store PyObject to a cell";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -93,25 +93,25 @@ def StoreDerefOp : Python_Op<"store_deref"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteNameOp : Python_Op<"delete_name"> {
+def DeleteNameOp : Python_Op<"delete_name", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the local environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteFastOp : Python_Op<"delete_fast"> {
+def DeleteFastOp : Python_Op<"delete_fast", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the bound variable";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteGlobalOp : Python_Op<"delete_global"> {
+def DeleteGlobalOp : Python_Op<"delete_global", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the global environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteDerefOp : Python_Op<"delete_deref"> {
+def DeleteDerefOp : Python_Op<"delete_deref", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from a cell";
 
     let arguments = (ins StrAttr:$name);
