@@ -63,85 +63,17 @@ namespace py {
 			}
 		};
 
-		struct StoreNameLowering : public mlir::OpRewritePattern<py::StoreNameOp>
-		{
-			using OpRewritePattern<py::StoreNameOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(py::StoreNameOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto object_name = op.getNameAttr();
-				auto object_value = op.getValue();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreNameOp>(
-					op, op.getOutput().getType(), object_name, object_value);
-
-				return success();
-			}
-		};
-
-		struct StoreDerefLowering : public mlir::OpRewritePattern<py::StoreDerefOp>
-		{
-			using OpRewritePattern<py::StoreDerefOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(py::StoreDerefOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto object_name = op.getNameAttr();
-				auto object_value = op.getValue();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreDerefOp>(
-					op, op.getOutput().getType(), object_name, object_value);
-
-				return success();
-			}
-		};
-
-		template<typename T> struct LocalDeclarationInterface : public T
-		{
-			template<typename... Args>
-			LocalDeclarationInterface(Args &&...args) : T(std::forward<Args>(args)...)
-			{}
-
-			void addLocalIdentifierToParentFunction(mlir::func::FuncOp &fn,
-				mlir::StringAttr identifier,
-				mlir::OpBuilder &builder) const
-			{
-				if (fn->hasAttr("locals")) {
-					auto names = fn->getAttr("locals");
-					std::vector<StringRef> names_vec;
-					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
-					if (std::find_if(arr.begin(),
-							arr.end(),
-							[identifier](mlir::Attribute attr) {
-								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
-							})
-						!= arr.end()) {
-						return;
-					}
-					std::transform(arr.begin(),
-						arr.end(),
-						std::back_inserter(names_vec),
-						[](mlir::Attribute attr) {
-							return mlir::cast<mlir::StringAttr>(attr).getValue();
-						});
-					names_vec.emplace_back(identifier);
-					fn->setAttr("locals", builder.getStrArrayAttr(names_vec));
-				} else {
-					fn->setAttr("locals", builder.getStrArrayAttr({ identifier }));
-				}
-			}
-		};
-
 		namespace {
-			void add_identifier(mlir::func::FuncOp &fn,
+			// Adds `identifier` to the StringRefAttr-array attribute named
+			// `attr_name` on `fn` if not already present. Used to track function-
+			// level locals/names sets that the bytecode emitter consumes.
+			void add_identifier_to(mlir::func::FuncOp fn,
+				mlir::StringRef attr_name,
 				mlir::StringRef identifier,
 				mlir::OpBuilder &builder)
 			{
-				if (fn->hasAttr("names")) {
-					auto names = fn->getAttr("names");
-					std::vector<StringRef> names_vec;
-					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
+				if (fn->hasAttr(attr_name)) {
+					auto arr = mlir::cast<mlir::ArrayAttr>(fn->getAttr(attr_name)).getValue();
 					if (std::find_if(arr.begin(),
 							arr.end(),
 							[identifier](mlir::Attribute attr) {
@@ -150,6 +82,7 @@ namespace py {
 						!= arr.end()) {
 						return;
 					}
+					std::vector<StringRef> names_vec;
 					std::transform(arr.begin(),
 						arr.end(),
 						std::back_inserter(names_vec),
@@ -157,230 +90,121 @@ namespace py {
 							return mlir::cast<mlir::StringAttr>(attr).getValue();
 						});
 					names_vec.emplace_back(identifier);
-					fn->setAttr("names", builder.getStrArrayAttr(names_vec));
+					fn->setAttr(attr_name, builder.getStrArrayAttr(names_vec));
 				} else {
-					fn->setAttr("names", builder.getStrArrayAttr({ identifier }));
+					fn->setAttr(attr_name, builder.getStrArrayAttr({ identifier }));
 				}
 			}
 
-			void build_const(mlir::func::FuncOp &fn, std::vector<mlir::Value> values) {}
+			void add_identifier(mlir::func::FuncOp fn,
+				mlir::StringRef identifier,
+				mlir::OpBuilder &builder)
+			{
+				add_identifier_to(fn, "names", identifier, builder);
+			}
 		}// namespace
 
-		template<typename T> struct GlobalDeclarationInterface : public T
-		{
-			template<typename... Args>
-			GlobalDeclarationInterface(Args &&...args) : T(std::forward<Args>(args)...)
-			{}
-
-			void addGlobalIdentifierToParentFunction(mlir::func::FuncOp &fn,
-				mlir::StringAttr identifier,
-				mlir::OpBuilder &builder) const
-			{
-				add_identifier(fn, identifier, builder);
-			}
+		// Categorizes how a Load/Store/Delete pattern should register its name
+		// with the parent FuncOp before lowering.
+		enum class NameKind {
+			None,// no registration (local-scope name / cell deref)
+			Local,// registers in the func's "locals" attribute
+			Global,// registers in the func's "names" attribute
 		};
 
-		struct StoreFastLowering
-			: public LocalDeclarationInterface<mlir::OpRewritePattern<py::StoreFastOp>>
-		{
-			using LocalDeclarationInterface<
-				OpRewritePattern<py::StoreFastOp>>::LocalDeclarationInterface;
-
-			mlir::LogicalResult matchAndRewrite(py::StoreFastOp op,
-				mlir::PatternRewriter &rewriter) const final
+		namespace {
+			void register_name_with_parent(mlir::Operation *op,
+				mlir::StringAttr name,
+				mlir::OpBuilder &builder,
+				NameKind kind)
 			{
-				auto object_name = op.getNameAttr();
-				auto object_value = op.getValue();
-
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
+				if (kind == NameKind::None) { return; }
+				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(op->getParentOp());
 				ASSERT(fn);
-				addLocalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreFastOp>(
-					op, op.getOutput().getType(), object_name, object_value);
-
-				return success();
+				add_identifier_to(
+					fn, kind == NameKind::Local ? "locals" : "names", name.getValue(), builder);
 			}
-		};
+		}// namespace
 
-		struct StoreGlobalLowering
-			: public GlobalDeclarationInterface<mlir::OpRewritePattern<py::StoreGlobalOp>>
+		// Trivial 1:1 lowering of py.load_* (and similar single-result name-
+		// referencing ops) to the corresponding emitpybytecode.LOAD_* op.
+		template<typename From, typename To, NameKind Kind = NameKind::None>
+		struct LoadNameLikeLowering : public mlir::OpRewritePattern<From>
 		{
-			using GlobalDeclarationInterface<
-				OpRewritePattern<py::StoreGlobalOp>>::GlobalDeclarationInterface;
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(py::StoreGlobalOp op,
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-				addGlobalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreGlobalOp>(
-					op, op.getOutput().getType(), object_name, op.getValue());
-
-				return success();
+				register_name_with_parent(op, op.getNameAttr(), rewriter, Kind);
+				rewriter.template replaceOpWithNewOp<To>(
+					op, op.getOutput().getType(), op.getNameAttr());
+				return mlir::success();
 			}
 		};
 
-		struct LoadNameLowering : public mlir::OpRewritePattern<py::LoadNameOp>
+		// Trivial 1:1 lowering of py.store_* to emitpybytecode.STORE_*.
+		template<typename From, typename To, NameKind Kind = NameKind::None>
+		struct StoreNameLikeLowering : public mlir::OpRewritePattern<From>
 		{
-			using OpRewritePattern<py::LoadNameOp>::OpRewritePattern;
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(py::LoadNameOp op,
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto object_name = op.getNameAttr();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadNameOp>(
-					op, op.getOutput().getType(), object_name);
-
-				return success();
+				register_name_with_parent(op, op.getNameAttr(), rewriter, Kind);
+				rewriter.template replaceOpWithNewOp<To>(
+					op, op.getOutput().getType(), op.getNameAttr(), op.getValue());
+				return mlir::success();
 			}
 		};
 
-
-		struct LoadGlobalLowering
-			: public GlobalDeclarationInterface<mlir::OpRewritePattern<py::LoadGlobalOp>>
+		// Trivial 1:1 lowering of py.delete_* to emitpybytecode.DELETE_*.
+		template<typename From, typename To, NameKind Kind = NameKind::None>
+		struct DeleteNameLikeLowering : public mlir::OpRewritePattern<From>
 		{
-			using GlobalDeclarationInterface<
-				OpRewritePattern<py::LoadGlobalOp>>::GlobalDeclarationInterface;
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(py::LoadGlobalOp op,
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-				addGlobalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadGlobalOp>(
-					op, op.getOutput().getType(), object_name);
-
-				return success();
+				register_name_with_parent(op, op.getNameAttr(), rewriter, Kind);
+				rewriter.template replaceOpWithNewOp<To>(op, op.getNameAttr());
+				return mlir::success();
 			}
 		};
 
+		using StoreNameLowering =
+			StoreNameLikeLowering<py::StoreNameOp, mlir::emitpybytecode::StoreNameOp>;
+		using StoreDerefLowering =
+			StoreNameLikeLowering<py::StoreDerefOp, mlir::emitpybytecode::StoreDerefOp>;
+		using StoreFastLowering = StoreNameLikeLowering<py::StoreFastOp,
+			mlir::emitpybytecode::StoreFastOp,
+			NameKind::Local>;
+		using StoreGlobalLowering = StoreNameLikeLowering<py::StoreGlobalOp,
+			mlir::emitpybytecode::StoreGlobalOp,
+			NameKind::Global>;
 
-		struct LoadFastLowering
-			: public LocalDeclarationInterface<mlir::OpRewritePattern<py::LoadFastOp>>
-		{
-			using LocalDeclarationInterface<
-				mlir::OpRewritePattern<py::LoadFastOp>>::LocalDeclarationInterface;
+		using LoadNameLowering =
+			LoadNameLikeLowering<py::LoadNameOp, mlir::emitpybytecode::LoadNameOp>;
+		using LoadDerefLowering =
+			LoadNameLikeLowering<py::LoadDerefOp, mlir::emitpybytecode::LoadDerefOp>;
+		using LoadFastLowering =
+			LoadNameLikeLowering<py::LoadFastOp, mlir::emitpybytecode::LoadFastOp, NameKind::Local>;
+		using LoadGlobalLowering = LoadNameLikeLowering<py::LoadGlobalOp,
+			mlir::emitpybytecode::LoadGlobalOp,
+			NameKind::Global>;
 
-			mlir::LogicalResult matchAndRewrite(py::LoadFastOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-				addLocalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadFastOp>(
-					op, op.getOutput().getType(), object_name);
-
-				return success();
-			}
-		};
-
-		struct LoadDerefLowering : public mlir::OpRewritePattern<py::LoadDerefOp>
-		{
-			using OpRewritePattern<py::LoadDerefOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(py::LoadDerefOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadDerefOp>(
-					op, op.getOutput().getType(), object_name);
-
-				return success();
-			}
-		};
-
-		struct DeleteNameLowering : public mlir::OpRewritePattern<py::DeleteNameOp>
-		{
-			using OpRewritePattern<py::DeleteNameOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(py::DeleteNameOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto object_name = op.getNameAttr();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteNameOp>(op, object_name);
-
-				return success();
-			}
-		};
-
-		struct DeleteFastLowering
-			: public LocalDeclarationInterface<mlir::OpRewritePattern<py::DeleteFastOp>>
-		{
-			using LocalDeclarationInterface<
-				mlir::OpRewritePattern<py::DeleteFastOp>>::LocalDeclarationInterface;
-
-			mlir::LogicalResult matchAndRewrite(py::DeleteFastOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-				addLocalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteFastOp>(op, object_name);
-
-				return success();
-			}
-		};
-
-		struct DeleteGlobalLowering
-			: public GlobalDeclarationInterface<mlir::OpRewritePattern<py::DeleteGlobalOp>>
-		{
-			using GlobalDeclarationInterface<
-				OpRewritePattern<py::DeleteGlobalOp>>::GlobalDeclarationInterface;
-
-			mlir::LogicalResult matchAndRewrite(py::DeleteGlobalOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-				addGlobalIdentifierToParentFunction(fn, object_name, rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteGlobalOp>(op, object_name);
-
-				return success();
-			}
-		};
-
-		struct DeleteDerefLowering : public mlir::OpRewritePattern<py::DeleteDerefOp>
-		{
-			using OpRewritePattern<py::DeleteDerefOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(py::DeleteDerefOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent = op.getOperation()->getParentOp();
-				auto fn = mlir::cast_or_null<mlir::func::FuncOp>(parent);
-				ASSERT(fn);
-				auto object_name = op.getNameAttr();
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteDerefOp>(op, object_name);
-
-				return success();
-			}
-		};
+		using DeleteNameLowering =
+			DeleteNameLikeLowering<py::DeleteNameOp, mlir::emitpybytecode::DeleteNameOp>;
+		using DeleteDerefLowering =
+			DeleteNameLikeLowering<py::DeleteDerefOp, mlir::emitpybytecode::DeleteDerefOp>;
+		using DeleteFastLowering = DeleteNameLikeLowering<py::DeleteFastOp,
+			mlir::emitpybytecode::DeleteFastOp,
+			NameKind::Local>;
+		using DeleteGlobalLowering = DeleteNameLikeLowering<py::DeleteGlobalOp,
+			mlir::emitpybytecode::DeleteGlobalOp,
+			NameKind::Global>;
 
 		struct CallFunctionLowering : public mlir::OpRewritePattern<py::FunctionCallOp>
 		{
@@ -576,84 +400,72 @@ namespace py {
 
 #undef BINARY_OP_LOWERING
 
-		struct LoadAssertionErrorOpLowering
-			: public mlir::OpRewritePattern<mlir::py::LoadAssertionError>
+		// Trivial 1:1 lowering of a py.unary_* op to emitpybytecode.UNARY_OP
+		// with the corresponding Unary::Operation enum baked in.
+		template<typename From, Unary::Operation Kind>
+		struct UnaryOpLowering : public mlir::OpRewritePattern<From>
 		{
-			using OpRewritePattern<mlir::py::LoadAssertionError>::OpRewritePattern;
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::LoadAssertionError op,
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadAssertionError>(
-					op, op.getOutput().getType());
-
-				return success();
+				rewriter.template replaceOpWithNewOp<mlir::emitpybytecode::UnaryOp>(
+					op, op.getOutput().getType(), op.getInput(), static_cast<uint8_t>(Kind));
+				return mlir::success();
 			}
 		};
 
-		struct PositiveOpLowering : public mlir::OpRewritePattern<mlir::py::PositiveOp>
-		{
-			using OpRewritePattern<mlir::py::PositiveOp>::OpRewritePattern;
+		using PositiveOpLowering =
+			UnaryOpLowering<mlir::py::PositiveOp, Unary::Operation::POSITIVE>;
+		using NegativeOpLowering =
+			UnaryOpLowering<mlir::py::NegativeOp, Unary::Operation::NEGATIVE>;
+		using InvertOpLowering = UnaryOpLowering<mlir::py::InvertOp, Unary::Operation::INVERT>;
+		using NotOpLowering = UnaryOpLowering<mlir::py::NotOp, Unary::Operation::NOT>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::PositiveOp op,
+		// Generic 1:1 lowering for ops whose source and target dialect schemas
+		// match exactly: same operand types/order, same attribute names/types,
+		// same result types. Forwards everything from source op to target op.
+		template<typename From, typename To>
+		struct DirectReplaceLowering : public mlir::OpRewritePattern<From>
+		{
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnaryOp>(op,
-					op.getOutput().getType(),
-					op.getInput(),
-					static_cast<uint8_t>(Unary::Operation::POSITIVE));
-
-				return success();
+				rewriter.template replaceOpWithNewOp<To>(op,
+					op.getOperation()->getResultTypes(),
+					op.getOperation()->getOperands(),
+					op.getOperation()->getAttrs());
+				return mlir::success();
 			}
 		};
 
-		struct NegativeOpLowering : public mlir::OpRewritePattern<mlir::py::NegativeOp>
+		// Like DirectReplaceLowering, but additionally registers the name
+		// returned by NameGetter in the parent FuncOp's "names" attribute.
+		// Used for ops whose names must appear in the function-level name
+		// table the bytecode emitter consumes (LoadMethod, StoreAttribute).
+		template<typename From, typename To, auto NameGetter>
+		struct DirectReplaceRegisterName : public mlir::OpRewritePattern<From>
 		{
-			using OpRewritePattern<mlir::py::NegativeOp>::OpRewritePattern;
+			using mlir::OpRewritePattern<From>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::NegativeOp op,
+			mlir::LogicalResult matchAndRewrite(From op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnaryOp>(op,
-					op.getOutput().getType(),
-					op.getInput(),
-					static_cast<uint8_t>(Unary::Operation::NEGATIVE));
-
-				return success();
+				auto parent_fn = op->template getParentOfType<mlir::func::FuncOp>();
+				add_identifier(parent_fn, (op.*NameGetter)(), rewriter);
+				rewriter.template replaceOpWithNewOp<To>(op,
+					op.getOperation()->getResultTypes(),
+					op.getOperation()->getOperands(),
+					op.getOperation()->getAttrs());
+				return mlir::success();
 			}
 		};
 
-		struct InvertOpLowering : public mlir::OpRewritePattern<mlir::py::InvertOp>
-		{
-			using OpRewritePattern<mlir::py::InvertOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::InvertOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnaryOp>(op,
-					op.getOutput().getType(),
-					op.getInput(),
-					static_cast<uint8_t>(Unary::Operation::INVERT));
-
-				return success();
-			}
-		};
-
-		struct NotOpLowering : public mlir::OpRewritePattern<mlir::py::NotOp>
-		{
-			using OpRewritePattern<mlir::py::NotOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::NotOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnaryOp>(op,
-					op.getOutput().getType(),
-					op.getInput(),
-					static_cast<uint8_t>(Unary::Operation::NOT));
-
-				return success();
-			}
-		};
+		using LoadAssertionErrorOpLowering = DirectReplaceLowering<mlir::py::LoadAssertionError,
+			mlir::emitpybytecode::LoadAssertionError>;
 
 		struct BuildDictOpLowering : public mlir::OpRewritePattern<mlir::py::BuildDictOp>
 		{
@@ -787,33 +599,11 @@ namespace py {
 			}
 		};
 
-		struct ListAppendOpLowering : public mlir::OpRewritePattern<mlir::py::ListAppendOp>
-		{
-			using OpRewritePattern<mlir::py::ListAppendOp>::OpRewritePattern;
+		using ListAppendOpLowering =
+			DirectReplaceLowering<mlir::py::ListAppendOp, mlir::emitpybytecode::ListAppend>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::ListAppendOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ListAppend>(
-					op, op.getList(), op.getValue());
-
-				return success();
-			}
-		};
-
-		struct DictAddOpLowering : public mlir::OpRewritePattern<mlir::py::DictAddOp>
-		{
-			using OpRewritePattern<mlir::py::DictAddOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::DictAddOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DictAdd>(
-					op, op.getDict(), op.getKey(), op.getValue());
-
-				return success();
-			}
-		};
+		using DictAddOpLowering =
+			DirectReplaceLowering<mlir::py::DictAddOp, mlir::emitpybytecode::DictAdd>;
 
 		struct BuildTupleOpLowering : public mlir::OpRewritePattern<mlir::py::BuildTupleOp>
 		{
@@ -892,33 +682,11 @@ namespace py {
 			}
 		};
 
-		struct SetAddOpLowering : public mlir::OpRewritePattern<mlir::py::SetAddOp>
-		{
-			using OpRewritePattern<mlir::py::SetAddOp>::OpRewritePattern;
+		using SetAddOpLowering =
+			DirectReplaceLowering<mlir::py::SetAddOp, mlir::emitpybytecode::SetAdd>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::SetAddOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::SetAdd>(
-					op, op.getSet(), op.getValue());
-
-				return success();
-			}
-		};
-
-		struct BuildStringOpLowering : public mlir::OpRewritePattern<mlir::py::BuildStringOp>
-		{
-			using OpRewritePattern<mlir::py::BuildStringOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::BuildStringOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildString>(
-					op, op.getOutput().getType(), op.getElements());
-
-				return success();
-			}
-		};
+		using BuildStringOpLowering =
+			DirectReplaceLowering<mlir::py::BuildStringOp, mlir::emitpybytecode::BuildString>;
 
 		struct FormatValueOpLowering : public mlir::OpRewritePattern<mlir::py::FormatValueOp>
 		{
@@ -936,126 +704,31 @@ namespace py {
 			}
 		};
 
-		struct LoadAttributeOpLowering : public mlir::OpRewritePattern<mlir::py::LoadAttributeOp>
-		{
-			using OpRewritePattern<mlir::py::LoadAttributeOp>::OpRewritePattern;
+		using LoadAttributeOpLowering =
+			DirectReplaceLowering<mlir::py::LoadAttributeOp, mlir::emitpybytecode::LoadAttribute>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::LoadAttributeOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadAttribute>(
-					op, op.getOutput().getType(), op.getSelf(), op.getAttr());
+		using DeleteAttributeOpLowering = DirectReplaceLowering<mlir::py::DeleteAttributeOp,
+			mlir::emitpybytecode::DeleteAttribute>;
 
-				return success();
-			}
-		};
+		using LoadMethodOpLowering = DirectReplaceRegisterName<mlir::py::LoadMethodOp,
+			mlir::emitpybytecode::LoadMethod,
+			&mlir::py::LoadMethodOp::getMethodName>;
 
-		struct DeleteAttributeOpLowering
-			: public mlir::OpRewritePattern<mlir::py::DeleteAttributeOp>
-		{
-			using OpRewritePattern<mlir::py::DeleteAttributeOp>::OpRewritePattern;
+		using BinarySubscriptOpLowering = DirectReplaceLowering<mlir::py::BinarySubscriptOp,
+			mlir::emitpybytecode::BinarySubscript>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::DeleteAttributeOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteAttribute>(
-					op, op.getSelf(), op.getAttr());
+		using StoreSubscriptOpLowering =
+			DirectReplaceLowering<mlir::py::StoreSubscriptOp, mlir::emitpybytecode::StoreSubscript>;
 
-				return success();
-			}
-		};
+		using DeleteSubscriptOpLowering = DirectReplaceLowering<mlir::py::DeleteSubscriptOp,
+			mlir::emitpybytecode::DeleteSubscript>;
 
-		struct LoadMethodOpLowering : public mlir::OpRewritePattern<mlir::py::LoadMethodOp>
-		{
-			using OpRewritePattern<mlir::py::LoadMethodOp>::OpRewritePattern;
+		using StoreAttributeOpLowering = DirectReplaceRegisterName<mlir::py::StoreAttributeOp,
+			mlir::emitpybytecode::StoreAttribute,
+			&mlir::py::StoreAttributeOp::getAttr>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::LoadMethodOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent_fn = op->getParentOfType<mlir::func::FuncOp>();
-				add_identifier(parent_fn, op.getMethodName(), rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadMethod>(
-					op, op.getMethod().getType(), op.getSelf(), op.getMethodName());
-
-				return success();
-			}
-		};
-
-		struct BinarySubscriptOpLowering
-			: public mlir::OpRewritePattern<mlir::py::BinarySubscriptOp>
-		{
-			using OpRewritePattern<mlir::py::BinarySubscriptOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::BinarySubscriptOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BinarySubscript>(
-					op, op.getOutput().getType(), op.getSelf(), op.getSubscript());
-
-				return success();
-			}
-		};
-
-		struct StoreSubscriptOpLowering : public mlir::OpRewritePattern<mlir::py::StoreSubscriptOp>
-		{
-			using OpRewritePattern<mlir::py::StoreSubscriptOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::StoreSubscriptOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreSubscript>(
-					op, op.getSelf(), op.getSubscript(), op.getValue());
-
-				return success();
-			}
-		};
-
-		struct DeleteSubscriptOpLowering
-			: public mlir::OpRewritePattern<mlir::py::DeleteSubscriptOp>
-		{
-			using OpRewritePattern<mlir::py::DeleteSubscriptOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::DeleteSubscriptOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::DeleteSubscript>(
-					op, op.getSelf(), op.getSubscript());
-
-				return success();
-			}
-		};
-
-		struct StoreAttributeOpLowering : public mlir::OpRewritePattern<mlir::py::StoreAttributeOp>
-		{
-			using OpRewritePattern<mlir::py::StoreAttributeOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::StoreAttributeOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent_fn = op->getParentOfType<mlir::func::FuncOp>();
-				add_identifier(parent_fn, op.getAttribute(), rewriter);
-
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::StoreAttribute>(
-					op, op.getSelf(), op.getAttribute(), op.getValue());
-
-				return success();
-			}
-		};
-
-		struct BuildSliceOpLowering : public mlir::OpRewritePattern<mlir::py::BuildSliceOp>
-		{
-			using OpRewritePattern<mlir::py::BuildSliceOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::BuildSliceOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildSlice>(
-					op, op.getSlice().getType(), op.getLower(), op.getUpper(), op.getStep());
-
-				return success();
-			}
-		};
+		using BuildSliceOpLowering =
+			DirectReplaceLowering<mlir::py::BuildSliceOp, mlir::emitpybytecode::BuildSlice>;
 
 		struct MakeFunctionOpLowering : public mlir::OpRewritePattern<mlir::py::MakeFunctionOp>
 		{
@@ -1112,36 +785,8 @@ namespace py {
 				for (size_t i = 0; i < op.getNumArguments(); ++i) {
 					auto arg_name = op.getArgAttr(i, "llvm.name");
 					ASSERT(arg_name);
-					add_local(op, mlir::cast<mlir::StringAttr>(arg_name).getValue(), builder);
-				}
-			}
-
-			void add_local(mlir::func::FuncOp &fn,
-				mlir::StringRef identifier,
-				mlir::OpBuilder &builder) const
-			{
-				if (fn->hasAttr("locals")) {
-					auto names = fn->getAttr("locals");
-					std::vector<StringRef> names_vec;
-					auto arr = mlir::cast<mlir::ArrayAttr>(names).getValue();
-					if (std::find_if(arr.begin(),
-							arr.end(),
-							[identifier](mlir::Attribute attr) {
-								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
-							})
-						!= arr.end()) {
-						return;
-					}
-					std::transform(arr.begin(),
-						arr.end(),
-						std::back_inserter(names_vec),
-						[](mlir::Attribute attr) {
-							return mlir::cast<mlir::StringAttr>(attr).getValue();
-						});
-					names_vec.emplace_back(identifier);
-					fn->setAttr("locals", builder.getStrArrayAttr(names_vec));
-				} else {
-					fn->setAttr("locals", builder.getStrArrayAttr({ identifier }));
+					add_identifier_to(
+						op, "locals", mlir::cast<mlir::StringAttr>(arg_name).getValue(), builder);
 				}
 			}
 		};
@@ -1889,32 +1534,11 @@ namespace py {
 			}
 		};
 
-		struct WithExceptStartOpLowering
-			: public mlir::OpRewritePattern<mlir::py::WithExceptStartOp>
-		{
-			using OpRewritePattern<mlir::py::WithExceptStartOp>::OpRewritePattern;
+		using WithExceptStartOpLowering = DirectReplaceLowering<mlir::py::WithExceptStartOp,
+			mlir::emitpybytecode::WithExceptStart>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::WithExceptStartOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::WithExceptStart>(
-					op, op.getOutput().getType(), op.getExitMethod());
-				return success();
-			}
-		};
-
-		struct ClearExceptionStateOpLowering
-			: public mlir::OpRewritePattern<mlir::py::ClearExceptionStateOp>
-		{
-			using OpRewritePattern<mlir::py::ClearExceptionStateOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::ClearExceptionStateOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ClearExceptionState>(op);
-				return success();
-			}
-		};
+		using ClearExceptionStateOpLowering = DirectReplaceLowering<mlir::py::ClearExceptionStateOp,
+			mlir::emitpybytecode::ClearExceptionState>;
 
 		struct RaiseOpLowering : public mlir::OpRewritePattern<mlir::py::RaiseOp>
 		{
@@ -2001,32 +1625,11 @@ namespace py {
 			}
 		};
 
-		struct ImportAllOpLowering : public mlir::OpRewritePattern<mlir::py::ImportAllOp>
-		{
-			using OpRewritePattern<mlir::py::ImportAllOp>::OpRewritePattern;
+		using ImportAllOpLowering =
+			DirectReplaceLowering<mlir::py::ImportAllOp, mlir::emitpybytecode::ImportAll>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::ImportAllOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ImportAll>(op, op.getModule());
-
-				return success();
-			}
-		};
-
-		struct ImportFromOpLowering : public mlir::OpRewritePattern<mlir::py::ImportFromOp>
-		{
-			using OpRewritePattern<mlir::py::ImportFromOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::ImportFromOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ImportFrom>(
-					op, op.getModule().getType(), op.getModule(), op.getName());
-
-				return success();
-			}
-		};
+		using ImportFromOpLowering =
+			DirectReplaceLowering<mlir::py::ImportFromOp, mlir::emitpybytecode::ImportFrom>;
 
 		struct CastToBoolOpLowering : public mlir::OpRewritePattern<mlir::py::CastToBoolOp>
 		{
@@ -2041,18 +1644,8 @@ namespace py {
 			}
 		};
 
-		struct YieldOpLowering : public mlir::OpRewritePattern<mlir::py::YieldOp>
-		{
-			using OpRewritePattern<mlir::py::YieldOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::YieldOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::Yield>(
-					op, op.getValue().getType(), op.getValue());
-				return success();
-			}
-		};
+		using YieldOpLowering =
+			DirectReplaceLowering<mlir::py::YieldOp, mlir::emitpybytecode::Yield>;
 
 		struct YieldFromOpLowering : public mlir::OpRewritePattern<mlir::py::YieldFromOp>
 		{
@@ -2073,44 +1666,14 @@ namespace py {
 			}
 		};
 
-		struct UnpackSequenceOpLowering : public mlir::OpRewritePattern<mlir::py::UnpackSequenceOp>
-		{
-			using OpRewritePattern<mlir::py::UnpackSequenceOp>::OpRewritePattern;
+		using UnpackSequenceOpLowering = DirectReplaceLowering<mlir::py::UnpackSequenceOp,
+			mlir::emitpybytecode::UnpackSequenceOp>;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::UnpackSequenceOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnpackSequenceOp>(
-					op, op.getUnpackedValues().getType(), op.getIterable());
-				return success();
-			}
-		};
+		using UnpackExpandOpLowering =
+			DirectReplaceLowering<mlir::py::UnpackExpandOp, mlir::emitpybytecode::UnpackExpandOp>;
 
-		struct UnpackExpandOpLowering : public mlir::OpRewritePattern<mlir::py::UnpackExpandOp>
-		{
-			using OpRewritePattern<mlir::py::UnpackExpandOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::UnpackExpandOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::UnpackExpandOp>(
-					op, op.getUnpackedValues().getType(), op.getRest().getType(), op.getIterable());
-				return success();
-			}
-		};
-
-		struct GetAwaitableOpLowering : public mlir::OpRewritePattern<mlir::py::GetAwaitableOp>
-		{
-			using OpRewritePattern<mlir::py::GetAwaitableOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(mlir::py::GetAwaitableOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::GetAwaitableOp>(
-					op, op.getIterator().getType(), op.getIterable());
-				return success();
-			}
-		};
+		using GetAwaitableOpLowering =
+			DirectReplaceLowering<mlir::py::GetAwaitableOp, mlir::emitpybytecode::GetAwaitableOp>;
 
 		struct PythonToPythonBytecodePass
 			: public PassWrapper<PythonToPythonBytecodePass, OperationPass<ModuleOp>>

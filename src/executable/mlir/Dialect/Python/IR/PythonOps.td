@@ -434,7 +434,7 @@ def StoreAttributeOp: Python_Op<"store_attribute"> {
     let summary = "Store value in object using an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
-                         StrAttr:$attribute,
+                         StrAttr:$attr,
                          Python_PyObjectType:$value);
 }
 

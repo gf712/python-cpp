@@ -905,7 +905,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::SetAdd &op)
 {
-	emit<SetAdd>(get_register(op.getSet()), get_register(op.getElement()));
+	emit<SetAdd>(get_register(op.getSet()), get_register(op.getValue()));
 	return success();
 }
 
@@ -960,14 +960,14 @@ template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::StoreAttribute &op)
 {
 	emit<StoreAttr>(
-		get_register(op.getSelf()), get_register(op.getValue()), get_name_idx(op.getAttribute()));
+		get_register(op.getSelf()), get_register(op.getValue()), get_name_idx(op.getAttr()));
 	return success();
 }
 
 template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::DeleteAttribute &op)
 {
-	emit<DeleteAttr>(get_register(op.getSelf()), add_name(op.getAttribute()));
+	emit<DeleteAttr>(get_register(op.getSelf()), add_name(op.getAttr()));
 	return success();
 }
 

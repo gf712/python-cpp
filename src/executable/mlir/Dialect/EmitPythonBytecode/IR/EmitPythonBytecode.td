@@ -273,9 +273,9 @@ def EmitPythonBytecode_BuildSet : EmitPythonBytecode_Op<"BUILD_SET"> {
 }
 
 def EmitPythonBytecode_SetAdd : EmitPythonBytecode_Op<"SET_ADD"> {
-    let summary = "Adds elemets to a set";
+    let summary = "Adds an element to a set";
 
-    let arguments = (ins Python_PyObjectType:$set, Python_PyObjectType:$element);
+    let arguments = (ins Python_PyObjectType:$set, Python_PyObjectType:$value);
 }
 
 def EmitPythonBytecode_SetUpdate : EmitPythonBytecode_Op<"SET_UPDATE"> {
@@ -324,7 +324,7 @@ def EmitPythonBytecode_DeleteAttribute: EmitPythonBytecode_Op<"DELETE_ATTRIBUTE"
     let summary = "Delete an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
-                         StrAttr:$attribute);
+                         StrAttr:$attr);
 }
 
 def EmitPythonBytecode_BinarySubscript: EmitPythonBytecode_Op<"BINARY_SUBSCRIPT"> {
@@ -355,7 +355,7 @@ def EmitPythonBytecode_StoreAttribute: EmitPythonBytecode_Op<"STORE_ATTRIBUTE"> 
     let summary = "Store value in object using an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
-                         StrAttr:$attribute,
+                         StrAttr:$attr,
                          Python_PyObjectType:$value);
 }
 
