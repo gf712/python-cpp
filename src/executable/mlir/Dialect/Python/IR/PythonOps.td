@@ -3,11 +3,12 @@ include "Python/IR/PythonTypes.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Python_Op<string mneomic, list<Trait> traits = []> : Op<Python_Dialect, mneomic, traits>;
 
-def ConstantOp : Python_Op<"constant"> {
+def ConstantOp : Python_Op<"constant", [Pure]> {
     let summary = "Build a PyObject from a constant";
 
     let arguments = (ins AnyAttr:$value);

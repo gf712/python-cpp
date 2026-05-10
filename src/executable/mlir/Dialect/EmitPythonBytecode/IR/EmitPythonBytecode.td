@@ -1,12 +1,13 @@
 include "EmitPythonBytecodeBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "Python/IR/PythonTypes.td"
 
 // Base class for EmitPythonBytecode dialect ops.
 class EmitPythonBytecode_Op<string mnemonic, list<Trait> traits = []>
     : Op<EmitPythonBytecode_Dialect, mnemonic, traits>;
 
-def EmitPythonBytecode_ConstantOp: EmitPythonBytecode_Op<"LOAD_CONST"> {
+def EmitPythonBytecode_ConstantOp: EmitPythonBytecode_Op<"LOAD_CONST", [Pure]> {
     let arguments = (ins AnyAttr:$value);
 
     let results = (outs Python_PyObjectType:$output);
