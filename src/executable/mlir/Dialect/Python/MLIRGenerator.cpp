@@ -2447,6 +2447,88 @@ MLIRGenerator::RAIIScope MLIRGenerator::setup_function(mlir::func::FuncOp &f,
 	return function_scope;
 }
 
+// Codegen each AST node and collect the resulting SSA values (as the
+// existing MLIRValue* indirection used elsewhere on MLIRGenerator's private
+// API).
+std::vector<MLIRGenerator::MLIRValue *> evaluate_expressions_for_make_function(MLIRGenerator &gen,
+	const std::vector<std::shared_ptr<ast::ASTNode>> &expressions)
+{
+	std::vector<MLIRGenerator::MLIRValue *> values;
+	values.reserve(expressions.size());
+	for (const auto &expr : expressions) {
+		auto *v = expr->codegen(&gen);
+		ASSERT(v);
+		values.push_back(static_cast<MLIRGenerator::MLIRValue *>(v));
+	}
+	return values;
+}
+
+std::vector<MLIRGenerator::MLIRValue *> evaluate_default_arguments_for_make_function(
+	MLIRGenerator &gen,
+	const std::shared_ptr<ast::Arguments> &args)
+{
+	return evaluate_expressions_for_make_function(gen, args->defaults());
+}
+
+std::vector<MLIRGenerator::MLIRValue *> evaluate_keyword_default_arguments_for_make_function(
+	MLIRGenerator &gen,
+	const std::shared_ptr<ast::Arguments> &args)
+{
+	std::vector<MLIRGenerator::MLIRValue *> kw_defaults;
+	kw_defaults.reserve(args->kw_defaults().size());
+	for (const auto &default_ : args->kw_defaults()) {
+		if (default_) {
+			kw_defaults.push_back(static_cast<MLIRGenerator::MLIRValue *>(default_->codegen(&gen)));
+		}
+	}
+	return kw_defaults;
+}
+
+// Apply a decorator chain to the value currently stored under
+// function_name. Decorators are applied in reverse order (innermost first)
+// per Python's @ semantics.
+void apply_decorators_for_make_function(MLIRGenerator &gen,
+	const std::vector<MLIRGenerator::MLIRValue *> &decorator_functions,
+	const std::string &function_name,
+	const SourceLocation &source_location)
+{
+	if (decorator_functions.empty()) { return; }
+
+	auto &builder = gen.m_context.builder();
+	auto empty_keywords_attr = mlir::DenseStringElementsAttr::get(
+		mlir::VectorType::get({ 0 }, mlir::StringAttr::get(&gen.m_context.ctx()).getType()), {});
+
+	mlir::Value arg = gen.load_name(function_name, source_location)->value;
+	for (auto *decorator : decorator_functions | std::ranges::views::reverse) {
+		mlir::Value decorator_function = decorator->value;
+		arg = builder.create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),
+			gen.m_context->pyobject_type(),
+			decorator_function,
+			mlir::ValueRange{ arg },
+			empty_keywords_attr,
+			mlir::ValueRange{},
+			false,
+			false);
+	}
+	gen.store_name(function_name, gen.new_value(arg), source_location);
+}
+
+std::vector<std::string> MLIRGenerator::collect_function_captures(const std::string &mangled_name)
+{
+	std::vector<std::string> captures;
+	const auto &scope = *m_variable_visibility.at(mangled_name);
+	// Cell captures first, then free captures. Order matters: the bytecode
+	// emitter consumes this list and assigns indices in this order.
+	for (auto kind : { VariablesResolver::Visibility::CELL, VariablesResolver::Visibility::FREE }) {
+		for (const auto &el : scope.symbol_map.symbols) {
+			if (el.visibility == kind && scope.captures.contains(el.name)) {
+				captures.push_back(el.name);
+			}
+		}
+	}
+	return captures;
+}
+
 MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &function_name,
 	const std::string &mangled_name,
 	const std::shared_ptr<ast::Arguments> &args,
@@ -2458,122 +2540,88 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 {
 	auto *last_block = m_context.builder().getBlock();
 
-	std::vector<mlir::Value> decorator_functions;
-	decorator_functions.reserve(decorator_list.size());
-	for (const auto &decorator_function : decorator_list) {
-		auto *f = decorator_function->codegen(this);
-		ASSERT(f);
-		decorator_functions.push_back(static_cast<MLIRValue *>(f)->value);
-	}
+	// Evaluate decorator expressions, then default-value expressions, in the
+	// caller's scope (before we create the new FuncOp).
+	auto decorator_functions = evaluate_expressions_for_make_function(*this, decorator_list);
+	auto defaults = evaluate_default_arguments_for_make_function(*this, args);
+	auto kw_defaults = evaluate_keyword_default_arguments_for_make_function(*this, args);
 
 	const size_t args_size = args->args().size() + args->posonlyargs().size()
 							 + args->kwonlyargs().size() + (args->vararg() != nullptr)
 							 + (args->kwarg() != nullptr);
-
-	std::vector<mlir::Value> defaults;
-	for (const auto &default_ : args->defaults()) {
-		defaults.push_back(static_cast<MLIRValue *>(default_->codegen(this))->value);
-	}
-
-	std::vector<mlir::Value> kw_defaults;
-	kw_defaults.reserve(args->kw_defaults().size());
-	for (const auto &default_ : args->kw_defaults()) {
-		if (default_) {
-			kw_defaults.push_back(static_cast<MLIRValue *>(default_->codegen(this))->value);
-		}
-	}
-
 	std::vector<mlir::Type> param_types(args_size, m_context->pyobject_type());
-
 	auto func_type =
 		mlir::FunctionType::get(&m_context.ctx(), param_types, { m_context->pyobject_type() });
+
+	// Build the per-argument llvm.name / llvm.kwonlyarg / llvm.vararg /
+	// llvm.kwarg attribute dicts. Order: positional, kwonly, vararg, kwarg
+	// - the downstream bytecode emitter relies on this order to assign
+	// argument indices.
+	auto &builder = m_context.builder();
+	const auto make_arg_attr = [&](mlir::StringRef name,
+								   std::initializer_list<mlir::NamedAttribute> extras = {}) {
+		std::vector<mlir::NamedAttribute> arg_attrs;
+		arg_attrs.push_back(builder.getNamedAttr("llvm.name", builder.getStringAttr(name)));
+		arg_attrs.insert(arg_attrs.end(), extras);
+		return builder.getDictionaryAttr(arg_attrs);
+	};
 	std::vector<mlir::DictionaryAttr> args_attrs;
-	for (const auto &arg : args->argument_names()) {
-		std::vector<mlir::NamedAttribute> arg_attrs;
-		arg_attrs.push_back(
-			m_context.builder().getNamedAttr("llvm.name", m_context.builder().getStringAttr(arg)));
-		args_attrs.push_back(m_context.builder().getDictionaryAttr(arg_attrs));
-	}
-
+	for (const auto &arg : args->argument_names()) { args_attrs.push_back(make_arg_attr(arg)); }
 	for (const auto &arg : args->kw_only_argument_names()) {
-		std::vector<mlir::NamedAttribute> arg_attrs;
-		arg_attrs.push_back(
-			m_context.builder().getNamedAttr("llvm.name", m_context.builder().getStringAttr(arg)));
-		arg_attrs.push_back(m_context.builder().getNamedAttr(
-			"llvm.kwonlyarg", m_context.builder().getBoolAttr(true)));
-		args_attrs.push_back(m_context.builder().getDictionaryAttr(arg_attrs));
+		args_attrs.push_back(make_arg_attr(
+			arg, { builder.getNamedAttr("llvm.kwonlyarg", builder.getBoolAttr(true)) }));
 	}
-
 	if (args->vararg()) {
-		std::vector<mlir::NamedAttribute> arg_attrs;
-		arg_attrs.push_back(m_context.builder().getNamedAttr(
-			"llvm.name", m_context.builder().getStringAttr(args->vararg()->name())));
-		arg_attrs.push_back(
-			m_context.builder().getNamedAttr("llvm.vararg", m_context.builder().getBoolAttr(true)));
-		args_attrs.push_back(m_context.builder().getDictionaryAttr(arg_attrs));
+		args_attrs.push_back(make_arg_attr(args->vararg()->name(),
+			{ builder.getNamedAttr("llvm.vararg", builder.getBoolAttr(true)) }));
 	}
-
 	if (args->kwarg()) {
-		std::vector<mlir::NamedAttribute> arg_attrs;
-		arg_attrs.push_back(m_context.builder().getNamedAttr(
-			"llvm.name", m_context.builder().getStringAttr(args->kwarg()->name())));
-		arg_attrs.push_back(
-			m_context.builder().getNamedAttr("llvm.kwarg", m_context.builder().getBoolAttr(true)));
-		args_attrs.push_back(m_context.builder().getDictionaryAttr(arg_attrs));
+		args_attrs.push_back(make_arg_attr(args->kwarg()->name(),
+			{ builder.getNamedAttr("llvm.kwarg", builder.getBoolAttr(true)) }));
 	}
 
-	m_context.builder().setInsertionPointToEnd(
-		&m_context.module().getBodyRegion().getBlocks().back());
-	auto f = m_context.builder().create<mlir::func::FuncOp>(
-		loc(m_context.builder(), m_context.filename(), source_location),
+	builder.setInsertionPointToEnd(&m_context.module().getBodyRegion().getBlocks().back());
+	auto f = builder.create<mlir::func::FuncOp>(loc(builder, m_context.filename(), source_location),
 		mangled_name,
 		func_type,
 		mlir::ArrayRef<mlir::NamedAttribute>{},
 		args_attrs);
-	m_context.builder().setInsertionPointToStart(f.addEntryBlock());
+	builder.setInsertionPointToStart(f.addEntryBlock());
 
 	std::vector<std::string> captures;
-
 	{
 		[[maybe_unused]] auto function_scope = setup_function(f, function_name, mangled_name);
-		if (is_async) { f->setAttr("async", m_context.builder().getBoolAttr(true)); }
+		if (is_async) { f->setAttr("async", builder.getBoolAttr(true)); }
 
-		// captures.reserve(m_variable_visibility.at(mangled_name)->captures.size());
-		for (const auto &el : m_variable_visibility.at(mangled_name)->symbol_map.symbols) {
-			if (el.visibility == VariablesResolver::Visibility::CELL
-				&& m_variable_visibility.at(mangled_name)->captures.contains(el.name)) {
-				captures.push_back(el.name);
-			}
-		}
+		captures = collect_function_captures(mangled_name);
 
-		for (const auto &el : m_variable_visibility.at(mangled_name)->symbol_map.symbols) {
-			if (el.visibility == VariablesResolver::Visibility::FREE
-				&& m_variable_visibility.at(mangled_name)->captures.contains(el.name)) {
-				captures.push_back(el.name);
-			}
-		}
-
-		m_context.builder().setInsertionPointToStart(&f.front());
+		builder.setInsertionPointToStart(&f.front());
 		for (const auto &el : body) { el->codegen(this); }
 
-		if (m_context.builder().getBlock()->empty()
-			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			auto none = m_context.builder().create<mlir::py::ConstantOp>(
-				m_context.builder().getUnknownLoc(), m_context.builder().getNoneType());
+		if (builder.getBlock()->empty()
+			|| !builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
+			auto none = builder.create<mlir::py::ConstantOp>(
+				builder.getUnknownLoc(), builder.getNoneType());
 			return_value(new_value(none), source_location);
 		}
 	}
 
-	m_context.builder().setInsertionPointToEnd(last_block);
+	builder.setInsertionPointToEnd(last_block);
 	std::vector<mlir::StringRef> captures_ref;
 	captures_ref.reserve(captures.size());
 	for (const auto &el : captures) { captures_ref.push_back(el); }
-	auto fn_obj = new_value(m_context.builder().create<mlir::py::MakeFunctionOp>(
-		loc(m_context.builder(), m_context.filename(), source_location),
+	std::vector<mlir::Value> defaults_values;
+	defaults_values.reserve(defaults.size());
+	for (auto *v : defaults) { defaults_values.push_back(v->value); }
+	std::vector<mlir::Value> kw_defaults_values;
+	kw_defaults_values.reserve(kw_defaults.size());
+	for (auto *v : kw_defaults) { kw_defaults_values.push_back(v->value); }
+	auto fn_obj = new_value(builder.create<mlir::py::MakeFunctionOp>(
+		loc(builder, m_context.filename(), source_location),
 		m_context->pyobject_type(),
 		mangled_name,
-		defaults,
-		kw_defaults,
+		defaults_values,
+		kw_defaults_values,
 		mlir::DenseStringElementsAttr::get(
 			mlir::VectorType::get({ static_cast<int64_t>(captures.size()) },
 				mlir::StringAttr::get(&m_context.ctx()).getType()),
@@ -2582,24 +2630,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 	if (is_anon) { return fn_obj; }
 	store_name(function_name, fn_obj, source_location);
 
-	if (!decorator_functions.empty()) {
-		ASSERT(!is_anon);
-		mlir::Value arg = load_name(function_name, source_location)->value;
-		for (const auto &decorator_function : decorator_functions | std::ranges::views::reverse) {
-			arg = m_context.builder().create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),
-				m_context->pyobject_type(),
-				decorator_function,
-				mlir::ValueRange{ arg },
-				mlir::DenseStringElementsAttr::get(
-					mlir::VectorType::get({ 0 }, mlir::StringAttr::get(&m_context.ctx()).getType()),
-					{}),
-				mlir::ValueRange{},
-				false,
-				false);
-		}
-		store_name(function_name, new_value(arg), source_location);
-	}
-
+	apply_decorators_for_make_function(*this, decorator_functions, function_name, source_location);
 	return nullptr;
 }
 
