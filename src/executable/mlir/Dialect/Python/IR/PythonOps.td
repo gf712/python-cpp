@@ -8,6 +8,15 @@ include "mlir/IR/SymbolInterfaces.td"
 
 class Python_Op<string mneomic, list<Trait> traits = []> : Op<Python_Dialect, mneomic, traits>;
 
+// Resource for the "may raise NameError / UnboundLocalError" effect that
+// Load* ops have. Defined in C++ as mlir::py::PythonExceptionStateResource
+// in Dialect.hpp. Marking Load* with a MemWrite on this resource prevents
+// canonicalize/DCE from eliminating loads whose results are unused (the
+// exception side effect is observable).
+def PythonExceptionStateResource :
+    Resource<"::mlir::py::PythonExceptionStateResource">;
+def PyExceptionStateWrite : MemWrite<PythonExceptionStateResource>;
+
 def ConstantOp : Python_Op<"constant", [Pure]> {
     let summary = "Build a PyObject from a constant";
 
@@ -29,7 +38,8 @@ def ConstantOp : Python_Op<"constant", [Pure]> {
     let hasVerifier = 1;
 }
 
-def LoadNameOp : Python_Op<"load_name"> {
+def LoadNameOp : Python_Op<"load_name",
+        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the local environment";
 
     let arguments = (ins StrAttr:$name);
@@ -37,7 +47,8 @@ def LoadNameOp : Python_Op<"load_name"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadFastOp : Python_Op<"load_fast"> {
+def LoadFastOp : Python_Op<"load_fast",
+        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject bound variable";
 
     let arguments = (ins StrAttr:$name);
@@ -45,7 +56,8 @@ def LoadFastOp : Python_Op<"load_fast"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadGlobalOp : Python_Op<"load_global"> {
+def LoadGlobalOp : Python_Op<"load_global",
+        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the global environment";
 
     let arguments = (ins StrAttr:$name);
@@ -53,7 +65,8 @@ def LoadGlobalOp : Python_Op<"load_global"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadDerefOp : Python_Op<"load_deref"> {
+def LoadDerefOp : Python_Op<"load_deref",
+        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from a cell";
 
     let arguments = (ins StrAttr:$name);
@@ -486,9 +499,13 @@ def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpIn
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
+    // orelse is AnyRegion (not MinSizedRegion<1>) so canonicalize can drop
+    // the empty entry block when there is no Python `else` clause. The
+    // getSuccessorRegions impl, the lowering pass, and the bytecode emitter
+    // all handle a 0-block orelse as "no else, branch to parent".
     let regions = (region MinSizedRegion<1>:$body,
                           SizedRegion<1>:$step,
-                          MinSizedRegion<1>:$orelse);
+                          AnyRegion:$orelse);
 }
 
 def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {

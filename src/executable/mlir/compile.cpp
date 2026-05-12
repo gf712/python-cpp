@@ -30,10 +30,15 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
 	// Post-lowering canonicalize + CSE: dedupes the emitpybytecode.LOAD_CONST
 	// ops the lowering and MLIRGenerator emit. Idiomatic Python compiles to
-	// many equal None/0/True constants per function. Pre-lowering
-	// canonicalize is not run because the Python dialect's ops don't yet
-	// have full effect-trait coverage (Load* in particular), so canonicalize
-	// can reshape IR in ways the lowering patterns don't expect.
+	// many equal None/0/True constants per function.
+	//
+	// Pre-lowering canonicalize is not run. Load* ops now declare a MemWrite
+	// on PythonExceptionStateResource (modelling may-raise NameError /
+	// UnboundLocalError), but several other py.* ops still need work before
+	// canonicalize can run safely: ClassDefinitionOp's region terminator
+	// gets confused with func.return, and the loop ops' getSuccessorInputs
+	// dataflow modelling would need to be reworked to match what the parent
+	// op actually forwards (currently nothing).
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
 	// pm.addPass(::mlir::createRemoveDeadValuesPass());

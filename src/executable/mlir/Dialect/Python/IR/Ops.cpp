@@ -149,19 +149,25 @@ namespace py {
 	}
 
 	namespace {
-		// Static getSuccessorInputs implementation shared by all four
+		// Shared getSuccessorInputs implementation for all four
 		// RegionBranchOpInterface ops in this dialect (WhileOp, ForLoopOp,
-		// TryOp, TryHandlerScope). MLIR 23 split the (region, block-args) pair
-		// that used to be carried by RegionSuccessor: the region is now in
-		// RegionSuccessor and the inputs come from this method. None of these
-		// ops thread operands through the parent-branch successor (they all
-		// return PyObject results that are produced by the regions, not
-		// forwarded by the op itself), so the parent case returns empty.
-		mlir::ValueRange region_or_block_arguments(mlir::Operation *,
-			mlir::RegionSuccessor successor)
+		// TryOp, TryHandlerScope). MLIR 23 split the (region, block-args)
+		// pair that used to be carried by RegionSuccessor: the region is now
+		// in RegionSuccessor and the inputs come from this method. The
+		// inputs MLIR expects here are the operands the parent op forwards
+		// INTO the destination (which the verifier matches against the op's
+		// operand list along each control-flow edge).
+		//
+		// None of these ops actually forward operands into their regions or
+		// out of them: the for-loop iterator is consumed by FOR_ITER inside
+		// `step`; the while condition is computed inside `condition`; try's
+		// regions communicate via the exception state, not block args; and
+		// the ops' results are produced by the ControlFlowYield terminator,
+		// not threaded through the parent successor. Return empty in all
+		// cases.
+		mlir::ValueRange region_or_block_arguments(mlir::Operation *, mlir::RegionSuccessor)
 		{
-			if (successor.isParent()) { return mlir::ValueRange{}; }
-			return successor.getSuccessor()->getArguments();
+			return mlir::ValueRange{};
 		}
 	}// namespace
 
