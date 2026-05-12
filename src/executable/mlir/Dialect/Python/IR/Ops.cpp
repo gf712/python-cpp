@@ -351,6 +351,59 @@ namespace py {
 		if (predecessor_region(point) == &getCond()) { regions.emplace_back(&getHandler()); }
 		regions.emplace_back(getOperation()->getParentRegion());
 	}
+
+	namespace {
+		// Forward the value of a preceding py.store_fast of the same name in
+		// the same block when no intervening op kills the binding. Locals
+		// can only be touched by store_fast / delete_fast in the current
+		// FuncOp, so most ops (including FunctionCall) are safe to walk
+		// past - with one exception: ops with regions (py.for_loop /
+		// py.while / py.try / py.with / py.if-like ops) may contain a
+		// store_fast or delete_fast targeting this name in their bodies.
+		// We don't recurse into those regions yet, so conservatively bail
+		// if any region-bearing op sits between the candidate store and the
+		// load.
+		struct ForwardStoreFastToLoadFast : public mlir::OpRewritePattern<LoadFastOp>
+		{
+			using mlir::OpRewritePattern<LoadFastOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(LoadFastOp load,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				const auto name = load.getName();
+				for (mlir::Operation *prev = load->getPrevNode(); prev != nullptr;
+					prev = prev->getPrevNode()) {
+					if (auto store = mlir::dyn_cast<StoreFastOp>(prev)) {
+						if (store.getName() == name) {
+							rewriter.replaceOp(load, store.getValue());
+							return mlir::success();
+						}
+					}
+					if (auto del = mlir::dyn_cast<DeleteFastOp>(prev)) {
+						if (del.getName() == name) {
+							// The binding was deleted between the store
+							// and the load - can't forward.
+							return mlir::failure();
+						}
+					}
+					if (prev->getNumRegions() > 0) {
+						// A nested region (loop body, try/with body, ...)
+						// might contain a store or delete of `name`. Be
+						// conservative and bail rather than try to prove it
+						// doesn't.
+						return mlir::failure();
+					}
+				}
+				return mlir::failure();
+			}
+		};
+	}// namespace
+
+	void LoadFastOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
+		mlir::MLIRContext *context)
+	{
+		patterns.add<ForwardStoreFastToLoadFast>(context);
+	}
 }// namespace py
 }// namespace mlir
 

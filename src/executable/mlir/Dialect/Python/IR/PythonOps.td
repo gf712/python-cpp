@@ -54,6 +54,12 @@ def LoadFastOp : Python_Op<"load_fast",
     let arguments = (ins StrAttr:$name);
 
     let results = (outs Python_PyObjectType:$output);
+
+    // Forward the value of a preceding py.store_fast of the same name in
+    // the same block when no intervening op writes to that local. Locals
+    // can only be touched by store_fast / delete_fast in the same FuncOp,
+    // so most ops (including FunctionCall) don't kill the forwarding.
+    let hasCanonicalizer = 1;
 }
 
 def LoadGlobalOp : Python_Op<"load_global",
