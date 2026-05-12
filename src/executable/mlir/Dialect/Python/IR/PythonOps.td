@@ -647,6 +647,38 @@ def ClassDefinitionOp: Python_Op<"class", [AttrSizedOperandSegments]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
+// Terminator for the body of a py.class. Carries the class object (or
+// __class__ cell) that the conversion pass forwards into the synthesised
+// func.return when it lowers the class body into a func.func. Existed as
+// func.return historically, but that op's verifier requires its parent to
+// be func.func - which the class region is not - so canonicalize tripped
+// the verifier whenever it ran pre-lowering.
+def ClassReturnOp : Python_Op<"class_return", [Terminator,
+                                               HasParent<"ClassDefinitionOp">,
+                                               ReturnLike]> {
+    let summary = "Yield a value from a class definition body";
+
+    let arguments = (ins Python_PyObjectType:$value);
+}
+
+// Function return that does not require its immediate parent to be a
+// func.func. Used in place of func.return inside py.try / py.with
+// regions where the return statement's enclosing FuncOp is several
+// regions up. The conversion pass flattens those regions into the
+// FuncOp's body and then rewrites py.return to func.return.
+//
+// NOTE: deliberately NOT marked ReturnLike. ReturnLike causes MLIR's
+// RegionBranchOpInterface dataflow to treat the op as a branch from
+// the enclosing region to its parent, and verify the operand count
+// against getSuccessorInputs. py.return is meant to short-circuit
+// straight through to the func.func boundary, not through each
+// enclosing try/with's region-branch interface.
+def ReturnOp : Python_Op<"return", [Terminator]> {
+    let summary = "Return from the enclosing func.func";
+
+    let arguments = (ins Variadic<Python_PyObjectType>:$value);
+}
+
 def YieldOp : Python_Op<"yield"> {
     let summary = "Yield value from generator";
 

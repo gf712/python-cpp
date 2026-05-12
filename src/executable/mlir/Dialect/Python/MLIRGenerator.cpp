@@ -1242,13 +1242,13 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 		if (class_scope->requires_class_ref) {
 			auto *__class__ = load_name("__class__", node->source_location());
 			store_name("__classcell__", __class__, node->source_location());
-			m_context.builder().create<mlir::func::ReturnOp>(
-				m_context.builder().getUnknownLoc(), mlir::ValueRange{ __class__->value });
+			m_context.builder().create<mlir::py::ClassReturnOp>(
+				m_context.builder().getUnknownLoc(), __class__->value);
 		} else {
 			auto result = m_context.builder().create<mlir::py::ConstantOp>(
 				m_context.builder().getUnknownLoc(), m_context.builder().getNoneType());
-			m_context.builder().create<mlir::func::ReturnOp>(
-				m_context.builder().getUnknownLoc(), mlir::ValueRange{ result });
+			m_context.builder().create<mlir::py::ClassReturnOp>(
+				m_context.builder().getUnknownLoc(), result);
 		}
 	}
 
@@ -2405,8 +2405,9 @@ void MLIRGenerator::return_value(MLIRValue *value, const SourceLocation &source_
 		scope().finally_blocks = std::move(finally_blocks);
 	}
 
-	m_context.builder().create<mlir::func::ReturnOp>(
-		loc(m_context.builder(), m_context.filename(), source_location), value->value);
+	m_context.builder().create<mlir::py::ReturnOp>(
+		loc(m_context.builder(), m_context.filename(), source_location),
+		mlir::ValueRange{ value->value });
 }
 
 MLIRGenerator::RAIIScope MLIRGenerator::setup_function(mlir::func::FuncOp &f,

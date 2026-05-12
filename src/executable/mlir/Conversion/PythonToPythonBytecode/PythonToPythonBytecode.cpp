@@ -467,6 +467,24 @@ namespace py {
 		using LoadAssertionErrorOpLowering = DirectReplaceLowering<mlir::py::LoadAssertionError,
 			mlir::emitpybytecode::LoadAssertionError>;
 
+		// py.return -> func.return. py.return relaxes func.return's
+		// HasParent<FuncOp> constraint so that return statements emitted
+		// inside py.try / py.with regions don't trip the verifier
+		// pre-lowering. By the time this pattern fires, the surrounding
+		// region ops have been flattened into the enclosing func.func's
+		// body, so func.return is well-formed.
+		struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::py::ReturnOp>
+		{
+			using OpRewritePattern<mlir::py::ReturnOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::ReturnOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, op.getValue());
+				return mlir::success();
+			}
+		};
+
 		struct BuildDictOpLowering : public mlir::OpRewritePattern<mlir::py::BuildDictOp>
 		{
 			using OpRewritePattern<mlir::py::BuildDictOp>::OpRewritePattern;
@@ -821,27 +839,25 @@ namespace py {
 							})
 						!= cell_names.end()) {
 
-						mlir::Operation *return_op_;
+						mlir::py::ClassReturnOp return_op;
 						op.getBody().walk<WalkOrder::PreOrder>(
-							[&return_op_](mlir::Operation *child_op) {
+							[&return_op](mlir::Operation *child_op) {
 								if (mlir::isa<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 										child_op)) {
 									return WalkResult::skip();
 								}
-								if (mlir::isa<mlir::func::ReturnOp>(child_op)) {
-									return_op_ = child_op;
+								if (auto cr = mlir::dyn_cast<mlir::py::ClassReturnOp>(child_op)) {
+									return_op = cr;
 									return WalkResult::interrupt();
 								}
 								return WalkResult::advance();
 							});
-						ASSERT(return_op_);
-						auto return_op = mlir::cast<mlir::func::ReturnOp>(return_op_);
-						ASSERT(return_op.getOperands().size() == 1);
+						ASSERT(return_op);
 						ASSERT(return_op->getParentOp() == op.getOperation());
-						ASSERT(return_op.getOperand(0).getDefiningOp());
-						rewriter.setInsertionPoint(return_op.getOperand(0).getDefiningOp());
+						ASSERT(return_op.getValue().getDefiningOp());
+						rewriter.setInsertionPoint(return_op.getValue().getDefiningOp());
 						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadClosureOp>(
-							return_op.getOperand(0).getDefiningOp(),
+							return_op.getValue().getDefiningOp(),
 							mlir::py::PyObjectType::get(getContext()),
 							mlir::StringRef{ "__class__" });
 					}
@@ -850,6 +866,15 @@ namespace py {
 				auto attr = class_fn_definition->getAttrs().vec();
 				attr.insert(attr.end(), op->getAttrs().begin(), op->getAttrs().end());
 				class_fn_definition->setAttrs(attr);
+
+				// Convert all py.class_return ops in the class body to
+				// func.return so that the body, once inlined into the
+				// synthesised func.func, has a valid terminator.
+				op.getBody().walk([&rewriter](mlir::py::ClassReturnOp cr) {
+					rewriter.setInsertionPoint(cr);
+					rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(
+						cr, mlir::ValueRange{ cr.getValue() });
+				});
 
 				auto *end = class_fn_definition.addEntryBlock();
 				rewriter.setInsertionPointToStart(end);
@@ -1736,7 +1761,8 @@ namespace py {
 			.add<ConditionalBranchOpLowering, CondBranchSubclassOpLowering, CastToBoolOpLowering>(
 				&getContext());
 		patterns.add<CompareOpLowering>(&getContext());
-		patterns.add<LoadAssertionErrorOpLowering, RaiseOpLowering>(&getContext());
+		patterns.add<LoadAssertionErrorOpLowering, RaiseOpLowering, ReturnOpLowering>(
+			&getContext());
 		patterns.add<PositiveOpLowering, NegativeOpLowering, InvertOpLowering, NotOpLowering>(
 			&getContext());
 		patterns.add<BuildDictOpLowering,
