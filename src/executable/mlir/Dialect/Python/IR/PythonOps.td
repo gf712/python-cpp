@@ -17,6 +17,13 @@ def PythonExceptionStateResource :
     Resource<"::mlir::py::PythonExceptionStateResource">;
 def PyExceptionStateWrite : MemWrite<PythonExceptionStateResource>;
 
+// Verifies the op carries a non-empty StringAttr "name". Applied to the
+// {Load,Store,Delete}{Name,Fast,Global,Deref} variable-access family.
+// Implementation: mlir::py::OpTrait::NamedOp in Dialect.hpp.
+def NamedOp : NativeOpTrait<"NamedOp"> {
+    let cppNamespace = "::mlir::py::OpTrait";
+}
+
 def ConstantOp : Python_Op<"constant", [Pure]> {
     let summary = "Build a PyObject from a constant";
 
@@ -39,7 +46,7 @@ def ConstantOp : Python_Op<"constant", [Pure]> {
 }
 
 def LoadNameOp : Python_Op<"load_name",
-        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the local environment";
 
     let arguments = (ins StrAttr:$name);
@@ -48,7 +55,7 @@ def LoadNameOp : Python_Op<"load_name",
 }
 
 def LoadFastOp : Python_Op<"load_fast",
-        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject bound variable";
 
     let arguments = (ins StrAttr:$name);
@@ -63,7 +70,7 @@ def LoadFastOp : Python_Op<"load_fast",
 }
 
 def LoadGlobalOp : Python_Op<"load_global",
-        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the global environment";
 
     let arguments = (ins StrAttr:$name);
@@ -72,7 +79,7 @@ def LoadGlobalOp : Python_Op<"load_global",
 }
 
 def LoadDerefOp : Python_Op<"load_deref",
-        [MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from a cell";
 
     let arguments = (ins StrAttr:$name);
@@ -80,7 +87,7 @@ def LoadDerefOp : Python_Op<"load_deref",
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreNameOp : Python_Op<"store_name", [MemoryEffects<[MemWrite]>]> {
+def StoreNameOp : Python_Op<"store_name", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to the local environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -88,7 +95,7 @@ def StoreNameOp : Python_Op<"store_name", [MemoryEffects<[MemWrite]>]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreFastOp : Python_Op<"store_fast", [MemoryEffects<[MemWrite]>]> {
+def StoreFastOp : Python_Op<"store_fast", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to local bound variable";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -96,7 +103,7 @@ def StoreFastOp : Python_Op<"store_fast", [MemoryEffects<[MemWrite]>]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreGlobalOp : Python_Op<"store_global", [MemoryEffects<[MemWrite]>]> {
+def StoreGlobalOp : Python_Op<"store_global", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in the global environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -104,7 +111,7 @@ def StoreGlobalOp : Python_Op<"store_global", [MemoryEffects<[MemWrite]>]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreDerefOp : Python_Op<"store_deref", [MemoryEffects<[MemWrite]>]> {
+def StoreDerefOp : Python_Op<"store_deref", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store PyObject to a cell";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
@@ -112,25 +119,25 @@ def StoreDerefOp : Python_Op<"store_deref", [MemoryEffects<[MemWrite]>]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteNameOp : Python_Op<"delete_name", [MemoryEffects<[MemWrite]>]> {
+def DeleteNameOp : Python_Op<"delete_name", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the local environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteFastOp : Python_Op<"delete_fast", [MemoryEffects<[MemWrite]>]> {
+def DeleteFastOp : Python_Op<"delete_fast", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the bound variable";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteGlobalOp : Python_Op<"delete_global", [MemoryEffects<[MemWrite]>]> {
+def DeleteGlobalOp : Python_Op<"delete_global", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the global environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteDerefOp : Python_Op<"delete_deref", [MemoryEffects<[MemWrite]>]> {
+def DeleteDerefOp : Python_Op<"delete_deref", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from a cell";
 
     let arguments = (ins StrAttr:$name);
