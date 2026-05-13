@@ -404,23 +404,6 @@ def UnpackExpandOp : Python_Op<"unpack_ex"> {
                         Python_PyObjectType:$rest);
 }
 
-def ForIterOp : Python_Op<"for_iter", [Terminator]> {
-    let summary = "Convenience op for for loops";
-
-    let description = [{
-Jumps to `end` if calling Python's `next` builtin raises StopIteration.
-Otherwise, returns the result of `next`.
-If an exception that is not a subclass of StopIteration is raised, that
-exception is thrown.
-    }];
-
-    let arguments = (ins Python_PyObjectType:$iterator);
-
-    let successors = (successor AnySuccessor:$start, AnySuccessor:$end);
-
-    let results = (outs Python_PyObjectType:$value);
-}
-
 def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "For loop representation";
 
