@@ -1766,6 +1766,70 @@ namespace py {
 
 			void runOnOperation() final;
 		};
+
+		// Pass scaffolds for the four region-bearing control-flow ops.
+		// Each pass applies its single lowering pattern greedily on the
+		// module. Dialect dependencies match PythonToPythonBytecodePass's
+		// (Python source dialect + EmitPythonBytecode target dialect); the
+		// patterns also create cf::BranchOp / func::FuncOp internally, but
+		// those dialects are already loaded by the time the pipeline runs.
+		template<typename Derived, typename Pattern, const char *Argument>
+		struct SinglePatternConversionPass : public PassWrapper<Derived, OperationPass<ModuleOp>>
+		{
+			void getDependentDialects(DialectRegistry &registry) const override
+			{
+				registry.insert<PythonDialect, emitpybytecode::EmitPythonBytecodeDialect>();
+			}
+
+			StringRef getArgument() const final { return Argument; }
+
+			void runOnOperation() final
+			{
+				mlir::RewritePatternSet patterns(&this->getContext());
+				patterns.template add<Pattern>(&this->getContext());
+
+				GreedyRewriteConfig config;
+				config.setStrictness(GreedyRewriteStrictness::AnyOp);
+				config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
+				config.setUseTopDownTraversal(true);
+				FrozenRewritePatternSet frozen{ std::move(patterns) };
+
+				(void)applyPatternsGreedily(this->getOperation(), frozen, config);
+			}
+		};
+
+		inline constexpr char kConvertForLoopArg[] = "convert-py-forloop";
+		inline constexpr char kConvertWhileLoopArg[] = "convert-py-while";
+		inline constexpr char kConvertTryArg[] = "convert-py-try";
+		inline constexpr char kConvertWithArg[] = "convert-py-with";
+
+		struct ConvertForLoopPass
+			: public SinglePatternConversionPass<ConvertForLoopPass,
+				  ForLoopOpLowering,
+				  kConvertForLoopArg>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertForLoopPass)
+		};
+
+		struct ConvertWhileLoopPass
+			: public SinglePatternConversionPass<ConvertWhileLoopPass,
+				  WhileOpLowering,
+				  kConvertWhileLoopArg>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertWhileLoopPass)
+		};
+
+		struct ConvertTryPass
+			: public SinglePatternConversionPass<ConvertTryPass, TryOpLowering, kConvertTryArg>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertTryPass)
+		};
+
+		struct ConvertWithPass
+			: public SinglePatternConversionPass<ConvertWithPass, WithOpLowering, kConvertWithArg>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertWithPass)
+		};
 	}// namespace
 
 	void PythonToPythonBytecodePass::runOnOperation()
@@ -1845,6 +1909,20 @@ namespace py {
 	{
 		return std::make_unique<PythonToPythonBytecodePass>();
 	}
+
+	std::unique_ptr<Pass> createConvertForLoopPass()
+	{
+		return std::make_unique<ConvertForLoopPass>();
+	}
+
+	std::unique_ptr<Pass> createConvertWhileLoopPass()
+	{
+		return std::make_unique<ConvertWhileLoopPass>();
+	}
+
+	std::unique_ptr<Pass> createConvertTryPass() { return std::make_unique<ConvertTryPass>(); }
+
+	std::unique_ptr<Pass> createConvertWithPass() { return std::make_unique<ConvertWithPass>(); }
 
 }// namespace py
 }// namespace mlir
