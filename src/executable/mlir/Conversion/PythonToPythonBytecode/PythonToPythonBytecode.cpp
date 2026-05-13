@@ -361,44 +361,77 @@ namespace py {
 			}
 		};
 
-		template<typename BinaryOpType, BinaryOperation::Operation OperationEnumType>
-		struct BinaryOpLowering : public mlir::OpRewritePattern<BinaryOpType>
+		// Translate py.binary's BinaryOpKind enum to the bytecode-level
+		// BinaryOperation::Operation enum. The two are deliberately decoupled:
+		// the dialect enum is part of the IR contract; the bytecode enum is
+		// the wire format consumed by the VM.
+		static BinaryOperation::Operation py_kind_to_binary_op(mlir::py::BinaryOpKind kind)
 		{
-			using OpRewritePattern<BinaryOpType>::OpRewritePattern;
+			switch (kind) {
+			case mlir::py::BinaryOpKind::add:
+				return BinaryOperation::Operation::PLUS;
+			case mlir::py::BinaryOpKind::sub:
+				return BinaryOperation::Operation::MINUS;
+			case mlir::py::BinaryOpKind::mod:
+				return BinaryOperation::Operation::MODULO;
+			case mlir::py::BinaryOpKind::mul:
+				return BinaryOperation::Operation::MULTIPLY;
+			case mlir::py::BinaryOpKind::exp:
+				return BinaryOperation::Operation::EXP;
+			case mlir::py::BinaryOpKind::div:
+				return BinaryOperation::Operation::SLASH;
+			case mlir::py::BinaryOpKind::fldiv:
+				return BinaryOperation::Operation::FLOORDIV;
+			case mlir::py::BinaryOpKind::mmul:
+				return BinaryOperation::Operation::MATMUL;
+			case mlir::py::BinaryOpKind::lshift:
+				return BinaryOperation::Operation::LEFTSHIFT;
+			case mlir::py::BinaryOpKind::rshift:
+				return BinaryOperation::Operation::RIGHTSHIFT;
+			}
+			ASSERT_NOT_REACHED();
+		}
 
-			mlir::LogicalResult matchAndRewrite(BinaryOpType op,
+		struct BinaryOpLowering : public mlir::OpRewritePattern<mlir::py::BinaryOp>
+		{
+			using OpRewritePattern<mlir::py::BinaryOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::py::BinaryOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto lhs = op.getLhs();
-				auto rhs = op.getRhs();
-				auto op_type = mlir::IntegerAttr::get(
-					rewriter.getIntegerType(8, false), static_cast<uint8_t>(OperationEnumType));
-
+				auto op_type = mlir::IntegerAttr::get(rewriter.getIntegerType(8, false),
+					static_cast<uint8_t>(py_kind_to_binary_op(op.getKind())));
 				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BinaryOp>(
-					op, op.getOutput().getType(), lhs, rhs, op_type);
-
+					op, op.getOutput().getType(), op.getLhs(), op.getRhs(), op_type);
 				return success();
 			}
 		};
 
-#define BINARY_OP_LOWERING(OPNAME, BINARYOP_ENUM) \
-	using OPNAME##Lowering = BinaryOpLowering<py::OPNAME, BinaryOperation::Operation::BINARYOP_ENUM>
+		// LogicalAnd/Or/XorOp still go through the legacy per-op template.
+		// Step 12 of the MLIR cleanup plan folds them into the unified
+		// py.binary op above; until then, keep their dedicated lowerings.
+		template<typename SourceOp, BinaryOperation::Operation OperationEnumType>
+		struct LogicalBinaryOpLowering : public mlir::OpRewritePattern<SourceOp>
+		{
+			using mlir::OpRewritePattern<SourceOp>::OpRewritePattern;
 
-		BINARY_OP_LOWERING(BinaryAddOp, PLUS);
-		BINARY_OP_LOWERING(BinarySubtractOp, MINUS);
-		BINARY_OP_LOWERING(BinaryModuloOp, MODULO);
-		BINARY_OP_LOWERING(BinaryMultiplyOp, MULTIPLY);
-		BINARY_OP_LOWERING(BinaryExpOp, EXP);
-		BINARY_OP_LOWERING(BinaryDivOp, SLASH);
-		BINARY_OP_LOWERING(BinaryFloorDivOp, FLOORDIV);
-		BINARY_OP_LOWERING(BinaryMatMulOp, MATMUL);
-		BINARY_OP_LOWERING(LeftShiftOp, LEFTSHIFT);
-		BINARY_OP_LOWERING(RightShiftOp, RIGHTSHIFT);
-		BINARY_OP_LOWERING(LogicalAndOp, AND);
-		BINARY_OP_LOWERING(LogicalOrOp, OR);
-		BINARY_OP_LOWERING(LogicalXorOp, XOR);
+			mlir::LogicalResult matchAndRewrite(SourceOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				auto op_type = mlir::IntegerAttr::get(
+					rewriter.getIntegerType(8, false), static_cast<uint8_t>(OperationEnumType));
+				rewriter.template replaceOpWithNewOp<mlir::emitpybytecode::BinaryOp>(
+					op, op.getOutput().getType(), op.getLhs(), op.getRhs(), op_type);
+				return success();
+			}
+		};
 
-#undef BINARY_OP_LOWERING
+		using LogicalAndOpLowering =
+			LogicalBinaryOpLowering<mlir::py::LogicalAndOp, BinaryOperation::Operation::AND>;
+		using LogicalOrOpLowering =
+			LogicalBinaryOpLowering<mlir::py::LogicalOrOp, BinaryOperation::Operation::OR>;
+		using LogicalXorOpLowering =
+			LogicalBinaryOpLowering<mlir::py::LogicalXorOp, BinaryOperation::Operation::XOR>;
 
 		// Trivial 1:1 lowering of a py.unary_* op to emitpybytecode.UNARY_OP
 		// with the corresponding Unary::Operation enum baked in.
@@ -1746,19 +1779,9 @@ namespace py {
 			.add<DeleteFastLowering, DeleteGlobalLowering, DeleteNameLowering, DeleteDerefLowering>(
 				&getContext());
 		patterns.add<CallFunctionLowering, FuncOpLowering, MakeFunctionOpLowering>(&getContext());
-		patterns.add<BinaryAddOpLowering,
-			BinarySubtractOpLowering,
-			BinaryModuloOpLowering,
-			BinaryMultiplyOpLowering,
-			BinaryExpOpLowering,
-			BinaryDivOpLowering,
-			BinaryFloorDivOpLowering,
-			BinaryMatMulOpLowering,
-			LeftShiftOpLowering,
-			RightShiftOpLowering,
-			LogicalAndOpLowering,
-			LogicalOrOpLowering,
-			LogicalXorOpLowering>(&getContext());
+		patterns
+			.add<BinaryOpLowering, LogicalAndOpLowering, LogicalOrOpLowering, LogicalXorOpLowering>(
+				&getContext());
 		patterns.add<InplaceOpLowering>(&getContext());
 		patterns
 			.add<ConditionalBranchOpLowering, CondBranchSubclassOpLowering, CastToBoolOpLowering>(

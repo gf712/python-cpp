@@ -832,112 +832,52 @@ ast::Value *MLIRGenerator::visit(const ast::BinaryExpr *node)
 {
 	auto lhs = static_cast<MLIRValue *>(node->lhs()->codegen(this))->value;
 	auto rhs = static_cast<MLIRValue *>(node->rhs()->codegen(this))->value;
+	auto location = loc(m_context.builder(), m_context.filename(), node->source_location());
+
+	auto build_binary = [&](mlir::py::BinaryOpKind kind) {
+		return new_value(m_context.builder().create<mlir::py::BinaryOp>(location,
+			m_context->pyobject_type(),
+			mlir::py::BinaryOpKindAttr::get(&m_context.ctx(), kind),
+			lhs,
+			rhs));
+	};
 
 	switch (node->op_type()) {
-	case ast::BinaryOpType::PLUS: {
-		auto result = m_context.builder().create<mlir::py::BinaryAddOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::MINUS: {
-		auto result = m_context.builder().create<mlir::py::BinarySubtractOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::MODULO: {
-		auto result = m_context.builder().create<mlir::py::BinaryModuloOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::MULTIPLY: {
-		auto result = m_context.builder().create<mlir::py::BinaryMultiplyOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::EXP: {
-		auto result = m_context.builder().create<mlir::py::BinaryExpOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::SLASH: {
-		auto result = m_context.builder().create<mlir::py::BinaryDivOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::FLOORDIV: {
-		auto result = m_context.builder().create<mlir::py::BinaryFloorDivOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::MATMUL: {
-		auto result = m_context.builder().create<mlir::py::BinaryMatMulOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::LEFTSHIFT: {
-		auto result = m_context.builder().create<mlir::py::LeftShiftOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
-	case ast::BinaryOpType::RIGHTSHIFT: {
-		auto result = m_context.builder().create<mlir::py::RightShiftOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
-		return new_value(result);
-	} break;
+	case ast::BinaryOpType::PLUS:
+		return build_binary(mlir::py::BinaryOpKind::add);
+	case ast::BinaryOpType::MINUS:
+		return build_binary(mlir::py::BinaryOpKind::sub);
+	case ast::BinaryOpType::MODULO:
+		return build_binary(mlir::py::BinaryOpKind::mod);
+	case ast::BinaryOpType::MULTIPLY:
+		return build_binary(mlir::py::BinaryOpKind::mul);
+	case ast::BinaryOpType::EXP:
+		return build_binary(mlir::py::BinaryOpKind::exp);
+	case ast::BinaryOpType::SLASH:
+		return build_binary(mlir::py::BinaryOpKind::div);
+	case ast::BinaryOpType::FLOORDIV:
+		return build_binary(mlir::py::BinaryOpKind::fldiv);
+	case ast::BinaryOpType::MATMUL:
+		return build_binary(mlir::py::BinaryOpKind::mmul);
+	case ast::BinaryOpType::LEFTSHIFT:
+		return build_binary(mlir::py::BinaryOpKind::lshift);
+	case ast::BinaryOpType::RIGHTSHIFT:
+		return build_binary(mlir::py::BinaryOpKind::rshift);
 	case ast::BinaryOpType::AND: {
 		auto result = m_context.builder().create<mlir::py::LogicalAndOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
+			location, m_context->pyobject_type(), lhs, rhs);
 		return new_value(result);
-	} break;
+	}
 	case ast::BinaryOpType::OR: {
 		auto result = m_context.builder().create<mlir::py::LogicalOrOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
+			location, m_context->pyobject_type(), lhs, rhs);
 		return new_value(result);
-	} break;
+	}
 	case ast::BinaryOpType::XOR: {
 		auto result = m_context.builder().create<mlir::py::LogicalXorOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type(),
-			lhs,
-			rhs);
+			location, m_context->pyobject_type(), lhs, rhs);
 		return new_value(result);
-	} break;
+	}
 	}
 
 	ASSERT_NOT_REACHED();

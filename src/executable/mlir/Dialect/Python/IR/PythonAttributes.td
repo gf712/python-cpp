@@ -58,6 +58,23 @@ def Python_InplaceOpKindAttr : I64EnumAttr<
   let cppNamespace = "::mlir::py";
 }
 
+def Python_BinaryOpKindAttr : I64EnumAttr<
+    "BinaryOpKind", "",
+    [
+      I64EnumAttrCase<"add", 0>,
+      I64EnumAttrCase<"sub", 1>,
+      I64EnumAttrCase<"mod", 2>,
+      I64EnumAttrCase<"mul", 3>,
+      I64EnumAttrCase<"exp", 4>,
+      I64EnumAttrCase<"div", 5>,
+      I64EnumAttrCase<"fldiv", 6>,
+      I64EnumAttrCase<"mmul", 7>,
+      I64EnumAttrCase<"lshift", 8>,
+      I64EnumAttrCase<"rshift", 9>,
+    ]> {
+  let cppNamespace = "::mlir::py";
+}
+
 class Python_Attr<string name, string attrMnemonic, list<Trait> traits = [],
                   string baseCppClass = "::mlir::Attribute">
     : AttrDef<Python_Dialect, name, traits, baseCppClass> {

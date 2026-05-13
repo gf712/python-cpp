@@ -168,82 +168,12 @@ def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def BinaryAddOp : Python_Op<"add"> {
-    let summary = "Generic binary addition operation";
+def BinaryOp : Python_Op<"binary"> {
+    let summary = "Generic binary operation dispatched on kind attribute";
 
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinarySubtractOp : Python_Op<"sub"> {
-    let summary = "Generic binary subtraction operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryModuloOp : Python_Op<"mod"> {
-    let summary = "Generic binary modulo operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryMultiplyOp : Python_Op<"mul"> {
-    let summary = "Generic binary multiplication operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryExpOp : Python_Op<"exp"> {
-    let summary = "Generic binary exponential operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryDivOp : Python_Op<"div"> {
-    let summary = "Generic binary division operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryFloorDivOp : Python_Op<"floordiv"> {
-    let summary = "Generic binary floor division operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryMatMulOp : Python_Op<"matmul"> {
-    let summary = "Generic binary matrix multiplication operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LeftShiftOp : Python_Op<"lshift"> {
-    let summary = "Generic binary left shift operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def RightShiftOp : Python_Op<"rshift"> {
-    let summary = "Generic binary right shift operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
+    let arguments = (ins Python_BinaryOpKindAttr:$kind,
+                         Python_PyObjectType:$lhs,
+                         Python_PyObjectType:$rhs);
 
     let results = (outs Python_PyObjectType:$output);
 }
