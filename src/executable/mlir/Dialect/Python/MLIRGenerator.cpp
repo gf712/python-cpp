@@ -712,53 +712,53 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 
 	auto result = [&]() {
 		auto make_binop = [this, &node](
-							  ast::Value *value, ast::Value *target, mlir::py::InplaceOpKind kind) {
+							  ast::Value *value, ast::Value *target, mlir::py::ArithOpKind kind) {
 			return new_value(m_context.builder().create<mlir::py::InplaceOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				static_cast<MLIRValue *>(value)->value,
 				static_cast<MLIRValue *>(target)->value,
-				mlir::py::InplaceOpKindAttr::get(&m_context.ctx(), kind)));
+				mlir::py::ArithOpKindAttr::get(&m_context.ctx(), kind)));
 		};
 		switch (node->op()) {
 		case ast::BinaryOpType::PLUS: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::add);
+			return make_binop(value, target, mlir::py::ArithOpKind::add);
 		} break;
 		case ast::BinaryOpType::MINUS: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::sub);
+			return make_binop(value, target, mlir::py::ArithOpKind::sub);
 		} break;
 		case ast::BinaryOpType::MODULO: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::mod);
+			return make_binop(value, target, mlir::py::ArithOpKind::mod);
 		} break;
 		case ast::BinaryOpType::MULTIPLY: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::mul);
+			return make_binop(value, target, mlir::py::ArithOpKind::mul);
 		} break;
 		case ast::BinaryOpType::EXP: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::exp);
+			return make_binop(value, target, mlir::py::ArithOpKind::exp);
 		} break;
 		case ast::BinaryOpType::SLASH: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::div);
+			return make_binop(value, target, mlir::py::ArithOpKind::div);
 		} break;
 		case ast::BinaryOpType::FLOORDIV: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::fldiv);
+			return make_binop(value, target, mlir::py::ArithOpKind::fldiv);
 		} break;
 		case ast::BinaryOpType::MATMUL: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::mmul);
+			return make_binop(value, target, mlir::py::ArithOpKind::mmul);
 		} break;
 		case ast::BinaryOpType::LEFTSHIFT: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::lshift);
+			return make_binop(value, target, mlir::py::ArithOpKind::lshift);
 		} break;
 		case ast::BinaryOpType::RIGHTSHIFT: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::rshift);
+			return make_binop(value, target, mlir::py::ArithOpKind::rshift);
 		} break;
 		case ast::BinaryOpType::AND: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::and_);
+			return make_binop(value, target, mlir::py::ArithOpKind::and_);
 		} break;
 		case ast::BinaryOpType::OR: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::or_);
+			return make_binop(value, target, mlir::py::ArithOpKind::or_);
 		} break;
 		case ast::BinaryOpType::XOR: {
-			return make_binop(value, target, mlir::py::InplaceOpKind::xor_);
+			return make_binop(value, target, mlir::py::ArithOpKind::xor_);
 		} break;
 		}
 		ASSERT_NOT_REACHED();
@@ -811,41 +811,41 @@ ast::Value *MLIRGenerator::visit(const ast::BinaryExpr *node)
 	auto rhs = static_cast<MLIRValue *>(node->rhs()->codegen(this))->value;
 	auto location = loc(m_context.builder(), m_context.filename(), node->source_location());
 
-	auto build_binary = [&](mlir::py::BinaryOpKind kind) {
+	auto build_binary = [&](mlir::py::ArithOpKind kind) {
 		return new_value(m_context.builder().create<mlir::py::BinaryOp>(location,
 			m_context->pyobject_type(),
-			mlir::py::BinaryOpKindAttr::get(&m_context.ctx(), kind),
+			mlir::py::ArithOpKindAttr::get(&m_context.ctx(), kind),
 			lhs,
 			rhs));
 	};
 
 	switch (node->op_type()) {
 	case ast::BinaryOpType::PLUS:
-		return build_binary(mlir::py::BinaryOpKind::add);
+		return build_binary(mlir::py::ArithOpKind::add);
 	case ast::BinaryOpType::MINUS:
-		return build_binary(mlir::py::BinaryOpKind::sub);
+		return build_binary(mlir::py::ArithOpKind::sub);
 	case ast::BinaryOpType::MODULO:
-		return build_binary(mlir::py::BinaryOpKind::mod);
+		return build_binary(mlir::py::ArithOpKind::mod);
 	case ast::BinaryOpType::MULTIPLY:
-		return build_binary(mlir::py::BinaryOpKind::mul);
+		return build_binary(mlir::py::ArithOpKind::mul);
 	case ast::BinaryOpType::EXP:
-		return build_binary(mlir::py::BinaryOpKind::exp);
+		return build_binary(mlir::py::ArithOpKind::exp);
 	case ast::BinaryOpType::SLASH:
-		return build_binary(mlir::py::BinaryOpKind::div);
+		return build_binary(mlir::py::ArithOpKind::div);
 	case ast::BinaryOpType::FLOORDIV:
-		return build_binary(mlir::py::BinaryOpKind::fldiv);
+		return build_binary(mlir::py::ArithOpKind::fldiv);
 	case ast::BinaryOpType::MATMUL:
-		return build_binary(mlir::py::BinaryOpKind::mmul);
+		return build_binary(mlir::py::ArithOpKind::mmul);
 	case ast::BinaryOpType::LEFTSHIFT:
-		return build_binary(mlir::py::BinaryOpKind::lshift);
+		return build_binary(mlir::py::ArithOpKind::lshift);
 	case ast::BinaryOpType::RIGHTSHIFT:
-		return build_binary(mlir::py::BinaryOpKind::rshift);
+		return build_binary(mlir::py::ArithOpKind::rshift);
 	case ast::BinaryOpType::AND:
-		return build_binary(mlir::py::BinaryOpKind::and_);
+		return build_binary(mlir::py::ArithOpKind::and_);
 	case ast::BinaryOpType::OR:
-		return build_binary(mlir::py::BinaryOpKind::or_);
+		return build_binary(mlir::py::ArithOpKind::or_);
 	case ast::BinaryOpType::XOR:
-		return build_binary(mlir::py::BinaryOpKind::xor_);
+		return build_binary(mlir::py::ArithOpKind::xor_);
 	}
 
 	ASSERT_NOT_REACHED();

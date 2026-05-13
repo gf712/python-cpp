@@ -163,7 +163,7 @@ def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
 def BinaryOp : Python_Op<"binary"> {
     let summary = "Generic binary operation dispatched on kind attribute";
 
-    let arguments = (ins Python_BinaryOpKindAttr:$kind,
+    let arguments = (ins Python_ArithOpKindAttr:$kind,
                          Python_PyObjectType:$lhs,
                          Python_PyObjectType:$rhs);
 
@@ -175,7 +175,7 @@ def InplaceOp : Python_Op<"inplace_op", [MemoryEffects<[MemWrite]>]> {
 
     let arguments = (ins Python_PyObjectType:$src,
                          Python_PyObjectType:$dst,
-                         Python_InplaceOpKindAttr:$kind);
+                         Python_ArithOpKindAttr:$kind);
 
     let results = (outs Python_PyObjectType:$result);
 }

@@ -1,8 +1,10 @@
 // RUN: python-mlir-opt %s | FileCheck %s
 
 // Round-trip the unified py.binary op across all 13 kinds. Confirms
-// the Python_BinaryOpKindAttr enum prints/parses and the op accepts
-// every kind value (arithmetic + bitwise/logical).
+// the Python_ArithOpKindAttr enum prints/parses and the op accepts
+// every kind value (arithmetic + bitwise/logical). The same attr is
+// reused by py.inplace_op, so adding a new kind here lights up both
+// dialect ops.
 
 module {
   // CHECK-LABEL: @each_kind

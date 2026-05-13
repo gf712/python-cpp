@@ -297,6 +297,44 @@ namespace py {
 			}
 		};
 
+		// Translate py.{binary,inplace_op}'s ArithOpKind enum to the
+		// bytecode-level BinaryOperation::Operation enum. The two are
+		// deliberately decoupled: the dialect enum is part of the IR
+		// contract; the bytecode enum is the wire format consumed by the
+		// VM, so the mapping between the two must stay explicit.
+		static BinaryOperation::Operation py_kind_to_binary_op(mlir::py::ArithOpKind kind)
+		{
+			switch (kind) {
+			case mlir::py::ArithOpKind::add:
+				return BinaryOperation::Operation::PLUS;
+			case mlir::py::ArithOpKind::sub:
+				return BinaryOperation::Operation::MINUS;
+			case mlir::py::ArithOpKind::mod:
+				return BinaryOperation::Operation::MODULO;
+			case mlir::py::ArithOpKind::mul:
+				return BinaryOperation::Operation::MULTIPLY;
+			case mlir::py::ArithOpKind::exp:
+				return BinaryOperation::Operation::EXP;
+			case mlir::py::ArithOpKind::div:
+				return BinaryOperation::Operation::SLASH;
+			case mlir::py::ArithOpKind::fldiv:
+				return BinaryOperation::Operation::FLOORDIV;
+			case mlir::py::ArithOpKind::mmul:
+				return BinaryOperation::Operation::MATMUL;
+			case mlir::py::ArithOpKind::lshift:
+				return BinaryOperation::Operation::LEFTSHIFT;
+			case mlir::py::ArithOpKind::rshift:
+				return BinaryOperation::Operation::RIGHTSHIFT;
+			case mlir::py::ArithOpKind::and_:
+				return BinaryOperation::Operation::AND;
+			case mlir::py::ArithOpKind::or_:
+				return BinaryOperation::Operation::OR;
+			case mlir::py::ArithOpKind::xor_:
+				return BinaryOperation::Operation::XOR;
+			}
+			ASSERT_NOT_REACHED();
+		}
+
 		struct InplaceOpLowering : public mlir::OpRewritePattern<InplaceOp>
 		{
 			using OpRewritePattern<InplaceOp>::OpRewritePattern;
@@ -304,98 +342,15 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(InplaceOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
-				auto kind = [&op]() {
-					switch (op.getKind()) {
-					case py::InplaceOpKind::add: {
-						return BinaryOperation::Operation::PLUS;
-					} break;
-					case py::InplaceOpKind::sub: {
-						return BinaryOperation::Operation::MINUS;
-					} break;
-					case py::InplaceOpKind::mod: {
-						return BinaryOperation::Operation::MODULO;
-					} break;
-					case py::InplaceOpKind::mul: {
-						return BinaryOperation::Operation::MULTIPLY;
-					} break;
-					case py::InplaceOpKind::exp: {
-						return BinaryOperation::Operation::EXP;
-					} break;
-					case py::InplaceOpKind::div: {
-						return BinaryOperation::Operation::SLASH;
-					} break;
-					case py::InplaceOpKind::fldiv: {
-						return BinaryOperation::Operation::FLOORDIV;
-					} break;
-					case py::InplaceOpKind::lshift: {
-						return BinaryOperation::Operation::LEFTSHIFT;
-					} break;
-					case py::InplaceOpKind::rshift: {
-						return BinaryOperation::Operation::RIGHTSHIFT;
-					} break;
-					case py::InplaceOpKind::and_: {
-						return BinaryOperation::Operation::AND;
-					} break;
-					case py::InplaceOpKind::or_: {
-						return BinaryOperation::Operation::OR;
-					} break;
-					case py::InplaceOpKind::xor_: {
-						return BinaryOperation::Operation::XOR;
-					} break;
-					case py::InplaceOpKind::mmul: {
-						return BinaryOperation::Operation::MATMUL;
-					} break;
-					}
-					ASSERT_NOT_REACHED();
-				}();
-				auto dst = op.getDst();
-				auto src = op.getSrc();
-				auto op_type = mlir::IntegerAttr::get(
-					rewriter.getIntegerType(8, false), static_cast<uint8_t>(kind));
+				auto op_type = mlir::IntegerAttr::get(rewriter.getIntegerType(8, false),
+					static_cast<uint8_t>(py_kind_to_binary_op(op.getKind())));
 
 				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::InplaceOp>(
-					op, op.getResult().getType(), dst, src, op_type);
+					op, op.getResult().getType(), op.getDst(), op.getSrc(), op_type);
 
 				return success();
 			}
 		};
-
-		// Translate py.binary's BinaryOpKind enum to the bytecode-level
-		// BinaryOperation::Operation enum. The two are deliberately decoupled:
-		// the dialect enum is part of the IR contract; the bytecode enum is
-		// the wire format consumed by the VM.
-		static BinaryOperation::Operation py_kind_to_binary_op(mlir::py::BinaryOpKind kind)
-		{
-			switch (kind) {
-			case mlir::py::BinaryOpKind::add:
-				return BinaryOperation::Operation::PLUS;
-			case mlir::py::BinaryOpKind::sub:
-				return BinaryOperation::Operation::MINUS;
-			case mlir::py::BinaryOpKind::mod:
-				return BinaryOperation::Operation::MODULO;
-			case mlir::py::BinaryOpKind::mul:
-				return BinaryOperation::Operation::MULTIPLY;
-			case mlir::py::BinaryOpKind::exp:
-				return BinaryOperation::Operation::EXP;
-			case mlir::py::BinaryOpKind::div:
-				return BinaryOperation::Operation::SLASH;
-			case mlir::py::BinaryOpKind::fldiv:
-				return BinaryOperation::Operation::FLOORDIV;
-			case mlir::py::BinaryOpKind::mmul:
-				return BinaryOperation::Operation::MATMUL;
-			case mlir::py::BinaryOpKind::lshift:
-				return BinaryOperation::Operation::LEFTSHIFT;
-			case mlir::py::BinaryOpKind::rshift:
-				return BinaryOperation::Operation::RIGHTSHIFT;
-			case mlir::py::BinaryOpKind::and_:
-				return BinaryOperation::Operation::AND;
-			case mlir::py::BinaryOpKind::or_:
-				return BinaryOperation::Operation::OR;
-			case mlir::py::BinaryOpKind::xor_:
-				return BinaryOperation::Operation::XOR;
-			}
-			ASSERT_NOT_REACHED();
-		}
 
 		struct BinaryOpLowering : public mlir::OpRewritePattern<mlir::py::BinaryOp>
 		{

@@ -38,28 +38,14 @@ def Python_FormatValueConversionAttr : I64EnumAttr<
   let cppNamespace = "::mlir::py";
 }
 
-def Python_InplaceOpKindAttr : I64EnumAttr<
-    "InplaceOpKind", "",
-    [
-      I64EnumAttrCase<"add", 0>,
-      I64EnumAttrCase<"sub", 1>,
-      I64EnumAttrCase<"mod", 2>,
-      I64EnumAttrCase<"mul", 3>,
-      I64EnumAttrCase<"exp", 4>,
-      I64EnumAttrCase<"div", 5>,
-      I64EnumAttrCase<"fldiv", 6>,
-      I64EnumAttrCase<"mmul", 7>,
-      I64EnumAttrCase<"lshift", 8>,
-      I64EnumAttrCase<"rshift", 9>,
-      I64EnumAttrCase<"and_", 10>,
-      I64EnumAttrCase<"or_", 11>,
-      I64EnumAttrCase<"xor_", 12>,
-    ]> {
-  let cppNamespace = "::mlir::py";
-}
-
-def Python_BinaryOpKindAttr : I64EnumAttr<
-    "BinaryOpKind", "",
+// Shared by py.binary and py.inplace_op. The set of operations is
+// identical between binary and inplace forms in Python (the operator
+// is binary; only the assignment differs), so a single enum avoids
+// drift between the two and a redundant translation switch in the
+// lowering pass. Covers arithmetic, bitwise, and shift operators,
+// matching Python's numeric protocols.
+def Python_ArithOpKindAttr : I64EnumAttr<
+    "ArithOpKind", "",
     [
       I64EnumAttrCase<"add", 0>,
       I64EnumAttrCase<"sub", 1>,
