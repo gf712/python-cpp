@@ -279,11 +279,11 @@ namespace py {
 			}
 		};
 
-		struct CompareOpLowering : public mlir::OpRewritePattern<mlir::py::Compare>
+		struct CompareOpLowering : public mlir::OpRewritePattern<mlir::py::CompareOp>
 		{
-			using OpRewritePattern<mlir::py::Compare>::OpRewritePattern;
+			using OpRewritePattern<mlir::py::CompareOp>::OpRewritePattern;
 
-			mlir::LogicalResult matchAndRewrite(mlir::py::Compare op,
+			mlir::LogicalResult matchAndRewrite(mlir::py::CompareOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
 				auto lhs = op.getLhs();

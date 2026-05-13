@@ -315,7 +315,7 @@ def CastToBoolOp : Python_Op<"as_bool"> {
     let results = (outs I1:$output);
 }
 
-def Compare : Python_Op<"cmp"> {
+def CompareOp : Python_Op<"cmp"> {
     let summary = "Compare two operands";
 
     let arguments = (ins Python_CmpPredicateAttr:$predicate,

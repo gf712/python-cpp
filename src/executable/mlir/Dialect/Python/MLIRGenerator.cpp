@@ -1300,7 +1300,7 @@ ast::Value *MLIRGenerator::visit(const ast::Continue *node)
 
 ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 {
-	std::optional<mlir::py::Compare> result;
+	std::optional<mlir::py::CompareOp> result;
 	auto lhs = static_cast<MLIRValue *>(node->lhs()->codegen(this))->value;
 	const auto &comparators = node->comparators();
 	const auto &ops = node->ops();
@@ -1311,7 +1311,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 
 		switch (op) {
 		case ast::Compare::OpType::Eq: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::eq),
@@ -1319,7 +1319,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::NotEq: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::ne),
@@ -1327,7 +1327,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Lt: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::lt),
@@ -1335,7 +1335,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::LtE: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::le),
@@ -1343,7 +1343,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Gt: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::gt),
@@ -1351,7 +1351,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::GtE: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::ge),
@@ -1359,7 +1359,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Is: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::is),
@@ -1367,7 +1367,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::IsNot: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::isnot),
@@ -1375,7 +1375,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::In: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::in),
@@ -1383,7 +1383,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::NotIn: {
-			result = m_context.builder().create<mlir::py::Compare>(
+			result = m_context.builder().create<mlir::py::CompareOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::notin),
