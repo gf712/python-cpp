@@ -163,6 +163,8 @@ def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments, MemoryEffects<
                          );
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 // MemWrite for the same reason as the unary ops above: __add__,

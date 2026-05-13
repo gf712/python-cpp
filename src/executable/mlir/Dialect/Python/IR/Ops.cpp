@@ -138,6 +138,44 @@ namespace py {
 		return emitOpError() << "value attribute has unsupported kind: " << attr;
 	}
 
+	mlir::LogicalResult FunctionCallOp::verify()
+	{
+		// Two distinct shapes share this op:
+		//
+		// 1. Plain kwargs: keywords[i] names kwargs[i], so the two lists
+		//    are parallel and must agree in length.
+		//
+		// 2. Expansion: when requires_{args,kwargs}_expansion is set,
+		//    the corresponding operand list holds at most one value (a
+		//    tuple or dict to splat), and keywords is empty regardless
+		//    of how many actual keyword names the call will produce at
+		//    runtime. MLIRGenerator currently still emits a kwargs
+		//    operand alongside an args-expansion-only call, so we can't
+		//    use the parallel rule in that case.
+		if (getRequiresArgsExpansion()) {
+			if (getArgs().size() > 1) {
+				return emitOpError()
+					   << "requires_args_expansion expects at most one args operand, got "
+					   << getArgs().size();
+			}
+		}
+		if (getRequiresKwargsExpansion()) {
+			if (getKwargs().size() > 1) {
+				return emitOpError()
+					   << "requires_kwargs_expansion expects at most one kwargs operand, got "
+					   << getKwargs().size();
+			}
+		}
+		if (getRequiresArgsExpansion() || getRequiresKwargsExpansion()) { return mlir::success(); }
+		const auto keywords_size = getKeywords().size();
+		const auto kwargs_size = getKwargs().size();
+		if (keywords_size != kwargs_size) {
+			return emitOpError() << "has " << keywords_size << " keyword name(s) but "
+								 << kwargs_size << " kwargs value(s)";
+		}
+		return mlir::success();
+	}
+
 	mlir::LogicalResult BuildDictOp::verify()
 	{
 		// SameVariadicOperandSize already enforces keys.size() == values.size().
