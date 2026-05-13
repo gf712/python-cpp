@@ -543,8 +543,22 @@ namespace py {
 
 					rewriter.replaceOp(op, { *result });
 				} else {
-					// TODO: this is a hack to avoid spilling to the stack when building large
-					// dictionaries from literals
+					// Register-pressure workaround for dict literals larger
+					// than ~10 entries. A single BuildDict consuming N keys
+					// + N values forces N+N live values to coexist in
+					// registers right before the call, which the linear-
+					// scan allocator (see LinearScanRegisterAllocation in
+					// Target/PythonBytecode/) handles by spilling - and
+					// spills are expensive because emitpybytecode has no
+					// stack slots, only register-to-register moves and
+					// Push/Pop. Emit an empty BuildDict and stream each kv
+					// pair via DictAdd directly after its value is computed
+					// instead, so only 3 live values (dict, key, value) are
+					// needed at any point. The threshold is empirical; the
+					// principled fix is to do register allocation as an
+					// MLIR pass before bytecode emission (plan step 19) so
+					// the lowering can pick a strategy based on actual
+					// pressure feedback.
 					if (op.getValues().size() > 10) {
 						auto keys = op.getKeys();
 						auto values = op.getValues();
@@ -621,6 +635,15 @@ namespace py {
 				} else if (std::all_of(op.getElements().begin(),
 							   op.getElements().end(),
 							   known_at_compiletime)) {
+					// Same register-pressure motivation as the BuildDict
+					// >10 branch above: an all-constants list literal
+					// would otherwise tie up N registers waiting for the
+					// BuildList consumer. Bake the elements into a tuple
+					// Attribute and emit a single ListExtend from the
+					// constant - 2 registers live (list, tuple), not N.
+					// The principled fix is to expose register-pressure
+					// data to the lowering via a real MLIR allocation
+					// pass (plan step 19).
 					std::vector<mlir::Attribute> elements;
 					elements.reserve(op.getElements().size());
 					for (const auto &el : op.getElements()) {
