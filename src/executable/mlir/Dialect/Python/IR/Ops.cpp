@@ -99,12 +99,9 @@ namespace py {
 
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
-		mlir::py::PyEllipsisType)
+		mlir::py::EllipsisAttr value)
 	{
-		ConstantOp::build(builder,
-			state,
-			PyObjectType::get(builder.getContext()),
-			EllipsisAttr::get(builder.getContext()));
+		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), value);
 	}
 
 	void ConstantOp::build(mlir::OpBuilder &builder,

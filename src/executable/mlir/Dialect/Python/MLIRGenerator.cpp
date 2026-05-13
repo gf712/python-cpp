@@ -183,8 +183,6 @@ struct Context::ContextImpl
 	}
 
 	mlir::Type pyobject_type() { return mlir::py::PyObjectType::get(&m_ctx); }
-
-	mlir::py::PyEllipsisType pyellipsis_type() { return mlir::py::PyEllipsisType::get(&m_ctx); }
 };
 
 mlir::MLIRContext &Context::ctx() { return m_impl->m_ctx; }
@@ -1394,7 +1392,7 @@ ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 			[this, node](py::Ellipsis) -> ast::Value * {
 				mlir::py::ConstantOp op = m_context.builder().create<mlir::py::ConstantOp>(
 					loc(m_context.builder(), m_context.filename(), node->source_location()),
-					m_context->pyellipsis_type());
+					mlir::py::EllipsisAttr::get(&m_context.ctx()));
 				return new_value(op);
 			},
 			[](auto) -> ast::Value * {
