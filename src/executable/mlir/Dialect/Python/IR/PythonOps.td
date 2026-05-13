@@ -146,7 +146,12 @@ def MakeFunctionOp : Python_Op<"make_function", [AttrSizedOperandSegments]> {
     let results = (outs Python_PyObjectType:$func_object);
 }
 
-def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
+// MemWrite: the strongest case for the conservative effect — a
+// generic call dispatches to arbitrary user code (or a builtin
+// that can mutate any object reachable through args). Anything
+// less than MemWrite would let a future pass illegally reorder or
+// CSE calls.
+def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments, MemoryEffects<[MemWrite]>]> {
     let summary = "A generic function call";
 
     let arguments = (ins Python_PyObjectType:$callee,
@@ -160,7 +165,9 @@ def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def BinaryOp : Python_Op<"binary"> {
+// MemWrite for the same reason as the unary ops above: __add__,
+// __sub__, etc. are user-overridable and can run arbitrary code.
+def BinaryOp : Python_Op<"binary", [MemoryEffects<[MemWrite]>]> {
     let summary = "Generic binary operation dispatched on kind attribute";
 
     let arguments = (ins Python_ArithOpKindAttr:$kind,
@@ -180,7 +187,13 @@ def InplaceOp : Python_Op<"inplace_op", [MemoryEffects<[MemWrite]>]> {
     let results = (outs Python_PyObjectType:$result);
 }
 
-def PositiveOp : Python_Op<"pos"> {
+// MemWrite is conservative: each of these ops dispatches to a user-
+// overridable dunder (__pos__, __neg__, __invert__, __bool__ +
+// negation) that can have arbitrary side effects in Python. We can't
+// use Load*'s MemRead+PyExceptionStateWrite pattern (which assumes
+// the op only touches private slots) because Python's operator
+// dispatch can run any user code.
+def PositiveOp : Python_Op<"pos", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary positive operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -188,7 +201,7 @@ def PositiveOp : Python_Op<"pos"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def NegativeOp : Python_Op<"neg"> {
+def NegativeOp : Python_Op<"neg", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary negative operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -196,7 +209,7 @@ def NegativeOp : Python_Op<"neg"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def InvertOp : Python_Op<"inv"> {
+def InvertOp : Python_Op<"inv", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary invert operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -204,7 +217,7 @@ def InvertOp : Python_Op<"inv"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def NotOp : Python_Op<"not"> {
+def NotOp : Python_Op<"not", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary negation operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -212,7 +225,9 @@ def NotOp : Python_Op<"not"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def CastToBoolOp : Python_Op<"as_bool"> {
+// MemWrite: as_bool calls __bool__ (or falls back to __len__),
+// both user-overridable.
+def CastToBoolOp : Python_Op<"as_bool", [MemoryEffects<[MemWrite]>]> {
     let summary = "Convert Python object to bool";
 
     let arguments = (ins Python_PyObjectType:$value);
@@ -220,7 +235,8 @@ def CastToBoolOp : Python_Op<"as_bool"> {
     let results = (outs I1:$output);
 }
 
-def CompareOp : Python_Op<"cmp"> {
+// MemWrite: __eq__/__lt__/__contains__/etc. are user-overridable.
+def CompareOp : Python_Op<"cmp", [MemoryEffects<[MemWrite]>]> {
     let summary = "Compare two operands";
 
     let arguments = (ins Python_CmpPredicateAttr:$predicate,
@@ -313,7 +329,8 @@ def BuildStringOp : Python_Op<"build_string"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def FormatValueOp : Python_Op<"format"> {
+// MemWrite: __format__ / __str__ / __repr__ are user-overridable.
+def FormatValueOp : Python_Op<"format", [MemoryEffects<[MemWrite]>]> {
     let summary = "Format an object as a string using the requested conversion";
 
     let arguments = (ins Python_PyObjectType:$value,
@@ -322,7 +339,11 @@ def FormatValueOp : Python_Op<"format"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadAttributeOp : Python_Op<"load_attribute"> {
+// MemWrite: attribute access goes through __getattribute__ /
+// __getattr__, both user-overridable. Unlike load_fast / load_name
+// (which read from private slots and are MemRead-safe), this can
+// run any user code.
+def LoadAttributeOp : Python_Op<"load_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Load an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -338,7 +359,8 @@ def DeleteAttributeOp : Python_Op<"delete_attribute", [MemoryEffects<[MemWrite]>
                          StrAttr:$attr);
 }
 
-def BinarySubscriptOp : Python_Op<"subscript"> {
+// MemWrite: __getitem__ is user-overridable.
+def BinarySubscriptOp : Python_Op<"subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Subscript an object";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -370,7 +392,9 @@ def StoreAttributeOp : Python_Op<"store_attribute", [MemoryEffects<[MemWrite]>]>
                          Python_PyObjectType:$value);
 }
 
-def LoadMethodOp : Python_Op<"load_method"> {
+// MemWrite: like load_attribute, this triggers attribute lookup
+// which is user-overridable via __getattribute__ / __getattr__.
+def LoadMethodOp : Python_Op<"load_method", [MemoryEffects<[MemWrite]>]> {
     let summary = "Load a method";
 
     let arguments = (ins Python_PyObjectType:$self,
