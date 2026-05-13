@@ -37,6 +37,21 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	// verifier).
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
+	// Lower the four region-bearing control-flow ops first, each as its
+	// own pass so we can interleave canonicalize + CSE between them. The
+	// patterns perform structural surgery (block splits, region inlining,
+	// IRMapping clones) and previously ran as part of a single greedy
+	// rewrite that couldn't simplify between them. Order: ForLoop and
+	// While first (they bake in step/condition blocks that the inner
+	// Try/With patterns may walk), then Try and With.
+	pm.addPass(::mlir::py::createConvertForLoopPass());
+	pm.addPass(::mlir::py::createConvertWhileLoopPass());
+	pm.addPass(::mlir::createCanonicalizerPass());
+	pm.addPass(::mlir::createCSEPass());
+	pm.addPass(::mlir::py::createConvertTryPass());
+	pm.addPass(::mlir::py::createConvertWithPass());
+	pm.addPass(::mlir::createCanonicalizerPass());
+	pm.addPass(::mlir::createCSEPass());
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
 	// Post-lowering canonicalize + CSE: dedupes the emitpybytecode.LOAD_CONST
 	// ops the lowering and MLIRGenerator emit. Idiomatic Python compiles to

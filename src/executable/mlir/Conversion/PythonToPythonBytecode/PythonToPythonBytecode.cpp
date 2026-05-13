@@ -1884,11 +1884,11 @@ namespace py {
 			DeleteSubscriptOpLowering,
 			DeleteAttributeOpLowering>(&getContext());
 		patterns.add<StoreAttributeOpLowering, BuildSliceOpLowering>(&getContext());
-		patterns.add<ForLoopOpLowering, WhileOpLowering>(&getContext());
-		patterns.add<TryOpLowering,
-			WithOpLowering,
-			WithExceptStartOpLowering,
-			ClearExceptionStateOpLowering>(&getContext());
+		// ForLoop/While/Try/With lowerings now run in dedicated passes
+		// (ConvertPyForLoop/While/Try/With) ahead of this monolithic
+		// conversion pass, so canonicalize / CSE can simplify between
+		// their structural rewrites.
+		patterns.add<WithExceptStartOpLowering, ClearExceptionStateOpLowering>(&getContext());
 		patterns.add<ImportOpLowering, ImportFromOpLowering, ImportAllOpLowering>(&getContext());
 		patterns.add<ClassDefinitionOpLowering>(&getContext());
 		patterns.add<YieldOpLowering, YieldFromOpLowering>(&getContext());
