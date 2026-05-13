@@ -863,21 +863,12 @@ ast::Value *MLIRGenerator::visit(const ast::BinaryExpr *node)
 		return build_binary(mlir::py::BinaryOpKind::lshift);
 	case ast::BinaryOpType::RIGHTSHIFT:
 		return build_binary(mlir::py::BinaryOpKind::rshift);
-	case ast::BinaryOpType::AND: {
-		auto result = m_context.builder().create<mlir::py::LogicalAndOp>(
-			location, m_context->pyobject_type(), lhs, rhs);
-		return new_value(result);
-	}
-	case ast::BinaryOpType::OR: {
-		auto result = m_context.builder().create<mlir::py::LogicalOrOp>(
-			location, m_context->pyobject_type(), lhs, rhs);
-		return new_value(result);
-	}
-	case ast::BinaryOpType::XOR: {
-		auto result = m_context.builder().create<mlir::py::LogicalXorOp>(
-			location, m_context->pyobject_type(), lhs, rhs);
-		return new_value(result);
-	}
+	case ast::BinaryOpType::AND:
+		return build_binary(mlir::py::BinaryOpKind::and_);
+	case ast::BinaryOpType::OR:
+		return build_binary(mlir::py::BinaryOpKind::or_);
+	case ast::BinaryOpType::XOR:
+		return build_binary(mlir::py::BinaryOpKind::xor_);
 	}
 
 	ASSERT_NOT_REACHED();

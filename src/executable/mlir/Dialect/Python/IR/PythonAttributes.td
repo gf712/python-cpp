@@ -71,6 +71,9 @@ def Python_BinaryOpKindAttr : I64EnumAttr<
       I64EnumAttrCase<"mmul", 7>,
       I64EnumAttrCase<"lshift", 8>,
       I64EnumAttrCase<"rshift", 9>,
+      I64EnumAttrCase<"and_", 10>,
+      I64EnumAttrCase<"or_", 11>,
+      I64EnumAttrCase<"xor_", 12>,
     ]> {
   let cppNamespace = "::mlir::py";
 }

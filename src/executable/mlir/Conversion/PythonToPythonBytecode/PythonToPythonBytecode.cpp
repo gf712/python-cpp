@@ -388,6 +388,12 @@ namespace py {
 				return BinaryOperation::Operation::LEFTSHIFT;
 			case mlir::py::BinaryOpKind::rshift:
 				return BinaryOperation::Operation::RIGHTSHIFT;
+			case mlir::py::BinaryOpKind::and_:
+				return BinaryOperation::Operation::AND;
+			case mlir::py::BinaryOpKind::or_:
+				return BinaryOperation::Operation::OR;
+			case mlir::py::BinaryOpKind::xor_:
+				return BinaryOperation::Operation::XOR;
 			}
 			ASSERT_NOT_REACHED();
 		}
@@ -406,32 +412,6 @@ namespace py {
 				return success();
 			}
 		};
-
-		// LogicalAnd/Or/XorOp still go through the legacy per-op template.
-		// Step 12 of the MLIR cleanup plan folds them into the unified
-		// py.binary op above; until then, keep their dedicated lowerings.
-		template<typename SourceOp, BinaryOperation::Operation OperationEnumType>
-		struct LogicalBinaryOpLowering : public mlir::OpRewritePattern<SourceOp>
-		{
-			using mlir::OpRewritePattern<SourceOp>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(SourceOp op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto op_type = mlir::IntegerAttr::get(
-					rewriter.getIntegerType(8, false), static_cast<uint8_t>(OperationEnumType));
-				rewriter.template replaceOpWithNewOp<mlir::emitpybytecode::BinaryOp>(
-					op, op.getOutput().getType(), op.getLhs(), op.getRhs(), op_type);
-				return success();
-			}
-		};
-
-		using LogicalAndOpLowering =
-			LogicalBinaryOpLowering<mlir::py::LogicalAndOp, BinaryOperation::Operation::AND>;
-		using LogicalOrOpLowering =
-			LogicalBinaryOpLowering<mlir::py::LogicalOrOp, BinaryOperation::Operation::OR>;
-		using LogicalXorOpLowering =
-			LogicalBinaryOpLowering<mlir::py::LogicalXorOp, BinaryOperation::Operation::XOR>;
 
 		// Trivial 1:1 lowering of a py.unary_* op to emitpybytecode.UNARY_OP
 		// with the corresponding Unary::Operation enum baked in.
@@ -1779,9 +1759,7 @@ namespace py {
 			.add<DeleteFastLowering, DeleteGlobalLowering, DeleteNameLowering, DeleteDerefLowering>(
 				&getContext());
 		patterns.add<CallFunctionLowering, FuncOpLowering, MakeFunctionOpLowering>(&getContext());
-		patterns
-			.add<BinaryOpLowering, LogicalAndOpLowering, LogicalOrOpLowering, LogicalXorOpLowering>(
-				&getContext());
+		patterns.add<BinaryOpLowering>(&getContext());
 		patterns.add<InplaceOpLowering>(&getContext());
 		patterns
 			.add<ConditionalBranchOpLowering, CondBranchSubclassOpLowering, CastToBoolOpLowering>(

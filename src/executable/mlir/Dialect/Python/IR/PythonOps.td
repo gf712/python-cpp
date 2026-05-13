@@ -178,30 +178,6 @@ def BinaryOp : Python_Op<"binary"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LogicalAndOp : Python_Op<"logical_and"> {
-    let summary = "Generic binary logical and operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LogicalOrOp : Python_Op<"logical_or"> {
-    let summary = "Generic binary logical or operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LogicalXorOp : Python_Op<"logical_xor"> {
-    let summary = "Generic binary logical xor operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
 def InplaceOp : Python_Op<"inplace_op", [MemoryEffects<[MemWrite]>]> {
     let summary = "Generic inplace operation";
 
