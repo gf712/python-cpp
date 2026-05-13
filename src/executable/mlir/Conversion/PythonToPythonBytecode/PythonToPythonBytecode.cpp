@@ -1604,9 +1604,12 @@ namespace py {
 						rewriter.setInsertionPoint(insertion_point->getBlock(), insertion_point);
 						return return_block;
 					})
-					.Default([](mlir::Operation *op) {
-						TODO();
-						return nullptr;
+					.Default([](mlir::Operation *) -> mlir::Block * {
+						// Structurally unreachable: getParentOfType only
+						// walks for TryOp/WithOp/FuncOp, and the preceding
+						// ASSERT rules out nullptr, so one of the three
+						// Cases above must match.
+						ASSERT_NOT_REACHED();
 					});
 			}
 
