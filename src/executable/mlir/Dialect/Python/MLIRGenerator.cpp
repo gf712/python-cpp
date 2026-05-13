@@ -1165,10 +1165,7 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 	std::vector<mlir::StringRef> captures_ref;
 	captures_ref.reserve(captures.size());
 	for (const auto &el : captures) { captures_ref.push_back(el); }
-	output.setCapturesAttr(mlir::DenseStringElementsAttr::get(
-		mlir::VectorType::get({ static_cast<int64_t>(captures.size()) },
-			mlir::StringAttr::get(&m_context.ctx()).getType()),
-		captures_ref));
+	output.setCapturesAttr(m_context.builder().getStrArrayAttr(captures_ref));
 
 	store_name(node->name(), new_value(output), node->source_location());
 
@@ -1631,8 +1628,7 @@ ast::Value *MLIRGenerator::visit(const ast::Import *node)
 {
 	for (const auto &n : node->names()) {
 		// empty from_list
-		auto from_list = mlir::DenseStringElementsAttr::get(
-			mlir::VectorType::get({ 0 }, mlir::StringAttr::get(&m_context.ctx()).getType()), {});
+		auto from_list = m_context.builder().getStrArrayAttr({});
 		const uint32_t level = 0;
 
 		auto module = new_value(m_context.builder().create<mlir::py::ImportOp>(
@@ -1662,10 +1658,7 @@ ast::Value *MLIRGenerator::visit(const ast::ImportFrom *node)
 	names.reserve(node->names().size());
 	for (const auto &n : node->names()) { names.emplace_back(n.name); }
 
-	auto from_list = mlir::DenseStringElementsAttr::get(
-		mlir::VectorType::get({ static_cast<int64_t>(names.size()) },
-			mlir::StringAttr::get(&m_context.ctx()).getType()),
-		names);
+	auto from_list = m_context.builder().getStrArrayAttr(names);
 
 	auto module = m_context.builder().create<mlir::py::ImportOp>(
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
@@ -2061,10 +2054,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 		mangled_name,
 		mlir::ValueRange{},
 		mlir::ValueRange{},
-		mlir::DenseStringElementsAttr::get(
-			mlir::VectorType::get({ static_cast<int64_t>(captures.size()) },
-				mlir::StringAttr::get(&m_context.ctx()).getType()),
-			captures_ref));
+		m_context.builder().getStrArrayAttr(captures_ref));
 
 	auto iterable = static_cast<MLIRValue *>(generators.front()->iter()->codegen(this))->value;
 
@@ -2533,10 +2523,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 		mangled_name,
 		defaults_values,
 		kw_defaults_values,
-		mlir::DenseStringElementsAttr::get(
-			mlir::VectorType::get({ static_cast<int64_t>(captures.size()) },
-				mlir::StringAttr::get(&m_context.ctx()).getType()),
-			captures_ref)));
+		builder.getStrArrayAttr(captures_ref)));
 
 	if (is_anon) { return fn_obj; }
 	store_name(function_name, fn_obj, source_location);

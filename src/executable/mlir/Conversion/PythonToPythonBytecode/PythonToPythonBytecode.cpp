@@ -769,7 +769,8 @@ namespace py {
 				auto captures_tuple = [&]() -> mlir::Value {
 					if (op.getCaptures().empty()) { return nullptr; }
 					std::vector<mlir::Value> captures_vec;
-					for (auto name : op.getCaptures().getValues<mlir::StringRef>()) {
+					for (auto attr : op.getCaptures()) {
+						auto name = mlir::cast<mlir::StringAttr>(attr).getValue();
 						captures_vec.push_back(rewriter.create<mlir::emitpybytecode::LoadClosureOp>(
 							op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
 					}
@@ -892,7 +893,8 @@ namespace py {
 				auto captures_tuple = [&]() -> mlir::Value {
 					if (op.getCaptures().empty()) { return {}; }
 					std::vector<mlir::Value> captures_vec;
-					for (auto name : op.getCaptures().getValues<mlir::StringRef>()) {
+					for (auto attr : op.getCaptures()) {
+						auto name = mlir::cast<mlir::StringAttr>(attr).getValue();
 						captures_vec.push_back(rewriter.create<mlir::emitpybytecode::LoadClosureOp>(
 							op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
 					}
@@ -1643,9 +1645,10 @@ namespace py {
 					op.getModule().getType(),
 					rewriter.getUI32IntegerAttr(op.getLevel()));
 				std::vector<mlir::Value> els;
-				for (auto from : op.getFromList().getValues<mlir::StringRef>()) {
+				for (auto attr : op.getFromList()) {
+					auto from = mlir::cast<mlir::StringAttr>(attr);
 					els.push_back(rewriter.create<mlir::emitpybytecode::ConstantOp>(
-						op.getLoc(), op.getModule().getType(), rewriter.getStringAttr(from)));
+						op.getLoc(), op.getModule().getType(), from));
 				}
 				auto from_list = rewriter.create<mlir::emitpybytecode::BuildTuple>(
 					op.getLoc(), op.getModule().getType(), els);

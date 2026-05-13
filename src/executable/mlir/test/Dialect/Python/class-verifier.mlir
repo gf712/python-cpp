@@ -15,7 +15,7 @@ module {
       name = "Foo",
       mangled_name = "Foo",
       keywords = dense<["metaclass", "total"]> : tensor<2x!llvm.ptr>,
-      captures = dense<> : tensor<0x!llvm.ptr>,
+      captures = [],
       operandSegmentSizes = array<i32: 1, 1>
     }> ({
       %r = "python.constant"() <{value}> : () -> !python.object
@@ -33,7 +33,7 @@ module {
       name = "Foo",
       mangled_name = "Foo",
       keywords = dense<["metaclass"]> : tensor<1x!llvm.ptr>,
-      captures = dense<> : tensor<0x!llvm.ptr>,
+      captures = [],
       operandSegmentSizes = array<i32: 1, 1>
     }> ({
       %r = "python.constant"() <{value}> : () -> !python.object

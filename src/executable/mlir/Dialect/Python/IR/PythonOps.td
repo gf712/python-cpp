@@ -138,10 +138,15 @@ def DeleteDerefOp : Python_Op<"delete_deref", [NamedOp, MemoryEffects<[MemWrite]
 def MakeFunctionOp : Python_Op<"make_function", [AttrSizedOperandSegments]> {
     let summary = "Make a function using the local environment and code object";
 
+    // captures is the list of free-variable names this function closes
+    // over. Encoded as a plain StrArrayAttr instead of a
+    // DenseStringElementsAttr — there's no tensor/vector semantics
+    // here, and StrArrayAttr prints as ["a", "b"] in textual IR
+    // instead of the noisy dense<["a", "b"]> : tensor<2x!llvm.ptr>.
     let arguments = (ins FlatSymbolRefAttr:$function_name,
                          Variadic<Python_PyObjectType>:$defaults,
                          Variadic<Python_PyObjectType>:$kw_defaults,
-                         Builtin_DenseStringElementsAttr:$captures);
+                         StrArrayAttr:$captures);
 
     let results = (outs Python_PyObjectType:$func_object);
 }
@@ -544,7 +549,10 @@ def CondBranchSubclassOp : Python_Op<"cond_br_subclass", [Terminator,
 def ImportOp : Python_Op<"import"> {
     let summary = "Import a Python module";
 
-    let arguments = (ins StrAttr:$name, Builtin_DenseStringElementsAttr:$from_list, UI32Attr:$level);
+    // from_list is the list of names introduced by `from m import a, b`.
+    // Plain StrArrayAttr (prints as ["a", "b"]); see same rationale on
+    // py.make_function.captures.
+    let arguments = (ins StrAttr:$name, StrArrayAttr:$from_list, UI32Attr:$level);
 
     let results = (outs Python_PyObjectType:$module);
 }
@@ -566,12 +574,15 @@ def ImportAllOp : Python_Op<"import_all"> {
 def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments]> {
     let summary = "Class definition";
 
+    // captures is a list of free-variable names — no tensor semantics,
+    // so a plain StrArrayAttr is the natural fit (prints as ["a", "b"]
+    // instead of dense<...> : tensor<...>).
     let arguments = (ins StrAttr:$name,
                          StrAttr:$mangled_name,
                          Variadic<Python_PyObjectType>:$bases,
                          Builtin_DenseStringElementsAttr:$keywords,
                          Variadic<Python_PyObjectType>:$kwargs,
-                         Builtin_DenseStringElementsAttr:$captures);
+                         StrArrayAttr:$captures);
 
     let regions = (region AnyRegion:$body);
 
