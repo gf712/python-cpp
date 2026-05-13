@@ -379,9 +379,11 @@ namespace py {
 					return success();
 				})
 				.Default([](Operation *) -> LogicalResult {
-					llvm_unreachable("TODO");
-					std::abort();
-					return failure();
+					// Unreachable in verified IR: the static_assert above
+					// constrains ControlFlowYield's parent op to one of the
+					// five Cases handled. A failure here means an
+					// unverified or malformed op slipped past verification.
+					llvm_unreachable("ControlFlowYield has unexpected parent op kind");
 				});
 
 		assert(result.succeeded());
