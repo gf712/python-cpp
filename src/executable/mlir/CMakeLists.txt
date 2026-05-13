@@ -20,6 +20,8 @@ set(PYTHON_MLIR_BINARY_DIR ${PROJECT_BINARY_DIR}/src/executable/mlir)
 add_subdirectory(Conversion)
 add_subdirectory(Dialect)
 add_subdirectory(Target)
+add_subdirectory(tools/python-mlir-opt)
+add_subdirectory(test)
 
 add_library(python-mlir compile.cpp)
 target_link_libraries(python-mlir PRIVATE PythonMLIRDialect TargetPythonBytecode PythonConversionPasses)
