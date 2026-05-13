@@ -738,6 +738,19 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::ClearEx
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::func::FuncOp &op)
 {
+	// Register allocation runs inline here rather than as an MLIR pass.
+	// Plan step 19 attempted to wrap LinearScanRegisterAllocation as an
+	// OperationPass<func::FuncOp> with the emitter recovering the value ->
+	// register map by re-running analyse() on the now-spilled IR. That
+	// failed in integration tests: two analyse() calls on identical IR
+	// can produce different assignments (a register that should hold a
+	// set ended up holding a range in set.py and friends). The algorithm
+	// has some state-dependent or non-deterministic tie-breaking that
+	// makes "spilled IR + fresh analyse" diverge from "iterative analyse
+	// that performed the spilling". Lifting allocation into a pass
+	// therefore requires plumbing the assignment from pass to emitter -
+	// e.g. encoding it as op attributes or via a side-channel keyed by
+	// FuncOp identity. Tracked separately.
 	LinearScanRegisterAllocation register_allocation{};
 	register_allocation.analyse(op, mlir::OpBuilder{ op.getContext() });
 	m_register_mapping.push(register_allocation.value2mem_map);
