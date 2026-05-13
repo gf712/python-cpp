@@ -141,6 +141,36 @@ namespace py {
 		return emitOpError() << "value attribute has unsupported kind: " << attr;
 	}
 
+	mlir::LogicalResult BuildDictOp::verify()
+	{
+		// SameVariadicOperandSize already enforces keys.size() == values.size().
+		// requires_expansion is one bool per kv pair.
+		const auto expansion_size = getRequiresExpansion().size();
+		const auto keys_size = getKeys().size();
+		if (expansion_size != keys_size) {
+			return emitOpError() << "requires_expansion has " << expansion_size
+								 << " entries but op has " << keys_size << " key/value pairs";
+		}
+		return mlir::success();
+	}
+
+	namespace {
+		template<typename Op> mlir::LogicalResult verify_elementwise_expansion(Op op)
+		{
+			const auto expansion_size = op.getRequiresExpansion().size();
+			const auto elements_size = op.getElements().size();
+			if (expansion_size != elements_size) {
+				return op.emitOpError() << "requires_expansion has " << expansion_size
+										<< " entries but op has " << elements_size << " elements";
+			}
+			return mlir::success();
+		}
+	}// namespace
+
+	mlir::LogicalResult BuildListOp::verify() { return verify_elementwise_expansion(*this); }
+	mlir::LogicalResult BuildTupleOp::verify() { return verify_elementwise_expansion(*this); }
+	mlir::LogicalResult BuildSetOp::verify() { return verify_elementwise_expansion(*this); }
+
 	SuccessorOperands CondBranchSubclassOp::getSuccessorOperands(unsigned index)
 	{
 		assert(index < getNumSuccessors() && "invalid successor index");

@@ -349,6 +349,8 @@ def BuildDictOp : Python_Op<"build_dict", [SameVariadicOperandSize]> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def DictAddOp : Python_Op<"dict_add"> {
@@ -366,6 +368,8 @@ def BuildListOp : Python_Op<"build_list"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def ListAppendOp : Python_Op<"list_append"> {
@@ -381,6 +385,8 @@ def BuildTupleOp : Python_Op<"build_tuple"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def BuildSetOp : Python_Op<"build_set"> {
@@ -390,6 +396,8 @@ def BuildSetOp : Python_Op<"build_set"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def SetAddOp : Python_Op<"set_add"> {
