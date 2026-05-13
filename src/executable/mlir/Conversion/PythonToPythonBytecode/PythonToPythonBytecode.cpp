@@ -570,6 +570,31 @@ namespace py {
 			}
 		};
 
+		// Build a list incrementally by walking (element, requires_expansion)
+		// pairs: each "expand" entry produces a ListExtend (unpacking *args
+		// or **kwargs in literals), each non-expand entry produces a
+		// ListAppend. Returns the resulting BuildList value, which both
+		// BuildListOp and BuildTupleOp lowerings hand off to their final
+		// step (replaceOp / wrap in ListToTuple respectively).
+		static mlir::emitpybytecode::BuildList build_list_with_expansion(
+			mlir::PatternRewriter &rewriter,
+			mlir::Location loc,
+			mlir::Type list_type,
+			mlir::ValueRange elements,
+			llvm::ArrayRef<bool> requires_expansion)
+		{
+			auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
+				loc, list_type, mlir::ValueRange{});
+			for (auto [el, expand] : llvm::zip(elements, requires_expansion)) {
+				if (expand) {
+					rewriter.create<mlir::emitpybytecode::ListExtend>(loc, list, el);
+				} else {
+					rewriter.create<mlir::emitpybytecode::ListAppend>(loc, list, el);
+				}
+			}
+			return list;
+		}
+
 		struct BuildListOpLowering : public mlir::OpRewritePattern<mlir::py::BuildListOp>
 		{
 			using OpRewritePattern<mlir::py::BuildListOp>::OpRewritePattern;
@@ -587,17 +612,11 @@ namespace py {
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),
 						[](const auto &el) { return el == 1; })) {
-					auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
-						op.getLoc(), op.getOutput().getType(), ValueRange{});
-					for (auto [el, expand] : llvm::zip(op.getElements(), requires_expansion)) {
-						if (expand) {
-							rewriter.create<mlir::emitpybytecode::ListExtend>(
-								op.getLoc(), list, el);
-						} else {
-							rewriter.create<mlir::emitpybytecode::ListAppend>(
-								op.getLoc(), list, el);
-						}
-					}
+					auto list = build_list_with_expansion(rewriter,
+						op.getLoc(),
+						op.getOutput().getType(),
+						op.getElements(),
+						requires_expansion);
 					rewriter.replaceOp(op, list);
 				} else if (std::all_of(op.getElements().begin(),
 							   op.getElements().end(),
@@ -647,17 +666,11 @@ namespace py {
 				if (std::any_of(requires_expansion.begin(),
 						requires_expansion.end(),
 						[](const auto &el) { return el == 1; })) {
-					auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
-						op.getLoc(), op.getOutput().getType(), ValueRange{});
-					for (auto [el, expand] : llvm::zip(op.getElements(), requires_expansion)) {
-						if (expand) {
-							rewriter.create<mlir::emitpybytecode::ListExtend>(
-								op.getLoc(), list, el);
-						} else {
-							rewriter.create<mlir::emitpybytecode::ListAppend>(
-								op.getLoc(), list, el);
-						}
-					}
+					auto list = build_list_with_expansion(rewriter,
+						op.getLoc(),
+						op.getOutput().getType(),
+						op.getElements(),
+						requires_expansion);
 					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ListToTuple>(
 						op, op.getOutput().getType(), list);
 				} else {
