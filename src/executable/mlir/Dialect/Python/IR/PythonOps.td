@@ -574,6 +574,8 @@ def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments]> {
     let regions = (region AnyRegion:$body);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 // Terminator for the body of a py.class. Carries the class object (or

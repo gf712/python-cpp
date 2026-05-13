@@ -176,6 +176,20 @@ namespace py {
 		return mlir::success();
 	}
 
+	mlir::LogicalResult ClassDefinitionOp::verify()
+	{
+		// keywords[i] names kwargs[i] — the two lists must agree in length.
+		// Unlike py.call, ClassDefinitionOp has no expansion flag, so the
+		// parallel rule always applies.
+		const auto keywords_size = getKeywords().size();
+		const auto kwargs_size = getKwargs().size();
+		if (keywords_size != kwargs_size) {
+			return emitOpError() << "has " << keywords_size << " keyword name(s) but "
+								 << kwargs_size << " kwargs value(s)";
+		}
+		return mlir::success();
+	}
+
 	mlir::LogicalResult BuildDictOp::verify()
 	{
 		// SameVariadicOperandSize already enforces keys.size() == values.size().
