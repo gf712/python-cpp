@@ -496,7 +496,7 @@ def ClearExceptionStateOp : Python_Op<"clear_exc_state",
     let summary = "Clears the interpreter exception state";
 }
 
-def ControlFlowYield : Python_Op<"cf_yield", [ReturnLike,
+def BranchYieldOp : Python_Op<"br_yield", [ReturnLike,
                                              DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, ["getSuccessorRegions"]>,
                                              Terminator,
                                              ParentOneOf<["TryOp",

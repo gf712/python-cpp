@@ -976,8 +976,8 @@ namespace py {
 					// llvm::outs() << '\n';
 					// llvm::outs().flush();
 
-					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
-						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
+						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
 								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
 									Impl>());
 						if (!yield_op.getKind().has_value()
@@ -1058,7 +1058,7 @@ namespace py {
 				// iterator_exit_block->print(llvm::outs());
 				// llvm::outs() << '\n';
 				// llvm::outs().flush();
-				ASSERT(mlir::isa<mlir::py::ControlFlowYield>(iterator_exit_block->getTerminator()));
+				ASSERT(mlir::isa<mlir::py::BranchYieldOp>(iterator_exit_block->getTerminator()));
 
 				rewriter.setInsertionPointToEnd(iterator_exit_block);
 				rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
@@ -1093,7 +1093,7 @@ namespace py {
 				if (!op.getOrelse().empty()) {
 					auto *orelse_exit_block = &op.getOrelse().back();
 					ASSERT(orelse_exit_block->getTerminator());
-					if (mlir::isa<mlir::py::ControlFlowYield>(orelse_exit_block->getTerminator())) {
+					if (mlir::isa<mlir::py::BranchYieldOp>(orelse_exit_block->getTerminator())) {
 						rewriter.setInsertionPointToEnd(orelse_exit_block);
 						rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
 							orelse_exit_block->getTerminator(), endBlock);
@@ -1142,8 +1142,8 @@ namespace py {
 					// operation->print(llvm::outs());
 					// llvm::outs() << '\n';
 					// llvm::outs().flush();
-					if (auto yield_op = mlir::dyn_cast<mlir::py::ControlFlowYield>(operation)) {
-						static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
+						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
 								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
 									Impl>());
 						if (!yield_op.getKind().has_value()
@@ -1209,7 +1209,7 @@ namespace py {
 				// if (!op.getOrelse().empty()) {
 				// 	auto *orelse_exit_block = &op.getOrelse().back();
 				// 	ASSERT(orelse_exit_block->getTerminator());
-				// 	if (mlir::isa<mlir::py::ControlFlowYield>(orelse_exit_block->getTerminator())) {
+				// 	if (mlir::isa<mlir::py::BranchYieldOp>(orelse_exit_block->getTerminator())) {
 				// 		rewriter.setInsertionPointToEnd(orelse_exit_block);
 				// 		rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
 				// 			orelse_exit_block->getTerminator(), endBlock);
@@ -1232,7 +1232,7 @@ namespace py {
 			{
 				if (region.empty()) { return; }
 				region.walk<WalkOrder::PreOrder>([callback](mlir::Operation *childOp) {
-					static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
 							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
 					if (mlir::isa<mlir::py::TryOp>(childOp)
 						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
@@ -1241,8 +1241,8 @@ namespace py {
 						|| mlir::isa<mlir::py::TryHandlerScope>(childOp)) {
 						return WalkResult::skip();
 					}
-					if (mlir::isa<mlir::py::ControlFlowYield>(childOp)
-						&& !mlir::cast<mlir::py::ControlFlowYield>(childOp).getKind().has_value()) {
+					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)
+						&& !mlir::cast<mlir::py::BranchYieldOp>(childOp).getKind().has_value()) {
 						callback(childOp);
 						return WalkResult::skip();
 					}
@@ -1471,7 +1471,7 @@ namespace py {
 
 				op.getBody().walk<WalkOrder::PreOrder>([&rewriter, exit_block, cleanup_block](
 														   mlir::Operation *childOp) {
-					static_assert(mlir::py::ControlFlowYield::hasTrait<mlir::OpTrait::
+					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
 							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
 					if (mlir::isa<mlir::py::TryOp>(childOp)
 						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
@@ -1492,7 +1492,7 @@ namespace py {
 							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
 								op, BlockRange{ cleanup_block });
 						}
-					} else if (auto op = mlir::dyn_cast<mlir::py::ControlFlowYield>(childOp);
+					} else if (auto op = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
 						op && !op.getKind().has_value()) {
 						auto *current = op->getBlock();
 						auto *next = rewriter.splitBlock(current, op->getIterator());

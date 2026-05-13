@@ -192,7 +192,7 @@ namespace py {
 		// out of them: the for-loop iterator is consumed by FOR_ITER inside
 		// `step`; the while condition is computed inside `condition`; try's
 		// regions communicate via the exception state, not block args; and
-		// the ops' results are produced by the ControlFlowYield terminator,
+		// the ops' results are produced by the BranchYieldOp terminator,
 		// not threaded through the parent successor. Return empty in all
 		// cases.
 		mlir::ValueRange region_or_block_arguments(mlir::Operation *, mlir::RegionSuccessor)
@@ -311,10 +311,10 @@ namespace py {
 		}
 	}
 
-	void ControlFlowYield::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> operands,
+	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> operands,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
-		static_assert(ControlFlowYield::hasTrait<
+		static_assert(BranchYieldOp::hasTrait<
 			mlir::OpTrait::HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
 
 		if (getKind().has_value()) { return; }
@@ -325,7 +325,7 @@ namespace py {
 					// Fallthrough (no exception) successors for a yield inside
 					// a TryOp. The exception → handler edges are not modeled
 					// here; they're induced by the exception state, not by a
-					// ControlFlowYield. Successor of yield from:
+					// BranchYieldOp. Successor of yield from:
 					//   body    -> orelse if non-empty, else finally if
 					//              non-empty, else parent.
 					//   handler -> finally if non-empty, else parent.
@@ -410,10 +410,10 @@ namespace py {
 				})
 				.Default([](Operation *) -> LogicalResult {
 					// Unreachable in verified IR: the static_assert above
-					// constrains ControlFlowYield's parent op to one of the
+					// constrains BranchYieldOp's parent op to one of the
 					// five Cases handled. A failure here means an
 					// unverified or malformed op slipped past verification.
-					llvm_unreachable("ControlFlowYield has unexpected parent op kind");
+					llvm_unreachable("BranchYieldOp has unexpected parent op kind");
 				});
 
 		assert(result.succeeded());

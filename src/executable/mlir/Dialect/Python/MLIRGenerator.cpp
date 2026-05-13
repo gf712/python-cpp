@@ -822,7 +822,7 @@ ast::Value *MLIRGenerator::visit(const ast::Break *node)
 	m_context.builder().create<mlir::cf::BranchOp>(
 		loc(m_context.builder(), m_context.filename(), node->source_location()), b);
 	m_context.builder().setInsertionPointToStart(b);
-	m_context.builder().create<mlir::py::ControlFlowYield>(
+	m_context.builder().create<mlir::py::BranchYieldOp>(
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		mlir::py::LoopOpKindAttr::get(&m_context.ctx(), mlir::py::LoopOpKind::break_));
 	return nullptr;
@@ -1223,7 +1223,7 @@ ast::Value *MLIRGenerator::visit(const ast::Continue *node)
 	m_context.builder().create<mlir::cf::BranchOp>(
 		loc(m_context.builder(), m_context.filename(), node->source_location()), b);
 	m_context.builder().setInsertionPointToStart(b);
-	m_context.builder().create<mlir::py::ControlFlowYield>(
+	m_context.builder().create<mlir::py::BranchYieldOp>(
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		mlir::py::LoopOpKindAttr::get(&m_context.ctx(), mlir::py::LoopOpKind::continue_));
 	return nullptr;
@@ -1483,7 +1483,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
 
 	assign(node->target(), iterator, node->target()->source_location());
-	m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
+	m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
 
 	m_context.builder().setInsertionPointToStart(&body_start);
 	for (const auto &el : node->body()) { el->codegen(this); }
@@ -1492,7 +1492,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 			.getInsertionBlock()
 			->back()
 			.hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
+		m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
 	}
 
 	if (!node->orelse().empty()) {
@@ -1500,7 +1500,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		for (const auto &el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::ControlFlowYield>(loc(
+			m_context.builder().create<mlir::py::BranchYieldOp>(loc(
 				m_context.builder(), m_context.filename(), node->body().back()->source_location()));
 		}
 	}
@@ -1973,7 +1973,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 			auto for_loop = m_context.builder().create<mlir::py::ForLoopOp>(
 				loc(m_context.builder(), m_context.filename(), generator->source_location()),
 				iterable);
-			m_context.builder().create<mlir::py::ControlFlowYield>(
+			m_context.builder().create<mlir::py::BranchYieldOp>(
 				loc(m_context.builder(), m_context.filename(), generator->source_location()));
 			// iterator
 			{
@@ -1981,7 +1981,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 				auto iterator = new_value(for_loop.getStep().addArgument(
 					m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
 				assign(generator->target(), iterator, generator->target()->source_location());
-				m_context.builder().create<mlir::py::ControlFlowYield>(
+				m_context.builder().create<mlir::py::BranchYieldOp>(
 					m_context.builder().getUnknownLoc());
 			}
 			// loop body
@@ -2028,7 +2028,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 							&body_continue);
 					}
 					m_context.builder().setInsertionPointToStart(&body_continue);
-					m_context.builder().create<mlir::py::ControlFlowYield>(
+					m_context.builder().create<mlir::py::BranchYieldOp>(
 						loc(m_context.builder(),
 							m_context.filename(),
 							generator->source_location()),
@@ -2056,7 +2056,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 			next_generator(iter, generator);
 		}
 		container_update(container);
-		m_context.builder().create<mlir::py::ControlFlowYield>(m_context.builder().getUnknownLoc());
+		m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
 
 		m_context.builder().setInsertionPointToEnd(entry_block);
 		m_context.builder().getBlock()->back().erase();
@@ -2635,7 +2635,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::ControlFlowYield>(
+		m_context.builder().create<mlir::py::BranchYieldOp>(
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	}
 
@@ -2678,7 +2678,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 					.getBlock()
 					->back()
 					.hasTrait<mlir::OpTrait::IsTerminator>()) {
-				m_context.builder().create<mlir::py::ControlFlowYield>(
+				m_context.builder().create<mlir::py::BranchYieldOp>(
 					loc(m_context.builder(), m_context.filename(), node->source_location()));
 			}
 		}
@@ -2689,7 +2689,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		for (auto el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::ControlFlowYield>(
+			m_context.builder().create<mlir::py::BranchYieldOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()));
 		}
 	}
@@ -2702,7 +2702,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		for (auto el : node->finalbody()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::ControlFlowYield>(
+			m_context.builder().create<mlir::py::BranchYieldOp>(
 				loc(m_context.builder(), m_context.filename(), node->source_location()));
 		}
 	}
@@ -2797,7 +2797,7 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::ControlFlowYield>(
+		m_context.builder().create<mlir::py::BranchYieldOp>(
 			loc(m_context.builder(), m_context.filename(), node->body().back()->source_location()));
 	}
 
@@ -2806,7 +2806,7 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 		for (const auto &el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::ControlFlowYield>(loc(
+			m_context.builder().create<mlir::py::BranchYieldOp>(loc(
 				m_context.builder(), m_context.filename(), node->body().back()->source_location()));
 		}
 	}
@@ -2870,7 +2870,7 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::ControlFlowYield>(
+		m_context.builder().create<mlir::py::BranchYieldOp>(
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	}
 	scope().finally_blocks.pop_back();
