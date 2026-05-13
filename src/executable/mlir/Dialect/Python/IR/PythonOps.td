@@ -631,9 +631,16 @@ def YieldFromOp : Python_Op<"yield_from"> {
 def BuildSliceOp : Python_Op<"build_slice"> {
     let summary = "Build a slice object from object subscripting";
 
+    // `step` is optional: the runtime BuildSlice instruction supports a
+    // step-less 2-operand form, and most Python slices in the wild
+    // (arr[:5], arr[1:], arr[1:5]) have no step. Omitting the None
+    // constant when step is missing saves a register per such slice.
+    // `lower` and `upper` stay required — the VM's BuildSlice::execute
+    // dereferences both unconditionally; rep-as-None is materialized
+    // by MLIRGenerator when the Python source lacks them.
     let arguments = (ins Python_PyObjectType:$lower,
                          Python_PyObjectType:$upper,
-                         Python_PyObjectType:$step);
+                         Optional<Python_PyObjectType>:$step);
 
     let results = (outs Python_PyObjectType:$slice);
 }

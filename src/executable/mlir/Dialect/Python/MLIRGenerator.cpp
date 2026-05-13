@@ -2112,6 +2112,11 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_slice(
 				return new_value(static_cast<const MLIRValue &>(*idx.value->codegen(this)).value);
 			},
 			[this, location](ast::Subscript::Slice slice) -> MLIRValue * {
+				// lower / upper are materialized as None constants when
+				// the Python source omits them (a[:5] etc.) because the
+				// runtime BuildSlice::execute dereferences both. step is
+				// genuinely optional at the dialect + runtime level:
+				// pass nullptr when missing and save a register.
 				auto lower = slice.lower
 								 ? static_cast<MLIRValue &>(*slice.lower->codegen(this)).value
 								 : m_context.builder().create<mlir::py::ConstantOp>(
@@ -2122,11 +2127,8 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_slice(
 								 : m_context.builder().create<mlir::py::ConstantOp>(
 									   loc(m_context.builder(), m_context.filename(), location),
 									   m_context.builder().getNoneType());
-				auto step = slice.step
-								? static_cast<MLIRValue &>(*slice.step->codegen(this)).value
-								: m_context.builder().create<mlir::py::ConstantOp>(
-									  loc(m_context.builder(), m_context.filename(), location),
-									  m_context.builder().getNoneType());
+				auto step = slice.step ? static_cast<MLIRValue &>(*slice.step->codegen(this)).value
+									   : mlir::Value{};
 				return new_value(m_context.builder().create<mlir::py::BuildSliceOp>(
 					loc(m_context.builder(), m_context.filename(), location),
 					m_context->pyobject_type(),

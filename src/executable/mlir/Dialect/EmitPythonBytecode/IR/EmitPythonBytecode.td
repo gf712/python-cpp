@@ -287,9 +287,12 @@ def EmitPythonBytecode_BuildString : EmitPythonBytecode_Op<"BUILD_STRING"> {
 def EmitPythonBytecode_BuildSlice: EmitPythonBytecode_Op<"BUILD_SLICE"> {
     let summary = "Build a slice object";
 
+    // `step` is optional: matches py.build_slice in the source dialect,
+    // and the bytecode emitter selects the 3- vs 4-arg BuildSlice
+    // instruction constructor based on whether step is present.
     let arguments = (ins Python_PyObjectType:$lower,
                          Python_PyObjectType:$upper,
-                         Python_PyObjectType:$step);
+                         Optional<Python_PyObjectType>:$step);
 
     let results = (outs Python_PyObjectType:$output);
 }

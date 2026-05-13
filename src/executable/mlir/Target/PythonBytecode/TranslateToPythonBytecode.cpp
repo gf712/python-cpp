@@ -909,10 +909,15 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::BuildSlice &op)
 {
-	emit<BuildSlice>(get_register(op.getOutput()),
-		get_register(op.getLower()),
-		get_register(op.getUpper()),
-		get_register(op.getStep()));
+	if (op.getStep()) {
+		emit<BuildSlice>(get_register(op.getOutput()),
+			get_register(op.getLower()),
+			get_register(op.getUpper()),
+			get_register(op.getStep()));
+	} else {
+		emit<BuildSlice>(
+			get_register(op.getOutput()), get_register(op.getLower()), get_register(op.getUpper()));
+	}
 	return success();
 }
 
