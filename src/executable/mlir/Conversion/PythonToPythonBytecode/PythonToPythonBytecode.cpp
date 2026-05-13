@@ -153,8 +153,7 @@ namespace py {
 				mlir::PatternRewriter &rewriter) const final
 			{
 				register_name_with_parent(op, op.getNameAttr(), rewriter, Kind);
-				rewriter.template replaceOpWithNewOp<To>(
-					op, op.getOutput().getType(), op.getNameAttr(), op.getValue());
+				rewriter.template replaceOpWithNewOp<To>(op, op.getNameAttr(), op.getValue());
 				return mlir::success();
 			}
 		};

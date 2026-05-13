@@ -19,8 +19,13 @@ module {
   // CHECK-LABEL: @lower_store_global
   // CHECK-SAME: attributes {locals = ["arg"], names = ["g"]}
   func.func @lower_store_global(%v: !python.object {llvm.name = "arg"}) -> !python.object {
+    // py.store_* / emitpybytecode.STORE_* are side-effecting writes that
+    // do NOT produce an SSA result. The lowered op uses `-> ()`, which
+    // matters for register allocation: a phantom unused result used to
+    // burn a register per store.
     // CHECK: emitpybytecode.STORE_GLOBAL
-    %0 = "python.store_global"(%v) {name = "g"} : (!python.object) -> !python.object
-    return %0 : !python.object
+    // CHECK-NOT: = "emitpybytecode.STORE_GLOBAL"
+    "python.store_global"(%v) {name = "g"} : (!python.object) -> ()
+    return %v : !python.object
   }
 }

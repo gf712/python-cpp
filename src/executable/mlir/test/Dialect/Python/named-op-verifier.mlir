@@ -18,8 +18,8 @@ module {
 module {
   func.func @bad_store(%v: !python.object) -> !python.object {
     // expected-error @+1 {{requires a non-empty 'name' attribute}}
-    %0 = "python.store_fast"(%v) {name = ""} : (!python.object) -> !python.object
-    return %0 : !python.object
+    "python.store_fast"(%v) {name = ""} : (!python.object) -> ()
+    return %v : !python.object
   }
 }
 

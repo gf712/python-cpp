@@ -328,35 +328,23 @@ void MLIRGenerator::store_name(std::string_view name,
 	switch (visibility) {
 	case VariablesResolver::Visibility::NAME: {
 		m_context.builder().create<mlir::py::StoreNameOp>(
-			loc(m_context.builder(), m_context.filename(), location),
-			m_context->pyobject_type(),
-			name,
-			value->value);
+			loc(m_context.builder(), m_context.filename(), location), name, value->value);
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
 		m_context.builder().create<mlir::py::StoreFastOp>(
-			loc(m_context.builder(), m_context.filename(), location),
-			m_context->pyobject_type(),
-			name,
-			value->value);
+			loc(m_context.builder(), m_context.filename(), location), name, value->value);
 	} break;
 	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
 	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		if (&m_scope.front() == &scope()) {
 			m_context.builder().create<mlir::py::StoreNameOp>(
-				loc(m_context.builder(), m_context.filename(), location),
-				m_context->pyobject_type(),
-				name,
-				value->value);
+				loc(m_context.builder(), m_context.filename(), location), name, value->value);
 		} else {
 			auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 				m_context.builder().getInsertionBlock()->getParent());
 			add_name(m_context.builder(), name, current_fn);
 			m_context.builder().create<mlir::py::StoreGlobalOp>(
-				loc(m_context.builder(), m_context.filename(), location),
-				m_context->pyobject_type(),
-				name,
-				value->value);
+				loc(m_context.builder(), m_context.filename(), location), name, value->value);
 		}
 	} break;
 	case VariablesResolver::Visibility::CELL: {
@@ -367,10 +355,7 @@ void MLIRGenerator::store_name(std::string_view name,
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		m_context.builder().create<mlir::py::StoreDerefOp>(
-			loc(m_context.builder(), m_context.filename(), location),
-			m_context->pyobject_type(),
-			name,
-			value->value);
+			loc(m_context.builder(), m_context.filename(), location), name, value->value);
 	} break;
 	case VariablesResolver::Visibility::FREE: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
@@ -380,17 +365,11 @@ void MLIRGenerator::store_name(std::string_view name,
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
 		m_context.builder().create<mlir::py::StoreDerefOp>(
-			loc(m_context.builder(), m_context.filename(), location),
-			m_context->pyobject_type(),
-			name,
-			value->value);
+			loc(m_context.builder(), m_context.filename(), location), name, value->value);
 	} break;
 	case VariablesResolver::Visibility::HIDDEN: {
 		m_context.builder().create<mlir::py::StoreNameOp>(
-			loc(m_context.builder(), m_context.filename(), location),
-			m_context->pyobject_type(),
-			name,
-			value->value);
+			loc(m_context.builder(), m_context.filename(), location), name, value->value);
 	} break;
 	}
 }

@@ -190,8 +190,7 @@ class LinearScanRegisterAllocation
 	{
 		if (!std::holds_alternative<mlir::Value>(interval.value)) { return false; }
 		auto val = std::get<mlir::Value>(interval.value);
-		return val.getDefiningOp()
-			   && mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp());
+		return val.getDefiningOp() && mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp());
 	}
 
 	/**
@@ -222,7 +221,7 @@ class LinearScanRegisterAllocation
 		ASSERT(def_op);
 		builder.setInsertionPointAfter(def_op);
 		builder.create<mlir::emitpybytecode::StoreFastOp>(
-			def_op->getLoc(), victim_value.getType(), name_attr, victim_value);
+			def_op->getLoc(), name_attr, victim_value);
 
 		// Before each original use: LOAD_FAST to reload the spilled value
 		for (auto *use : uses) {
@@ -255,7 +254,7 @@ class LinearScanRegisterAllocation
 
 		// Insert STORE_FAST at the very start of the block
 		builder.setInsertionPoint(bb, bb->begin());
-		builder.create<mlir::emitpybytecode::StoreFastOp>(loc, arg.getType(), name_attr, arg);
+		builder.create<mlir::emitpybytecode::StoreFastOp>(loc, name_attr, arg);
 
 		// Before each original use: LOAD_FAST to reload the value
 		for (auto *use : uses) {
@@ -467,7 +466,8 @@ class LinearScanRegisterAllocation
 	/**
 	 * Collect available registers, accounting for special constraints
 	 */
-	std::bitset<kRegCount> collect_available_registers(const LiveIntervalAnalysis::LiveInterval &cur,
+	std::bitset<kRegCount> collect_available_registers(
+		const LiveIntervalAnalysis::LiveInterval &cur,
 		const std::bitset<kRegCount> &free,
 		LiveIntervalSet &inactive,
 		std::span<LiveIntervalAnalysis::LiveInterval> unhandled,

@@ -51,26 +51,18 @@ def EmitPythonBytecode_LoadClosureOp: EmitPythonBytecode_Op<"LOAD_CLOSURE"> {
 
 def EmitPythonBytecode_StoreNameOp: EmitPythonBytecode_Op<"STORE_NAME", [MemoryEffects<[MemWrite]>]> {
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$object);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def EmitPythonBytecode_StoreGlobalOp: EmitPythonBytecode_Op<"STORE_GLOBAL", [MemoryEffects<[MemWrite]>]> {
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$object);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def EmitPythonBytecode_StoreFastOp: EmitPythonBytecode_Op<"STORE_FAST", [MemoryEffects<[MemWrite]>]> {
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$object);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def EmitPythonBytecode_StoreDerefOp: EmitPythonBytecode_Op<"STORE_DEREF", [MemoryEffects<[MemWrite]>]> {
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$object);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def EmitPythonBytecode_DeleteNameOp: EmitPythonBytecode_Op<"DELETE_NAME", [MemoryEffects<[MemWrite]>]> {

@@ -91,32 +91,24 @@ def StoreNameOp : Python_Op<"store_name", [NamedOp, MemoryEffects<[MemWrite]>]> 
     let summary = "Store value to the local environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def StoreFastOp : Python_Op<"store_fast", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to local bound variable";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def StoreGlobalOp : Python_Op<"store_global", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in the global environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def StoreDerefOp : Python_Op<"store_deref", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store PyObject to a cell";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
 def DeleteNameOp : Python_Op<"delete_name", [NamedOp, MemoryEffects<[MemWrite]>]> {
