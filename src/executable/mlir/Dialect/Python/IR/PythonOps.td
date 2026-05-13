@@ -272,7 +272,7 @@ def LogicalXorOp : Python_Op<"logical_xor"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def InplaceOp : Python_Op<"inplace_op"> {
+def InplaceOp : Python_Op<"inplace_op", [MemoryEffects<[MemWrite]>]> {
     let summary = "Generic inplace operation";
 
     let arguments = (ins Python_PyObjectType:$src,
@@ -353,7 +353,7 @@ def BuildDictOp : Python_Op<"build_dict", [SameVariadicOperandSize]> {
     let hasVerifier = 1;
 }
 
-def DictAddOp : Python_Op<"dict_add"> {
+def DictAddOp : Python_Op<"dict_add", [MemoryEffects<[MemWrite]>]> {
     let summary = "Adds a key/value pair to the provided dictionary";
 
     let arguments = (ins Python_PyObjectType:$dict,
@@ -372,7 +372,7 @@ def BuildListOp : Python_Op<"build_list"> {
     let hasVerifier = 1;
 }
 
-def ListAppendOp : Python_Op<"list_append"> {
+def ListAppendOp : Python_Op<"list_append", [MemoryEffects<[MemWrite]>]> {
     let summary = "Append to a Python list";
 
     let arguments = (ins Python_PyObjectType:$list, Python_PyObjectType:$value);
@@ -400,7 +400,7 @@ def BuildSetOp : Python_Op<"build_set"> {
     let hasVerifier = 1;
 }
 
-def SetAddOp : Python_Op<"set_add"> {
+def SetAddOp : Python_Op<"set_add", [MemoryEffects<[MemWrite]>]> {
     let summary = "Add a value to a set";
 
     let arguments = (ins Python_PyObjectType:$set,
@@ -433,7 +433,7 @@ def LoadAttributeOp : Python_Op<"load_attribute"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteAttributeOp : Python_Op<"delete_attribute"> {
+def DeleteAttributeOp : Python_Op<"delete_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -449,7 +449,7 @@ def BinarySubscriptOp : Python_Op<"subscript"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreSubscriptOp : Python_Op<"store_subscript"> {
+def StoreSubscriptOp : Python_Op<"store_subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -457,14 +457,14 @@ def StoreSubscriptOp : Python_Op<"store_subscript"> {
                          Python_PyObjectType:$value);
 }
 
-def DeleteSubscriptOp : Python_Op<"delete_subscript"> {
+def DeleteSubscriptOp : Python_Op<"delete_subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
                          Python_PyObjectType:$subscript);
 }
 
-def StoreAttributeOp : Python_Op<"store_attribute"> {
+def StoreAttributeOp : Python_Op<"store_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in object using an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -585,7 +585,8 @@ def RaiseOp : Python_Op<"raise", [Terminator,
     ];
 }
 
-def ClearExceptionStateOp : Python_Op<"clear_exc_state"> {
+def ClearExceptionStateOp : Python_Op<"clear_exc_state",
+        [MemoryEffects<[MemWrite<PythonExceptionStateResource>]>]> {
     let summary = "Clears the interpreter exception state";
 }
 
