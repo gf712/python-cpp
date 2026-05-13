@@ -978,10 +978,10 @@ namespace py {
 
 					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
 						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
+								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::
 									Impl>());
 						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
+							&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
 							return WalkResult::advance();
 						}
 						// is this hacky? maybe there is a better way of ignoring the else branch of
@@ -1144,10 +1144,10 @@ namespace py {
 					// llvm::outs().flush();
 					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
 						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::
+								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::
 									Impl>());
 						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerScope>(yield_op->getParentOp())) {
+							&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
 							return WalkResult::advance();
 						}
 						rewriter.setInsertionPoint(yield_op);
@@ -1233,12 +1233,12 @@ namespace py {
 				if (region.empty()) { return; }
 				region.walk<WalkOrder::PreOrder>([callback](mlir::Operation *childOp) {
 					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
+							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
 					if (mlir::isa<mlir::py::TryOp>(childOp)
 						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
 						|| mlir::isa<mlir::py::WhileOp>(childOp)
 						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerScope>(childOp)) {
+						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
 						return WalkResult::skip();
 					}
 					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)
@@ -1321,7 +1321,7 @@ namespace py {
 					auto &handler = op.getHandlers().front();
 					ASSERT(handler.getBlocks().size() == 1);
 					auto handler_scope =
-						mlir::cast<mlir::py::TryHandlerScope>(handler.front().getTerminator());
+						mlir::cast<mlir::py::TryHandlerOp>(handler.front().getTerminator());
 					ASSERT(handler_scope);
 					rewriter.create<mlir::emitpybytecode::SetupExceptionHandle>(op.getLoc(),
 						body_start,
@@ -1340,7 +1340,7 @@ namespace py {
 
 						ASSERT(handler.getBlocks().size() == 1);
 						auto handler_scope =
-							mlir::cast<mlir::py::TryHandlerScope>(handler.front().getTerminator());
+							mlir::cast<mlir::py::TryHandlerOp>(handler.front().getTerminator());
 						ASSERT(handler_scope);
 
 						if (!handler_scope.getCond().empty()) {
@@ -1350,7 +1350,7 @@ namespace py {
 							rewriter.setInsertionPoint(cond);
 							auto &next_handler = op.getHandlers()[idx + 1];
 							ASSERT(next_handler.getBlocks().size() == 1);
-							auto next_handler_scope = mlir::cast<mlir::py::TryHandlerScope>(
+							auto next_handler_scope = mlir::cast<mlir::py::TryHandlerOp>(
 								next_handler.front().getTerminator());
 							ASSERT(next_handler_scope);
 
@@ -1387,7 +1387,7 @@ namespace py {
 						auto &handler = op.getHandlers().back();
 						ASSERT(handler.getBlocks().size() == 1);
 						auto handler_scope =
-							mlir::cast<mlir::py::TryHandlerScope>(handler.front().getTerminator());
+							mlir::cast<mlir::py::TryHandlerOp>(handler.front().getTerminator());
 						ASSERT(handler_scope);
 						if (!handler_scope.getCond().empty()) {
 							auto cond = mlir::cast<mlir::py::ConditionOp>(
@@ -1472,12 +1472,12 @@ namespace py {
 				op.getBody().walk<WalkOrder::PreOrder>([&rewriter, exit_block, cleanup_block](
 														   mlir::Operation *childOp) {
 					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
+							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
 					if (mlir::isa<mlir::py::TryOp>(childOp)
 						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
 						|| mlir::isa<mlir::py::WhileOp>(childOp)
 						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerScope>(childOp)) {
+						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
 						return WalkResult::skip();
 					}
 					if (auto op = mlir::dyn_cast<mlir::py::RaiseOp>(childOp)) {

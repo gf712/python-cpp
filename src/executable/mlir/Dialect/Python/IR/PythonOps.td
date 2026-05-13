@@ -442,13 +442,13 @@ def WhileOp : Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterf
 }
 
 def ConditionOp : Python_Op<"condition", [Terminator,
-                                         ParentOneOf<["WhileOp", "TryHandlerScope"]>]> {
+                                         ParentOneOf<["WhileOp", "TryHandlerOp"]>]> {
     let summary = "Condition of a while loop or a catch statement";
 
     let arguments = (ins Python_PyObjectType:$cond);
 }
 
-def TryHandlerScope : Python_Op<"catch", [Terminator,
+def TryHandlerOp : Python_Op<"catch", [Terminator,
                                          HasParent<"TryOp">,
                                          DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$cond,
@@ -503,7 +503,7 @@ def BranchYieldOp : Python_Op<"br_yield", [ReturnLike,
                                                           "ForLoopOp",
                                                           "WithOp",
                                                           "WhileOp",
-                                                          "TryHandlerScope"]>]> {
+                                                          "TryHandlerOp"]>]> {
     let summary = "Yield control to the parent operation";
 
     let arguments = (ins OptionalAttr<Python_LoopOpKindAttr>:$kind);

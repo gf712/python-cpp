@@ -181,7 +181,7 @@ namespace py {
 	namespace {
 		// Shared getSuccessorInputs implementation for all four
 		// RegionBranchOpInterface ops in this dialect (WhileOp, ForLoopOp,
-		// TryOp, TryHandlerScope). MLIR 23 split the (region, block-args)
+		// TryOp, TryHandlerOp). MLIR 23 split the (region, block-args)
 		// pair that used to be carried by RegionSuccessor: the region is now
 		// in RegionSuccessor and the inputs come from this method. The
 		// inputs MLIR expects here are the operands the parent op forwards
@@ -315,106 +315,105 @@ namespace py {
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
 		static_assert(BranchYieldOp::hasTrait<
-			mlir::OpTrait::HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerScope>::Impl>());
+			mlir::OpTrait::HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
 
 		if (getKind().has_value()) { return; }
 
-		auto result =
-			llvm::TypeSwitch<Operation *, LogicalResult>(getOperation()->getParentOp())
-				.Case<TryOp>([this, &regions](TryOp op) -> LogicalResult {
-					// Fallthrough (no exception) successors for a yield inside
-					// a TryOp. The exception → handler edges are not modeled
-					// here; they're induced by the exception state, not by a
-					// BranchYieldOp. Successor of yield from:
-					//   body    -> orelse if non-empty, else finally if
-					//              non-empty, else parent.
-					//   handler -> finally if non-empty, else parent.
-					//   orelse  -> finally if non-empty, else parent.
-					//   finally -> parent.
-					// Matches the "exit-to-parent" convention used by
-					// TryOp::getSuccessorRegions (emplaces the containing
-					// region rather than RegionSuccessor::parent()).
-					auto *parent_region = getOperation()->getParentRegion();
-					auto exit_to_finally_or_parent = [&] {
-						if (!op.getFinally().empty()) {
-							regions.emplace_back(&op.getFinally());
-						} else {
-							regions.emplace_back(op->getParentRegion());
-						}
-					};
-					if (parent_region == &op.getBody()) {
-						if (!op.getOrelse().empty()) {
-							regions.emplace_back(&op.getOrelse());
-						} else {
-							exit_to_finally_or_parent();
-						}
-					} else if (parent_region == &op.getOrelse()) {
-						exit_to_finally_or_parent();
-					} else if (parent_region == &op.getFinally()) {
-						regions.emplace_back(op->getParentRegion());
-					} else {
-						bool in_handler = false;
-						for (mlir::Region &handler : op.getHandlers()) {
-							if (parent_region == &handler) {
-								in_handler = true;
-								break;
-							}
-						}
-						if (!in_handler) { llvm_unreachable("unexpected branch origin"); }
-						exit_to_finally_or_parent();
-					}
-					return success();
-				})
-				.Case<ForLoopOp>([this, &regions](ForLoopOp op) -> LogicalResult {
-					if (getOperation()->getParentRegion() == &op.getStep()) {
-						regions.emplace_back(&op.getBody());
-					} else if (getOperation()->getParentRegion() == &op.getBody()) {
-						regions.emplace_back(&op.getStep());
-					} else if (getOperation()->getParentRegion() == &op.getOrelse()) {
-					} else {
-						llvm_unreachable("unexpected branch origin");
-					}
-					return success();
-				})
-				.Case<WithOp>([&regions](WithOp op) -> LogicalResult {
-					regions.emplace_back(op->getParentRegion());
-					return success();
-				})
-				.Case<WhileOp>([this, &regions](WhileOp op) -> LogicalResult {
-					if (getOperation()->getParentRegion() == &op.getCondition()) {
-						regions.emplace_back(&op.getBody());
-					} else if (getOperation()->getParentRegion() == &op.getBody()) {
-						regions.emplace_back(&op.getCondition());
-					} else if (getOperation()->getParentRegion() == &op.getOrelse()) {
-					} else {
-						llvm_unreachable("unexpected branch origin");
-					}
-					return success();
-				})
-				.Case<TryHandlerScope>([this, &regions](TryHandlerScope op) -> LogicalResult {
-					// TryHandlerScope models a single except-clause: cond is
-					// the type-match test, handler is the body run on match.
-					// Yield from cond can fall through to the handler (match)
-					// or out to the parent (no match - try the next clause or
-					// re-raise). Yield from handler exits the scope.
-					auto *parent_region = getOperation()->getParentRegion();
-					if (parent_region == &op.getCond()) {
-						regions.emplace_back(&op.getHandler());
-						regions.emplace_back(op->getParentRegion());
-					} else if (parent_region == &op.getHandler()) {
-						regions.emplace_back(op->getParentRegion());
-					} else {
-						llvm_unreachable("unexpected branch origin");
-					}
-					return success();
-				})
-				.Default([](Operation *) -> LogicalResult {
-					// Unreachable in verified IR: the static_assert above
-					// constrains BranchYieldOp's parent op to one of the
-					// five Cases handled. A failure here means an
-					// unverified or malformed op slipped past verification.
-					llvm_unreachable("BranchYieldOp has unexpected parent op kind");
-				});
+		auto result = llvm::TypeSwitch<Operation *, LogicalResult>(getOperation()->getParentOp())
+						  .Case<TryOp>([this, &regions](TryOp op) -> LogicalResult {
+							  // Fallthrough (no exception) successors for a yield inside
+							  // a TryOp. The exception → handler edges are not modeled
+							  // here; they're induced by the exception state, not by a
+							  // BranchYieldOp. Successor of yield from:
+							  //   body    -> orelse if non-empty, else finally if
+							  //              non-empty, else parent.
+							  //   handler -> finally if non-empty, else parent.
+							  //   orelse  -> finally if non-empty, else parent.
+							  //   finally -> parent.
+							  // Matches the "exit-to-parent" convention used by
+							  // TryOp::getSuccessorRegions (emplaces the containing
+							  // region rather than RegionSuccessor::parent()).
+							  auto *parent_region = getOperation()->getParentRegion();
+							  auto exit_to_finally_or_parent = [&] {
+								  if (!op.getFinally().empty()) {
+									  regions.emplace_back(&op.getFinally());
+								  } else {
+									  regions.emplace_back(op->getParentRegion());
+								  }
+							  };
+							  if (parent_region == &op.getBody()) {
+								  if (!op.getOrelse().empty()) {
+									  regions.emplace_back(&op.getOrelse());
+								  } else {
+									  exit_to_finally_or_parent();
+								  }
+							  } else if (parent_region == &op.getOrelse()) {
+								  exit_to_finally_or_parent();
+							  } else if (parent_region == &op.getFinally()) {
+								  regions.emplace_back(op->getParentRegion());
+							  } else {
+								  bool in_handler = false;
+								  for (mlir::Region &handler : op.getHandlers()) {
+									  if (parent_region == &handler) {
+										  in_handler = true;
+										  break;
+									  }
+								  }
+								  if (!in_handler) { llvm_unreachable("unexpected branch origin"); }
+								  exit_to_finally_or_parent();
+							  }
+							  return success();
+						  })
+						  .Case<ForLoopOp>([this, &regions](ForLoopOp op) -> LogicalResult {
+							  if (getOperation()->getParentRegion() == &op.getStep()) {
+								  regions.emplace_back(&op.getBody());
+							  } else if (getOperation()->getParentRegion() == &op.getBody()) {
+								  regions.emplace_back(&op.getStep());
+							  } else if (getOperation()->getParentRegion() == &op.getOrelse()) {
+							  } else {
+								  llvm_unreachable("unexpected branch origin");
+							  }
+							  return success();
+						  })
+						  .Case<WithOp>([&regions](WithOp op) -> LogicalResult {
+							  regions.emplace_back(op->getParentRegion());
+							  return success();
+						  })
+						  .Case<WhileOp>([this, &regions](WhileOp op) -> LogicalResult {
+							  if (getOperation()->getParentRegion() == &op.getCondition()) {
+								  regions.emplace_back(&op.getBody());
+							  } else if (getOperation()->getParentRegion() == &op.getBody()) {
+								  regions.emplace_back(&op.getCondition());
+							  } else if (getOperation()->getParentRegion() == &op.getOrelse()) {
+							  } else {
+								  llvm_unreachable("unexpected branch origin");
+							  }
+							  return success();
+						  })
+						  .Case<TryHandlerOp>([this, &regions](TryHandlerOp op) -> LogicalResult {
+							  // TryHandlerOp models a single except-clause: cond is
+							  // the type-match test, handler is the body run on match.
+							  // Yield from cond can fall through to the handler (match)
+							  // or out to the parent (no match - try the next clause or
+							  // re-raise). Yield from handler exits the scope.
+							  auto *parent_region = getOperation()->getParentRegion();
+							  if (parent_region == &op.getCond()) {
+								  regions.emplace_back(&op.getHandler());
+								  regions.emplace_back(op->getParentRegion());
+							  } else if (parent_region == &op.getHandler()) {
+								  regions.emplace_back(op->getParentRegion());
+							  } else {
+								  llvm_unreachable("unexpected branch origin");
+							  }
+							  return success();
+						  })
+						  .Default([](Operation *) -> LogicalResult {
+							  // Unreachable in verified IR: the static_assert above
+							  // constrains BranchYieldOp's parent op to one of the
+							  // five Cases handled. A failure here means an
+							  // unverified or malformed op slipped past verification.
+							  llvm_unreachable("BranchYieldOp has unexpected parent op kind");
+						  });
 
 		assert(result.succeeded());
 	}
@@ -424,12 +423,12 @@ namespace py {
 		return region_or_block_arguments(getOperation(), successor);
 	}
 
-	mlir::ValueRange TryHandlerScope::getSuccessorInputs(mlir::RegionSuccessor successor)
+	mlir::ValueRange TryHandlerOp::getSuccessorInputs(mlir::RegionSuccessor successor)
 	{
 		return region_or_block_arguments(getOperation(), successor);
 	}
 
-	void TryHandlerScope::getSuccessorRegions(mlir::RegionBranchPoint point,
+	void TryHandlerOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
 		if (predecessor_region(point) == &getCond()) { regions.emplace_back(&getHandler()); }

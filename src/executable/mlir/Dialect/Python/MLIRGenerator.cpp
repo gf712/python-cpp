@@ -2653,7 +2653,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		ASSERT(!handler_region.getBlocks().empty());
 
 		m_context.builder().setInsertionPointToStart(&handler_region.front());
-		auto handler_op = m_context.builder().create<mlir::py::TryHandlerScope>(
+		auto handler_op = m_context.builder().create<mlir::py::TryHandlerOp>(
 			loc(m_context.builder(), m_context.filename(), handler->source_location()));
 
 		if (handler->type()) {
