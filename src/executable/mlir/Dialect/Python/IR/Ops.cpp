@@ -176,6 +176,19 @@ namespace py {
 		return mlir::success();
 	}
 
+	mlir::LogicalResult UnpackSequenceOp::verify()
+	{
+		// Variadic results, but a zero-result unpack is meaningless: there
+		// would be no Python-level target receiving the unpacked values
+		// and the bytecode emitter would still pay for the iterator
+		// machinery. MLIRGenerator only emits this for sequence-assignment
+		// targets, which always carry at least one binding.
+		if (getUnpackedValues().empty()) {
+			return emitOpError() << "must produce at least one unpacked value";
+		}
+		return mlir::success();
+	}
+
 	mlir::LogicalResult ClassDefinitionOp::verify()
 	{
 		// keywords[i] names kwargs[i] — the two lists must agree in length.

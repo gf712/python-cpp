@@ -411,6 +411,8 @@ def UnpackSequenceOp : Python_Op<"unpack"> {
     let arguments = (ins Python_PyObjectType:$iterable);
 
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
+
+    let hasVerifier = 1;
 }
 
 def UnpackExpandOp : Python_Op<"unpack_ex"> {
