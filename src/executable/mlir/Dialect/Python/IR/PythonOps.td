@@ -409,7 +409,7 @@ def FormatValueOp : Python_Op<"format"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadAttributeOp: Python_Op<"load_attribute"> {
+def LoadAttributeOp : Python_Op<"load_attribute"> {
     let summary = "Load an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -418,14 +418,14 @@ def LoadAttributeOp: Python_Op<"load_attribute"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteAttributeOp: Python_Op<"delete_attribute"> {
+def DeleteAttributeOp : Python_Op<"delete_attribute"> {
     let summary = "Delete an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
                          StrAttr:$attr);
 }
 
-def BinarySubscriptOp: Python_Op<"subscript"> {
+def BinarySubscriptOp : Python_Op<"subscript"> {
     let summary = "Subscript an object";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -434,7 +434,7 @@ def BinarySubscriptOp: Python_Op<"subscript"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreSubscriptOp: Python_Op<"store_subscript"> {
+def StoreSubscriptOp : Python_Op<"store_subscript"> {
     let summary = "Store value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -442,14 +442,14 @@ def StoreSubscriptOp: Python_Op<"store_subscript"> {
                          Python_PyObjectType:$value);
 }
 
-def DeleteSubscriptOp: Python_Op<"delete_subscript"> {
+def DeleteSubscriptOp : Python_Op<"delete_subscript"> {
     let summary = "Delete value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
                          Python_PyObjectType:$subscript);
 }
 
-def StoreAttributeOp: Python_Op<"store_attribute"> {
+def StoreAttributeOp : Python_Op<"store_attribute"> {
     let summary = "Store value in object using an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -457,7 +457,7 @@ def StoreAttributeOp: Python_Op<"store_attribute"> {
                          Python_PyObjectType:$value);
 }
 
-def LoadMethodOp: Python_Op<"load_method"> {
+def LoadMethodOp : Python_Op<"load_method"> {
     let summary = "Load a method";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -466,7 +466,7 @@ def LoadMethodOp: Python_Op<"load_method"> {
     let results = (outs Python_PyObjectType:$method);
 }
 
-def UnpackSequenceOp: Python_Op<"unpack"> {
+def UnpackSequenceOp : Python_Op<"unpack"> {
     let summary = "Unpack sequence";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -474,7 +474,7 @@ def UnpackSequenceOp: Python_Op<"unpack"> {
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
 }
 
-def UnpackExpandOp: Python_Op<"unpack_ex"> {
+def UnpackExpandOp : Python_Op<"unpack_ex"> {
     let summary = "Unpack iterable with expansion";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -483,7 +483,7 @@ def UnpackExpandOp: Python_Op<"unpack_ex"> {
                         Python_PyObjectType:$rest);
 }
 
-def ForIterOp: Python_Op<"for_iter", [Terminator]> {
+def ForIterOp : Python_Op<"for_iter", [Terminator]> {
     let summary = "Convenience op for for loops";
 
     let description = [{
@@ -500,7 +500,7 @@ exception is thrown.
     let results = (outs Python_PyObjectType:$value);
 }
 
-def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
+def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "For loop representation";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -514,46 +514,46 @@ def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpIn
                           AnyRegion:$orelse);
 }
 
-def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
+def WhileOp : Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "While loop representation";
 
     let regions = (region AnyRegion:$condition, AnyRegion:$body, AnyRegion:$orelse);
 }
 
-def ConditionOp: Python_Op<"condition", [Terminator,
+def ConditionOp : Python_Op<"condition", [Terminator,
                                          ParentOneOf<["WhileOp", "TryHandlerScope"]>]> {
     let summary = "Condition of a while loop or a catch statement";
 
     let arguments = (ins Python_PyObjectType:$cond);
 }
 
-def TryHandlerScope: Python_Op<"catch", [Terminator,
+def TryHandlerScope : Python_Op<"catch", [Terminator,
                                          HasParent<"TryOp">,
                                          DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$cond,
                           AnyRegion:$handler);
 }
 
-def TryOp: Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
+def TryOp : Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$body,
                           AnyRegion:$orelse,
                           AnyRegion:$finally,
                           VariadicRegion<SizedRegion<1>>:$handlers);
 }
 
-def WithOp: Python_Op<"with"> {
+def WithOp : Python_Op<"with"> {
     let arguments = (ins Variadic<Python_PyObjectType>:$items);
 
     let regions = (region AnyRegion:$body);
 }
 
-def WithExceptStartOp: Python_Op<"with_except_start"> {
+def WithExceptStartOp : Python_Op<"with_except_start"> {
     let arguments = (ins Python_PyObjectType:$exit_method);
 
     let results = (outs Python_PyObjectType:$output);
 }
 
-def RaiseOp: Python_Op<"raise", [Terminator,
+def RaiseOp : Python_Op<"raise", [Terminator,
                                  AttrSizedOperandSegments]> {
     let summary = "Raises an exception";
 
@@ -570,11 +570,11 @@ def RaiseOp: Python_Op<"raise", [Terminator,
     ];
 }
 
-def ClearExceptionStateOp: Python_Op<"clear_exc_state"> {
+def ClearExceptionStateOp : Python_Op<"clear_exc_state"> {
     let summary = "Clears the interpreter exception state";
 }
 
-def ControlFlowYield: Python_Op<"cf_yield", [ReturnLike,
+def ControlFlowYield : Python_Op<"cf_yield", [ReturnLike,
                                              DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, ["getSuccessorRegions"]>,
                                              Terminator,
                                              ParentOneOf<["TryOp",
@@ -597,7 +597,7 @@ def ControlFlowYield: Python_Op<"cf_yield", [ReturnLike,
     }];
 }
 
-def CondBranchSubclassOp: Python_Op<"cond_br_subclass", [Terminator,
+def CondBranchSubclassOp : Python_Op<"cond_br_subclass", [Terminator,
     AttrSizedOperandSegments, DeclareOpInterfaceMethods<BranchOpInterface>]> {
     let summary = "Jump if the current active exception is not of `object_type`";
 
@@ -638,7 +638,7 @@ def ImportAllOp : Python_Op<"import_all"> {
     let arguments = (ins Python_PyObjectType:$module);
 }
 
-def ClassDefinitionOp: Python_Op<"class", [AttrSizedOperandSegments]> {
+def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments]> {
     let summary = "Class definition";
 
     let arguments = (ins StrAttr:$name,
