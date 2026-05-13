@@ -43,7 +43,14 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	// many equal None/0/True constants per function.
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
-	// pm.addPass(::mlir::createRemoveDeadValuesPass());
+	// createRemoveDeadValuesPass() cannot be enabled here: it strips
+	// operands from func.return when their producer is unused, leaving a
+	// zero-operand return. The bytecode emitter ASSERTs exactly one
+	// operand (TranslateToPythonBytecode.cpp emitOperation<func::ReturnOp>),
+	// reflecting Python's invariant that every function returns a value
+	// (None at minimum). Unblocking this would require teaching the pass
+	// that func.return here is fixed-arity, or materialising a None when
+	// it strips the operand. Tracked separately.
 	// {
 	// 	int fd;
 	// 	std::string filename = llvm::createGraphFilename("python", fd);
