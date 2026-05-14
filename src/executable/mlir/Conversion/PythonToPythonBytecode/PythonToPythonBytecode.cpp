@@ -39,204 +39,73 @@ namespace mlir {
 namespace py {
 
 	namespace {
-		namespace {
-			// Adds `identifier` to the StringRefAttr-array attribute named
-			// `attr_name` on `fn` if not already present. Used to track function-
-			// level locals/names sets that the bytecode emitter consumes.
-			void add_identifier_to(mlir::func::FuncOp fn,
-				mlir::StringRef attr_name,
-				mlir::StringRef identifier,
-				mlir::OpBuilder &builder)
-			{
-				if (fn->hasAttr(attr_name)) {
-					auto arr = mlir::cast<mlir::ArrayAttr>(fn->getAttr(attr_name)).getValue();
-					if (std::find_if(arr.begin(),
-							arr.end(),
-							[identifier](mlir::Attribute attr) {
-								return mlir::cast<mlir::StringAttr>(attr).getValue() == identifier;
-							})
-						!= arr.end()) {
-						return;
-					}
-					std::vector<StringRef> names_vec;
-					std::transform(arr.begin(),
-						arr.end(),
-						std::back_inserter(names_vec),
-						[](mlir::Attribute attr) {
-							return mlir::cast<mlir::StringAttr>(attr).getValue();
-						});
-					names_vec.emplace_back(identifier);
-					fn->setAttr(attr_name, builder.getStrArrayAttr(names_vec));
-				} else {
-					fn->setAttr(attr_name, builder.getStrArrayAttr({ identifier }));
-				}
-			}
+		// All non-region-bearing patterns now live in per-family files:
+		// {Arith, AttributeSubscript, Collection, ControlFlow, Function,
+		// Import, LoadStore}Patterns.cpp, registered via the
+		// populate*Patterns() entry points below.
+		// The shared DirectReplaceLowering / DirectReplaceRegisterName
+		// helpers and add_identifier* utilities moved to LoweringHelpers.hpp.
+		// What remains in this file are the four region-bearing structural
+		// patterns (ForLoop / While / Try / With), the
+		// PythonToPythonBytecodePass, and the dedicated single-pattern
+		// passes that wrap the structural ones.
 
-			void add_identifier(mlir::func::FuncOp fn,
-				mlir::StringRef identifier,
-				mlir::OpBuilder &builder)
-			{
-				add_identifier_to(fn, "names", identifier, builder);
-			}
-		}// namespace
-
-		// LoadStore patterns moved to LoadStorePatterns.cpp.
-
-		// CallFunctionLowering moved to FunctionPatterns.cpp.
-
-		// Arith patterns (BinaryOp, InplaceOp, CompareOp, CastToBoolOp, the four
-		// unary ops, and the py_kind_to_binary_op helper) moved to
-		// ArithPatterns.cpp.
-		// ConditionalBranch / CondBranchSubclass / LoadAssertionError / Raise /
-		// WithExceptStart / ClearExceptionState / Yield / YieldFrom /
-		// UnpackSequence / UnpackExpand / GetAwaitable moved to
-		// ControlFlowPatterns.cpp.
-
-		// Generic 1:1 lowering for ops whose source and target dialect schemas
-		// match exactly: same operand types/order, same attribute names/types,
-		// same result types. Forwards everything from source op to target op.
-		template<typename From, typename To>
-		struct DirectReplaceLowering : public mlir::OpRewritePattern<From>
+		// Shared walker used by both ForLoopOpLowering and WhileOpLowering
+		// to lower py.br_yield ops nested inside a loop body to cf.br ops
+		// that target the right block (continue→condition / step, break→
+		// end). Nested loops are walked into their orelse regions only;
+		// the loop body itself is skipped because the nested loop will be
+		// lowered by its own pattern.
+		//
+		// `skip_op` allows a caller to short-circuit on yield ops whose
+		// enclosing loop matches a specific predicate — ForLoopOpLowering
+		// uses this to ignore yields that bind to the *outer* for-loop's
+		// orelse (which shouldn't be lowered as part of the inner loop
+		// pass).
+		void replace_loop_branch_yields(mlir::PatternRewriter &rewriter,
+			mlir::Region &region,
+			mlir::Block *continue_target,
+			mlir::Block *break_target,
+			llvm::function_ref<bool(mlir::py::BranchYieldOp)> skip_op)
 		{
-			using mlir::OpRewritePattern<From>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(From op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				rewriter.template replaceOpWithNewOp<To>(op,
-					op.getOperation()->getResultTypes(),
-					op.getOperation()->getOperands(),
-					op.getOperation()->getAttrs());
-				return mlir::success();
-			}
-		};
-
-		// Like DirectReplaceLowering, but additionally registers the name
-		// returned by NameGetter in the parent FuncOp's "names" attribute.
-		// Used for ops whose names must appear in the function-level name
-		// table the bytecode emitter consumes (LoadMethod, StoreAttribute).
-		template<typename From, typename To, auto NameGetter>
-		struct DirectReplaceRegisterName : public mlir::OpRewritePattern<From>
-		{
-			using mlir::OpRewritePattern<From>::OpRewritePattern;
-
-			mlir::LogicalResult matchAndRewrite(From op,
-				mlir::PatternRewriter &rewriter) const final
-			{
-				auto parent_fn = op->template getParentOfType<mlir::func::FuncOp>();
-				add_identifier(parent_fn, (op.*NameGetter)(), rewriter);
-				rewriter.template replaceOpWithNewOp<To>(op,
-					op.getOperation()->getResultTypes(),
-					op.getOperation()->getOperands(),
-					op.getOperation()->getAttrs());
-				return mlir::success();
-			}
-		};
-
-		// LoadAssertionErrorOpLowering moved to ControlFlowPatterns.cpp.
-
-		// ReturnOpLowering moved to FunctionPatterns.cpp.
-
-		// Collection patterns (BuildDict, BuildList, BuildTuple, BuildSet,
-		// BuildString, FormatValue, ListAppend, DictAdd, SetAdd, BuildSlice,
-		// build_list_with_expansion helper) moved to CollectionPatterns.cpp.
-		// The attribute/subscript family below (LoadAttributeOpLowering etc.)
-		// still lives here pending its own split.
-
-		// Attribute / subscript patterns (LoadAttribute, DeleteAttribute,
-		// LoadMethod, BinarySubscript, StoreSubscript, DeleteSubscript,
-		// StoreAttribute) moved to AttributeSubscriptPatterns.cpp.
-		// BuildSliceOpLowering moved to CollectionPatterns.cpp.
-
-
-		struct ForLoopOpLowering : public mlir::OpRewritePattern<mlir::py::ForLoopOp>
-		{
-		  private:
-			std::function<WalkResult(mlir::Operation *)> yield_op_callback(
-				mlir::PatternRewriter &rewriter,
-				mlir::Block *condition_start,
-				mlir::Block *end_block) const
-			{
-				return [this, &rewriter, condition_start, end_block](mlir::Operation *operation) {
-					auto parent_is_orelse = [](mlir::Operation *operation) {
-						auto forloop_op = operation->getParentOfType<mlir::py::ForLoopOp>();
-						if (!forloop_op) { return false; }
-						return &forloop_op.getOrelse() == operation->getParentRegion();
-					};
-					// llvm::outs() << "ForOpLowering 1:\n";
-					// operation->print(llvm::outs());
-					// llvm::outs() << '\n';
-					// llvm::outs().flush();
-
+			std::function<WalkResult(mlir::Operation *)> callback =
+				[&rewriter, continue_target, break_target, skip_op, &callback](
+					mlir::Operation *operation) {
 					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
 						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						// llvm::outs() << "ForOpLowering - ForLoopOp or else\n";
-						// loop.getOrelse().front().print(llvm::outs());
-						// llvm::outs() << '\n';
-						// llvm::outs().flush();
-						loop.getOrelse().walk<WalkOrder::PreOrder>(
-							yield_op_callback(rewriter, condition_start, end_block));
+						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
 						return WalkResult::skip();
 					}
 					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
 						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						// llvm::outs() << "ForOpLowering - WhileOp or else\n";
-						loop.getOrelse().walk<WalkOrder::PreOrder>(
-							yield_op_callback(rewriter, condition_start, end_block));
+						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
 						return WalkResult::skip();
 					}
-
-					// llvm::outs() << "ForOpLowering 2:\n";
-					// operation->print(llvm::outs());
-					// llvm::outs() << '\n';
-					// llvm::outs().flush();
-
-					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
-						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::
-									Impl>());
-						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
-							return WalkResult::advance();
-						}
-						// is this hacky? maybe there is a better way of ignoring the else branch of
-						// a for loop
-						if (parent_is_orelse(operation)) { return WalkResult::advance(); }
-						rewriter.setInsertionPoint(yield_op);
-						if (!yield_op.getKind().has_value()
-							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-								yield_op, condition_start);
-						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, end_block);
-						}
+					auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation);
+					if (!yield_op) { return WalkResult::advance(); }
+					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
+							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
+					// Kindless yields under try/with/try-handler don't
+					// participate in the loop's continue/break flow.
+					if (!yield_op.getKind().has_value()
+						&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
+						return WalkResult::advance();
+					}
+					if (skip_op && skip_op(yield_op)) { return WalkResult::advance(); }
+					rewriter.setInsertionPoint(yield_op);
+					if (!yield_op.getKind().has_value()
+						|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
+						rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, continue_target);
+					} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
+						rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, break_target);
 					}
 					return WalkResult::advance();
 				};
-			}
+			region.walk<WalkOrder::PreOrder>(callback);
+		}
 
-			std::vector<mlir::Value> getIterators(mlir::py::ForLoopOp op,
-				mlir::emitpybytecode::GetIter current_iterator) const
-			{
-				std::vector<mlir::Value> iterators;
-
-				iterators.push_back(current_iterator);
-
-				auto parent = op->getParentOfType<mlir::py::ForLoopOp>();
-				while (parent) {
-					auto iterable = parent.getIterable();
-					ASSERT(!iterable.getUsers().empty());
-					auto iterator = *iterable.getUsers().begin();
-					ASSERT(mlir::isa<mlir::emitpybytecode::GetIter>(*iterator));
-					iterators.insert(
-						iterators.end() - 1, mlir::cast<mlir::emitpybytecode::GetIter>(*iterator));
-					parent = parent->getParentOfType<mlir::py::ForLoopOp>();
-				}
-
-				return iterators;
-			}
-
-		  public:
+		struct ForLoopOpLowering : public mlir::OpRewritePattern<mlir::py::ForLoopOp>
+		{
 			using OpRewritePattern<mlir::py::ForLoopOp>::OpRewritePattern;
 
 			mlir::LogicalResult matchAndRewrite(mlir::py::ForLoopOp op,
@@ -254,37 +123,28 @@ namespace py {
 
 				// advance iterator
 				auto iterator_next_block = rewriter.createBlock(endBlock);
-				// iterator_next_block->addArgument(iterator.getType(), op.getStep().getLoc());
 				rewriter.setInsertionPointToEnd(initBlock);
-				const auto &iterators = getIterators(op, iterator);
 				rewriter.create<mlir::cf::BranchOp>(op.getStep().getLoc(), iterator_next_block);
 
 				rewriter.setInsertionPointToStart(iterator_next_block);
 
 				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
-					// iterator_next_block->getArgument(0),
-					iterators.front(),
+					iterator,
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
 
 				ASSERT(!op.getStep().empty());
 				auto *iterator_exit_block = &op.getStep().back();
 				ASSERT(iterator_exit_block->getTerminator());
-				// iterator_exit_block->print(llvm::outs());
-				// llvm::outs() << '\n';
-				// llvm::outs().flush();
 				ASSERT(mlir::isa<mlir::py::BranchYieldOp>(iterator_exit_block->getTerminator()));
 
 				rewriter.setInsertionPointToEnd(iterator_exit_block);
 				rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-					iterator_exit_block->getTerminator(), &op.getBody().front() /*, iterators*/);
+					iterator_exit_block->getTerminator(), &op.getBody().front());
 
 				auto *for_iter_block = rewriter.createBlock(&op.getBody());
-				// for (const auto &it : iterators) {
-				// 	for_iter_block->addArgument(it.getType(), op.getStep().getLoc());
-				// }
 				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
-					iterators.front(),
+					iterator,
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
 
@@ -292,12 +152,15 @@ namespace py {
 				rewriter.inlineRegionBefore(
 					op.getStep(), *op->getParentRegion(), endBlock->getIterator());
 
-				// for (const auto &it : iterators) {
-				// 	op.getBody().addArgument(it.getType(), op.getStep().getLoc());
-				// }
-
-				op.getBody().walk<WalkOrder::PreOrder>(
-					yield_op_callback(rewriter, for_iter_block, endBlock));
+				// Skip yields whose enclosing for-loop sits inside an
+				// outer for-loop's orelse — those belong to the outer
+				// pattern's rewrite, not this one.
+				auto skip_orelse_yields = [](mlir::py::BranchYieldOp y) {
+					auto forloop_op = y->getParentOfType<mlir::py::ForLoopOp>();
+					return forloop_op && &forloop_op.getOrelse() == y->getParentRegion();
+				};
+				replace_loop_branch_yields(
+					rewriter, op.getBody(), for_iter_block, endBlock, skip_orelse_yields);
 
 				ASSERT(!op.getBody().empty());
 				auto *body_exit_block = &op.getBody().back();
@@ -319,8 +182,6 @@ namespace py {
 
 				rewriter.eraseOp(op);
 
-				// llvm::outs() << "ForLoopOp rewrite end\n";
-				// llvm::outs().flush();
 
 				return success();
 			}
@@ -328,57 +189,6 @@ namespace py {
 
 		struct WhileOpLowering : public mlir::OpRewritePattern<mlir::py::WhileOp>
 		{
-		  private:
-			std::function<WalkResult(mlir::Operation *)> yield_op_callback(
-				mlir::PatternRewriter &rewriter,
-				mlir::Block *condition_start,
-				mlir::Block *end_block) const
-			{
-				return [this, &rewriter, condition_start, end_block](mlir::Operation *operation) {
-					// llvm::outs() << "WhileOpLowering 1:\n";
-					// operation->print(llvm::outs());
-					// llvm::outs() << '\n';
-					// llvm::outs().flush();
-					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						// llvm::outs() << "WhileOpLowering - ForLoopOp or else\n";
-						loop.getOrelse().walk<WalkOrder::PreOrder>(
-							yield_op_callback(rewriter, condition_start, end_block));
-						return WalkResult::skip();
-					}
-					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						// llvm::outs() << "WhileOpLowering - WhileOp or else\n";
-						loop.getOrelse().walk<WalkOrder::PreOrder>(
-							yield_op_callback(rewriter, condition_start, end_block));
-						return WalkResult::skip();
-					}
-					// llvm::outs() << "WhileOpLowering 2:\n";
-					// operation->print(llvm::outs());
-					// llvm::outs() << '\n';
-					// llvm::outs().flush();
-					if (auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation)) {
-						static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-								HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::
-									Impl>());
-						if (!yield_op.getKind().has_value()
-							&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
-							return WalkResult::advance();
-						}
-						rewriter.setInsertionPoint(yield_op);
-						if (!yield_op.getKind().has_value()
-							|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-								yield_op, condition_start);
-						} else if (yield_op.getKind().value() == py::LoopOpKind::break_) {
-							rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, end_block);
-						}
-					}
-					return WalkResult::advance();
-				};
-			}
-
-		  public:
 			using OpRewritePattern<mlir::py::WhileOp>::OpRewritePattern;
 
 			mlir::LogicalResult matchAndRewrite(mlir::py::WhileOp op,
@@ -416,8 +226,11 @@ namespace py {
 				rewriter.eraseOp(condition_op);
 				rewriter.inlineRegionBefore(condition, endBlock);
 
-				op.getBody().walk<WalkOrder::PreOrder>(
-					yield_op_callback(rewriter, &condition_start, endBlock));
+				replace_loop_branch_yields(rewriter,
+					op.getBody(),
+					&condition_start,
+					endBlock,
+					/*skip_op=*/{});
 
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
