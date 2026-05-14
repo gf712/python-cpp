@@ -27,6 +27,26 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	::mlir::py::registerConversionPasses();
 
 	::mlir::PassManager pm{ &ctx.ctx() };
+	// Default PassManager already runs verification after each pass; be
+	// explicit so a build that disables it for performance reasons has
+	// a single place to flip the switch. Env-gated print-after-all gives
+	// a quick way to inspect intermediate IR ('MLIR_PRINT_IR_AFTER_ALL=1
+	// ./build/src/python <script>') without recompiling.
+	pm.enableVerifier(true);
+	if (std::getenv("MLIR_PRINT_IR_AFTER_ALL")) {
+		// IR printing requires single-threaded execution so per-pass
+		// output isn't interleaved across threads. The pipeline isn't
+		// performance-critical for debug runs, so unconditionally
+		// switching off multi-threading when the env var is set is fine.
+		ctx.ctx().disableMultithreading();
+		pm.enableIRPrinting(
+			/*shouldPrintBeforePass=*/[](::mlir::Pass *, ::mlir::Operation *) { return false; },
+			/*shouldPrintAfterPass=*/[](::mlir::Pass *, ::mlir::Operation *) { return true; },
+			/*printModuleScope=*/true,
+			/*printAfterOnlyOnChange=*/false,
+			/*printAfterOnlyOnFailure=*/false,
+			llvm::errs());
+	}
 	// Pre-lowering canonicalize + CSE on the Python dialect. Now safe to run
 	// because Load* declares a MemWrite on PythonExceptionStateResource
 	// (preventing DCE of unused loads whose may-raise side effect is
