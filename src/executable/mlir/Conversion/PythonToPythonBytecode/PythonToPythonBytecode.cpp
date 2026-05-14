@@ -534,6 +534,15 @@ namespace py {
 
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
+				// Multi-item with-statements (with a, b, c: ...) are not
+				// yet supported end-to-end: MLIRGenerator currently TODOs
+				// out for items().size() > 1, so the dialect op only ever
+				// arrives here with a single item. The loops below over
+				// op.getItems() exist for shape symmetry with the future
+				// multi-item version but bail explicitly until that work
+				// lands.
+				ASSERT(op.getItems().size() == 1
+					   && "WithOp lowering does not yet support multiple context managers");
 				rewriter.setInsertionPointToStart(cleanup_block);
 				for (const auto &item : op.getItems()) {
 					auto exit = rewriter.create<mlir::py::LoadMethodOp>(item.getLoc(),
@@ -556,12 +565,10 @@ namespace py {
 					rewriter.setInsertionPointToStart(reraise_block);
 					rewriter.create<mlir::emitpybytecode::ReRaiseOp>(item.getLoc(), endBlock);
 
-					// TODO: handle multiple handlers
 					rewriter.setInsertionPointToStart(continue_block);
 					rewriter.create<mlir::emitpybytecode::ClearExceptionState>(item.getLoc());
 					rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
 				}
-				// rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
 
 				rewriter.setInsertionPointToStart(exit_block);
 				for (const auto &item : op.getItems()) {
