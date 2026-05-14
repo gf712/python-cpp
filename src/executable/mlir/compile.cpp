@@ -4,6 +4,7 @@
 #include "Dialect/Python/MLIRGenerator.hpp"
 #include "Target/PythonBytecode/PythonBytecodeEmitter.hpp"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -78,14 +79,12 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	// many equal None/0/True constants per function.
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
-	// createRemoveDeadValuesPass() cannot be enabled here: it strips
-	// operands from func.return when their producer is unused, leaving a
-	// zero-operand return. The bytecode emitter ASSERTs exactly one
-	// operand (TranslateToPythonBytecode.cpp emitOperation<func::ReturnOp>),
-	// reflecting Python's invariant that every function returns a value
-	// (None at minimum). Unblocking this would require teaching the pass
-	// that func.return here is fixed-arity, or materialising a None when
-	// it strips the operand. Tracked separately.
+	// Idempotent on currently-valid IR: only fires when a func.return has
+	// zero operands but its enclosing func.func declares a result type.
+	// Wired into the pipeline ahead of any pass that strips return
+	// operands (next commit enables createRemoveDeadValuesPass) so the
+	// invariant is enforced before the bytecode emitter sees the IR.
+	pm.addNestedPass<::mlir::func::FuncOp>(::mlir::py::createMaterialiseReturnNonePass());
 	// {
 	// 	int fd;
 	// 	std::string filename = llvm::createGraphFilename("python", fd);

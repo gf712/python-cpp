@@ -17,6 +17,14 @@ namespace py {
 	std::unique_ptr<Pass> createConvertWhileLoopPass();
 	std::unique_ptr<Pass> createConvertTryPass();
 	std::unique_ptr<Pass> createConvertWithPass();
+
+	// Materialise an emitpybytecode constant None as the operand of any
+	// zero-operand func.return inside a func.func whose result type is
+	// non-empty. Used as a follow-up to mlir::createRemoveDeadValuesPass,
+	// which can strip the return's operand when its producer becomes
+	// dead, leaving zero-operand returns that violate the bytecode
+	// emitter's exactly-one-operand invariant.
+	std::unique_ptr<Pass> createMaterialiseReturnNonePass();
 }// namespace py
 
 }// namespace mlir

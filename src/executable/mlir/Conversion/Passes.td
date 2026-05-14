@@ -25,3 +25,9 @@ def ConvertPyWith : Pass<"convert-py-with"> {
   let summary = "Lower py.with to emitpybytecode control flow";
   let constructor = "mlir::py::createConvertWithPass()";
 }
+
+def MaterialiseReturnNone : Pass<"materialise-return-none", "::mlir::func::FuncOp"> {
+  let summary = "Insert emitpybytecode.LOAD_CONST(None) before zero-operand func.return ops";
+  let constructor = "mlir::py::createMaterialiseReturnNonePass()";
+  let dependentDialects = ["::mlir::emitpybytecode::EmitPythonBytecodeDialect"];
+}

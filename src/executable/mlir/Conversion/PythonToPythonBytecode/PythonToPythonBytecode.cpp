@@ -686,6 +686,57 @@ namespace py {
 		{
 			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertWithPass)
 		};
+
+		// Pattern: rewrite a zero-operand func.return inside a function
+		// whose return type expects at least one result by inserting a
+		// None constant. Reaches for emitpybytecode::ConstantOp because
+		// the pass runs after PythonToPythonBytecodePass has already
+		// lowered py.constant; using py.constant here would re-introduce
+		// an illegal source-dialect op into the lowered IR.
+		struct MaterialiseReturnNonePattern : public mlir::OpRewritePattern<mlir::func::ReturnOp>
+		{
+			using mlir::OpRewritePattern<mlir::func::ReturnOp>::OpRewritePattern;
+
+			mlir::LogicalResult matchAndRewrite(mlir::func::ReturnOp op,
+				mlir::PatternRewriter &rewriter) const final
+			{
+				if (op.getNumOperands() != 0) { return mlir::failure(); }
+				auto parent = op->getParentOfType<mlir::func::FuncOp>();
+				if (!parent) { return mlir::failure(); }
+				if (parent.getFunctionType().getNumResults() == 0) { return mlir::failure(); }
+				rewriter.setInsertionPoint(op);
+				auto none = rewriter.create<mlir::emitpybytecode::ConstantOp>(op.getLoc(),
+					mlir::py::PyObjectType::get(rewriter.getContext()),
+					rewriter.getUnitAttr());
+				rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, mlir::ValueRange{ none });
+				return mlir::success();
+			}
+		};
+
+		struct MaterialiseReturnNonePass
+			: public PassWrapper<MaterialiseReturnNonePass, OperationPass<mlir::func::FuncOp>>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MaterialiseReturnNonePass)
+
+			void getDependentDialects(DialectRegistry &registry) const override
+			{
+				registry.insert<emitpybytecode::EmitPythonBytecodeDialect>();
+			}
+
+			StringRef getArgument() const final { return "materialise-return-none"; }
+
+			void runOnOperation() final
+			{
+				mlir::RewritePatternSet patterns(&getContext());
+				patterns.add<MaterialiseReturnNonePattern>(&getContext());
+
+				GreedyRewriteConfig config;
+				config.setStrictness(GreedyRewriteStrictness::AnyOp);
+				FrozenRewritePatternSet frozen{ std::move(patterns) };
+
+				(void)applyPatternsGreedily(getOperation(), frozen, config);
+			}
+		};
 	}// namespace
 
 	void PythonToPythonBytecodePass::runOnOperation()
@@ -739,6 +790,11 @@ namespace py {
 	std::unique_ptr<Pass> createConvertTryPass() { return std::make_unique<ConvertTryPass>(); }
 
 	std::unique_ptr<Pass> createConvertWithPass() { return std::make_unique<ConvertWithPass>(); }
+
+	std::unique_ptr<Pass> createMaterialiseReturnNonePass()
+	{
+		return std::make_unique<MaterialiseReturnNonePass>();
+	}
 
 }// namespace py
 }// namespace mlir
