@@ -687,12 +687,18 @@ namespace py {
 			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertWithPass)
 		};
 
-		// Pattern: rewrite a zero-operand func.return inside a function
-		// whose return type expects at least one result by inserting a
-		// None constant. Reaches for emitpybytecode::ConstantOp because
-		// the pass runs after PythonToPythonBytecodePass has already
-		// lowered py.constant; using py.constant here would re-introduce
-		// an illegal source-dialect op into the lowered IR.
+		// Pattern: rewrite a zero-operand func.return by inserting a None
+		// constant operand and, if RemoveDeadValues also rewrote the
+		// parent FuncOp's signature to return nothing, restoring its
+		// declared result type to PyObjectType. The bytecode emitter
+		// assumes every function returns a value (Python's "every
+		// function returns at minimum None") regardless of whether MLIR
+		// sees the result as used.
+		//
+		// Reaches for emitpybytecode::ConstantOp because the pass runs
+		// after PythonToPythonBytecodePass has already lowered
+		// py.constant; using py.constant here would re-introduce an
+		// illegal source-dialect op into the lowered IR.
 		struct MaterialiseReturnNonePattern : public mlir::OpRewritePattern<mlir::func::ReturnOp>
 		{
 			using mlir::OpRewritePattern<mlir::func::ReturnOp>::OpRewritePattern;
@@ -703,12 +709,23 @@ namespace py {
 				if (op.getNumOperands() != 0) { return mlir::failure(); }
 				auto parent = op->getParentOfType<mlir::func::FuncOp>();
 				if (!parent) { return mlir::failure(); }
-				if (parent.getFunctionType().getNumResults() == 0) { return mlir::failure(); }
+				auto pyobject_ty = mlir::py::PyObjectType::get(rewriter.getContext());
 				rewriter.setInsertionPoint(op);
-				auto none = rewriter.create<mlir::emitpybytecode::ConstantOp>(op.getLoc(),
-					mlir::py::PyObjectType::get(rewriter.getContext()),
-					rewriter.getUnitAttr());
+				auto none = rewriter.create<mlir::emitpybytecode::ConstantOp>(
+					op.getLoc(), pyobject_ty, rewriter.getUnitAttr());
 				rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, mlir::ValueRange{ none });
+
+				// Restore the function signature if RemoveDeadValues stripped
+				// the result type. Plain assignment to the function-type
+				// attribute is fine here because the parent op's properties
+				// aren't tracked by the pattern rewriter's mutation tracking
+				// (we already produced a successful match-and-rewrite via
+				// replaceOpWithNewOp above).
+				if (parent.getFunctionType().getNumResults() == 0) {
+					auto fn_ty = parent.getFunctionType();
+					parent.setFunctionType(rewriter.getFunctionType(
+						fn_ty.getInputs(), mlir::TypeRange{ pyobject_ty }));
+				}
 				return mlir::success();
 			}
 		};

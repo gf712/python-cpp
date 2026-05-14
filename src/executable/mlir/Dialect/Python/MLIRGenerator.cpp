@@ -1781,7 +1781,20 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 		m_context.builder().create<mlir::func::FuncOp>(m_context.builder().getUnknownLoc(),
 			"__hidden_init__",
 			m_context.builder().getFunctionType({}, { m_context->pyobject_type() }));
-	module_fn.setPrivate();
+	// Public visibility: the module entry's side effects (storing names
+	// into the module dict, etc.) escape this MLIR module because the
+	// bytecode runtime invokes it and importers observe the resulting
+	// bindings. Public also tells RemoveDeadValuesPass to skip its
+	// processFuncOp (which would otherwise strip the return value and
+	// propagate "dead" backward through every side-effecting op in the
+	// body — see compile.cpp).
+	module_fn.setPublic();
+	// is_module_entry is the stable signal the bytecode emitter and any
+	// pipeline-internal pass uses to detect the module-entry FuncOp,
+	// without relying on the symbol name (a user-defined Python function
+	// could accidentally collide) or on the symbol visibility (which
+	// other passes may rewrite).
+	module_fn->setAttr("is_module_entry", m_context.builder().getBoolAttr(true));
 	auto *entry_block = module_fn.addEntryBlock();
 	auto *exit_block = module_fn.addBlock();
 	m_context.builder().setInsertionPointToEnd(entry_block);
@@ -1916,7 +1929,13 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 		func_type,
 		mlir::ArrayRef<mlir::NamedAttribute>{},
 		args_attrs);
-	f.setPrivate();
+	// Public visibility: Python functions are invoked at runtime via
+	// MAKE_FUNCTION + CALL ops (a value-based runtime dispatch), not
+	// via func.call. MLIR's CallOpInterface-based analyses — including
+	// RemoveDeadValuesPass — don't see the runtime dispatch as a caller
+	// and would otherwise strip "uncalled" private functions' arguments
+	// and return values, which breaks the runtime dispatch.
+	f.setPublic();
 
 	std::vector<std::string> captures;
 	{

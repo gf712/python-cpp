@@ -756,7 +756,8 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::func::FuncOp
 	m_register_mapping.push(register_allocation.value2mem_map);
 
 	std::string prev_func;
-	const bool is_module_entry = op.isPrivate() && op.getSymName() == "__hidden_init__";
+	const auto entry_attr = op->getAttrOfType<mlir::BoolAttr>("is_module_entry");
+	const bool is_module_entry = entry_attr && entry_attr.getValue();
 	if (!is_module_entry) {
 		auto current_func = m_function_map.emplace(op.getSymName(), FunctionInfo{});
 		prev_func = m_current_function.has_value() ? m_current_function->get().first : "";
@@ -1383,8 +1384,9 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::ModuleOp &mo
 		module_region.getBlocks().back().getOperations().end(),
 		[](mlir::Operation &op) {
 			auto fn = mlir::cast<mlir::func::FuncOp>(op);
-			if (fn) { return fn.isPrivate() && fn.getSymName() == "__hidden_init__"; }
-			return false;
+			if (!fn) { return false; }
+			auto attr = fn->getAttrOfType<mlir::BoolAttr>("is_module_entry");
+			return attr && attr.getValue();
 		});
 	ASSERT(fn != module_region.getBlocks().back().getOperations().end());
 	m_parent_fn = mlir::cast<mlir::func::FuncOp>(*fn);
@@ -1393,8 +1395,8 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::ModuleOp &mo
 
 	for (auto &op : module_region.getBlocks().back().getOperations()) {
 		ASSERT(mlir::isa<mlir::func::FuncOp>(op));
-		if (mlir::cast<mlir::func::FuncOp>(op).isPrivate()
-			&& mlir::cast<mlir::func::FuncOp>(op).getSymName() == "__hidden_init__") {
+		if (auto entry = op.getAttrOfType<mlir::BoolAttr>("is_module_entry");
+			entry && entry.getValue()) {
 			continue;
 		}
 		if (failed(emitOperation(op))) { return failure(); }

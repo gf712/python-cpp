@@ -79,11 +79,21 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	// many equal None/0/True constants per function.
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
-	// Idempotent on currently-valid IR: only fires when a func.return has
-	// zero operands but its enclosing func.func declares a result type.
-	// Wired into the pipeline ahead of any pass that strips return
-	// operands (next commit enables createRemoveDeadValuesPass) so the
-	// invariant is enforced before the bytecode emitter sees the IR.
+	// RemoveDeadValues prunes dead block arguments, dead function results,
+	// and operands whose producers are unused. Path (a) from the prior
+	// design comment landed: @__hidden_init__ is now marked public, so
+	// RemoveDeadValues' processFuncOp skips it ("Function is public or
+	// external, skipping") instead of stripping its side-effecting body.
+	// User-defined functions remain private — RDV may legitimately drop
+	// dead args / results from those.
+	//
+	// MaterialiseReturnNonePass right after handles the corner case
+	// where RDV strips the operand of a func.return inside a non-public
+	// function with no callers, leaving a zero-operand return that
+	// would violate the bytecode emitter's exactly-one-operand
+	// invariant. It re-introduces a None constant + restores the
+	// FuncOp's result type.
+	pm.addPass(::mlir::createRemoveDeadValuesPass());
 	pm.addNestedPass<::mlir::func::FuncOp>(::mlir::py::createMaterialiseReturnNonePass());
 	// {
 	// 	int fd;
