@@ -203,6 +203,10 @@ def EmitPythonBytecode_BuildDict : EmitPythonBytecode_Op<"BUILD_DICT", [SameVari
                          Variadic<Python_PyObjectType>:$values);
 
     let results = (outs Python_PyObjectType:$output);
+
+    // Register-pressure relief for large dict literals. See
+    // ExpandLargeBuildDict in EmitPythonBytecode.cpp.
+    let hasCanonicalizer = 1;
 }
 
 def EmitPythonBytecode_DictUpdate : EmitPythonBytecode_Op<"DICT_UPDATE"> {
@@ -226,6 +230,10 @@ def EmitPythonBytecode_BuildList : EmitPythonBytecode_Op<"BUILD_LIST"> {
     let arguments = (ins Variadic<Python_PyObjectType>:$elements);
 
     let results = (outs Python_PyObjectType:$output);
+
+    // Register-pressure relief for all-constants list literals. See
+    // FoldAllConstBuildListIntoExtend in EmitPythonBytecode.cpp.
+    let hasCanonicalizer = 1;
 }
 
 def EmitPythonBytecode_ListExtend : EmitPythonBytecode_Op<"LIST_EXTEND"> {

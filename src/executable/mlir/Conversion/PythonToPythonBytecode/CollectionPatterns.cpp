@@ -62,41 +62,14 @@ namespace {
 
 				rewriter.replaceOp(op, { *result });
 			} else {
-				// Register-pressure workaround for dict literals larger
-				// than ~10 entries. A single BuildDict consuming N keys
-				// + N values forces N+N live values to coexist in
-				// registers right before the call, which the linear-
-				// scan allocator (see LinearScanRegisterAllocation in
-				// Target/PythonBytecode/) handles by spilling - and
-				// spills are expensive because emitpybytecode has no
-				// stack slots, only register-to-register moves and
-				// Push/Pop. Emit an empty BuildDict and stream each kv
-				// pair via DictAdd directly after its value is computed
-				// instead, so only 3 live values (dict, key, value) are
-				// needed at any point. The threshold is empirical; the
-				// principled fix is to do register allocation as an
-				// MLIR pass before bytecode emission (plan step 19) so
-				// the lowering can pick a strategy based on actual
-				// pressure feedback.
-				if (op.getValues().size() > 10) {
-					auto keys = op.getKeys();
-					auto values = op.getValues();
-					rewriter.setInsertionPointAfterValue(keys.front());
-					auto result = rewriter.create<mlir::emitpybytecode::BuildDict>(op->getLoc(),
-						op.getOutput().getType(),
-						mlir::ValueRange{},
-						mlir::ValueRange{});
-
-					for (auto [key, value] : llvm::zip(keys, values)) {
-						rewriter.setInsertionPointAfterValue(value);
-						rewriter.create<mlir::emitpybytecode::DictAdd>(
-							op.getLoc(), result, key, value);
-					}
-					rewriter.replaceOp(op, result);
-				} else {
-					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
-						op, op.getOutput().getType(), op.getKeys(), op.getValues());
-				}
+				// Plain dict literal: lower 1:1. The register-pressure
+				// optimisation for large literals lives as a
+				// canonicalize pattern on emitpybytecode.BuildDict
+				// (ExpandLargeBuildDict in EmitPythonBytecode.cpp) so
+				// any path that reaches that op benefits, not just the
+				// one through this lowering.
+				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildDict>(
+					op, op.getOutput().getType(), op.getKeys(), op.getValues());
 			}
 
 			return success();
@@ -135,11 +108,6 @@ namespace {
 			mlir::PatternRewriter &rewriter) const final
 		{
 			const auto &requires_expansion = op.getRequiresExpansion();
-			auto known_at_compiletime = [op](mlir::Value element) -> bool {
-				return element.getDefiningOp()
-					   && (mlir::isa<mlir::py::ConstantOp>(element.getDefiningOp())
-						   || mlir::isa<mlir::emitpybytecode::ConstantOp>(element.getDefiningOp()));
-			};
 			if (std::any_of(requires_expansion.begin(),
 					requires_expansion.end(),
 					[](const auto &el) { return el == 1; })) {
@@ -149,38 +117,13 @@ namespace {
 					op.getElements(),
 					requires_expansion);
 				rewriter.replaceOp(op, list);
-			} else if (std::all_of(op.getElements().begin(),
-						   op.getElements().end(),
-						   known_at_compiletime)) {
-				// Same register-pressure motivation as the BuildDict
-				// >10 branch above: an all-constants list literal
-				// would otherwise tie up N registers waiting for the
-				// BuildList consumer. Bake the elements into a tuple
-				// Attribute and emit a single ListExtend from the
-				// constant - 2 registers live (list, tuple), not N.
-				// The principled fix is to expose register-pressure
-				// data to the lowering via a real MLIR allocation
-				// pass (plan step 19).
-				std::vector<mlir::Attribute> elements;
-				elements.reserve(op.getElements().size());
-				for (const auto &el : op.getElements()) {
-					if (el.getDefiningOp<mlir::py::ConstantOp>()) {
-						elements.push_back(el.getDefiningOp<mlir::py::ConstantOp>().getValue());
-					} else {
-						ASSERT(el.getDefiningOp<mlir::emitpybytecode::ConstantOp>());
-						elements.push_back(
-							el.getDefiningOp<mlir::emitpybytecode::ConstantOp>().getValue());
-					}
-				}
-				auto loc = op.getLoc();
-				auto output_type = op.getOutput().getType();
-				auto list = rewriter.create<mlir::emitpybytecode::BuildList>(
-					loc, output_type, ::mlir::ValueRange{});
-				auto tuple = rewriter.create<mlir::emitpybytecode::ConstantOp>(
-					loc, output_type, mlir::ArrayAttr::get(getContext(), elements));
-				rewriter.create<mlir::emitpybytecode::ListExtend>(loc, list, tuple);
-				rewriter.replaceOp(op, list);
 			} else {
+				// Plain list literal: lower 1:1. The all-constants
+				// register-pressure rewrite lives as a canonicalize
+				// pattern on emitpybytecode.BuildList
+				// (FoldAllConstBuildListIntoExtend in
+				// EmitPythonBytecode.cpp), so any caller landing on
+				// the bytecode-level op benefits, not just this path.
 				rewriter.replaceOpWithNewOp<mlir::emitpybytecode::BuildList>(
 					op, op.getOutput().getType(), op.getElements());
 			}
