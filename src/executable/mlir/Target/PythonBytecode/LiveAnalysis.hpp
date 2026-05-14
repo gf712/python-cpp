@@ -3,6 +3,7 @@
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "RegisterAllocationLogger.hpp"
 #include "RegisterAllocationTypes.hpp"
+#include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
@@ -21,15 +22,25 @@
 namespace codegen {
 
 /**
- * LiveAnalysis performs backward dataflow analysis to determine which values are alive
- * at each point in the program. This is the first step in register allocation.
+ * LiveAnalysis determines which values are alive at each point in the program.
+ * This is the first step in register allocation.
  *
- * Uses the standard liveness algorithm:
- *   LiveOut[B] = union of LiveIn[S] for all successors S of B
- *   LiveIn[B] = Use[B] ∪ (LiveOut[B] - Def[B])
- *   Iterate until fixed point
+ * The block-level fixed-point dataflow is delegated to mlir::Liveness — it
+ * already implements the standard LiveOut[B] = ∪ LiveIn[S] for S in succ(B),
+ * LiveIn[B] = Use[B] ∪ (LiveOut[B] - Def[B]) algorithm and handles loops /
+ * back-edges. What's project-specific stays here:
  *
- * This correctly handles loops and back edges.
+ *   1. ForwardedOutput for FOR_ITER. The body block's first argument is the
+ *      loop value produced by FOR_ITER's terminator, which MLIR can't model
+ *      natively. We track it as a synthetic Value-like entity.
+ *
+ *   2. alive_at_timestep — a linearised per-operation list of "what's alive
+ *      here". mlir::Liveness only exposes per-block / per-value queries; the
+ *      register allocator wants the linearised view, so we materialise it on
+ *      top of mlir::Liveness's block-level results.
+ *
+ *   3. block_input_mappings — for each value, the set of block arguments it
+ *      could flow into via a CFG edge. Computed from the terminator operands.
  */
 class LiveAnalysis
 {
@@ -53,18 +64,20 @@ class LiveAnalysis
 		block_input_mappings;
 
 	/**
-	 * Analyze the function to determine liveness information using backward dataflow
+	 * Analyze the function to determine liveness information.
 	 */
 	void analyse(mlir::func::FuncOp &fn)
 	{
 		auto logger = get_regalloc_logger();
-		logger->info(
-			"Starting backward dataflow live analysis for function: {}", fn.getName().str());
+		logger->info("Starting live analysis for function: {}", fn.getName().str());
 
 		auto &region = fn.getRegion();
 		auto sorted_blocks = sortBlocks(region);
 
-		// Build block information and Use/Def sets
+		// Collect block operations and the project-specific bits MLIR doesn't
+		// model natively (ForwardedOutputs from FOR_ITER, value→block-arg
+		// edge mapping). Use/def computation is no longer needed here —
+		// mlir::Liveness owns the dataflow.
 		std::map<mlir::Block *, BlockInfo> block_info;
 		std::vector<std::pair<std::variant<mlir::Value, ForwardedOutput>, mlir::BlockArgument>>
 			block_parameters_to_args;
@@ -73,12 +86,13 @@ class LiveAnalysis
 			build_block_info(block, block_info[block], block_parameters_to_args, logger);
 		}
 
-		// Run backward dataflow to compute LiveIn/LiveOut
-		compute_liveness(sorted_blocks, block_info, logger);
+		// Block-level live-in / live-out via the upstream analysis.
+		mlir::Liveness liveness(fn);
 
-		// Build alive_at_timestep from LiveIn/LiveOut
+		// Materialise alive_at_timestep on top of mlir::Liveness's block
+		// results, injecting ForwardedOutputs into the live sets as needed.
 		std::map<mlir::Block *, std::pair<size_t, size_t>> blocks_span;
-		build_timesteps(sorted_blocks, block_info, blocks_span);
+		build_timesteps(sorted_blocks, block_info, liveness, blocks_span);
 
 		// Propagate block argument inputs through the liveness information
 		propagate_block_arguments(block_parameters_to_args, blocks_span);
@@ -91,22 +105,13 @@ class LiveAnalysis
 
   private:
 	/**
-	 * Information about a single block for dataflow analysis
+	 * Per-block ancillary state: the operation list (in topological order,
+	 * needed because the linearised timesteps must match the order ops are
+	 * walked by the bytecode emitter) plus the ForwardedOutputs created by
+	 * this block's terminator (FOR_ITER's synthetic loop-var value).
 	 */
 	struct BlockInfo
 	{
-		// Values used in this block (before being defined)
-		ValueSet use;
-
-		// Values defined in this block
-		ValueSet def;
-
-		// Values live at entry to this block (computed by dataflow)
-		ValueSet live_in;
-
-		// Values live at exit from this block (computed by dataflow)
-		ValueSet live_out;
-
 		// Operations in this block (in order)
 		std::vector<mlir::Operation *> operations;
 
@@ -115,7 +120,8 @@ class LiveAnalysis
 	};
 
 	/**
-	 * Build Use/Def sets for a block
+	 * Collect operations and project-specific terminator metadata for a block.
+	 * Block-level live-in/out is computed separately by mlir::Liveness.
 	 */
 	void build_block_info(mlir::Block *block,
 		BlockInfo &info,
@@ -129,26 +135,12 @@ class LiveAnalysis
 			std::abort();
 		}
 
-		// Build Use/Def sets
-		// For each operation, add operands to Use (if not already in Def), and add results to Def
-		for (auto &op : block->getOperations()) {
-			info.operations.push_back(&op);
-
-			// Add operands to Use (if not already defined)
-			for (const auto &operand : op.getOperands()) {
-				if (!info.def.contains(operand)) { info.use.insert(operand); }
-			}
-
-			// Add results to Def
-			for (const auto &result : op.getResults()) { info.def.insert(result); }
-		}
+		for (auto &op : block->getOperations()) { info.operations.push_back(&op); }
 
 		// Handle terminators specially
 		if (auto *terminator = block->getTerminator()) {
 			handle_terminator(terminator, info, block_parameters_to_args, logger);
 		}
-
-		logger->debug("Block has {} uses, {} defs", info.use.size(), info.def.size());
 	}
 
 	/**
@@ -217,70 +209,7 @@ class LiveAnalysis
 	}
 
 	/**
-	 * Compute LiveIn/LiveOut using backward dataflow iteration
-	 */
-	void compute_liveness(const std::vector<mlir::Block *> &sorted_blocks,
-		std::map<mlir::Block *, BlockInfo> &block_info,
-		std::shared_ptr<spdlog::logger> &logger)
-	{
-		logger->info("Running backward dataflow iteration to compute liveness");
-
-		// Initialize all LiveIn and LiveOut to empty (already done by default)
-
-		// Iterate until fixed point
-		bool changed = true;
-		int iteration = 0;
-
-		while (changed) {
-			changed = false;
-			iteration++;
-
-			logger->debug("Dataflow iteration {}", iteration);
-
-			// Process blocks in reverse post-order for better convergence
-			for (auto it = sorted_blocks.rbegin(); it != sorted_blocks.rend(); ++it) {
-				auto *block = *it;
-				auto &info = block_info[block];
-
-				// Save old LiveIn for convergence check
-				auto old_live_in = info.live_in;
-
-				// LiveOut[B] = union of LiveIn[S] for all successors S
-				info.live_out.clear();
-				for (auto *successor : block->getSuccessors()) {
-					const auto &succ_info = block_info[successor];
-					info.live_out.insert(succ_info.live_in.begin(), succ_info.live_in.end());
-				}
-
-				// LiveIn[B] = Use[B] ∪ (LiveOut[B] - Def[B])
-				info.live_in = info.use;
-				for (const auto &val : info.live_out) {
-					if (!info.def.contains(val)) { info.live_in.insert(val); }
-				}
-
-				// Add ForwardedOutputs to LiveIn (they're "defined" by the terminator but need
-				// to be live for the successor)
-				for (const auto &fwd : info.forwarded_outputs) { info.live_in.insert(fwd); }
-
-				// Check if LiveIn changed
-				if (info.live_in != old_live_in) { changed = true; }
-			}
-		}
-
-		logger->info("Dataflow converged after {} iterations", iteration);
-
-		// Debug: print LiveIn/LiveOut for each block
-		for (auto *block : sorted_blocks) {
-			const auto &info = block_info[block];
-			logger->debug("Block {} LiveIn: {} values, LiveOut: {} values",
-				static_cast<void *>(block),
-				info.live_in.size(),
-				info.live_out.size());
-		}
-	}
-
-	/**
-	 * Build alive_at_timestep from LiveIn/LiveOut
+	 * Build alive_at_timestep from mlir::Liveness's block live-out info.
 	 *
 	 * Computes precise per-operation liveness by propagating backward within each block.
 	 * This ensures values are only marked alive when actually needed, not conservatively
@@ -288,6 +217,7 @@ class LiveAnalysis
 	 */
 	void build_timesteps(const std::vector<mlir::Block *> &sorted_blocks,
 		const std::map<mlir::Block *, BlockInfo> &block_info,
+		const mlir::Liveness &liveness,
 		std::map<mlir::Block *, std::pair<size_t, size_t>> &blocks_span)
 	{
 		auto logger = get_regalloc_logger();
@@ -301,8 +231,13 @@ class LiveAnalysis
 			std::vector<ValueSet> alive_before_op;
 			alive_before_op.resize(info.operations.size());
 
-			// Start from LiveOut (values alive at block exit) and work backward
-			ValueSet alive_after = info.live_out;
+			// Start from LiveOut (values alive at block exit) and work backward.
+			// mlir::Liveness returns a SmallPtrSet<Value>; the project's
+			// ValueSet is a variant<Value, ForwardedOutput> set, so we
+			// convert. ForwardedOutputs aren't part of mlir::Liveness's view
+			// and are added separately below.
+			ValueSet alive_after;
+			for (mlir::Value v : liveness.getLiveOut(block)) { alive_after.insert(v); }
 
 			for (size_t i = info.operations.size(); i-- > 0;) {
 				auto *op = info.operations[i];
@@ -349,19 +284,24 @@ class LiveAnalysis
 				}
 			}
 
-			// Add ForwardedOutputs to the first operation if they're in LiveIn
-			// (they're "defined" by the terminator but need to be live for the successor)
+			// Add ForwardedOutputs to the first operation's alive set.
+			// These are "defined" by the terminator but need to be live
+			// throughout the block so the successor (the FOR_ITER body)
+			// can pick the loop variable up via the same register. The
+			// previous custom dataflow unconditionally injected these
+			// into LiveIn before this point; mlir::Liveness doesn't know
+			// about them, so they're injected here directly.
 			if (!info.operations.empty()) {
-				for (const auto &fwd : info.forwarded_outputs) {
-					if (info.live_in.contains(fwd)) { alive_before_op[0].insert(fwd); }
-				}
+				for (const auto &fwd : info.forwarded_outputs) { alive_before_op[0].insert(fwd); }
 			}
 
-			// Note: alive_before_op[0] may differ from LiveIn because the needs_tracking
-			// pass above adds impure operation results to the timestep of their defining op.
-			// These results are defined within this block so they cannot be in LiveIn.
-			// This discrepancy is expected and intentional — it ensures impure ops get
-			// proper register assignments at their definition site.
+			// Note: alive_before_op[0] may differ from mlir::Liveness's
+			// LiveIn(block) because the needs_tracking pass above adds
+			// impure operation results to the timestep of their defining
+			// op. These results are defined within this block so they
+			// cannot be in LiveIn. The discrepancy is intentional — it
+			// ensures impure ops get a register assignment at their
+			// definition site.
 
 			// Now build timesteps in forward order using the computed liveness
 			for (size_t i = 0; i < info.operations.size(); i++) {
@@ -382,7 +322,7 @@ class LiveAnalysis
 				start,
 				end,
 				info.operations.size(),
-				info.live_in.size());
+				liveness.getLiveIn(block).size());
 			if (block->getTerminator()
 				&& mlir::isa<mlir::emitpybytecode::ForIter>(block->getTerminator())) {
 				logger->debug("  ^ FOR_ITER block");
