@@ -8,10 +8,12 @@
 #include "mlir/IR/Builders.h"
 #include "utilities.hpp"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Format.h"
 
 #include <algorithm>
 #include <bitset>
+#include <iostream>
 #include <optional>
 #include <ranges>
 #include <set>
@@ -38,7 +40,9 @@ class LinearScanRegisterAllocation
 		size_t idx;
 	};
 
-	// Stack spill location (currently not used - we abort if we run out of registers)
+	// Stack spill location (reserved for future use; iterative spilling via STORE_FAST/LOAD_FAST
+	// ensures all final assignments are Reg, so StackLocation never appears in value2mem_map
+	// after a completed allocation pass).
 	struct StackLocation
 	{
 		size_t idx;
@@ -52,22 +56,45 @@ class LinearScanRegisterAllocation
 	using LiveIntervalSet = std::multiset<LiveIntervalAnalysis::LiveInterval,
 		decltype([](const auto &lhs, const auto &rhs) { return lhs.end() < rhs.end(); })>;
 
-	// Track registers that are reserved for FOR_ITER iterators
-	// Maps loop variable value -> iterator register index
-	ValueMapping<size_t> foriter_reserved_regs;
+	static constexpr size_t kRegCount = kNumRegisters;
 
 	// Live interval analysis results (stored for visualization)
 	std::optional<LiveIntervalAnalysis> live_interval_analysis;
 
+	// Monotonically increasing across passes to generate unique spill slot names
+	size_t m_spill_slot_count{ 0 };
+
+	// Set to true by spill_value(); causes analyse() to restart the pass
+	bool m_spills_emitted{ false };
+
 	/**
-	 * Run register allocation on the function
+	 * Run register allocation on the function.
+	 *
+	 * Uses an iterative strategy: if register pressure forces a spill, spill code
+	 * (STORE_FAST / LOAD_FAST) is inserted into the IR and the entire analysis is
+	 * restarted so that the new ops receive proper live intervals and register assignments.
+	 * This repeats until a complete allocation with no spills is achieved.
 	 */
 	void analyse(mlir::func::FuncOp &func, mlir::OpBuilder builder)
 	{
+		m_spill_slot_count = 0;
+		do {
+			m_spills_emitted = false;
+			value2mem_map.clear();
+			live_interval_analysis.reset();
+			run_single_pass(func, builder);
+		} while (m_spills_emitted);
+	}
+
+  private:
+	/**
+	 * Single pass of liveness analysis + linear scan. Invoked by analyse().
+	 * Returns without completing allocation if a spill is needed (m_spills_emitted is set).
+	 */
+	void run_single_pass(mlir::func::FuncOp &func, mlir::OpBuilder &builder)
+	{
 		auto logger = get_regalloc_logger();
-		// Enable debug logging temporarily to diagnose ForIter bug
-		logger->set_level(spdlog::level::debug);
-		logger->info("Starting linear scan register allocation");
+		logger->info("Starting linear scan register allocation pass");
 
 		// Run live interval analysis
 		live_interval_analysis = LiveIntervalAnalysis{};
@@ -88,8 +115,8 @@ class LinearScanRegisterAllocation
 		LiveIntervalSet inactive;
 		LiveIntervalSet handled;
 
-		// 32 available registers
-		std::bitset<32> free;
+		// kNumRegisters available registers
+		std::bitset<kRegCount> free;
 		free.set();
 
 		// Pre-allocate r0 for operations that clobber it
@@ -100,21 +127,45 @@ class LinearScanRegisterAllocation
 			const auto &cur = *unhandled.begin();
 			unhandled = unhandled.subspan(1, unhandled.size() - 1);
 
-			logger->trace("Processing interval: {}", to_string(cur.value));
+			logger->trace(
+				"Processing interval: {} [start={}, end={}]", cur.value, cur.start(), cur.end());
+
+			// Log active intervals before expiring
+			if (logger->should_log(spdlog::level::trace)) {
+				logger->trace("Active intervals before expire:");
+				for (const auto &interval : active) {
+					if (auto it = value2mem_map.find(interval.value); it != value2mem_map.end()) {
+						if (std::holds_alternative<Reg>(it->second)) {
+							logger->trace("  {} in r{} [start={}, end={}]",
+								interval.value,
+								std::get<Reg>(it->second).idx,
+								interval.start(),
+								interval.end());
+						}
+					}
+				}
+			}
 
 			// Expire old intervals and free their registers
-			expire_old_intervals(cur, active, inactive, handled, free, logger);
+			bool was_inactive = expire_old_intervals(cur, active, inactive, handled, free, logger);
 
 			// Collect available registers for this interval
 			auto available_regs = collect_available_registers(
 				cur, free, inactive, unhandled, *live_interval_analysis);
 
 			if (available_regs.none()) {
-				logger->error("No available registers for {}", to_string(cur.value));
-				TODO();// Should implement spilling
+				logger->info("Register pressure: spilling for {}", cur.value);
+				spill_value(cur, active, func, builder);
+				return;// Restart from scratch with updated IR
 			} else {
-				allocate_register(
-					cur, free, available_regs, builder, *live_interval_analysis, active, logger);
+				allocate_register(cur,
+					free,
+					available_regs,
+					builder,
+					*live_interval_analysis,
+					active,
+					was_inactive,
+					logger);
 			}
 		}
 
@@ -131,10 +182,198 @@ class LinearScanRegisterAllocation
 		}
 	}
 
-  private:
 	/**
-	 * Pre-allocate register 0 for operations that must use it
-	 * (function calls, yield, etc.)
+	 * Returns true if the interval's value is a GET_ITER result.
+	 * GET_ITER intervals are deliberately collapsed to contiguous spans and must never be spilled.
+	 */
+	static bool is_get_iter_result(const LiveIntervalAnalysis::LiveInterval &interval)
+	{
+		if (!std::holds_alternative<mlir::Value>(interval.value)) { return false; }
+		auto val = std::get<mlir::Value>(interval.value);
+		return val.getDefiningOp() && mlir::isa<mlir::emitpybytecode::GetIter>(val.getDefiningOp());
+	}
+
+	/**
+	 * Returns true if the interval's value is a regular (non-block-argument) op result that
+	 * can be spilled using the standard STORE_FAST-after-def / LOAD_FAST-before-use pattern.
+	 */
+	static bool is_regular_op_result(const LiveIntervalAnalysis::LiveInterval &interval)
+	{
+		if (!std::holds_alternative<mlir::Value>(interval.value)) { return false; }
+		auto val = std::get<mlir::Value>(interval.value);
+		return !mlir::isa<mlir::BlockArgument>(val);
+	}
+
+	/**
+	 * Spill a regular op-result value: insert STORE_FAST after its defining op and
+	 * LOAD_FAST before each existing use, replacing those uses with the reload.
+	 */
+	void do_spill_op_result(mlir::Value victim_value,
+		mlir::StringAttr name_attr,
+		mlir::OpBuilder &builder)
+	{
+		// Collect existing uses before inserting the STORE_FAST (which adds a new use)
+		llvm::SmallVector<mlir::OpOperand *> uses;
+		for (auto &use : victim_value.getUses()) { uses.push_back(&use); }
+
+		// After the defining op: STORE_FAST to save the spilled value
+		auto *def_op = victim_value.getDefiningOp();
+		ASSERT(def_op);
+		builder.setInsertionPointAfter(def_op);
+		builder.create<mlir::emitpybytecode::StoreFastOp>(
+			def_op->getLoc(), name_attr, victim_value);
+
+		// Before each original use: LOAD_FAST to reload the spilled value
+		for (auto *use : uses) {
+			auto *user_op = use->getOwner();
+			builder.setInsertionPoint(user_op);
+			auto reload = builder.create<mlir::emitpybytecode::LoadFastOp>(
+				user_op->getLoc(), victim_value.getType(), name_attr);
+			use->set(reload.getOutput());
+		}
+	}
+
+	/**
+	 * Spill a block argument: insert STORE_FAST as the first op of its block and
+	 * LOAD_FAST before each use, replacing those uses with the reload.
+	 *
+	 * Used for both regular block arguments and ForwardedOutput loop variables
+	 * (whose corresponding value is the body block's first argument).
+	 */
+	void do_spill_block_argument(mlir::BlockArgument arg,
+		mlir::StringAttr name_attr,
+		mlir::OpBuilder &builder)
+	{
+		auto *bb = arg.getOwner();
+		ASSERT(!bb->empty());
+		auto loc = bb->front().getLoc();
+
+		// Collect existing uses before inserting STORE_FAST
+		llvm::SmallVector<mlir::OpOperand *> uses;
+		for (auto &use : arg.getUses()) { uses.push_back(&use); }
+
+		// Insert STORE_FAST at the very start of the block
+		builder.setInsertionPoint(bb, bb->begin());
+		builder.create<mlir::emitpybytecode::StoreFastOp>(loc, name_attr, arg);
+
+		// Before each original use: LOAD_FAST to reload the value
+		for (auto *use : uses) {
+			auto *user_op = use->getOwner();
+			builder.setInsertionPoint(user_op);
+			auto reload = builder.create<mlir::emitpybytecode::LoadFastOp>(
+				user_op->getLoc(), arg.getType(), name_attr);
+			use->set(reload.getOutput());
+		}
+	}
+
+	/**
+	 * Spill a value to a named local variable slot to free up a register.
+	 *
+	 * Victim selection (in priority order):
+	 *   1. The active non-block-arg op-result with the latest end point (cheapest to spill).
+	 *   2. Active block argument or ForwardedOutput (spilled at block entry).
+	 *   3. cur itself if the above don't apply.
+	 *
+	 * GET_ITER results are never eligible: their intervals are collapsed to contiguous spans
+	 * and must stay alive throughout the loop.
+	 *
+	 * After inserting spill code, sets m_spills_emitted = true so analyse() restarts.
+	 */
+	void spill_value(const LiveIntervalAnalysis::LiveInterval &cur,
+		LiveIntervalSet &active,
+		mlir::func::FuncOp &func,
+		mlir::OpBuilder &builder)
+	{
+		auto logger = get_regalloc_logger();
+
+		// --- Victim selection ---
+		// Pass 1: prefer regular op-results (cheapest path)
+		const LiveIntervalAnalysis::LiveInterval *victim_interval = nullptr;
+		for (auto it = active.rbegin(); it != active.rend(); ++it) {
+			if (!is_regular_op_result(*it)) { continue; }
+			if (is_get_iter_result(*it)) { continue; }
+			victim_interval = &(*it);
+			break;
+		}
+
+		// Pass 2: fall back to block arguments / ForwardedOutputs
+		if (!victim_interval) {
+			for (auto it = active.rbegin(); it != active.rend(); ++it) {
+				if (is_get_iter_result(*it)) { continue; }
+				victim_interval = &(*it);
+				break;
+			}
+		}
+
+		// --- Choose: spill active victim or cur ---
+		const LiveIntervalAnalysis::LiveInterval *to_spill = nullptr;
+		if (victim_interval && victim_interval->end() > cur.end()) {
+			to_spill = victim_interval;
+			logger->info("Spilling active {} (end={}) to free register for {} (end={})",
+				victim_interval->value,
+				victim_interval->end(),
+				cur.value,
+				cur.end());
+		} else if (!is_get_iter_result(cur)) {
+			to_spill = &cur;
+			logger->info("Spilling current {} (end={})", cur.value, cur.end());
+		} else {
+			logger->error(
+				"Cannot spill: all live intervals are GET_ITER results — function requires "
+				"more than {} registers.",
+				kRegCount);
+			TODO();
+			return;
+		}
+
+		// --- Allocate spill slot ---
+		const std::string spill_name = "__spill_" + std::to_string(m_spill_slot_count++);
+		logger->info("Spilling {} to slot '{}'", to_spill->value, spill_name);
+
+		auto *ctx = func->getContext();
+		auto name_attr = mlir::StringAttr::get(ctx, spill_name);
+		{
+			auto existing = func->getAttr("locals");
+			llvm::SmallVector<mlir::Attribute> locals;
+			if (existing) {
+				auto arr = mlir::cast<mlir::ArrayAttr>(existing);
+				locals.assign(arr.begin(), arr.end());
+			}
+			locals.push_back(name_attr);
+			func->setAttr("locals", mlir::ArrayAttr::get(ctx, locals));
+		}
+
+		// --- Dispatch spill by value type ---
+		if (std::holds_alternative<mlir::Value>(to_spill->value)) {
+			auto val = std::get<mlir::Value>(to_spill->value);
+			if (mlir::isa<mlir::BlockArgument>(val)) {
+				// Block argument: spill at block entry
+				do_spill_block_argument(mlir::cast<mlir::BlockArgument>(val), name_attr, builder);
+			} else {
+				// Regular op result: spill after defining op
+				do_spill_op_result(val, name_attr, builder);
+			}
+		} else {
+			// ForwardedOutput: the loop variable from FOR_ITER lives as the body block's arg
+			ASSERT(std::holds_alternative<ForwardedOutput>(to_spill->value));
+			auto [op_ptr, idx] = std::get<ForwardedOutput>(to_spill->value);
+			auto for_iter = mlir::cast<mlir::emitpybytecode::ForIter>(op_ptr);
+			auto body_arg = for_iter.getBody()->getArgument(idx);
+			do_spill_block_argument(body_arg, name_attr, builder);
+		}
+
+		m_spills_emitted = true;
+	}
+
+	/**
+	 * Pre-allocate r0 for operations that directly clobber it (CALL, YIELD, etc.)
+	 *
+	 * This ensures that values produced by these operations are assigned to r0,
+	 * matching the VM's behavior where these operations place results directly in r0.
+	 *
+	 * Note: Block arguments are NOT pre-allocated here. If a block argument receives
+	 * values from r0-clobbering operations in different registers, MOVE instructions
+	 * will be inserted at block boundaries during bytecode emission.
 	 */
 	void preallocate_r0_clobbering_operations(
 		std::span<LiveIntervalAnalysis::LiveInterval> unhandled,
@@ -144,50 +383,36 @@ class LinearScanRegisterAllocation
 		auto logger = get_regalloc_logger();
 
 		for (const auto &interval : unhandled) {
-			bool needs_r0 = false;
+			// Only pre-allocate values that directly clobber r0
+			if (!std::holds_alternative<mlir::Value>(interval.value)) { continue; }
 
-			// Check if this value directly clobbers r0
-			if (std::holds_alternative<mlir::Value>(interval.value)) {
-				auto value = std::get<mlir::Value>(interval.value);
-				if (clobbers_r0(value)) {
-					needs_r0 = true;
-					logger->debug("Value {} clobbers r0", to_string(value));
-				}
-			}
+			auto value = std::get<mlir::Value>(interval.value);
 
-			// Check if this value flows from something that clobbers r0
-			if (!needs_r0) {
-				if (auto it = live_interval_analysis.block_input_mappings.find(interval.value);
-					it != live_interval_analysis.block_input_mappings.end()) {
-					for (auto mapped_value : it->second) {
-						if (std::holds_alternative<ForwardedOutput>(mapped_value)) { continue; }
-						if (clobbers_r0(std::get<mlir::Value>(mapped_value))) {
-							needs_r0 = true;
-							logger->debug("Value {} flows from r0-clobbering value",
-								to_string(interval.value));
-							break;
-						}
-					}
-				}
-			}
+			// Skip block arguments - they don't clobber r0 themselves
+			if (mlir::isa<mlir::BlockArgument>(value)) { continue; }
 
-			if (needs_r0) {
+			if (clobbers_r0(value)) {
+				// Pre-allocate r0 but DON'T add to inactive - let it be processed normally
+				// in the main loop to handle conflicts and spilling if needed
 				value2mem_map.insert_or_assign(interval.value, Reg{ .idx = 0 });
-				inactive.insert(interval);
+				logger->debug("Pre-allocated r0 for: {}", interval.value);
 			}
 		}
 	}
 
 	/**
 	 * Expire intervals that are no longer alive and free their registers
+	 * Returns true if cur was found in inactive and moved to active
 	 */
-	void expire_old_intervals(const LiveIntervalAnalysis::LiveInterval &cur,
+	bool expire_old_intervals(const LiveIntervalAnalysis::LiveInterval &cur,
 		LiveIntervalSet &active,
 		LiveIntervalSet &inactive,
 		LiveIntervalSet &handled,
-		std::bitset<32> &free,
+		std::bitset<kRegCount> &free,
 		std::shared_ptr<spdlog::logger> &logger)
 	{
+		bool cur_was_inactive = false;
+
 		// Expire active intervals
 		for (auto it = active.begin(); it != active.end();) {
 			const auto &interval = *it;
@@ -199,7 +424,9 @@ class LinearScanRegisterAllocation
 				it = active.erase(it);
 				free_register(interval, free, logger);
 			} else if (!interval.alive_at(cur.start())) {
-				// Interval temporarily not alive (goes inactive)
+				// Interval temporarily not alive (goes inactive).
+				// GET_ITER intervals are guaranteed contiguous by extend_iterator_liveness(),
+				// so they will never take this branch during their loop span.
 				inactive.insert(interval);
 				it = active.erase(it);
 				free_register(interval, free, logger);
@@ -216,6 +443,8 @@ class LinearScanRegisterAllocation
 				// Current interval was previously allocated (e.g., r0 clobbering)
 				active.insert(interval);
 				it = inactive.erase(it);
+				cur_was_inactive = true;
+				logger->debug("Moved cur from inactive to active: {}", cur.value);
 			} else if (interval.end() < cur.start()) {
 				// Interval completely expired
 				handled.insert(interval);
@@ -225,21 +454,26 @@ class LinearScanRegisterAllocation
 				active.insert(interval);
 				it = inactive.erase(it);
 				mark_register_used(interval, free, logger);
+				logger->debug("Reactivated interval: {}", interval.value);
 			} else {
 				++it;
 			}
 		}
+
+		return cur_was_inactive;
 	}
 
 	/**
 	 * Collect available registers, accounting for special constraints
 	 */
-	std::bitset<32> collect_available_registers(const LiveIntervalAnalysis::LiveInterval &cur,
-		const std::bitset<32> &free,
+	std::bitset<kRegCount> collect_available_registers(
+		const LiveIntervalAnalysis::LiveInterval &cur,
+		const std::bitset<kRegCount> &free,
 		LiveIntervalSet &inactive,
 		std::span<LiveIntervalAnalysis::LiveInterval> unhandled,
 		const LiveIntervalAnalysis &live_interval_analysis)
 	{
+		auto logger = get_regalloc_logger();
 		auto available = free;
 
 		// Exclude registers used by overlapping inactive intervals
@@ -271,73 +505,31 @@ class LinearScanRegisterAllocation
 
 	/**
 	 * Apply special constraints for specific operations:
-	 * - GetIter cannot use r0 (reserved for function call results)
-	 * - ForIter loop variable cannot use the same register as its iterator
+	 * - GetIter cannot use r0 (reserved for function call results by VM convention)
+	 * - BuildList cannot use r0 (ListExtend internally calls the iterator protocol
+	 *   which executes Python bytecode and triggers pop_frame(true), propagating
+	 *   the callee's r0 into the caller's r0, overwriting the list)
 	 */
 	void apply_special_constraints(const LiveIntervalAnalysis::LiveInterval &cur,
-		std::bitset<32> &available,
-		const LiveIntervalAnalysis &live_interval_analysis)
+		std::bitset<kRegCount> &available,
+		const LiveIntervalAnalysis & /*live_interval_analysis*/)
 	{
 		auto logger = get_regalloc_logger();
 
-		// GetIter: cannot use r0
 		if (std::holds_alternative<mlir::Value>(cur.value)) {
 			auto value = std::get<mlir::Value>(cur.value);
+			// GetIter: cannot use r0 (r0 is reserved for function call results)
 			if (value.getDefiningOp()
 				&& mlir::isa<mlir::emitpybytecode::GetIter>(value.getDefiningOp())) {
 				available.set(0, false);
 				logger->debug("GetIter result cannot use r0");
 			}
-		}
-
-		// FIX FOR FORITER BUG:
-		// ForIter loop variable (ForwardedOutput) cannot use same register as iterator
-		if (std::holds_alternative<ForwardedOutput>(cur.value)) {
-			auto forwarded = std::get<ForwardedOutput>(cur.value);
-			if (auto for_iter = mlir::dyn_cast<mlir::emitpybytecode::ForIter>(forwarded.first)) {
-				// Get the iterator value
-				auto iterator = for_iter.getIterator();
-
-				logger->debug("Processing ForIter loop variable, looking for iterator register");
-
-				// Find what register the iterator is assigned to
-				// Need to check both as mlir::Value and potentially through block argument mappings
-				std::optional<size_t> iterator_reg;
-
-				if (auto it = value2mem_map.find(iterator); it != value2mem_map.end()) {
-					if (std::holds_alternative<Reg>(it->second)) {
-						iterator_reg = std::get<Reg>(it->second).idx;
-						logger->debug("Found iterator in r{}", *iterator_reg);
-					}
-				}
-
-				// Also check block argument mappings
-				if (!iterator_reg.has_value()) {
-					if (auto it = live_interval_analysis.block_input_mappings.find(iterator);
-						it != live_interval_analysis.block_input_mappings.end()) {
-						for (const auto &mapped : it->second) {
-							if (auto reg_it = value2mem_map.find(mapped);
-								reg_it != value2mem_map.end()) {
-								if (std::holds_alternative<Reg>(reg_it->second)) {
-									iterator_reg = std::get<Reg>(reg_it->second).idx;
-									logger->debug(
-										"Found iterator via block mapping in r{}", *iterator_reg);
-									break;
-								}
-							}
-						}
-					}
-				}
-
-				if (iterator_reg.has_value()) {
-					available.set(*iterator_reg, false);
-					logger->info(
-						"ForIter loop variable CANNOT use r{} (iterator register)", *iterator_reg);
-				} else {
-					logger->error("ForIter iterator register not found - BUG NOT FIXED!");
-					// This is a critical error - the iterator must be allocated before the loop
-					// variable
-				}
+			// BuildList: cannot use r0 (ListExtend iterates Python iterators which
+			// trigger pop_frame(true) and overwrite r0 with the iterator's return value)
+			if (value.getDefiningOp()
+				&& mlir::isa<mlir::emitpybytecode::BuildList>(value.getDefiningOp())) {
+				available.set(0, false);
+				logger->debug("BuildList result cannot use r0");
 			}
 		}
 	}
@@ -346,11 +538,12 @@ class LinearScanRegisterAllocation
 	 * Allocate a register for the current interval
 	 */
 	void allocate_register(const LiveIntervalAnalysis::LiveInterval &cur,
-		std::bitset<32> &free,
-		const std::bitset<32> &available,
+		std::bitset<kRegCount> &free,
+		const std::bitset<kRegCount> &available,
 		mlir::OpBuilder &builder,
 		const LiveIntervalAnalysis &live_interval_analysis,
 		LiveIntervalSet &active,
+		bool was_inactive,
 		std::shared_ptr<spdlog::logger> &logger)
 	{
 		std::optional<size_t> cur_reg;
@@ -366,7 +559,7 @@ class LinearScanRegisterAllocation
 				if (available.test(i)) {
 					cur_reg = i;
 					value2mem_map.insert_or_assign(cur.value, Reg{ .idx = i });
-					logger->debug("Allocated r{} to {}", i, to_string(cur.value));
+					logger->debug("Allocated r{} to {}", i, cur.value);
 					break;
 				}
 			}
@@ -376,68 +569,31 @@ class LinearScanRegisterAllocation
 
 		// Handle case where the chosen register is not free (need to save/restore)
 		if (!free.test(*cur_reg)) {
+			logger->info("Register conflict: r{} is not free, handling conflict for {}",
+				*cur_reg,
+				cur.value);
 			handle_register_conflict(
-				cur, *cur_reg, available, builder, live_interval_analysis, logger);
+				cur, *cur_reg, available, free, builder, live_interval_analysis, logger);
 		} else {
+			logger->debug("Marking r{} as not free for {} [{}..{})",
+				*cur_reg,
+				cur.value,
+				cur.start(),
+				cur.end());
 			free.set(*cur_reg, false);
 		}
 
-		active.insert(cur);
-
-		// CRITICAL FIX FOR FORITER BUG:
-		// When allocating a block argument that is a FOR_ITER loop variable, reserve the
-		// iterator register for the duration of the loop to prevent it from being reused
-		if (std::holds_alternative<mlir::Value>(cur.value)) {
-			auto value = std::get<mlir::Value>(cur.value);
-
-			// Check if this is a block argument
-			if (mlir::isa<mlir::BlockArgument>(value)) {
-				logger->debug("Allocated block argument: {}", to_string(cur.value));
-
-				// Check if this block argument comes from a FOR_ITER
-				if (auto it = live_interval_analysis.block_input_mappings.find(cur.value);
-					it != live_interval_analysis.block_input_mappings.end()) {
-
-					for (const auto &input : it->second) {
-						if (std::holds_alternative<ForwardedOutput>(input)) {
-							auto forwarded = std::get<ForwardedOutput>(input);
-
-							if (auto for_iter = mlir::dyn_cast<mlir::emitpybytecode::ForIter>(
-									forwarded.first)) {
-								logger->debug("Block argument is FOR_ITER loop variable");
-								auto iterator = for_iter.getIterator();
-								logger->debug("Iterator value: {}", to_string(iterator));
-
-								// Find the iterator's register
-								if (auto iter_it = value2mem_map.find(iterator);
-									iter_it != value2mem_map.end()) {
-									if (std::holds_alternative<Reg>(iter_it->second)) {
-										auto iterator_reg = std::get<Reg>(iter_it->second).idx;
-										logger->debug("Found iterator register: r{}", iterator_reg);
-
-										// Reserve this register for the duration of the loop
-										// variable's lifetime
-										foriter_reserved_regs[cur.value] = iterator_reg;
-
-										// Mark the iterator register as busy
-										free.set(iterator_reg, false);
-
-										logger->info(
-											"FOR_ITER FIX: Reserved r{} (iterator) for loop "
-											"variable {}",
-											iterator_reg,
-											to_string(cur.value));
-									} else {
-										logger->warn("Iterator register is not a Reg!");
-									}
-								} else {
-									logger->error("Iterator not found in value2mem_map!");
-								}
-							}
-						}
-					}
-				}
-			}
+		// Only insert into active if it wasn't already moved from inactive
+		if (!was_inactive) {
+			active.insert(cur);
+			logger->debug(
+				"Added to active: {} in r{} [{}..{})", cur.value, *cur_reg, cur.start(), cur.end());
+		} else {
+			logger->debug("Already in active (was inactive): {} in r{} [{}..{})",
+				cur.value,
+				*cur_reg,
+				cur.start(),
+				cur.end());
 		}
 	}
 
@@ -447,7 +603,8 @@ class LinearScanRegisterAllocation
 	 */
 	void handle_register_conflict(const LiveIntervalAnalysis::LiveInterval &cur,
 		size_t cur_reg,
-		const std::bitset<32> &available,
+		const std::bitset<kRegCount> &available,
+		std::bitset<kRegCount> &free,
 		mlir::OpBuilder &builder,
 		const LiveIntervalAnalysis &live_interval_analysis,
 		std::shared_ptr<spdlog::logger> &logger)
@@ -492,8 +649,40 @@ class LinearScanRegisterAllocation
 
 			value2mem_map.insert_or_assign(cur.value, Reg{ .idx = *scratch_reg });
 
-			logger->debug("Register conflict: moved {} from r{} to r{} (scratch)",
-				to_string(current_value),
+			// BUG FIX: Mark the scratch register as not free
+			free.set(*scratch_reg, false);
+
+			logger->info(
+				"Register conflict: moved {} from r{} to r{} (scratch), marked as not free",
+				current_value,
+				cur_reg,
+				*scratch_reg);
+		} else {
+			// ForwardedOutput: the defining op is the FOR_ITER terminator.
+			// The loop variable becomes available in the body block; insert PUSH before
+			// FOR_ITER and MOVE/POP at the start of the body block.
+			ASSERT(std::holds_alternative<ForwardedOutput>(cur.value));
+			auto [op_ptr, idx] = std::get<ForwardedOutput>(cur.value);
+			auto *for_iter_op = op_ptr;
+			auto loc = for_iter_op->getLoc();
+
+			auto for_iter = mlir::cast<mlir::emitpybytecode::ForIter>(for_iter_op);
+			auto *body_block = for_iter.getBody();
+			ASSERT(!body_block->empty());
+
+			// Save cur_reg before FOR_ITER, move loop variable to scratch, restore cur_reg
+			builder.setInsertionPoint(for_iter_op);
+			builder.create<mlir::emitpybytecode::Push>(loc, cur_reg);
+			builder.setInsertionPoint(body_block, body_block->begin());
+			builder.create<mlir::emitpybytecode::Move>(loc, *scratch_reg, cur_reg);
+			builder.create<mlir::emitpybytecode::Pop>(loc, cur_reg);
+
+			value2mem_map.insert_or_assign(cur.value, Reg{ .idx = *scratch_reg });
+			free.set(*scratch_reg, false);
+
+			logger->info(
+				"Register conflict (ForwardedOutput): moved FOR_ITER loop var from r{} to r{} "
+				"(scratch)",
 				cur_reg,
 				*scratch_reg);
 		}
@@ -503,30 +692,25 @@ class LinearScanRegisterAllocation
 	 * Free a register when an interval expires
 	 */
 	void free_register(const LiveIntervalAnalysis::LiveInterval &interval,
-		std::bitset<32> &free,
+		std::bitset<kRegCount> &free,
 		std::shared_ptr<spdlog::logger> &logger)
 	{
 		const auto reg = value2mem_map.at(interval.value);
 		ASSERT(std::holds_alternative<Reg>(reg));
 		size_t reg_idx = std::get<Reg>(reg).idx;
 		free.set(reg_idx, true);
-		logger->trace("Freed r{} from {}", reg_idx, to_string(interval.value));
-
-		// If this was a FOR_ITER loop variable with a reserved iterator register, free it too
-		if (auto it = foriter_reserved_regs.find(interval.value);
-			it != foriter_reserved_regs.end()) {
-			auto reserved_reg = it->second;
-			free.set(reserved_reg, true);
-			logger->info("FOR_ITER FIX: Freed reserved iterator register r{}", reserved_reg);
-			foriter_reserved_regs.erase(it);
-		}
+		logger->debug("Freed r{} from {} [{}..{})",
+			reg_idx,
+			interval.value,
+			interval.start(),
+			interval.end());
 	}
 
 	/**
 	 * Mark a register as used when an interval becomes active
 	 */
 	void mark_register_used(const LiveIntervalAnalysis::LiveInterval &interval,
-		std::bitset<32> &free,
+		std::bitset<kRegCount> &free,
 		std::shared_ptr<spdlog::logger> &logger)
 	{
 		const auto reg = value2mem_map.at(interval.value);
@@ -534,16 +718,7 @@ class LinearScanRegisterAllocation
 		size_t reg_idx = std::get<Reg>(reg).idx;
 		ASSERT(free.test(reg_idx));
 		free.set(reg_idx, false);
-		logger->trace("Marked r{} as used for {}", reg_idx, to_string(interval.value));
-
-		// If this is a FOR_ITER loop variable, also mark the iterator register as used
-		if (auto it = foriter_reserved_regs.find(interval.value);
-			it != foriter_reserved_regs.end()) {
-			auto reserved_reg = it->second;
-			free.set(reserved_reg, false);
-			logger->trace(
-				"FOR_ITER FIX: Marked reserved iterator register r{} as used", reserved_reg);
-		}
+		logger->trace("Marked r{} as used for {}", reg_idx, interval.value);
 	}
 
 	/**
@@ -572,7 +747,7 @@ class LinearScanRegisterAllocation
 			logger->debug("Final register assignments:");
 			for (const auto &[value, location] : value2mem_map) {
 				if (std::holds_alternative<Reg>(location)) {
-					logger->debug("  {} -> r{}", to_string(value), std::get<Reg>(location).idx);
+					logger->debug("  {} -> r{}", value, std::get<Reg>(location).idx);
 				}
 			}
 		}
@@ -616,7 +791,7 @@ class LinearScanRegisterAllocation
 		// Print each value's liveness
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
-			std::string value_str = to_string(interval.value);
+			std::string value_str = fmt::format("{}", interval.value);
 			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 
@@ -666,7 +841,7 @@ class LinearScanRegisterAllocation
 		// Print each value's register assignment
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
-			std::string value_str = to_string(interval.value);
+			std::string value_str = fmt::format("{}", interval.value);
 			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 

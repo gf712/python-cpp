@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Dialect.hpp"
+#include "PythonAttributes.hpp"
 #include "PythonTypes.hpp"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"

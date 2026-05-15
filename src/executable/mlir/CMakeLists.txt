@@ -1,4 +1,4 @@
-find_package(LLVM 20.1 REQUIRED CONFIG)
+find_package(LLVM 23 REQUIRED CONFIG)
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 find_package(MLIR CONFIG REQUIRED
@@ -20,6 +20,8 @@ set(PYTHON_MLIR_BINARY_DIR ${PROJECT_BINARY_DIR}/src/executable/mlir)
 add_subdirectory(Conversion)
 add_subdirectory(Dialect)
 add_subdirectory(Target)
+add_subdirectory(tools/python-mlir-opt)
+add_subdirectory(test)
 
 add_library(python-mlir compile.cpp)
 target_link_libraries(python-mlir PRIVATE PythonMLIRDialect TargetPythonBytecode PythonConversionPasses)

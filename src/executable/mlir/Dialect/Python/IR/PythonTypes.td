@@ -13,9 +13,3 @@ def Python_PyObjectType: Python_Type<"PyObject", "object", []> {
 
     let description = "Represents the Python object type";
 }
-
-def Python_PyEllipsisType: Python_Type<"PyEllipsis", "ellipsis", []> {
-    let summary = "Python ellipsis type (...)";
-
-    let description = "Represents the Python singleton ellipsis type";
-}

@@ -3,11 +3,28 @@ include "Python/IR/PythonTypes.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Python_Op<string mneomic, list<Trait> traits = []> : Op<Python_Dialect, mneomic, traits>;
 
-def ConstantOp : Python_Op<"constant"> {
+// Resource for the "may raise NameError / UnboundLocalError" effect that
+// Load* ops have. Defined in C++ as mlir::py::PythonExceptionStateResource
+// in Dialect.hpp. Marking Load* with a MemWrite on this resource prevents
+// canonicalize/DCE from eliminating loads whose results are unused (the
+// exception side effect is observable).
+def PythonExceptionStateResource :
+    Resource<"::mlir::py::PythonExceptionStateResource">;
+def PyExceptionStateWrite : MemWrite<PythonExceptionStateResource>;
+
+// Verifies the op carries a non-empty StringAttr "name". Applied to the
+// {Load,Store,Delete}{Name,Fast,Global,Deref} variable-access family.
+// Implementation: mlir::py::OpTrait::NamedOp in Dialect.hpp.
+def NamedOp : NativeOpTrait<"NamedOp"> {
+    let cppNamespace = "::mlir::py::OpTrait";
+}
+
+def ConstantOp : Python_Op<"constant", [Pure]> {
     let summary = "Build a PyObject from a constant";
 
     let arguments = (ins AnyAttr:$value);
@@ -21,12 +38,15 @@ def ConstantOp : Python_Op<"constant"> {
         OpBuilder<(ins "NoneType":$value)>,
         OpBuilder<(ins "StringAttr":$value)>,
         OpBuilder<(ins "std::vector<std::byte>":$value)>,
-        OpBuilder<(ins "::mlir::py::PyEllipsisType":$value)>,
+        OpBuilder<(ins "::mlir::py::EllipsisAttr":$value)>,
         OpBuilder<(ins "::mlir::ArrayRef<mlir::Attribute>":$elements)>,
     ];
+
+    let hasVerifier = 1;
 }
 
-def LoadNameOp : Python_Op<"load_name"> {
+def LoadNameOp : Python_Op<"load_name",
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the local environment";
 
     let arguments = (ins StrAttr:$name);
@@ -34,15 +54,23 @@ def LoadNameOp : Python_Op<"load_name"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadFastOp : Python_Op<"load_fast"> {
+def LoadFastOp : Python_Op<"load_fast",
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject bound variable";
 
     let arguments = (ins StrAttr:$name);
 
     let results = (outs Python_PyObjectType:$output);
+
+    // Forward the value of a preceding py.store_fast of the same name in
+    // the same block when no intervening op writes to that local. Locals
+    // can only be touched by store_fast / delete_fast in the same FuncOp,
+    // so most ops (including FunctionCall) don't kill the forwarding.
+    let hasCanonicalizer = 1;
 }
 
-def LoadGlobalOp : Python_Op<"load_global"> {
+def LoadGlobalOp : Python_Op<"load_global",
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from the global environment";
 
     let arguments = (ins StrAttr:$name);
@@ -50,7 +78,8 @@ def LoadGlobalOp : Python_Op<"load_global"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadDerefOp : Python_Op<"load_deref"> {
+def LoadDerefOp : Python_Op<"load_deref",
+        [NamedOp, MemoryEffects<[MemRead, PyExceptionStateWrite]>]> {
     let summary = "Load PyObject from a cell";
 
     let arguments = (ins StrAttr:$name);
@@ -58,57 +87,49 @@ def LoadDerefOp : Python_Op<"load_deref"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreNameOp : Python_Op<"store_name"> {
+def StoreNameOp : Python_Op<"store_name", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to the local environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreFastOp : Python_Op<"store_fast"> {
+def StoreFastOp : Python_Op<"store_fast", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value to local bound variable";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreGlobalOp : Python_Op<"store_global"> {
+def StoreGlobalOp : Python_Op<"store_global", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in the global environment";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreDerefOp : Python_Op<"store_deref"> {
+def StoreDerefOp : Python_Op<"store_deref", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Store PyObject to a cell";
 
     let arguments = (ins StrAttr:$name, Python_PyObjectType:$value);
-
-    let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteNameOp : Python_Op<"delete_name"> {
+def DeleteNameOp : Python_Op<"delete_name", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the local environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteFastOp : Python_Op<"delete_fast"> {
+def DeleteFastOp : Python_Op<"delete_fast", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the bound variable";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteGlobalOp : Python_Op<"delete_global"> {
+def DeleteGlobalOp : Python_Op<"delete_global", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from the global environment";
 
     let arguments = (ins StrAttr:$name);
 }
 
-def DeleteDerefOp : Python_Op<"delete_deref"> {
+def DeleteDerefOp : Python_Op<"delete_deref", [NamedOp, MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value from a cell";
 
     let arguments = (ins StrAttr:$name);
@@ -117,15 +138,25 @@ def DeleteDerefOp : Python_Op<"delete_deref"> {
 def MakeFunctionOp : Python_Op<"make_function", [AttrSizedOperandSegments]> {
     let summary = "Make a function using the local environment and code object";
 
+    // captures is the list of free-variable names this function closes
+    // over. Encoded as a plain StrArrayAttr instead of a
+    // DenseStringElementsAttr — there's no tensor/vector semantics
+    // here, and StrArrayAttr prints as ["a", "b"] in textual IR
+    // instead of the noisy dense<["a", "b"]> : tensor<2x!llvm.ptr>.
     let arguments = (ins FlatSymbolRefAttr:$function_name,
                          Variadic<Python_PyObjectType>:$defaults,
                          Variadic<Python_PyObjectType>:$kw_defaults,
-                         Builtin_DenseStringElementsAttr:$captures);
+                         StrArrayAttr:$captures);
 
     let results = (outs Python_PyObjectType:$func_object);
 }
 
-def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
+// MemWrite: the strongest case for the conservative effect — a
+// generic call dispatches to arbitrary user code (or a builtin
+// that can mutate any object reachable through args). Anything
+// less than MemWrite would let a future pass illegally reorder or
+// CSE calls.
+def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments, MemoryEffects<[MemWrite]>]> {
     let summary = "A generic function call";
 
     let arguments = (ins Python_PyObjectType:$callee,
@@ -137,123 +168,39 @@ def FunctionCallOp : Python_Op<"call", [AttrSizedOperandSegments]> {
                          );
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
-def BinaryAddOp : Python_Op<"add"> {
-    let summary = "Generic binary addition operation";
+// MemWrite for the same reason as the unary ops above: __add__,
+// __sub__, etc. are user-overridable and can run arbitrary code.
+def BinaryOp : Python_Op<"binary", [MemoryEffects<[MemWrite]>]> {
+    let summary = "Generic binary operation dispatched on kind attribute";
 
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
+    let arguments = (ins Python_ArithOpKindAttr:$kind,
+                         Python_PyObjectType:$lhs,
+                         Python_PyObjectType:$rhs);
 
     let results = (outs Python_PyObjectType:$output);
 }
 
-def BinarySubtractOp : Python_Op<"sub"> {
-    let summary = "Generic binary subtraction operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryModuloOp : Python_Op<"mod"> {
-    let summary = "Generic binary modulo operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryMultiplyOp : Python_Op<"mul"> {
-    let summary = "Generic binary multiplication operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryExpOp : Python_Op<"exp"> {
-    let summary = "Generic binary exponential operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryDivOp : Python_Op<"div"> {
-    let summary = "Generic binary division operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryFloorDivOp : Python_Op<"floordiv"> {
-    let summary = "Generic binary floor division operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def BinaryMatMulOp : Python_Op<"matmul"> {
-    let summary = "Generic binary matrix multiplication operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LeftShiftOp : Python_Op<"lshift"> {
-    let summary = "Generic binary left shift operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def RightShiftOp : Python_Op<"rshift"> {
-    let summary = "Generic binary right shift operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LogicalAndOp : Python_Op<"logical_and"> {
-    let summary = "Generic binary logical and operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LogicalOrOp : Python_Op<"logical_or"> {
-    let summary = "Generic binary logical or operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def LogicalXorOp : Python_Op<"logical_xor"> {
-    let summary = "Generic binary logical xor operation";
-
-    let arguments = (ins Python_PyObjectType:$lhs, Python_PyObjectType:$rhs);
-
-    let results = (outs Python_PyObjectType:$output);
-}
-
-def InplaceOp : Python_Op<"inplace_op"> {
+def InplaceOp : Python_Op<"inplace_op", [MemoryEffects<[MemWrite]>]> {
     let summary = "Generic inplace operation";
 
     let arguments = (ins Python_PyObjectType:$src,
                          Python_PyObjectType:$dst,
-                         Python_InplaceOpKindAttr:$kind);
+                         Python_ArithOpKindAttr:$kind);
 
     let results = (outs Python_PyObjectType:$result);
 }
 
-def PositiveOp : Python_Op<"pos"> {
+// MemWrite is conservative: each of these ops dispatches to a user-
+// overridable dunder (__pos__, __neg__, __invert__, __bool__ +
+// negation) that can have arbitrary side effects in Python. We can't
+// use Load*'s MemRead+PyExceptionStateWrite pattern (which assumes
+// the op only touches private slots) because Python's operator
+// dispatch can run any user code.
+def PositiveOp : Python_Op<"pos", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary positive operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -261,7 +208,7 @@ def PositiveOp : Python_Op<"pos"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def NegativeOp : Python_Op<"neg"> {
+def NegativeOp : Python_Op<"neg", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary negative operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -269,7 +216,7 @@ def NegativeOp : Python_Op<"neg"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def InvertOp : Python_Op<"inv"> {
+def InvertOp : Python_Op<"inv", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary invert operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -277,7 +224,7 @@ def InvertOp : Python_Op<"inv"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def NotOp : Python_Op<"not"> {
+def NotOp : Python_Op<"not", [MemoryEffects<[MemWrite]>]> {
     let summary = "Unary negation operation";
 
     let arguments = (ins Python_PyObjectType:$input);
@@ -285,7 +232,9 @@ def NotOp : Python_Op<"not"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def CastToBoolOp : Python_Op<"as_bool"> {
+// MemWrite: as_bool calls __bool__ (or falls back to __len__),
+// both user-overridable.
+def CastToBoolOp : Python_Op<"as_bool", [MemoryEffects<[MemWrite]>]> {
     let summary = "Convert Python object to bool";
 
     let arguments = (ins Python_PyObjectType:$value);
@@ -293,7 +242,8 @@ def CastToBoolOp : Python_Op<"as_bool"> {
     let results = (outs I1:$output);
 }
 
-def Compare : Python_Op<"cmp"> {
+// MemWrite: __eq__/__lt__/__contains__/etc. are user-overridable.
+def CompareOp : Python_Op<"cmp", [MemoryEffects<[MemWrite]>]> {
     let summary = "Compare two operands";
 
     let arguments = (ins Python_CmpPredicateAttr:$predicate,
@@ -303,7 +253,7 @@ def Compare : Python_Op<"cmp"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadAssertionError : Python_Op<"load_assertion_error"> {
+def LoadAssertionError : Python_Op<"load_assertion_error", [Pure]> {
     let summary = [{
 Loads AssertionError type. This is guaranteed to be the builtin
 AssertionError.
@@ -320,9 +270,11 @@ def BuildDictOp : Python_Op<"build_dict", [SameVariadicOperandSize]> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
-def DictAddOp : Python_Op<"dict_add"> {
+def DictAddOp : Python_Op<"dict_add", [MemoryEffects<[MemWrite]>]> {
     let summary = "Adds a key/value pair to the provided dictionary";
 
     let arguments = (ins Python_PyObjectType:$dict,
@@ -337,9 +289,11 @@ def BuildListOp : Python_Op<"build_list"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
-def ListAppendOp : Python_Op<"list_append"> {
+def ListAppendOp : Python_Op<"list_append", [MemoryEffects<[MemWrite]>]> {
     let summary = "Append to a Python list";
 
     let arguments = (ins Python_PyObjectType:$list, Python_PyObjectType:$value);
@@ -352,6 +306,8 @@ def BuildTupleOp : Python_Op<"build_tuple"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
 def BuildSetOp : Python_Op<"build_set"> {
@@ -361,9 +317,11 @@ def BuildSetOp : Python_Op<"build_set"> {
                          DenseBoolArrayAttr:$requires_expansion);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
 }
 
-def SetAddOp : Python_Op<"set_add"> {
+def SetAddOp : Python_Op<"set_add", [MemoryEffects<[MemWrite]>]> {
     let summary = "Add a value to a set";
 
     let arguments = (ins Python_PyObjectType:$set,
@@ -378,7 +336,8 @@ def BuildStringOp : Python_Op<"build_string"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def FormatValueOp : Python_Op<"format"> {
+// MemWrite: __format__ / __str__ / __repr__ are user-overridable.
+def FormatValueOp : Python_Op<"format", [MemoryEffects<[MemWrite]>]> {
     let summary = "Format an object as a string using the requested conversion";
 
     let arguments = (ins Python_PyObjectType:$value,
@@ -387,7 +346,11 @@ def FormatValueOp : Python_Op<"format"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def LoadAttributeOp: Python_Op<"load_attribute"> {
+// MemWrite: attribute access goes through __getattribute__ /
+// __getattr__, both user-overridable. Unlike load_fast / load_name
+// (which read from private slots and are MemRead-safe), this can
+// run any user code.
+def LoadAttributeOp : Python_Op<"load_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Load an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -396,14 +359,15 @@ def LoadAttributeOp: Python_Op<"load_attribute"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def DeleteAttributeOp: Python_Op<"delete_attribute"> {
+def DeleteAttributeOp : Python_Op<"delete_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
                          StrAttr:$attr);
 }
 
-def BinarySubscriptOp: Python_Op<"subscript"> {
+// MemWrite: __getitem__ is user-overridable.
+def BinarySubscriptOp : Python_Op<"subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Subscript an object";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -412,7 +376,7 @@ def BinarySubscriptOp: Python_Op<"subscript"> {
     let results = (outs Python_PyObjectType:$output);
 }
 
-def StoreSubscriptOp: Python_Op<"store_subscript"> {
+def StoreSubscriptOp : Python_Op<"store_subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -420,22 +384,24 @@ def StoreSubscriptOp: Python_Op<"store_subscript"> {
                          Python_PyObjectType:$value);
 }
 
-def DeleteSubscriptOp: Python_Op<"delete_subscript"> {
+def DeleteSubscriptOp : Python_Op<"delete_subscript", [MemoryEffects<[MemWrite]>]> {
     let summary = "Delete value in object using a subscript";
 
     let arguments = (ins Python_PyObjectType:$self,
                          Python_PyObjectType:$subscript);
 }
 
-def StoreAttributeOp: Python_Op<"store_attribute"> {
+def StoreAttributeOp : Python_Op<"store_attribute", [MemoryEffects<[MemWrite]>]> {
     let summary = "Store value in object using an attribute";
 
     let arguments = (ins Python_PyObjectType:$self,
-                         StrAttr:$attribute,
+                         StrAttr:$attr,
                          Python_PyObjectType:$value);
 }
 
-def LoadMethodOp: Python_Op<"load_method"> {
+// MemWrite: like load_attribute, this triggers attribute lookup
+// which is user-overridable via __getattribute__ / __getattr__.
+def LoadMethodOp : Python_Op<"load_method", [MemoryEffects<[MemWrite]>]> {
     let summary = "Load a method";
 
     let arguments = (ins Python_PyObjectType:$self,
@@ -444,15 +410,17 @@ def LoadMethodOp: Python_Op<"load_method"> {
     let results = (outs Python_PyObjectType:$method);
 }
 
-def UnpackSequenceOp: Python_Op<"unpack"> {
+def UnpackSequenceOp : Python_Op<"unpack"> {
     let summary = "Unpack sequence";
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
     let results = (outs Variadic<Python_PyObjectType>:$unpacked_values);
+
+    let hasVerifier = 1;
 }
 
-def UnpackExpandOp: Python_Op<"unpack_ex"> {
+def UnpackExpandOp : Python_Op<"unpack_ex"> {
     let summary = "Unpack iterable with expansion";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -461,73 +429,60 @@ def UnpackExpandOp: Python_Op<"unpack_ex"> {
                         Python_PyObjectType:$rest);
 }
 
-def ForIterOp: Python_Op<"for_iter", [Terminator]> {
-    let summary = "Convenience op for for loops";
-
-    let description = [{
-Jumps to `end` if calling Python's `next` builtin raises StopIteration.
-Otherwise, returns the result of `next`.
-If an exception that is not a subclass of StopIteration is raised, that
-exception is thrown.
-    }];
-
-    let arguments = (ins Python_PyObjectType:$iterator);
-
-    let successors = (successor AnySuccessor:$start, AnySuccessor:$end);
-
-    let results = (outs Python_PyObjectType:$value);
-}
-
-def ForLoopOp: Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "For loop representation";
 
     let arguments = (ins Python_PyObjectType:$iterable);
 
+    // orelse is AnyRegion (not MinSizedRegion<1>) so canonicalize can drop
+    // the empty entry block when there is no Python `else` clause. The
+    // getSuccessorRegions impl, the lowering pass, and the bytecode emitter
+    // all handle a 0-block orelse as "no else, branch to parent".
     let regions = (region MinSizedRegion<1>:$body,
                           SizedRegion<1>:$step,
-                          MinSizedRegion<1>:$orelse);
+                          AnyRegion:$orelse);
 }
 
-def WhileOp: Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def WhileOp : Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let summary = "While loop representation";
 
     let regions = (region AnyRegion:$condition, AnyRegion:$body, AnyRegion:$orelse);
 }
 
-def ConditionOp: Python_Op<"condition", [Terminator,
-                                         ParentOneOf<["WhileOp", "TryHandlerScope"]>]> {
+def ConditionOp : Python_Op<"condition", [Terminator,
+                                         ParentOneOf<["WhileOp", "TryHandlerOp"]>]> {
     let summary = "Condition of a while loop or a catch statement";
 
     let arguments = (ins Python_PyObjectType:$cond);
 }
 
-def TryHandlerScope: Python_Op<"catch", [Terminator,
+def TryHandlerOp : Python_Op<"catch", [Terminator,
                                          HasParent<"TryOp">,
-                                         DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+                                         DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$cond,
                           AnyRegion:$handler);
 }
 
-def TryOp: Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+def TryOp : Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let regions = (region AnyRegion:$body,
                           AnyRegion:$orelse,
                           AnyRegion:$finally,
                           VariadicRegion<SizedRegion<1>>:$handlers);
 }
 
-def WithOp: Python_Op<"with"> {
+def WithOp : Python_Op<"with"> {
     let arguments = (ins Variadic<Python_PyObjectType>:$items);
 
     let regions = (region AnyRegion:$body);
 }
 
-def WithExceptStartOp: Python_Op<"with_except_start"> {
+def WithExceptStartOp : Python_Op<"with_except_start"> {
     let arguments = (ins Python_PyObjectType:$exit_method);
 
     let results = (outs Python_PyObjectType:$output);
 }
 
-def RaiseOp: Python_Op<"raise", [Terminator,
+def RaiseOp : Python_Op<"raise", [Terminator,
                                  AttrSizedOperandSegments]> {
     let summary = "Raises an exception";
 
@@ -544,18 +499,19 @@ def RaiseOp: Python_Op<"raise", [Terminator,
     ];
 }
 
-def ClearExceptionStateOp: Python_Op<"clear_exc_state"> {
+def ClearExceptionStateOp : Python_Op<"clear_exc_state",
+        [MemoryEffects<[MemWrite<PythonExceptionStateResource>]>]> {
     let summary = "Clears the interpreter exception state";
 }
 
-def ControlFlowYield: Python_Op<"cf_yield", [ReturnLike,
+def BranchYieldOp : Python_Op<"br_yield", [ReturnLike,
                                              DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, ["getSuccessorRegions"]>,
                                              Terminator,
                                              ParentOneOf<["TryOp",
                                                           "ForLoopOp",
                                                           "WithOp",
                                                           "WhileOp",
-                                                          "TryHandlerScope"]>]> {
+                                                          "TryHandlerOp"]>]> {
     let summary = "Yield control to the parent operation";
 
     let arguments = (ins OptionalAttr<Python_LoopOpKindAttr>:$kind);
@@ -571,7 +527,7 @@ def ControlFlowYield: Python_Op<"cf_yield", [ReturnLike,
     }];
 }
 
-def CondBranchSubclassOp: Python_Op<"cond_br_subclass", [Terminator,
+def CondBranchSubclassOp : Python_Op<"cond_br_subclass", [Terminator,
     AttrSizedOperandSegments, DeclareOpInterfaceMethods<BranchOpInterface>]> {
     let summary = "Jump if the current active exception is not of `object_type`";
 
@@ -593,7 +549,10 @@ def CondBranchSubclassOp: Python_Op<"cond_br_subclass", [Terminator,
 def ImportOp : Python_Op<"import"> {
     let summary = "Import a Python module";
 
-    let arguments = (ins StrAttr:$name, Builtin_DenseStringElementsAttr:$from_list, UI32Attr:$level);
+    // from_list is the list of names introduced by `from m import a, b`.
+    // Plain StrArrayAttr (prints as ["a", "b"]); see same rationale on
+    // py.make_function.captures.
+    let arguments = (ins StrAttr:$name, StrArrayAttr:$from_list, UI32Attr:$level);
 
     let results = (outs Python_PyObjectType:$module);
 }
@@ -612,19 +571,56 @@ def ImportAllOp : Python_Op<"import_all"> {
     let arguments = (ins Python_PyObjectType:$module);
 }
 
-def ClassDefinitionOp: Python_Op<"class", [AttrSizedOperandSegments]> {
+def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments]> {
     let summary = "Class definition";
 
+    // captures is a list of free-variable names — no tensor semantics,
+    // so a plain StrArrayAttr is the natural fit (prints as ["a", "b"]
+    // instead of dense<...> : tensor<...>).
     let arguments = (ins StrAttr:$name,
                          StrAttr:$mangled_name,
                          Variadic<Python_PyObjectType>:$bases,
                          Builtin_DenseStringElementsAttr:$keywords,
                          Variadic<Python_PyObjectType>:$kwargs,
-                         Builtin_DenseStringElementsAttr:$captures);
+                         StrArrayAttr:$captures);
 
     let regions = (region AnyRegion:$body);
 
     let results = (outs Python_PyObjectType:$output);
+
+    let hasVerifier = 1;
+}
+
+// Terminator for the body of a py.class. Carries the class object (or
+// __class__ cell) that the conversion pass forwards into the synthesised
+// func.return when it lowers the class body into a func.func. Existed as
+// func.return historically, but that op's verifier requires its parent to
+// be func.func - which the class region is not - so canonicalize tripped
+// the verifier whenever it ran pre-lowering.
+def ClassReturnOp : Python_Op<"class_return", [Terminator,
+                                               HasParent<"ClassDefinitionOp">,
+                                               ReturnLike]> {
+    let summary = "Yield a value from a class definition body";
+
+    let arguments = (ins Python_PyObjectType:$value);
+}
+
+// Function return that does not require its immediate parent to be a
+// func.func. Used in place of func.return inside py.try / py.with
+// regions where the return statement's enclosing FuncOp is several
+// regions up. The conversion pass flattens those regions into the
+// FuncOp's body and then rewrites py.return to func.return.
+//
+// NOTE: deliberately NOT marked ReturnLike. ReturnLike causes MLIR's
+// RegionBranchOpInterface dataflow to treat the op as a branch from
+// the enclosing region to its parent, and verify the operand count
+// against getSuccessorInputs. py.return is meant to short-circuit
+// straight through to the func.func boundary, not through each
+// enclosing try/with's region-branch interface.
+def ReturnOp : Python_Op<"return", [Terminator]> {
+    let summary = "Return from the enclosing func.func";
+
+    let arguments = (ins Variadic<Python_PyObjectType>:$value);
 }
 
 def YieldOp : Python_Op<"yield"> {
@@ -646,9 +642,16 @@ def YieldFromOp : Python_Op<"yield_from"> {
 def BuildSliceOp : Python_Op<"build_slice"> {
     let summary = "Build a slice object from object subscripting";
 
+    // `step` is optional: the runtime BuildSlice instruction supports a
+    // step-less 2-operand form, and most Python slices in the wild
+    // (arr[:5], arr[1:], arr[1:5]) have no step. Omitting the None
+    // constant when step is missing saves a register per such slice.
+    // `lower` and `upper` stay required — the VM's BuildSlice::execute
+    // dereferences both unconditionally; rep-as-None is materialized
+    // by MLIRGenerator when the Python source lacks them.
     let arguments = (ins Python_PyObjectType:$lower,
                          Python_PyObjectType:$upper,
-                         Python_PyObjectType:$step);
+                         Optional<Python_PyObjectType>:$step);
 
     let results = (outs Python_PyObjectType:$slice);
 }

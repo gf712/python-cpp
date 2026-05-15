@@ -303,22 +303,20 @@ void VirtualMachine::pop_frame(bool should_return_value)
 {
 	if (m_stack_frames.size() > 1) {
 		const size_t locals_size = m_stack_frames.top().get().locals.size();
-
 		auto return_value = m_stack_frames.top().get().registers[0];
+
 		ASSERT((*m_stack_frames.top().get().return_address).get());
 		m_instruction_pointer = m_stack_frames.top().get().return_address;
 		auto f = m_stack_frames.top();
 		f.get().stack_pointer = m_stack_pointer;
 		m_stack_frames.pop();
-		if (should_return_value) {
-			// returning a value may not be always desirable (e.g. leaving a function in an
-			// exception state)
-			m_stack_frames.top().get().registers[0] = std::move(return_value);
-		}
 
 		// restore stack frame state
 		m_state = m_stack_frames.top().get().state.get();
 		m_stack_objects.pop_back();
+		if (should_return_value) {
+			m_stack_frames.top().get().registers[0] = std::move(return_value);
+		}
 
 		f.get().locals_storage.resize(locals_size, nullptr);
 		for (size_t i = 0; i < locals_size; ++i) { f.get().locals_storage[i] = f.get().locals[i]; }
