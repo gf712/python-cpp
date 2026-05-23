@@ -23,6 +23,7 @@ static constexpr std::array builtin_modules{
 	std::tuple<std::string_view, PyModule *(*)()>{ "_signal", signal_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "errno", errno_module },
 	std::tuple<std::string_view, PyModule *(*)()>{ "_struct", struct_module },
+	std::tuple<std::string_view, PyModule *(*)()>{ "gc", gc_module },
 };
 
 inline bool is_builtin(std::string_view name)

@@ -106,14 +106,14 @@ PyResult<Value> Bytecode::call_without_setup(VirtualMachine &vm, Interpreter &in
 	// create main stack frame
 	ASSERT(!vm.stack().empty());
 
-	constexpr auto sentinel = decltype(vm.stack().top().get().last_instruction_pointer)();
-	if (vm.stack().top().get().last_instruction_pointer == sentinel) {
+	constexpr auto sentinel = decltype(vm.stack().back().get().last_instruction_pointer)();
+	if (vm.stack().back().get().last_instruction_pointer == sentinel) {
 		// first time calling with the stack frame, so we don't have a last instruction pointer yet
 		vm.set_instruction_pointer(begin());
 	} else {
 		// otherwise resume execution, by starting execution from the instruction after the last run
 		// instruction
-		vm.set_instruction_pointer(vm.stack().top().get().last_instruction_pointer + 1);
+		vm.set_instruction_pointer(vm.stack().back().get().last_instruction_pointer + 1);
 	}
 
 	return eval_loop(vm, interpreter);

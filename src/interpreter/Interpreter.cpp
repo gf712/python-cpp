@@ -269,7 +269,7 @@ PyModule *Interpreter::get_imported_module(PyString *name) const
 ScopedStack::~ScopedStack()
 {
 	auto &vm = VirtualMachine::the();
-	if (!vm.stack().empty() && top_frame && &vm.stack().top().get() == top_frame.get()) {
+	if (!vm.stack().empty() && top_frame && &vm.stack().back().get() == top_frame.get()) {
 		vm.pop_frame(true);
 	}
 }

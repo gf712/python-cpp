@@ -6,6 +6,7 @@ PyModule *builtins_module(Interpreter &interpreter);
 PyModule *codecs_module();
 PyModule *collections_module();
 PyModule *errno_module();
+PyModule *gc_module();
 PyModule *imp_module();
 PyModule *io_module();
 PyModule *math_module();

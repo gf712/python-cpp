@@ -18,7 +18,9 @@
 
 namespace py {
 
-static std::unordered_set<PyObject *> visited_dict_values;
+// Tracks dict_values currently being repr'd on this thread. Same rationale as
+// PyList::visited; drained by the RAII Cleanup in PyDictValues::__repr__.
+thread_local std::unordered_set<PyObject *> visited_dict_values;
 
 template<> PyDict *as(PyObject *obj)
 {

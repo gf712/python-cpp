@@ -4,6 +4,8 @@
 #include "runtime/forward.hpp"
 #include "utilities.hpp"
 
+#include <algorithm>
+#include <array>
 #include <bitset>
 #include <cstdint>
 #include <memory>
@@ -98,8 +100,7 @@ class Block
 		void deallocate(uint8_t *ptr)
 		{
 			uintptr_t start = bit_cast<uintptr_t>(m_memory);
-			uintptr_t end =
-				bit_cast<uintptr_t>(m_memory + (m_object_size + 1) * ChunkView<>::ChunkCount);
+			uintptr_t end = bit_cast<uintptr_t>(m_memory + m_object_size * ChunkView<>::ChunkCount);
 			ASSERT(bit_cast<uintptr_t>(ptr) >= start && bit_cast<uintptr_t>(ptr) < end);
 			ASSERT((bit_cast<uintptr_t>(ptr) - start) % m_object_size == 0);
 
@@ -160,6 +161,7 @@ class Block
 	void deallocate(uint8_t *ptr);
 
 	std::vector<Chunk> &chunks() { return m_chunks; }
+	const std::vector<Chunk> &chunks() const { return m_chunks; }
 
 	size_t object_size() const { return m_chunks.back().object_size(); }
 
@@ -171,47 +173,58 @@ class Block
 class Slab
 {
   public:
+	static constexpr std::array<size_t, 8> kBlockSizes{ 16, 32, 64, 128, 256, 512, 1024, 2048 };
+	static constexpr size_t kBlockCount = kBlockSizes.size();
+
 	Slab()
 	{
-		block16 = std::make_unique<Block>(16, 1000);
-		block32 = std::make_unique<Block>(32, 1000);
-		block64 = std::make_unique<Block>(64, 1000);
-		block128 = std::make_unique<Block>(128, 1000);
-		block256 = std::make_unique<Block>(256, 1000);
-		block512 = std::make_unique<Block>(512, 1000);
-		block1024 = std::make_unique<Block>(1024, 1000);
-		block2048 = std::make_unique<Block>(2048, 1000);
+		for (size_t i = 0; i < kBlockCount; ++i) {
+			m_blocks[i] = std::make_unique<Block>(kBlockSizes[i], 1000);
+		}
 	}
 
-	std::unique_ptr<Block> &block_16() { return block16; }
-	std::unique_ptr<Block> &block_32() { return block32; }
-	std::unique_ptr<Block> &block_64() { return block64; }
-	std::unique_ptr<Block> &block_128() { return block128; }
-	std::unique_ptr<Block> &block_256() { return block256; }
-	std::unique_ptr<Block> &block_512() { return block512; }
-	std::unique_ptr<Block> &block_1024() { return block1024; }
-	std::unique_ptr<Block> &block_2048() { return block2048; }
+	std::unique_ptr<Block> &block_16() { return m_blocks[0]; }
+	std::unique_ptr<Block> &block_32() { return m_blocks[1]; }
+	std::unique_ptr<Block> &block_64() { return m_blocks[2]; }
+	std::unique_ptr<Block> &block_128() { return m_blocks[3]; }
+	std::unique_ptr<Block> &block_256() { return m_blocks[4]; }
+	std::unique_ptr<Block> &block_512() { return m_blocks[5]; }
+	std::unique_ptr<Block> &block_1024() { return m_blocks[6]; }
+	std::unique_ptr<Block> &block_2048() { return m_blocks[7]; }
+
+	template<typename F> void for_each_block(F &&f)
+	{
+		for (auto &b : m_blocks) { f(*b); }
+	}
+	template<typename F> void for_each_block(F &&f) const
+	{
+		for (const auto &b : m_blocks) { f(*b); }
+	}
 
 	template<typename T>
 	uint8_t *allocate()
 		requires std::is_base_of_v<Cell, T>
 	{
 		spdlog::trace("Allocating Cell object memory for object of size {}", sizeof(T));
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 16) { return block16->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 32) { return block32->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 64) { return block64->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 128) { return block128->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 256) { return block256->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 512) { return block512->allocate(); }
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 1024) {
-			return block1024->allocate();
-		}
-		if constexpr (sizeof(T) + sizeof(GarbageCollected) <= 2048) {
-			return block2048->allocate();
+		constexpr size_t needed = sizeof(T) + sizeof(GarbageCollected);
+		static_assert(needed <= kBlockSizes.back(),
+			"only object sizes <= 2048 bytes are currently supported");
+		if constexpr (needed <= 16) {
+			return m_blocks[0]->allocate();
+		} else if constexpr (needed <= 32) {
+			return m_blocks[1]->allocate();
+		} else if constexpr (needed <= 64) {
+			return m_blocks[2]->allocate();
+		} else if constexpr (needed <= 128) {
+			return m_blocks[3]->allocate();
+		} else if constexpr (needed <= 256) {
+			return m_blocks[4]->allocate();
+		} else if constexpr (needed <= 512) {
+			return m_blocks[5]->allocate();
+		} else if constexpr (needed <= 1024) {
+			return m_blocks[6]->allocate();
 		} else {
-			[]<bool flag = false>() {
-				static_assert(flag, "only object sizes <= 2048 bytes are currently supported");
-			}();
+			return m_blocks[7]->allocate();
 		}
 	}
 
@@ -220,32 +233,11 @@ class Slab
 		requires std::is_base_of_v<Cell, T>
 	{
 		spdlog::trace("Allocating Cell object memory for object of size {}", sizeof(T));
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 16) {
-			return block16->allocate();
+		const size_t needed = sizeof(T) + extra_bytes + sizeof(GarbageCollected);
+		for (size_t i = 0; i < kBlockCount; ++i) {
+			if (needed <= kBlockSizes[i]) { return m_blocks[i]->allocate(); }
 		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 32) {
-			return block32->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 64) {
-			return block64->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 128) {
-			return block128->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 256) {
-			return block256->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 512) {
-			return block512->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 1024) {
-			return block1024->allocate();
-		}
-		if (sizeof(T) + extra_bytes + sizeof(GarbageCollected) <= 2048) {
-			return block2048->allocate();
-		} else {
-			TODO();
-		}
+		TODO();
 	}
 
 	template<typename T> uint8_t *allocate()
@@ -254,50 +246,17 @@ class Slab
 			static_assert(flag, "only GC collected objects are currently supported");
 		}();
 		return nullptr;
-
-		// uint8_t *ptr{ nullptr };
-		// spdlog::debug("Allocating memory for object of size {}", sizeof(T));
-		// if constexpr (sizeof(T) <= 16) { ptr = block16->allocate(); }
-		// if constexpr (sizeof(T) <= 32) { ptr = block32->allocate(); }
-		// if constexpr (sizeof(T) <= 64) { ptr = block64->allocate(); }
-		// if constexpr (sizeof(T) <= 128) { ptr = block128->allocate(); }
-		// if constexpr (sizeof(T) <= 256) { ptr = block256->allocate(); }
-		// if constexpr (sizeof(T) <= 512) {
-		// 	return block512->allocate();
-		// } else {
-		// 	[]<bool flag = false>()
-		// 	{
-		// 		static_assert(flag, "only object sizes <= 512 bytes are currently supported");
-		// 	}
-		// 	();
-		// }
-		// new (ptr + sizeof(GarbageCollected)) T(std::forward<Args>(args)...);
-		// return ptr;
 	}
 
 	bool has_address(uint8_t *addr) const;
 
 	void reset()
 	{
-		block16->reset();
-		block32->reset();
-		block64->reset();
-		block128->reset();
-		block256->reset();
-		block512->reset();
-		block1024->reset();
-		block2048->reset();
+		for (auto &b : m_blocks) { b->reset(); }
 	}
 
   private:
-	std::unique_ptr<Block> block16{ nullptr };
-	std::unique_ptr<Block> block32{ nullptr };
-	std::unique_ptr<Block> block64{ nullptr };
-	std::unique_ptr<Block> block128{ nullptr };
-	std::unique_ptr<Block> block256{ nullptr };
-	std::unique_ptr<Block> block512{ nullptr };
-	std::unique_ptr<Block> block1024{ nullptr };
-	std::unique_ptr<Block> block2048{ nullptr };
+	std::array<std::unique_ptr<Block>, kBlockCount> m_blocks;
 };
 
 class Heap
@@ -430,6 +389,19 @@ class Heap
 	{
 		if (auto it = m_weakrefs.find(obj); it != m_weakrefs.end()) { return it->second; }
 		return {};
+	}
+
+	// Called from a weakref wrapper's destructor when the wrapper itself
+	// (not the target) is being collected. Without this, m_weakrefs[target]
+	// would retain a dangling pointer that getweakrefs/getweakrefcount
+	// would later hand back to user code.
+	void unregister_weakref(uint8_t *target, py::PyObject *wrapper)
+	{
+		auto it = m_weakrefs.find(target);
+		if (it == m_weakrefs.end()) { return; }
+		auto &wrappers = it->second;
+		wrappers.erase(std::remove(wrappers.begin(), wrappers.end(), wrapper), wrappers.end());
+		if (wrappers.empty()) { m_weakrefs.erase(it); }
 	}
 
   private:

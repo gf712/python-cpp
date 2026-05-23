@@ -21,7 +21,7 @@ using namespace py;
 StackFrame::StackFrame(size_t register_count,
 	size_t locals_count,
 	size_t stack_size,
-	InstructionVector::const_iterator return_address,
+	std::optional<InstructionVector::const_iterator> return_address,
 	VirtualMachine *vm_)
 	: registers(register_count, nullptr),
 	  locals(vm_->m_stack_pointer, vm_->m_stack_pointer + stack_size),
@@ -83,19 +83,19 @@ StackFrame &StackFrame::restore()
 	auto start = stack_pointer;
 	for (const auto &el : locals_storage) { *start++ = el; }
 	vm->push_frame(*this);
-	return vm->stack().top();
+	return vm->stack().back();
 }
 
 void StackFrame::leave()
 {
 	ASSERT(vm);
-	// ASSERT(vm->m_stack_frames.top() == *this);
+	// ASSERT(vm->m_stack_frames.back() == *this);
 	vm->pop_frame(true);
 }
 
 VirtualMachine::VirtualMachine()
-	: m_stack(10'000, nullptr), m_stack_pointer(m_stack.begin()), m_base_pointer(m_stack_pointer),
-	  m_heap(Heap::create())
+	: m_stack(kStackSize, nullptr), m_stack_pointer(m_stack.begin()),
+	  m_base_pointer(m_stack_pointer), m_heap(Heap::create())
 {
 	uintptr_t *rbp;
 	asm volatile("movq %%rbp, %0" : "=r"(rbp));
@@ -105,6 +105,11 @@ VirtualMachine::VirtualMachine()
 std::unique_ptr<StackFrame>
 	VirtualMachine::setup_call_stack(size_t register_count, size_t locals_count, size_t stack_size)
 {
+	// Guard the invariant that m_stack is never reallocated after the VM
+	// is constructed. Every active StackFrame holds raw pointers/iterators
+	// into this buffer (locals span, base_pointer, stack_pointer), so any
+	// grow/shrink would silently dangle them.
+	ASSERT(m_stack.size() == kStackSize && "m_stack capacity changed; locals spans would dangle");
 	return push_frame(register_count, locals_count, stack_size);
 }
 
@@ -148,27 +153,6 @@ const Interpreter &VirtualMachine::interpreter() const
 {
 	ASSERT(has_interpreter());
 	return *m_interpreter;
-}
-
-
-void VirtualMachine::show_current_instruction(size_t index, size_t window) const
-{
-	TODO();
-	(void)index;
-	(void)window;
-
-	// size_t start = std::max(
-	// 	int64_t{ 0 }, static_cast<int64_t>(index) - static_cast<int64_t>((window - 1) / 2));
-	// size_t end = std::min(index + (window - 1) / 2 + 1, m_bytecode->instructions().size());
-
-	// for (size_t i = start; i < end; ++i) {
-	// 	if (i == index) {
-	// 		std::cout << "->" << m_bytecode->instructions()[i]->to_string() << '\n';
-	// 	} else {
-	// 		std::cout << "  " << m_bytecode->instructions()[i]->to_string() << '\n';
-	// 	}
-	// }
-	// std::cout << '\n';
 }
 
 
@@ -229,7 +213,7 @@ void VirtualMachine::dump() const
 void VirtualMachine::clear()
 {
 	m_heap->reset();
-	while (!m_stack_frames.empty()) m_stack_frames.pop();
+	while (!m_stack_frames.empty()) m_stack_frames.pop_back();
 	// should instruction pointer be optional?
 	// m_instruction_pointer = nullptr;
 }
@@ -249,15 +233,17 @@ void VirtualMachine::leave_cleanup_handling()
 std::unique_ptr<StackFrame>
 	VirtualMachine::push_frame(size_t register_count, size_t locals_count, size_t stack_size)
 {
-	auto new_frame =
-		m_stack_frames.empty()
-			? StackFrame::create(register_count,
-				  locals_count,
-				  stack_size,
-				  InstructionVector::const_iterator{},
-				  this)
-			: StackFrame::create(
-				  register_count, locals_count, stack_size, m_instruction_pointer, this);
+	auto new_frame = m_stack_frames.empty()
+						 ? StackFrame::create(register_count,
+							   locals_count,
+							   stack_size,
+							   std::optional<InstructionVector::const_iterator>{},
+							   this)
+						 : StackFrame::create(register_count,
+							   locals_count,
+							   stack_size,
+							   std::optional{ m_instruction_pointer },
+							   this);
 	push_frame(*new_frame);
 
 	return new_frame;
@@ -265,13 +251,24 @@ std::unique_ptr<StackFrame>
 
 void VirtualMachine::push_frame(StackFrame &frame)
 {
+	// Validate the incoming frame's footprint BEFORE mutating any VM state:
+	// frame.locals spans [sp, sp + stack_size) inside m_stack, so its end()
+	// is the highest slot the frame can legitimately address. If pushing
+	// this frame would extend past m_stack's tail, bail loudly here rather
+	// than corrupting unrelated memory later via push()/pop().
+	const auto *frame_top = frame.locals.data() + frame.locals.size();
+	const auto *stack_end = m_stack.data() + m_stack.size();
+	ASSERT(frame_top <= stack_end && "VM stack overflow at push_frame");
+	ASSERT(std::distance(m_stack_pointer, frame.stack_pointer) >= 0);
+	ASSERT(std::distance(m_base_pointer, frame.base_pointer) >= 0);
+
 	if (!m_stack_frames.empty()) {
 		// stash the current stack pointer so we can restore it later
-		m_stack_frames.top().get().stack_pointer = m_stack_pointer;
+		m_stack_frames.back().get().stack_pointer = m_stack_pointer;
 	}
-	m_stack_frames.push(frame);
+	m_stack_frames.push_back(frame);
 	// set a new state for this stack frame
-	m_state = m_stack_frames.top().get().state.get();
+	m_state = m_stack_frames.back().get().state.get();
 
 	const auto &r = registers();
 	auto &stack_objects = m_stack_objects.emplace_back();
@@ -279,14 +276,6 @@ void VirtualMachine::push_frame(StackFrame &frame)
 		for (const auto &v : r->get()) { stack_objects.push_back(&v); }
 	}
 	for (const auto &v : stack_locals()) { stack_objects.push_back(&v); }
-
-	ASSERT(std::distance(m_stack_pointer, frame.stack_pointer) >= 0);
-	ASSERT(std::distance(m_base_pointer, frame.base_pointer) >= 0);
-
-	if (std::distance(m_stack.begin(), frame.stack_pointer)
-		>= static_cast<int64_t>(m_stack.size())) {
-		ASSERT(false && "Stack overflow!");
-	}
 
 	m_stack_pointer = frame.stack_pointer;
 	m_base_pointer = frame.base_pointer;
@@ -302,39 +291,35 @@ std::deque<std::vector<const py::Value *>> VirtualMachine::stack_objects() const
 void VirtualMachine::pop_frame(bool should_return_value)
 {
 	if (m_stack_frames.size() > 1) {
-		const size_t locals_size = m_stack_frames.top().get().locals.size();
-		auto return_value = m_stack_frames.top().get().registers[0];
+		const size_t locals_size = m_stack_frames.back().get().locals.size();
+		auto return_value = m_stack_frames.back().get().registers[0];
 
-		ASSERT((*m_stack_frames.top().get().return_address).get());
-		m_instruction_pointer = m_stack_frames.top().get().return_address;
-		auto f = m_stack_frames.top();
+		// Non-top-level frames are pushed with a concrete call-site
+		// instruction. If we ever see nullopt here, the VM was popping
+		// past the top-of-stack frame through a non-top path.
+		ASSERT(m_stack_frames.back().get().return_address.has_value());
+		m_instruction_pointer = *m_stack_frames.back().get().return_address;
+		auto f = m_stack_frames.back();
 		f.get().stack_pointer = m_stack_pointer;
-		m_stack_frames.pop();
+		m_stack_frames.pop_back();
 
 		// restore stack frame state
-		m_state = m_stack_frames.top().get().state.get();
+		m_state = m_stack_frames.back().get().state.get();
 		m_stack_objects.pop_back();
 		if (should_return_value) {
-			m_stack_frames.top().get().registers[0] = std::move(return_value);
+			m_stack_frames.back().get().registers[0] = std::move(return_value);
 		}
 
 		f.get().locals_storage.resize(locals_size, nullptr);
 		for (size_t i = 0; i < locals_size; ++i) { f.get().locals_storage[i] = f.get().locals[i]; }
 		f.get().locals = std::span{ f.get().locals_storage.begin(), f.get().locals_storage.end() };
 
-		ASSERT(std::distance(m_stack_frames.top().get().stack_pointer, m_stack_pointer) >= 0);
-		ASSERT(std::distance(m_stack_frames.top().get().base_pointer, m_base_pointer) >= 0);
-		m_base_pointer = m_stack_frames.top().get().base_pointer;
-		m_stack_pointer = m_stack_frames.top().get().stack_pointer;
+		ASSERT(std::distance(m_stack_frames.back().get().stack_pointer, m_stack_pointer) >= 0);
+		ASSERT(std::distance(m_stack_frames.back().get().base_pointer, m_base_pointer) >= 0);
+		m_base_pointer = m_stack_frames.back().get().base_pointer;
+		m_stack_pointer = m_stack_frames.back().get().stack_pointer;
 	} else {
-		m_stack_frames.pop();
+		m_stack_frames.pop_back();
 		m_stack_objects.pop_back();
 	}
-}
-
-PyModule *import(PyString *path)
-{
-	(void)path;
-	TODO();
-	return nullptr;
 }
