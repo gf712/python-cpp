@@ -217,6 +217,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/PyType.cpp
     runtime/PyZip.cpp
     runtime/RuntimeError.cpp
+    runtime/SourceManager.cpp
     runtime/StopIteration.cpp
     runtime/SyntaxError.cpp
     runtime/TypeError.cpp
@@ -242,6 +243,7 @@ set(UNITTEST_SOURCES
     runtime/PyNumber_tests.cpp
     runtime/PyString_tests.cpp
     runtime/PyType_tests.cpp
+    runtime/SourceManager_tests.cpp
     testing/main.cpp)
 
 set(PYTHON_LIB_PATH ${cpython_SOURCE_DIR}/Lib)

@@ -248,6 +248,8 @@ class BytecodeGenerator : public ast::CodeGenerator
 	ASTContext m_ctx;
 	std::stack<Scope> m_stack;
 
+	SourceLocation m_current_source_location{};
+
 	std::set<size_t> m_clear_exception_before_return_functions;
 	std::unordered_map<size_t, std::vector<std::function<void(bool)>>> m_return_transform;
 	std::unordered_map<size_t, size_t> m_current_exception_depth;
@@ -264,8 +266,11 @@ class BytecodeGenerator : public ast::CodeGenerator
 	template<typename OpType, typename... Args> void emit(Args &&...args)
 	{
 		ASSERT(m_current_block);
+		record_location_for_next_instruction();
 		m_current_block->push_back(std::make_unique<OpType>(std::forward<Args>(args)...));
 	}
+
+	void record_location_for_next_instruction();
 
 	friend std::ostream &operator<<(std::ostream &os, BytecodeGenerator &generator);
 
@@ -374,8 +379,11 @@ class BytecodeGenerator : public ast::CodeGenerator
 	{
 		m_ctx.push_node(node);
 		const auto old_function_id = m_function_id;
+		const auto old_source_location = m_current_source_location;
 		m_function_id = function_id;
+		m_current_source_location = node->source_location();
 		auto *value = node->codegen(this);
+		m_current_source_location = old_source_location;
 		m_function_id = old_function_id;
 		m_ctx.pop_node();
 		return static_cast<BytecodeValue *>(value);

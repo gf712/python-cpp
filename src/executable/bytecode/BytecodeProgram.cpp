@@ -37,6 +37,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 		main_func.metadata.stack_size,
 		main_func.metadata.function_name,
 		std::move(main_func.blocks),
+		std::move(main_func.instruction_locations),
 		program);
 	auto consts = PyTuple::create(main_func.metadata.consts);
 	if (consts.is_err()) { TODO(); }
@@ -69,6 +70,7 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::create(FunctionBlocks &&func_b
 			func.metadata.stack_size,
 			func.metadata.function_name,
 			std::move(func.blocks),
+			std::move(func.instruction_locations),
 			program);
 		consts = PyTuple::create(func.metadata.consts);
 		if (consts.is_err()) { TODO(); }
