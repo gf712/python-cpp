@@ -144,6 +144,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/struct/module.cpp
     runtime/modules/SysModule.cpp
     runtime/modules/WarningsModule.cpp
+    runtime/modules/GcModule.cpp
     runtime/types/builtin.cpp
     runtime/warnings/DeprecationWarning.cpp
     runtime/warnings/ImportWarning.cpp

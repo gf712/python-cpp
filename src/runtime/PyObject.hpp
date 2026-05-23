@@ -531,11 +531,64 @@ namespace detail {
 	size_t slot_count(PyType *);
 }
 
+namespace detail {
+	// Lazy-initialize the optional protocol structs that hold mapping /
+	// sequence / buffer slots, returning a reference to the live one.
+	inline MappingTypePrototype &ensure_mapping_proto(TypePrototype &tp)
+	{
+		if (!tp.mapping_type_protocol.has_value()) {
+			tp.mapping_type_protocol = MappingTypePrototype{};
+		}
+		return *tp.mapping_type_protocol;
+	}
+	inline SequenceTypePrototype &ensure_sequence_proto(TypePrototype &tp)
+	{
+		if (!tp.sequence_type_protocol.has_value()) {
+			tp.sequence_type_protocol = SequenceTypePrototype{};
+		}
+		return *tp.sequence_type_protocol;
+	}
+	inline PyBufferProcs &ensure_buffer_proto(TypePrototype &tp)
+	{
+		if (!tp.as_buffer.has_value()) { tp.as_buffer = PyBufferProcs{}; }
+		return *tp.as_buffer;
+	}
+}// namespace detail
+
+// Slot-installer macros. Each one expands to the same shape:
+//   if constexpr (concepts::Concept<Type>) { <slot> = +[](sig){ cast(self)->method(args...); }; }
+// The macro names encode the trampoline signature so picking the right one
+// is mechanical. Defined here as local macros for TypePrototype::create only
+// and #undef'd at the end of the function so they don't leak.
+#define PYC_SLOT_UNARY_CONST_PYOBJ(Concept, Slot, Method)                          \
+	if constexpr (concepts::Concept<Type>) {                                       \
+		type_prototype->Slot = +[](const PyObject *self) -> PyResult<PyObject *> { \
+			return static_cast<const Type *>(self)->Method();                      \
+		};                                                                         \
+	}
+#define PYC_SLOT_UNARY_PYOBJ(Concept, Slot, Method)                          \
+	if constexpr (concepts::Concept<Type>) {                                 \
+		type_prototype->Slot = +[](PyObject *self) -> PyResult<PyObject *> { \
+			return static_cast<Type *>(self)->Method();                      \
+		};                                                                   \
+	}
+#define PYC_SLOT_BINARY_CONST_PYOBJ(Concept, Slot, Method)                             \
+	if constexpr (concepts::Concept<Type>) {                                           \
+		type_prototype->Slot =                                                         \
+			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> { \
+			return static_cast<const Type *>(self)->Method(other);                     \
+		};                                                                             \
+	}
+#define PYC_SLOT_BINARY_PYOBJ(Concept, Slot, Method)                                          \
+	if constexpr (concepts::Concept<Type>) {                                                  \
+		type_prototype->Slot = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> { \
+			return static_cast<Type *>(self)->Method(other);                                  \
+		};                                                                                    \
+	}
+
 template<typename Type, typename... Args>
 std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args &&...args)
 {
-	using namespace concepts;
-
 	auto type_prototype = std::make_unique<TypePrototype>();
 	type_prototype->__name__ = std::string(name);
 	type_prototype->__bases__ = std::vector<PyType *>{ args... };
@@ -552,390 +605,196 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 		if (!obj) { return Err(memory_error(sizeof(Type))); }
 		return Ok(obj);
 	};
-	if constexpr (HasRepr<Type>) {
-		type_prototype->__repr__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__repr__();
-		};
-	}
-	if constexpr (HasCall<Type>) {
+
+	// Plain slots that follow the standard `cast(self)->__x__(args)` shape.
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasRepr, __repr__, __repr__)
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasIter, __iter__, __iter__)
+	PYC_SLOT_UNARY_PYOBJ(HasNext, __next__, __next__)
+	PYC_SLOT_UNARY_PYOBJ(HasStr, __str__, __str__)
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasAbs, __abs__, __abs__)
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasNeg, __neg__, __neg__)
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasPos, __pos__, __pos__)
+	PYC_SLOT_UNARY_CONST_PYOBJ(HasInvert, __invert__, __invert__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasLt, __lt__, __lt__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasLe, __le__, __le__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasEq, __eq__, __eq__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasNe, __ne__, __ne__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasGt, __gt__, __gt__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasGe, __ge__, __ge__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasSub, __sub__, __sub__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasLshift, __lshift__, __lshift__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasRshift, __rshift__, __rshift__)
+	PYC_SLOT_BINARY_CONST_PYOBJ(HasModulo, __mod__, __mod__)
+	PYC_SLOT_BINARY_PYOBJ(HasTrueDiv, __truediv__, __truediv__)
+	PYC_SLOT_BINARY_PYOBJ(HasFloorDiv, __floordiv__, __floordiv__)
+	PYC_SLOT_BINARY_PYOBJ(HasDivmod, __divmod__, __divmod__)
+	PYC_SLOT_BINARY_PYOBJ(HasAnd, __and__, __and__)
+	PYC_SLOT_BINARY_PYOBJ(HasOr, __or__, __or__)
+	PYC_SLOT_BINARY_PYOBJ(HasXor, __xor__, __xor__)
+
+	// Slots whose trampoline shape doesn't match the generic macros.
+	if constexpr (concepts::HasCall<Type>) {
 		type_prototype->__call__ =
 			+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 			return static_cast<Type *>(self)->__call__(args, kwargs);
 		};
 	}
-	if constexpr (HasNew<Type>) {
+	if constexpr (concepts::HasNew<Type>) {
 		type_prototype->__new__ =
 			+[](const PyType *type, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 			return Type::__new__(type, args, kwargs);
 		};
 	}
-	if constexpr (HasInit<Type>) {
+	if constexpr (concepts::HasInit<Type>) {
 		type_prototype->__init__ =
 			+[](PyObject *self, PyTuple *args, PyDict *kwargs) -> PyResult<int32_t> {
 			return static_cast<Type *>(self)->__init__(args, kwargs);
 		};
 	}
-	if constexpr (HasDoc<Type>) { type_prototype->__doc__ = Type::__doc__; }
-	if constexpr (HasHash<Type>) {
+	if constexpr (concepts::HasDoc<Type>) { type_prototype->__doc__ = Type::__doc__; }
+	if constexpr (concepts::HasHash<Type>) {
 		type_prototype->__hash__ = +[](const PyObject *self) -> PyResult<int64_t> {
 			return static_cast<const Type *>(self)->__hash__();
 		};
 	}
-	if constexpr (HasLt<Type>) {
-		type_prototype->__lt__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__lt__(other);
+	if constexpr (concepts::HasBool<Type>) {
+		type_prototype->__bool__ = +[](const PyObject *self) -> PyResult<bool> {
+			return static_cast<const Type *>(self)->__bool__();
 		};
 	}
-	if constexpr (HasLe<Type>) {
-		type_prototype->__le__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__le__(other);
-		};
-	}
-	if constexpr (HasEq<Type>) {
-		type_prototype->__eq__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__eq__(other);
-		};
-	}
-	if constexpr (HasNe<Type>) {
-		type_prototype->__ne__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__ne__(other);
-		};
-	}
-	if constexpr (HasGt<Type>) {
-		type_prototype->__gt__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__gt__(other);
-		};
-	}
-	if constexpr (HasGe<Type>) {
-		type_prototype->__ge__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__ge__(other);
-		};
-	}
-	if constexpr (HasIter<Type>) {
-		type_prototype->__iter__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__iter__();
-		};
-	}
-	if constexpr (HasNext<Type>) {
-		type_prototype->__next__ = +[](PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__next__();
-		};
-	}
-	if constexpr (HasLength<Type>) {
-		if (!type_prototype->mapping_type_protocol.has_value()) {
-			type_prototype->mapping_type_protocol =
-				MappingTypePrototype{ .__len__ = +[](const PyObject *self) -> PyResult<size_t> {
-					return static_cast<const Type *>(self)->__len__();
-				} };
-		} else {
-			type_prototype->mapping_type_protocol->__len__ =
-				+[](const PyObject *self) -> PyResult<size_t> {
-				return static_cast<const Type *>(self)->__len__();
-			};
-		}
-	}
-	if constexpr (HasSetItem<Type>) {
-		if (!type_prototype->mapping_type_protocol.has_value()) {
-			type_prototype->mapping_type_protocol =
-				MappingTypePrototype{ .__setitem__ =
-										  +[](PyObject *self,
-											   PyObject *name,
-											   PyObject *value) -> PyResult<std::monostate> {
-					return static_cast<Type *>(self)->__setitem__(name, value);
-				} };
-		} else {
-			type_prototype->mapping_type_protocol->__setitem__ =
-				+[](PyObject *self, PyObject *name, PyObject *value) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__setitem__(name, value);
-			};
-		}
-	}
-	if constexpr (HasGetItem<Type>) {
-		if (!type_prototype->mapping_type_protocol.has_value()) {
-			type_prototype->mapping_type_protocol = MappingTypePrototype{
-				.__getitem__ = +[](PyObject *self, PyObject *name) -> PyResult<PyObject *> {
-					return static_cast<Type *>(self)->__getitem__(name);
-				}
-			};
-		} else {
-			type_prototype->mapping_type_protocol->__getitem__ =
-				+[](PyObject *self, PyObject *name) -> PyResult<PyObject *> {
-				return static_cast<Type *>(self)->__getitem__(name);
-			};
-		}
-	}
-	if constexpr (HasDelItem<Type>) {
-		if (!type_prototype->mapping_type_protocol.has_value()) {
-			type_prototype->mapping_type_protocol = MappingTypePrototype{
-				.__delitem__ = +[](PyObject *self, PyObject *name) -> PyResult<std::monostate> {
-					return static_cast<Type *>(self)->__delitem__(name);
-				}
-			};
-		} else {
-			type_prototype->mapping_type_protocol->__delitem__ =
-				+[](PyObject *self, PyObject *name) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__delitem__(name);
-			};
-		}
-	}
-	if constexpr (HasContains<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol =
-				SequenceTypePrototype{ .__contains__ =
-										   +[](PyObject *self, PyObject *value) -> PyResult<bool> {
-					return static_cast<Type *>(self)->__contains__(value);
-				} };
-		} else {
-			type_prototype->sequence_type_protocol->__contains__ =
-				+[](PyObject *self, PyObject *value) -> PyResult<bool> {
-				return static_cast<Type *>(self)->__contains__(value);
-			};
-		}
-	}
-	if constexpr (HasSequenceGetItem<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol = SequenceTypePrototype{
-				.__getitem__ = +[](PyObject *self, int64_t index) -> PyResult<PyObject *> {
-					return static_cast<Type *>(self)->__getitem__(index);
-				}
-			};
-		} else {
-			type_prototype->sequence_type_protocol->__getitem__ =
-				+[](PyObject *self, int64_t index) -> PyResult<PyObject *> {
-				return static_cast<Type *>(self)->__getitem__(index);
-			};
-		}
-	}
-	if constexpr (HasSequenceSetItem<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol =
-				SequenceTypePrototype{ .__setitem__ =
-										   +[](PyObject *self,
-												int64_t index,
-												PyObject *value) -> PyResult<std::monostate> {
-					return static_cast<Type *>(self)->__setitem__(index, value);
-				} };
-		} else {
-			type_prototype->sequence_type_protocol->__setitem__ =
-				+[](PyObject *self, int64_t index, PyObject *value) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__setitem__(index, value);
-			};
-		}
-	}
-	if constexpr (HasSequenceDelItem<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol = SequenceTypePrototype{
-				.__delitem__ = +[](PyObject *self, int64_t index) -> PyResult<std::monostate> {
-					return static_cast<Type *>(self)->__delitem__(index);
-				}
-			};
-		} else {
-			type_prototype->sequence_type_protocol->__delitem__ =
-				+[](PyObject *self, int64_t index) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__delitem__(index);
-			};
-		}
-	}
-	if constexpr (std::is_base_of_v<PySequence, Type> && HasAdd<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol = SequenceTypePrototype{
-				.__concat__ =
-					+[](const PyObject *self, const PyObject *value) -> PyResult<PyObject *> {
-					return static_cast<const Type *>(self)->__add__(value);
-				}
-			};
-		} else {
-			type_prototype->sequence_type_protocol->__concat__ =
-				+[](const PyObject *self, const PyObject *value) -> PyResult<PyObject *> {
-				return static_cast<const Type *>(self)->__add__(value);
-			};
-		}
-	} else {
-		if constexpr (HasAdd<Type>) {
-			type_prototype->__add__ =
-				+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-				return static_cast<const Type *>(self)->__add__(other);
-			};
-		}
-	}
-	if constexpr (HasSub<Type>) {
-		type_prototype->__sub__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__sub__(other);
-		};
-	}
-	if constexpr (std::is_base_of_v<PySequence, Type> && HasRepeat<Type>) {
-		if (!type_prototype->sequence_type_protocol.has_value()) {
-			type_prototype->sequence_type_protocol = SequenceTypePrototype{
-				.__repeat__ = +[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
-					return static_cast<const Type *>(self)->__mul__(count);
-				}
-			};
-		} else {
-			type_prototype->sequence_type_protocol->__repeat__ =
-				+[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
-				return static_cast<const Type *>(self)->__mul__(count);
-			};
-		}
-	} else {
-		if constexpr (HasMul<Type>) {
-			type_prototype->__mul__ =
-				+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-				return static_cast<const Type *>(self)->__mul__(other);
-			};
-		}
-	}
-
-	if constexpr (HasPow<Type>) {
+	if constexpr (concepts::HasPow<Type>) {
 		type_prototype->__pow__ = +[](const PyObject *self,
 									   const PyObject *other,
 									   const PyObject *modulo) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__pow__(other, modulo);
 		};
 	}
-	if constexpr (HasTrueDiv<Type>) {
-		type_prototype->__truediv__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__truediv__(other);
-		};
-	}
-	if constexpr (HasFloorDiv<Type>) {
-		type_prototype->__floordiv__ =
-			+[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__floordiv__(other);
-		};
-	}
-	if constexpr (HasLshift<Type>) {
-		type_prototype->__lshift__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__lshift__(other);
-		};
-	}
-	if constexpr (HasRshift<Type>) {
-		type_prototype->__rshift__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__rshift__(other);
-		};
-	}
-	if constexpr (HasModulo<Type>) {
-		type_prototype->__mod__ =
-			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__mod__(other);
-		};
-	}
-	if constexpr (HasDivmod<Type>) {
-		type_prototype->__divmod__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__divmod__(other);
-		};
-	}
-	if constexpr (HasAnd<Type>) {
-		type_prototype->__and__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__and__(other);
-		};
-	}
-	if constexpr (HasOr<Type>) {
-		type_prototype->__or__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__or__(other);
-		};
-	}
-	if constexpr (HasXor<Type>) {
-		type_prototype->__xor__ = +[](PyObject *self, PyObject *other) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__xor__(other);
-		};
-	}
-	if constexpr (HasAbs<Type>) {
-		type_prototype->__abs__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__abs__();
-		};
-	}
-	if constexpr (HasNeg<Type>) {
-		type_prototype->__neg__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__neg__();
-		};
-	}
-	if constexpr (HasPos<Type>) {
-		type_prototype->__pos__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__pos__();
-		};
-	}
-	if constexpr (HasInvert<Type>) {
-		type_prototype->__invert__ = +[](const PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<const Type *>(self)->__invert__();
-		};
-	}
-	if constexpr (HasBool<Type>) {
-		type_prototype->__bool__ = +[](const PyObject *self) -> PyResult<bool> {
-			return static_cast<const Type *>(self)->__bool__();
-		};
-	}
-	if constexpr (HasGetAttro<Type>) {
+	if constexpr (concepts::HasGetAttro<Type>) {
 		type_prototype->__getattribute__ =
 			+[](const PyObject *self, PyObject *attr) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__getattribute__(attr);
 		};
 	}
-	if constexpr (HasSetAttro<Type>) {
+	if constexpr (concepts::HasSetAttro<Type>) {
 		type_prototype->__setattribute__ =
 			+[](PyObject *self, PyObject *attr, PyObject *value) -> PyResult<std::monostate> {
 			return static_cast<Type *>(self)->__setattribute__(attr, value);
 		};
 	}
-	if constexpr (HasDelAttro<Type>) {
+	if constexpr (concepts::HasDelAttro<Type>) {
 		type_prototype->__delattribute__ =
 			+[](PyObject *self, PyObject *attr) -> PyResult<std::monostate> {
 			return static_cast<Type *>(self)->__delattribute__(attr);
 		};
 	}
-	if constexpr (HasGet<Type>) {
+	if constexpr (concepts::HasGet<Type>) {
 		type_prototype->__get__ =
 			+[](const PyObject *self, PyObject *instance, PyObject *owner) -> PyResult<PyObject *> {
 			return static_cast<const Type *>(self)->__get__(instance, owner);
 		};
 	}
-	if constexpr (HasSet<Type>) {
+	if constexpr (concepts::HasSet<Type>) {
 		type_prototype->__set__ =
 			+[](PyObject *self, PyObject *attribute, PyObject *value) -> PyResult<std::monostate> {
 			return static_cast<Type *>(self)->__set__(attribute, value);
 		};
 	}
-	if constexpr (HasDelete<Type>) {
+	if constexpr (concepts::HasDelete<Type>) {
 		type_prototype->__delete__ =
 			+[](PyObject *self, PyObject *attribute) -> PyResult<std::monostate> {
 			return static_cast<Type *>(self)->__delete__(attribute);
 		};
 	}
-	if constexpr (HasStr<Type>) {
-		type_prototype->__str__ = +[](PyObject *self) -> PyResult<PyObject *> {
-			return static_cast<Type *>(self)->__str__();
+
+	// mapping_type_protocol slots — the protocol struct is created lazily.
+	if constexpr (concepts::HasLength<Type>) {
+		detail::ensure_mapping_proto(*type_prototype).__len__ =
+			+[](const PyObject *self) -> PyResult<size_t> {
+			return static_cast<const Type *>(self)->__len__();
+		};
+	}
+	if constexpr (concepts::HasGetItem<Type>) {
+		detail::ensure_mapping_proto(*type_prototype).__getitem__ =
+			+[](PyObject *self, PyObject *name) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__getitem__(name);
+		};
+	}
+	if constexpr (concepts::HasSetItem<Type>) {
+		detail::ensure_mapping_proto(*type_prototype).__setitem__ =
+			+[](PyObject *self, PyObject *name, PyObject *value) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__setitem__(name, value);
+		};
+	}
+	if constexpr (concepts::HasDelItem<Type>) {
+		detail::ensure_mapping_proto(*type_prototype).__delitem__ =
+			+[](PyObject *self, PyObject *name) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__delitem__(name);
 		};
 	}
 
-	if constexpr (HasGetBuffer<Type>) {
-		type_prototype->as_buffer = PyBufferProcs{
-			.getbuffer =
-				+[](PyObject *self, PyBuffer &view, int flags) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__getbuffer__(view, flags);
-			},
+	// sequence_type_protocol slots.
+	if constexpr (concepts::HasContains<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__contains__ =
+			+[](PyObject *self, PyObject *value) -> PyResult<bool> {
+			return static_cast<Type *>(self)->__contains__(value);
 		};
 	}
-	if constexpr (HasReleaseBuffer<Type>) {
-		if (!type_prototype->as_buffer.has_value()) {
-			type_prototype->as_buffer = PyBufferProcs{
-				.releasebuffer = +[](PyObject *self, PyBuffer &view) -> PyResult<std::monostate> {
-					return static_cast<Type *>(self)->__releasebuffer__(view);
-				},
-			};
-		} else {
-			type_prototype->as_buffer->releasebuffer =
-				+[](PyObject *self, PyBuffer &view) -> PyResult<std::monostate> {
-				return static_cast<Type *>(self)->__releasebuffer__(view);
-			};
-		}
+	if constexpr (concepts::HasSequenceGetItem<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__getitem__ =
+			+[](PyObject *self, int64_t index) -> PyResult<PyObject *> {
+			return static_cast<Type *>(self)->__getitem__(index);
+		};
+	}
+	if constexpr (concepts::HasSequenceSetItem<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__setitem__ =
+			+[](PyObject *self, int64_t index, PyObject *value) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__setitem__(index, value);
+		};
+	}
+	if constexpr (concepts::HasSequenceDelItem<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__delitem__ =
+			+[](PyObject *self, int64_t index) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__delitem__(index);
+		};
+	}
+
+	// PySequence subtypes route __add__/__mul__ through the sequence
+	// __concat__/__repeat__ slots; everyone else gets the binary operators.
+	if constexpr (std::is_base_of_v<PySequence, Type> && concepts::HasAdd<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__concat__ =
+			+[](const PyObject *self, const PyObject *value) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__add__(value);
+		};
+	} else if constexpr (concepts::HasAdd<Type>) {
+		type_prototype->__add__ =
+			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__add__(other);
+		};
+	}
+	if constexpr (std::is_base_of_v<PySequence, Type> && concepts::HasRepeat<Type>) {
+		detail::ensure_sequence_proto(*type_prototype).__repeat__ =
+			+[](const PyObject *self, size_t count) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__mul__(count);
+		};
+	} else if constexpr (concepts::HasMul<Type>) {
+		type_prototype->__mul__ =
+			+[](const PyObject *self, const PyObject *other) -> PyResult<PyObject *> {
+			return static_cast<const Type *>(self)->__mul__(other);
+		};
+	}
+
+	// Buffer protocol.
+	if constexpr (concepts::HasGetBuffer<Type>) {
+		detail::ensure_buffer_proto(*type_prototype).getbuffer =
+			+[](PyObject *self, PyBuffer &view, int flags) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__getbuffer__(view, flags);
+		};
+	}
+	if constexpr (concepts::HasReleaseBuffer<Type>) {
+		detail::ensure_buffer_proto(*type_prototype).releasebuffer =
+			+[](PyObject *self, PyBuffer &view) -> PyResult<std::monostate> {
+			return static_cast<Type *>(self)->__releasebuffer__(view);
+		};
 	}
 
 	type_prototype->traverse =
@@ -943,6 +802,11 @@ std::unique_ptr<TypePrototype> TypePrototype::create(std::string_view name, Args
 
 	return type_prototype;
 }
+
+#undef PYC_SLOT_UNARY_CONST_PYOBJ
+#undef PYC_SLOT_UNARY_PYOBJ
+#undef PYC_SLOT_BINARY_CONST_PYOBJ
+#undef PYC_SLOT_BINARY_PYOBJ
 
 
 class PyBaseObject : public PyObject

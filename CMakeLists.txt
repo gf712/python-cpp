@@ -5,7 +5,7 @@ include(CheckCXXSourceCompiles)
 
 project(python++)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 include(cmake/CPM.cmake)
 

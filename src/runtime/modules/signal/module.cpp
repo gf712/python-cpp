@@ -72,7 +72,9 @@ PyResult<PyObject *> signal(PyTuple *args, PyDict *kwargs)
 	__sighandler_t sighandler = +[](int signumber) {
 		if (auto it = handlers->map().find(Number{ signumber }); it != handlers->map().end()) {
 			ASSERT(std::holds_alternative<PyObject *>(it->second));
-			std::get<PyObject *>(it->second)
+			// C-style signal context: any exception raised by the Python
+			// handler has nowhere to propagate. Best-effort fire-and-forget.
+			(void)std::get<PyObject *>(it->second)
 				->call(PyTuple::create(Number{ signumber }, py_none()).unwrap(), nullptr);
 		}
 	};

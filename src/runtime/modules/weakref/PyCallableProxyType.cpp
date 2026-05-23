@@ -19,6 +19,13 @@ PyCallableProxyType::PyCallableProxyType(PyObject *object, PyObject *callback)
 	: PyBaseObject(s_weak_callableproxy), m_object(object), m_callback(callback)
 {}
 
+PyCallableProxyType::~PyCallableProxyType()
+{
+	if (m_object && m_object != py_none()) {
+		VirtualMachine::the().heap().unregister_weakref(bit_cast<uint8_t *>(m_object), this);
+	}
+}
+
 PyResult<PyCallableProxyType *> PyCallableProxyType::create(PyObject *object, PyObject *callback)
 {
 	auto *result =

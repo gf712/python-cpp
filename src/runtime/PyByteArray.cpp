@@ -570,6 +570,7 @@ PyType *PyByteArrayIterator::static_type() const { return types::bytearray_itera
 
 void PyByteArrayIterator::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	if (m_bytes) { visitor.visit(*m_bytes); }
 }
 

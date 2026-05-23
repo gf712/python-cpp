@@ -141,18 +141,22 @@ PyResult<std::monostate> PyFrame::put_global(const std::string &name, const Valu
 
 PyObject *PyFrame::locals() const
 {
+	// locals() returns PyObject* and cannot propagate failures, so any
+	// errors from setitem/delitem on a non-PyDict m_locals are silently
+	// swallowed here. TODO: change locals() to PyResult<PyObject*> so
+	// __setitem__/__delitem__ exceptions surface to the caller.
 	auto insert = [this](const Value &key, const Value &value) {
 		if (auto l = as<PyDict>(m_locals)) {
 			l->insert(key, value);
 		} else {
-			m_locals->setitem(PyObject::from(key).unwrap(), PyObject::from(value).unwrap());
+			(void)m_locals->setitem(PyObject::from(key).unwrap(), PyObject::from(value).unwrap());
 		}
 	};
 	auto remove = [this](const Value &key) {
 		if (auto l = as<PyDict>(m_locals)) {
 			l->remove(key);
 		} else {
-			m_locals->delitem(PyObject::from(key).unwrap());
+			(void)m_locals->delitem(PyObject::from(key).unwrap());
 		}
 	};
 	const auto &fast_locals = VirtualMachine::the().stack_locals();
