@@ -6,8 +6,11 @@
 #include "runtime/Value.hpp"
 #include "utilities.hpp"
 
+#include <deque>
+#include <functional>
 #include <span>
 #include <stack>
+#include <vector>
 
 class VirtualMachine;
 
@@ -32,7 +35,7 @@ struct StackFrame : NonCopyable
 	StackFrame(size_t register_count,
 		size_t locals_count,
 		size_t stack_size,
-		InstructionVector::const_iterator return_address,
+		std::optional<InstructionVector::const_iterator> return_address,
 		VirtualMachine *);
 
 	StackFrame(StackFrame &&);
@@ -46,7 +49,11 @@ struct StackFrame : NonCopyable
 	Registers registers;
 	std::vector<py::Value> locals_storage;
 	std::span<py::Value> locals;
-	InstructionVector::const_iterator return_address;
+	// nullopt for the top-level frame: there is no instruction to resume at.
+	// For nested frames this holds the call-site instruction whose execution
+	// triggered the push; the VM resumes at that iterator on pop, after
+	// which the eval loop's `std::next` advances past it.
+	std::optional<InstructionVector::const_iterator> return_address;
 	InstructionVector::const_iterator last_instruction_pointer;
 	std::vector<py::Value>::const_iterator base_pointer;
 	std::vector<py::Value>::iterator stack_pointer;
@@ -65,8 +72,18 @@ class VirtualMachine
 	: NonCopyable
 	, NonMoveable
 {
+	// Fixed-capacity value stack. Every StackFrame::locals is a std::span
+	// pointing directly into this buffer, so the storage MUST NOT be
+	// resized or reallocated for the lifetime of the VM — doing so would
+	// dangle every existing frame's locals span and the m_stack_pointer
+	// iterator. If the stack ever needs to grow, switch StackFrame::locals
+	// to an (offset, size) pair against m_stack first.
+	static constexpr size_t kStackSize = 10'000;
 	std::vector<py::Value> m_stack;
-	std::stack<std::reference_wrapper<StackFrame>> m_stack_frames;
+	// m_stack_frames is a vector rather than a stack so callers can iterate
+	// over the frame chain (used by VirtualMachine::dump and the GC root
+	// scan). LIFO access is via back()/push_back()/pop_back().
+	std::vector<std::reference_wrapper<StackFrame>> m_stack_frames;
 	std::deque<std::vector<const py::Value *>> m_stack_objects;
 
 	InstructionVector::const_iterator m_instruction_pointer;
@@ -121,28 +138,28 @@ class VirtualMachine
 
 	std::optional<std::reference_wrapper<Registers>> registers()
 	{
-		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().registers; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.back().get().registers; }
 		return {};
 	}
 	std::optional<std::reference_wrapper<const Registers>> registers() const
 	{
-		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().registers; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.back().get().registers; }
 		return {};
 	}
 
 	std::span<py::Value> stack_locals()
 	{
-		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().locals; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.back().get().locals; }
 		return {};
 	}
 
-	std::span<py::Value> stack_locals() const
+	std::span<const py::Value> stack_locals() const
 	{
-		if (!m_stack_frames.empty()) { return m_stack_frames.top().get().locals; }
+		if (!m_stack_frames.empty()) { return m_stack_frames.back().get().locals; }
 		return {};
 	}
 
-	const std::stack<std::reference_wrapper<StackFrame>> &stack() const { return m_stack_frames; }
+	const std::vector<std::reference_wrapper<StackFrame>> &stack() const { return m_stack_frames; }
 	const State &state() const { return *m_state; }
 	State &state() { return *m_state; }
 
@@ -156,7 +173,7 @@ class VirtualMachine
 	void set_instruction_pointer(InstructionVector::const_iterator pos)
 	{
 		m_instruction_pointer = pos;
-		m_stack_frames.top().get().last_instruction_pointer = m_instruction_pointer;
+		m_stack_frames.back().get().last_instruction_pointer = m_instruction_pointer;
 	}
 
 	const InstructionVector::const_iterator &instruction_pointer() const
@@ -185,18 +202,26 @@ class VirtualMachine
 
 	void pop_frame(bool should_return_value);
 
-	void push(py::Value value) { *m_stack_pointer++ = value; }
+	void push(py::Value value)
+	{
+		ASSERT(m_stack_pointer != m_stack.end() && "VM stack overflow on push");
+		*m_stack_pointer++ = value;
+	}
 
-	py::Value pop() { return *--m_stack_pointer; }
+	py::Value pop()
+	{
+		ASSERT(m_stack_pointer != m_stack.begin() && "VM stack underflow on pop");
+		return *--m_stack_pointer;
+	}
 
 	std::deque<std::vector<const py::Value *>> stack_objects() const;
-
-	py::PyModule *import(py::PyString *path);
 
   private:
 	VirtualMachine();
 
 	int execute_internal(std::shared_ptr<Program> program);
-
-	void show_current_instruction(size_t index, size_t window) const;
 };
+
+static_assert(std::is_same_v<decltype(std::declval<const VirtualMachine &>().stack_locals()),
+				  std::span<const py::Value>>,
+	"stack_locals() const must return a span of const py::Value");

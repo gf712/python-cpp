@@ -38,13 +38,26 @@ class Context
 	ContextImpl *operator->() { return m_impl.get(); }
 };
 
-class SSABuilder;
-
 class MLIRGenerator : ast::CodeGenerator
 {
 	struct MLIRValue;
 
-	// std::unique_ptr<SSABuilder> m_builder;
+	// Free-function helpers for make_function() defined in MLIRGenerator.cpp.
+	// Declared friends here so they can take MLIRValue* (a private inner
+	// struct) and reach the private store_name / load_name / new_value /
+	// m_context / m_variable_visibility members without exposing mlir:: types
+	// in this header.
+	friend std::vector<MLIRValue *> evaluate_expressions_for_make_function(MLIRGenerator &,
+		const std::vector<std::shared_ptr<ast::ASTNode>> &);
+	friend std::vector<MLIRValue *> evaluate_default_arguments_for_make_function(MLIRGenerator &,
+		const std::shared_ptr<ast::Arguments> &);
+	friend std::vector<MLIRValue *> evaluate_keyword_default_arguments_for_make_function(
+		MLIRGenerator &,
+		const std::shared_ptr<ast::Arguments> &);
+	friend void apply_decorators_for_make_function(MLIRGenerator &,
+		const std::vector<MLIRValue *> &,
+		const std::string &,
+		const SourceLocation &);
 
   private:
 	struct Scope
@@ -145,6 +158,8 @@ class MLIRGenerator : ast::CodeGenerator
 		bool is_anon,
 		bool is_async,
 		const SourceLocation &source_location);
+
+	std::vector<std::string> collect_function_captures(const std::string &mangled_name);
 
 	MLIRValue *build_comprehension(std::string_view function_name,
 		std::function<MLIRValue *()> container_factory,

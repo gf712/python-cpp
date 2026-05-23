@@ -1208,7 +1208,9 @@ PyResult<std::monostate> PyType::ready()
 	}
 
 	// initialize base class
-	if (base) { base->ready(); }
+	if (base) {
+		if (auto r = base->ready(); r.is_err()) { return r; }
+	}
 
 	// initialize bases
 	auto bases = underlying_type().__bases__;
@@ -1245,7 +1247,7 @@ PyResult<std::monostate> PyType::ready()
 				&& std::get<PyType *>(m_type) == types::type())
 			|| (&std::get<std::reference_wrapper<const TypePrototype>>(m_type).get()
 				== &types::BuiltinTypes::the().type())) {
-			inherit_slots(static_cast<PyType *>(base));
+			if (auto r = inherit_slots(static_cast<PyType *>(base)); r.is_err()) { return r; }
 		}
 	}
 
@@ -1528,15 +1530,19 @@ PyResult<PyType *> PyType::build_type(const PyType *metatype,
 		}
 	}
 
-	return PyType::create(const_cast<PyType *>(metatype)).and_then([&](PyType *type) {
-		type->underlying_type().is_heaptype = true;
-		type->__mro__ = nullptr;
-		type->initialize(type_name->value(), base, std::move(bases), ns);
+	return PyType::create(const_cast<PyType *>(metatype))
+		.and_then([&](PyType *type) -> PyResult<PyType *> {
+			type->underlying_type().is_heaptype = true;
+			type->__mro__ = nullptr;
+			if (auto r = type->initialize(type_name->value(), base, std::move(bases), ns);
+				r.is_err()) {
+				return Err(r.unwrap_err());
+			}
 
-		spdlog::trace("Created type@{} #{}", (void *)type, type->name());
+			spdlog::trace("Created type@{} #{}", (void *)type, type->name());
 
-		return Ok(type);
-	});
+			return Ok(type);
+		});
 }
 
 PyResult<const PyType *> PyType::calculate_metaclass(const PyType *type_,

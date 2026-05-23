@@ -64,7 +64,15 @@ class GarbageCollector
 {
   public:
 	virtual ~GarbageCollector() = default;
-	virtual void run(Heap &) const = 0;
+	// Not const: a GC pass advances the collector's per-call cadence
+	// counter, flips every cell's mark colour, and may destroy a large
+	// chunk of the heap. Pretending the GC instance is immutable across
+	// the call is a const-correctness lie that this signature avoids.
+	virtual void run(Heap &) = 0;
+	// Unconditional collection. Bypasses both the pause flag and the
+	// cadence counter; used by gc.collect() so user code can force a
+	// full sweep even while the GC has been disabled.
+	virtual void force_run(Heap &) = 0;
 	virtual void resume() = 0;
 	virtual void pause() = 0;
 	virtual bool is_active() const = 0;
@@ -81,7 +89,8 @@ class MarkSweepGC : public GarbageCollector
 {
   public:
 	MarkSweepGC();
-	void run(Heap &) const override;
+	void run(Heap &) override;
+	void force_run(Heap &) override;
 	void resume() override;
 	void pause() override;
 	bool is_active() const override;
@@ -92,7 +101,11 @@ class MarkSweepGC : public GarbageCollector
 	void sweep(Heap &heap) const;
 
   private:
+	void mark_and_sweep(Heap &);
+
+	// Lazily initialised once on first collect_roots; afterwards immutable.
+	// `mutable` is the textbook one-time-cache use case.
 	mutable uint8_t *m_stack_bottom{ nullptr };
-	mutable size_t m_iterations_since_last_sweep{ 0 };
+	size_t m_iterations_since_last_sweep{ 0 };
 	bool m_pause{ false };
 };

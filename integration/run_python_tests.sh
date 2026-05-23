@@ -5,7 +5,7 @@
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 PYTHON_EXECUTABLE=$1
-GC_FREQUENCY=100000
+GC_FREQUENCY=${GC_FREQUENCY:-100000}
 
 # start by calling the tests that we need to work in order to trust the result of the other python tests
 if timeout 10s $PYTHON_EXECUTABLE $SCRIPT_DIR/tests/lemmas/assert_false.py --gc-frequency $GC_FREQUENCY &> /dev/null; then

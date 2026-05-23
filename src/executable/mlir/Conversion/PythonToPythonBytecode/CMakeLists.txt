@@ -1,5 +1,12 @@
 add_mlir_conversion_library(PythonToPythonBytecode
     PythonToPythonBytecode.cpp
+    ArithPatterns.cpp
+    AttributeSubscriptPatterns.cpp
+    CollectionPatterns.cpp
+    ControlFlowPatterns.cpp
+    FunctionPatterns.cpp
+    ImportPatterns.cpp
+    LoadStorePatterns.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/src/executable/mlir/Conversion/PythonToPythonBytecode

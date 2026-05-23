@@ -71,6 +71,35 @@ TEST_F(TestHeap, AllocatesInOldBlockWhenPossible)
 	ASSERT_EQ(ptr, old_ptr);
 }
 
+TEST_F(TestHeap, DeallocatesAllChunkSlotsIncludingLast)
+{
+	// Regression test for Chunk::deallocate's bound check. The bound previously
+	// accepted pointers up to (object_size + 1) * ChunkCount past base, leaving
+	// a slack region that should not exist. Fill an entire chunk and deallocate
+	// every slot; every pointer must fall within the tight [base, base+size*N)
+	// range without firing the bound assert.
+	struct Data : Cell
+	{
+		int64_t foo;
+		Data(int64_t foo_) : foo(foo_) {}
+		std::string to_string() const override { return "Data"; }
+		void visit_graph(Visitor &) override {}
+	};
+
+	static_assert(sizeof(Data) + sizeof(GarbageCollected) > 16
+				  && sizeof(Data) + sizeof(GarbageCollected) <= 32);
+
+	[[maybe_unused]] auto scope = m_heap->scoped_gc_pause();
+
+	std::vector<Data *> data;
+	data.reserve(chunk_size);
+	for (size_t idx = 0; idx < chunk_size; ++idx) { data.push_back(m_heap->allocate<Data>(idx)); }
+
+	for (auto *d : data) {
+		m_heap->slab().block_32()->deallocate(bit_cast<uint8_t *>(d) - sizeof(GarbageCollected));
+	}
+}
+
 TEST_F(TestHeap, ResetCallsDestructorOfAllHeapAllocatecObjects)
 {
 	int64_t counter = 0;

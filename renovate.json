@@ -8,7 +8,7 @@
       "customType": "regex",
       "fileMatch": ["(^|/)CMakeLists\\.txt$", "\\.cmake$"],
       "matchStrings": [
-        "CPMAddPackage\\(\"gh:(?<depName>[^@]+)@(?<currentValue>[^\"#]+)\"\\)"
+        "CPMAddPackage\\(\"gh:(?<depName>[^@#]+)@(?<currentValue>[^\"#]+)\"\\)"
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"

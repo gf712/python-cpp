@@ -17,6 +17,7 @@ add_mlir_library(PythonMLIRDialect
                  MLIRPass
                  MLIRSupport
                  MLIRTransforms
+                 MLIRTransformUtils
                 )
 
 target_include_directories(PythonMLIRDialect PUBLIC

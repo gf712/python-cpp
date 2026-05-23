@@ -1161,7 +1161,7 @@ PyResult<PyObject *> PyObject::__ne__(const PyObject *other) const
 	if (!type_prototype().__eq__.has_value()) { return Ok(not_implemented()); }
 	return call_slot(*type_prototype().__eq__, this, other).and_then([](PyObject *obj) {
 		return truthy(obj, VirtualMachine::the().interpreter()).and_then([](bool value) {
-			return Ok(value ? py_true() : py_false());
+			return Ok(value ? py_false() : py_true());
 		});
 	});
 }

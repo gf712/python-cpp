@@ -144,6 +144,7 @@ set(RUNTIME_SOURCE_FILES
     runtime/modules/struct/module.cpp
     runtime/modules/SysModule.cpp
     runtime/modules/WarningsModule.cpp
+    runtime/modules/GcModule.cpp
     runtime/types/builtin.cpp
     runtime/warnings/DeprecationWarning.cpp
     runtime/warnings/ImportWarning.cpp
@@ -298,7 +299,7 @@ target_link_libraries(python-cpp
 )
 
 # LLVM backend
-find_package(LLVM CONFIG 20.1)
+find_package(LLVM CONFIG 23)
 if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
   message(FATAL_ERROR "Could not find LLVM in the local environment")
 elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)

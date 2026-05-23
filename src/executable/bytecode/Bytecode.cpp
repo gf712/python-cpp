@@ -106,14 +106,14 @@ PyResult<Value> Bytecode::call_without_setup(VirtualMachine &vm, Interpreter &in
 	// create main stack frame
 	ASSERT(!vm.stack().empty());
 
-	constexpr auto sentinel = decltype(vm.stack().top().get().last_instruction_pointer)();
-	if (vm.stack().top().get().last_instruction_pointer == sentinel) {
+	constexpr auto sentinel = decltype(vm.stack().back().get().last_instruction_pointer)();
+	if (vm.stack().back().get().last_instruction_pointer == sentinel) {
 		// first time calling with the stack frame, so we don't have a last instruction pointer yet
 		vm.set_instruction_pointer(begin());
 	} else {
 		// otherwise resume execution, by starting execution from the instruction after the last run
 		// instruction
-		vm.set_instruction_pointer(vm.stack().top().get().last_instruction_pointer + 1);
+		vm.set_instruction_pointer(vm.stack().back().get().last_instruction_pointer + 1);
 	}
 
 	return eval_loop(vm, interpreter);
@@ -132,7 +132,9 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		ASSERT((*vm.instruction_pointer()).get());
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;
-		spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
+		// spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
+		// std::cout << std::format("{} {}", (void *)instruction.get(), instruction->to_string())
+		// 		  << std::endl;
 		auto result = instruction->execute(vm, vm.interpreter());
 		// we left the current stack frame in the previous instruction
 		if (vm.stack().size() != stack_depth) {

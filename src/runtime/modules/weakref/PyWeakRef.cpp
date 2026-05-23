@@ -18,6 +18,18 @@ PyWeakRef::PyWeakRef(PyObject *object, PyObject *callback)
 	: PyBaseObject(s_weak_ref), m_object(object), m_callback(callback)
 {}
 
+PyWeakRef::~PyWeakRef()
+{
+	// If the target is still alive, scrub our entry from its weakref list
+	// so getweakrefcount/getweakrefs don't hand out a dangling pointer.
+	// When the target has already been collected, is_alive() has either
+	// switched m_object to py_none() or the entry was erased by sweep —
+	// either way, unregister_weakref is a safe no-op.
+	if (m_object && m_object != py_none()) {
+		VirtualMachine::the().heap().unregister_weakref(bit_cast<uint8_t *>(m_object), this);
+	}
+}
+
 PyResult<PyWeakRef *> PyWeakRef::create(PyObject *object, PyObject *callback)
 {
 	auto *result = VirtualMachine::the().heap().allocate_weakref<PyWeakRef>(object, callback);

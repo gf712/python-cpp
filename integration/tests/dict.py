@@ -45,3 +45,26 @@ def dict_setdefault():
     assert a["b"] == 10
 
 dict_setdefault()
+
+def dict_pop_missing_key_with_failing_repr():
+    # Regression: PyDict::pop formatted KeyError via key.__repr__() and
+    # unconditionally unwrapped the result, aborting if __repr__ raised.
+    class Bad:
+        def __hash__(self):
+            return 0
+        def __eq__(self, other):
+            return False
+        def __repr__(self):
+            raise ValueError("bad repr")
+
+    d = {}
+    raised = None
+    try:
+        d.pop(Bad())
+    except KeyError:
+        raised = "KeyError"
+    except ValueError:
+        raised = "ValueError"
+    assert raised is not None, "dict.pop on missing key with failing __repr__ must not abort"
+
+dict_pop_missing_key_with_failing_repr()

@@ -78,4 +78,10 @@ inline std::vector<mlir::Block *> sortBlocks(mlir::Region &region)
 	return { result.begin(), result.end() };
 }
 
+// Total number of registers available for allocation
+constexpr size_t kNumRegisters = 32;
+
+// Register index where CALL/YIELD/WITH_EXCEPT_START results land at runtime
+constexpr size_t kCallResultReg = 0;
+
 }// namespace codegen

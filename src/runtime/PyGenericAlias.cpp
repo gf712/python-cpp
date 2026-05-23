@@ -94,6 +94,7 @@ PyType *PyGenericAlias::static_type() const { return types::generic_alias(); }
 
 void PyGenericAlias::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	if (m_origin) visitor.visit(*m_origin);
 	if (m_args) visitor.visit(*m_args);
 	if (m_parameters) visitor.visit(*m_parameters);

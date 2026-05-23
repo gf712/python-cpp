@@ -18,6 +18,8 @@ class PyCallableProxyType : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
   public:
+	~PyCallableProxyType() override;
+
 	static PyResult<PyCallableProxyType *> create(PyObject *object, PyObject *callback);
 
 	std::string to_string() const override;

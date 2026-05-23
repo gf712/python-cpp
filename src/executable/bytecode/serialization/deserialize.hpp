@@ -3,7 +3,9 @@
 #include "forward.hpp"
 #include "runtime/Value.hpp"
 #include "serialize.hpp"
+#include "utilities.hpp"
 
+#include <iostream>
 #include <span>
 #include <string>
 
