@@ -2,12 +2,20 @@
 
 #include "Program.hpp"
 #include "forward.hpp"
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 #include <vector>
 
 using InstructionVector = std::vector<std::unique_ptr<Instruction>>;
+
+struct InstructionSourceLocation
+{
+	uint32_t instruction_index;
+	uint32_t line;
+	uint32_t column;
+};
 
 struct FunctionMetaData
 {
@@ -33,6 +41,7 @@ struct FunctionBlock
 {
 	FunctionMetaData metadata;
 	InstructionVector blocks;
+	std::vector<InstructionSourceLocation> instruction_locations;
 	std::string to_string() const;
 };
 

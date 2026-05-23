@@ -3119,6 +3119,7 @@ std::shared_ptr<Program> BytecodeGenerator::generate_executable(std::string file
 	ASSERT(m_frame_stack_value_count.size() == 2);
 	ASSERT(m_frame_free_var_count.size() == 2);
 	relocate_labels(m_functions);
+	for (auto &func : m_functions.functions) { func.metadata.filename = filename; }
 	return BytecodeProgram::create(std::move(m_functions), filename, argv);
 }
 
@@ -3128,6 +3129,20 @@ InstructionVector *BytecodeGenerator::allocate_block(size_t function_id)
 
 	auto function = std::next(m_functions.functions.begin(), function_id);
 	return &function->blocks;
+}
+
+void BytecodeGenerator::record_location_for_next_instruction()
+{
+	ASSERT(m_function_id < m_functions.functions.size());
+	auto &func = *std::next(m_functions.functions.begin(), m_function_id);
+	const auto line = static_cast<uint32_t>(m_current_source_location.start.row + 1);
+	const auto column = static_cast<uint32_t>(m_current_source_location.start.column);
+	auto &locations = func.instruction_locations;
+	if (!locations.empty() && locations.back().line == line && locations.back().column == column) {
+		return;
+	}
+	const auto next_instruction_index = static_cast<uint32_t>(func.blocks.size());
+	locations.emplace_back(next_instruction_index, line, column);
 }
 
 std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::Module> node,

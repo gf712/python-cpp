@@ -1,4 +1,6 @@
 #include "Bytecode.hpp"
+#include "ast/AST.hpp"
+#include "executable/FunctionBlock.hpp"
 #include "instructions/Instructions.hpp"
 #include "interpreter/Interpreter.hpp"
 #include "runtime/BaseException.hpp"
@@ -8,6 +10,9 @@
 #include "serialization/deserialize.hpp"
 #include "serialization/serialize.hpp"
 
+#include <algorithm>
+#include <optional>
+
 using namespace py;
 
 Bytecode::Bytecode(size_t register_count,
@@ -15,6 +20,7 @@ Bytecode::Bytecode(size_t register_count,
 	size_t stack_size,
 	std::string function_name,
 	InstructionVector instructions,
+	std::vector<InstructionSourceLocation> instruction_locations,
 	std::shared_ptr<Program> program)
 	: Function(register_count,
 		  locals_count,
@@ -22,8 +28,23 @@ Bytecode::Bytecode(size_t register_count,
 		  function_name,
 		  FunctionExecutionBackend::BYTECODE,
 		  std::move(program)),
-	  m_instructions(std::move(instructions))
+	  m_instructions(std::move(instructions)),
+	  m_instruction_locations(std::move(instruction_locations))
 {}
+
+std::optional<InstructionSourceLocation> Bytecode::location_for(size_t instruction_index) const
+{
+	if (m_instruction_locations.empty()) { return std::nullopt; }
+	// Find the last entry whose instruction_index is <= the query.
+	const auto it = std::upper_bound(m_instruction_locations.begin(),
+		m_instruction_locations.end(),
+		instruction_index,
+		[](size_t idx, const InstructionSourceLocation &entry) {
+			return idx < entry.instruction_index;
+		});
+	if (it == m_instruction_locations.begin()) { return std::nullopt; }
+	return *std::prev(it);
+}
 
 std::string Bytecode::to_string() const
 {
@@ -83,6 +104,7 @@ std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer
 		stack_size,
 		function_name,
 		std::move(instructions),
+		std::vector<InstructionSourceLocation>{},
 		std::move(program));
 }
 
@@ -144,8 +166,9 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		// vm.dump();
 		if (result.is_err()) {
 			auto *exception = result.unwrap_err();
-			size_t tb_lineno = 0;
-			size_t tb_lasti = std::distance(initial_ip, current_ip);
+			const size_t tb_lasti = std::distance(initial_ip, current_ip);
+			const size_t tb_lineno =
+				location_for(tb_lasti).value_or(InstructionSourceLocation{ 0, 0, 0 }).line;
 			PyTraceback *tb_next = exception->traceback();
 			auto traceback =
 				PyTraceback::create(interpreter.execution_frame(), tb_lasti, tb_lineno, tb_next);

@@ -15,6 +15,7 @@
 class Bytecode : public Function
 {
 	const InstructionVector m_instructions;
+	const std::vector<InstructionSourceLocation> m_instruction_locations;
 
   public:
 	Bytecode(size_t register_count,
@@ -22,10 +23,13 @@ class Bytecode : public Function
 		size_t stack_size,
 		std::string function_name,
 		InstructionVector instructions,
+		std::vector<InstructionSourceLocation> instruction_locations,
 		std::shared_ptr<Program> program);
 
 	auto begin() const { return m_instructions.begin(); }
 	auto end() const { return m_instructions.end(); }
+
+	std::optional<InstructionSourceLocation> location_for(size_t instruction_index) const;
 
 	std::string to_string() const override;
 

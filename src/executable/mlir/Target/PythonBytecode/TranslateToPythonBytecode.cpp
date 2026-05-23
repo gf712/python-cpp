@@ -111,6 +111,7 @@ struct PythonBytecodeEmitter
 	struct FunctionInfo
 	{
 		std::vector<std::unique_ptr<Instruction>> instructions;
+		std::vector<InstructionSourceLocation> instruction_locations;
 		std::vector<::py::Value> m_consts;
 		std::vector<std::string> m_varnames;
 		std::vector<std::string> m_names;
@@ -191,6 +192,7 @@ struct PythonBytecodeEmitter
 	std::stack<size_t> m_current_operation_index;
 	std::stack<std::vector<Block *>> m_sorted_blocks;
 	mlir::func::FuncOp m_parent_fn;
+	InstructionSourceLocation m_current_op_location{};
 
 	bool m_writing_to_module{ true };
 
@@ -222,7 +224,29 @@ struct PythonBytecodeEmitter
 	template<typename InstructionT, typename... Args> void emit(Args &&...args)
 	{
 		auto instruction = std::make_unique<InstructionT>(std::forward<Args>(args)...);
+		record_location_for_next_instruction();
 		current_function().instructions.push_back(std::move(instruction));
+	}
+
+	void record_location_for_next_instruction()
+	{
+		auto &locations = current_function().instruction_locations;
+		if (!locations.empty() && locations.back().line == m_current_op_location.line
+			&& locations.back().column == m_current_op_location.column) {
+			return;
+		}
+		const auto next_instruction_index =
+			static_cast<uint32_t>(current_function().instructions.size());
+		locations.emplace_back(
+			next_instruction_index, m_current_op_location.line, m_current_op_location.column);
+	}
+
+	void capture_op_location(mlir::Operation &op)
+	{
+		if (auto loc = mlir::dyn_cast<mlir::FileLineColLoc>(op.getLoc())) {
+			m_current_op_location.line = loc.getLine() + 1;
+			m_current_op_location.column = loc.getColumn();
+		}
 	}
 
 	size_t add_name(std::string_view str) { return current_function().add_name(str); }
@@ -472,6 +496,7 @@ struct PythonBytecodeEmitter
 
 template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 {
+	capture_op_location(op);
 	return llvm::TypeSwitch<Operation *, LogicalResult>(&op)
 		// Builtin ops.
 		.Case<mlir::ModuleOp>([this](auto op) {
@@ -1445,9 +1470,11 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 					.register_count = codegen::kNumRegisters,
 					.stack_size = emitter.m_module.m_stack_size,
 					.names = std::move(emitter.m_module.m_names),
+					.filename = emitter.m_filename,
 					.consts = std::move(emitter.m_module.m_consts),
 				},
 			.blocks = std::move(instructions),
+			.instruction_locations = std::move(emitter.m_module.instruction_locations),
 		};
 		func_blocks.functions.push_back(std::move(fb_module));
 	}
@@ -1463,6 +1490,7 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 					.varnames = std::move(fn.m_varnames),
 					.freevars = std::move(fn.m_freevars),
 					.names = std::move(fn.m_names),
+					.filename = emitter.m_filename,
 					.arg_count = fn.m_arg_count,
 					.kwonly_arg_count = fn.m_kwonly_arg_count,
 					.cell2arg = std::move(fn.m_cell2arg),
@@ -1470,6 +1498,7 @@ std::shared_ptr<Program> translateToPythonBytecode(Operation *op)
 					.flags = std::move(fn.m_flags),
 				},
 			.blocks = std::move(fn.instructions),
+			.instruction_locations = std::move(fn.instruction_locations),
 		};
 		func_blocks.functions.push_back(std::move(fb));
 	}

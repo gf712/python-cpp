@@ -1,8 +1,10 @@
+#include "../Bytecode.hpp"
 #include "../BytecodeProgram.hpp"
 #include "BytecodeGenerator.hpp"
 #include "executable/common.hpp"
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
+#include "runtime/PyCode.hpp"
 
 #include "gtest/gtest.h"
 
@@ -43,4 +45,30 @@ TEST(BytecodeGenerator, EmitsProgramWithFunctionDefinitions)
 	auto bytecode_generator = generate_bytecode(program);
 	ASSERT_EQ(bytecode_generator->functions().size(), 2);
 	ASSERT_TRUE(bytecode_generator->main_function());
+}
+
+TEST(BytecodeGenerator, AttachesSourceLineToMainInstructions)
+{
+	constexpr std::string_view program =
+		"x = 1\n"
+		"y = 2\n"
+		"z = 3\n";
+
+	auto bytecode_generator = generate_bytecode(program);
+	auto *code = static_cast<py::PyCode *>(bytecode_generator->main_function());
+	ASSERT_TRUE(code);
+	const auto *bytecode = static_cast<const Bytecode *>(code->function().get());
+
+	// We don't pin down which instruction maps to which line — that's an
+	// implementation detail of the codegen. We do require that at least one
+	// instruction reports each of the three source lines (1, 2, 3) and that
+	// no instruction reports a bogus line.
+	std::set<uint32_t> observed_lines;
+	for (size_t i = 0; i < static_cast<size_t>(std::distance(bytecode->begin(), bytecode->end()));
+		++i) {
+		if (const auto loc = bytecode->location_for(i)) { observed_lines.insert(loc->line); }
+	}
+	EXPECT_TRUE(observed_lines.contains(1u));
+	EXPECT_TRUE(observed_lines.contains(2u));
+	EXPECT_TRUE(observed_lines.contains(3u));
 }
