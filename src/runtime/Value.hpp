@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <expected>
 #include <sstream>
 #include <variant>
 #include <vector>
@@ -230,59 +231,62 @@ namespace detail {
 }// namespace detail
 
 
-template<typename T> class PyResult
+template<typename T> class [[nodiscard]] PyResult
 {
   public:
 	using OkType = T;
 	using ErrType = BaseException *;
-	using StorageType = std::variant<Ok<T>, Err>;
+	using StorageType = std::expected<T, BaseException *>;
 
   private:
 	StorageType result;
 
   public:
-	PyResult(Ok<T> result_) : result(std::move(result_)) {}
-	template<typename U> constexpr PyResult(Ok<U> result_) : result(Ok<T>(std::move(result_.value)))
+	PyResult(Ok<T> result_) : result(std::move(result_.value)) {}
+	template<typename U>
+	constexpr PyResult(Ok<U> result_) : result(static_cast<T>(std::move(result_.value)))
 	{
 		static_assert(std::is_convertible_v<U, T>);
 	}
-	constexpr PyResult(Err result_) : result(result_) {}
+	constexpr PyResult(Err result_) : result(std::unexpected(result_.exc)) {}
 
-	template<typename U> constexpr PyResult(const PyResult<U> &other) : result(Err(nullptr))
+	template<typename U>
+	constexpr PyResult(const PyResult<U> &other)
+		: result(std::unexpected(static_cast<BaseException *>(nullptr)))
 	{
 		static_assert(std::is_convertible_v<U, T>);
 		if (other.is_ok()) {
-			result = Ok<T>(other.unwrap());
+			result = static_cast<T>(other.unwrap());
 		} else {
-			result = Err(other.unwrap_err());
+			result = std::unexpected(other.unwrap_err());
 		}
 	}
 
-	bool is_ok() const { return std::holds_alternative<Ok<T>>(result); }
-	bool is_err() const { return !is_ok(); }
+	[[nodiscard]] bool is_ok() const { return result.has_value(); }
+	[[nodiscard]] bool is_err() const { return !result.has_value(); }
 
-	const T &unwrap() const &
+	[[nodiscard]] const T &unwrap() const &
 	{
 		ASSERT(is_ok());
-		return std::get<Ok<T>>(result).value;
+		return result.value();
 	}
 
-	T &unwrap() &
+	[[nodiscard]] T &unwrap() &
 	{
 		ASSERT(is_ok());
-		return std::get<Ok<T>>(result).value;
+		return result.value();
 	}
 
-	T &&unwrap() &&
+	[[nodiscard]] T &&unwrap() &&
 	{
 		ASSERT(is_ok());
-		return std::move(std::get<Ok<T>>(result).value);
+		return std::move(result).value();
 	}
 
-	BaseException *unwrap_err() const
+	[[nodiscard]] BaseException *unwrap_err() const
 	{
 		ASSERT(is_err());
-		return std::get<Err>(result).exc;
+		return result.error();
 	}
 
 	template<typename FunctorType,
@@ -290,9 +294,9 @@ template<typename T> class PyResult
 			std::conditional_t<detail::is_ok<typename std::invoke_result_t<FunctorType, T>>{},
 				typename detail::is_ok<typename std::invoke_result_t<FunctorType, T>>::type,
 				typename detail::is_pyresult<typename std::invoke_result_t<FunctorType, T>>::type>>
-	PyResult<PyResultType> and_then(FunctorType &&op) const;
+	[[nodiscard]] PyResult<PyResultType> and_then(FunctorType &&op) const;
 
-	template<typename FunctorType> PyResult<T> or_else(FunctorType &&op) const;
+	template<typename FunctorType> [[nodiscard]] PyResult<T> or_else(FunctorType &&op) const;
 };
 
 template<typename T>
