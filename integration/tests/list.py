@@ -23,3 +23,13 @@ except IndexError:
     exception_raised = True
 finally:
     assert exception_raised, "list.pop with empty list should raise an IndexError"
+
+def list_recursive_repr():
+    a = []
+    a.append(a)
+    assert repr(a) == "[[...]]", "recursive list repr should use [...] sentinel"
+    # Calling repr again must drain the visited set; otherwise nested
+    # repr() would still see `a` as visited.
+    assert repr(a) == "[[...]]", "recursive list repr should be idempotent"
+
+list_recursive_repr()

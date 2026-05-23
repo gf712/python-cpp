@@ -243,7 +243,14 @@ PyResult<PyObject *> PyDict::pop(PyObject *key, PyObject *default_value)
 	} else if (default_value) {
 		return Ok(default_value);
 	}
-	return Err(key_error("{}", key->repr().unwrap()->to_string()));
+	auto repr = key->repr();
+	if (repr.is_err()) {
+		// A failing user-defined __repr__ must not abort the process. Fall back
+		// to the type name so the caller still sees a KeyError rather than the
+		// unrelated repr exception.
+		return Err(key_error("<{} object>", key->type()->name()));
+	}
+	return Err(key_error("{}", repr.unwrap()->to_string()));
 }
 
 PyResult<std::monostate> PyDict::merge(PyObject *other, bool override)

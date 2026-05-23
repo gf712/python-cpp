@@ -33,7 +33,11 @@
 
 namespace py {
 
-static std::unordered_set<PyObject *> visited;
+// Tracks lists currently being repr'd on this thread so that cyclic structures
+// emit "[...]" instead of recursing forever. Drained by the RAII Cleanup in
+// __repr__; thread_local rather than file-scope static so concurrent
+// interpreters/threads do not see each other's in-flight repr stack.
+thread_local std::unordered_set<PyObject *> visited;
 
 template<> PyList *as(PyObject *obj)
 {
@@ -131,7 +135,9 @@ PyResult<PyObject *> PyList::extend(PyObject *iterable)
 	auto *tmp_list = tmp_list_.unwrap();
 	auto value = iterator.unwrap()->next();
 	while (value.is_ok()) {
-		tmp_list->append(value.unwrap());
+		if (auto appended = tmp_list->append(value.unwrap()); appended.is_err()) {
+			return Err(appended.unwrap_err());
+		}
 		value = iterator.unwrap()->next();
 	}
 

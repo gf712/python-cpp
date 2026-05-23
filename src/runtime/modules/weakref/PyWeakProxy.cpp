@@ -19,6 +19,13 @@ PyWeakProxy::PyWeakProxy(PyObject *object, PyObject *callback)
 	: PyBaseObject(s_weak_proxy), m_object(object), m_callback(callback)
 {}
 
+PyWeakProxy::~PyWeakProxy()
+{
+	if (m_object && m_object != py_none()) {
+		VirtualMachine::the().heap().unregister_weakref(bit_cast<uint8_t *>(m_object), this);
+	}
+}
+
 PyResult<PyWeakProxy *> PyWeakProxy::create(PyObject *object, PyObject *callback)
 {
 	auto *result = VirtualMachine::the().heap().allocate_weakref<PyWeakProxy>(object, callback);

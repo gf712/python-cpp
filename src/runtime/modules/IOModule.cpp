@@ -928,7 +928,10 @@ struct Buffered
 	PyResult<PyObject *> _dealloc_warn(PyObject *source) const
 	{
 		if (this->ok && this->raw) {
-			this->raw->get_method(PyString::create("_dealloc_warn").unwrap())
+			// Best-effort warning fired from a deallocation path; any
+			// exception raised by the user's _dealloc_warn override has
+			// nowhere useful to land, so deliberately discard.
+			(void)this->raw->get_method(PyString::create("_dealloc_warn").unwrap())
 				.and_then([source](PyObject *_dealloc_warn) {
 					return _dealloc_warn->call(
 						PyTuple::create(source).unwrap(), PyDict::create().unwrap());
@@ -2872,7 +2875,9 @@ class TextIOWrapper : public TextIOBase
 		while (m_position < m_buffer_bytes->b.size()) {
 			auto line = readline(nullptr, nullptr);
 			if (line.is_err()) { return line; }
-			result->append(line.unwrap());
+			if (auto appended = result->append(line.unwrap()); appended.is_err()) {
+				return Err(appended.unwrap_err());
+			}
 		}
 
 		return Ok(result);

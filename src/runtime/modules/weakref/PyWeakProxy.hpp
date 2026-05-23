@@ -18,6 +18,8 @@ class PyWeakProxy : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
   public:
+	~PyWeakProxy() override;
+
 	static PyResult<PyWeakProxy *> create(PyObject *object, PyObject *callback);
 
 	std::string to_string() const override;

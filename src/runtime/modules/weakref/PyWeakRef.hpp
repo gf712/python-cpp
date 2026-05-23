@@ -18,6 +18,8 @@ class PyWeakRef : public PyBaseObject
 	void visit_graph(Visitor &) override;
 
   public:
+	~PyWeakRef() override;
+
 	static PyResult<PyWeakRef *> create(PyObject *object, PyObject *callback);
 
 	std::string to_string() const override;

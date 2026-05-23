@@ -327,6 +327,7 @@ PyType *PySlice::static_type() const { return types::slice(); }
 
 void PySlice::visit_graph(Visitor &visitor)
 {
+	PyObject::visit_graph(visitor);
 	if (m_start) visitor.visit(*m_start);
 	if (m_stop) visitor.visit(*m_stop);
 	if (m_step) visitor.visit(*m_step);
