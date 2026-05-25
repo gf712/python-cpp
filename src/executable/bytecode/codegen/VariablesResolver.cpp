@@ -392,8 +392,8 @@ Value *VariablesResolver::visit(const Dict *node)
 {
 	ASSERT(node->keys().size() == node->values().size());
 	for (size_t i = 0; i < node->keys().size(); ++i) {
-		if (auto key = node->keys()[i]) { key->codegen(this); }
-		auto value = node->values()[i];
+		if (const auto &key = node->keys()[i]) { key->codegen(this); }
+		const auto &value = node->values()[i];
 		ASSERT(value);
 		value->codegen(this);
 	}
@@ -848,7 +848,7 @@ Value *VariablesResolver::visit(const JoinedStr *node)
 Value *VariablesResolver::visit(const Comprehension *node)
 {
 	if (node->target()->node_type() == ASTNodeType::Name) {
-		auto name = std::static_pointer_cast<Name>(node->target());
+		auto *name = as<Name>(node->target());
 		ASSERT(name->ids().size() == 1);
 		m_current_scope->get().symbol_map.add_symbol(Symbol{ .name = name->ids()[0],
 			.visibility = Visibility::LOCAL,

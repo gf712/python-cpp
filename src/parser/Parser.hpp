@@ -37,7 +37,9 @@ class Parser
 
 	struct CacheValue
 	{
-		using ValueType = std::variant<std::shared_ptr<ast::ASTNode>, std::vector<Token>>;
+		// AST nodes are owned by the Module's arena; the cache holds non-owning
+		// raw pointers safe to alias across backtracking attempts.
+		using ValueType = std::variant<ast::ASTNode *, std::vector<Token>>;
 		std::variant<bool, ValueType> value;
 		size_t position;
 	};
@@ -55,6 +57,9 @@ class Parser
 
 	std::shared_ptr<ast::Module> module() { return m_module; }
 
+	// Arena that owns every child node reachable from the parsed Module.
+	ast::ASTArena &arena() { return m_module->arena(); }
+
 	const size_t &token_position() const { return m_token_position; }
 	size_t &token_position() { return m_token_position; }
 
@@ -65,7 +70,7 @@ class Parser
 	py::PyResult<std::shared_ptr<ast::Module>> parse_expression();
 
 	// parses the rule inside the {} in an fstring
-	py::PyResult<std::shared_ptr<ast::ASTNode>> parse_fstring();
+	py::PyResult<ast::ASTNode *> parse_fstring();
 };
 
 }// namespace parser

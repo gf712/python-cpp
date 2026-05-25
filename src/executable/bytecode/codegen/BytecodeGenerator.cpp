@@ -488,8 +488,8 @@ Value *BytecodeGenerator::visit(const Constant *node)
 
 Value *BytecodeGenerator::visit(const BinaryExpr *node)
 {
-	auto *lhs = generate(node->lhs().get(), m_function_id);
-	auto *rhs = generate(node->rhs().get(), m_function_id);
+	auto *lhs = generate(node->lhs(), m_function_id);
+	auto *rhs = generate(node->rhs(), m_function_id);
 	auto *dst = create_value();
 
 	switch (node->op_type()) {
@@ -582,7 +582,7 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	std::vector<BytecodeValue *> decorator_functions;
 	decorator_functions.reserve(node->decorator_list().size());
 	for (const auto &decorator_function : node->decorator_list()) {
-		auto *f = generate(decorator_function.get(), m_function_id);
+		auto *f = generate(decorator_function, m_function_id);
 		ASSERT(f);
 		decorator_functions.push_back(f);
 	}
@@ -675,9 +675,9 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	auto *old_block = m_current_block;
 	set_insert_point(block);
 
-	generate(node->args().get(), f->function_info().function_id);
+	generate(node->args(), f->function_info().function_id);
 
-	for (const auto &node : node->body()) { generate(node.get(), f->function_info().function_id); }
+	for (const auto &node : node->body()) { generate(node, f->function_info().function_id); }
 
 	// always return None
 	// this can be optimised away later on
@@ -754,14 +754,14 @@ Value *BytecodeGenerator::generate_function(const FunctionType *node)
 	std::vector<Register> defaults;
 	defaults.reserve(node->args()->defaults().size());
 	for (const auto &default_node : node->args()->defaults()) {
-		defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+		defaults.push_back(generate(default_node, m_function_id)->get_register());
 	}
 
 	std::vector<Register> kw_defaults;
 	kw_defaults.reserve(node->args()->kw_defaults().size());
 	for (const auto &default_node : node->args()->kw_defaults()) {
 		if (default_node) {
-			kw_defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+			kw_defaults.push_back(generate(default_node, m_function_id)->get_register());
 		}
 	}
 
@@ -924,9 +924,9 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	auto *old_block = m_current_block;
 	set_insert_point(block);
 
-	generate(node->args().get(), f->function_info().function_id);
+	generate(node->args(), f->function_info().function_id);
 
-	auto *lambda_return_value = generate(node->body().get(), f->function_info().function_id);
+	auto *lambda_return_value = generate(node->body(), f->function_info().function_id);
 	ASSERT(lambda_return_value);
 	emit<ReturnValue>(lambda_return_value->get_register());
 
@@ -1005,14 +1005,14 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 	std::vector<Register> defaults;
 	defaults.reserve(node->args()->defaults().size());
 	for (const auto &default_node : node->args()->defaults()) {
-		defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+		defaults.push_back(generate(default_node, m_function_id)->get_register());
 	}
 
 	std::vector<Register> kw_defaults;
 	kw_defaults.reserve(node->args()->kw_defaults().size());
 	for (const auto &default_node : node->args()->kw_defaults()) {
 		if (default_node) {
-			kw_defaults.push_back(generate(default_node.get(), m_function_id)->get_register());
+			kw_defaults.push_back(generate(default_node, m_function_id)->get_register());
 		}
 	}
 
@@ -1059,11 +1059,11 @@ Value *BytecodeGenerator::visit(const Lambda *node)
 
 Value *BytecodeGenerator::visit(const Arguments *node)
 {
-	for (const auto &arg : node->posonlyargs()) { generate(arg.get(), m_function_id); }
-	for (const auto &arg : node->args()) { generate(arg.get(), m_function_id); }
-	for (const auto &arg : node->kwonlyargs()) { generate(arg.get(), m_function_id); }
-	if (node->vararg()) { generate(node->vararg().get(), m_function_id); }
-	if (node->kwarg()) { generate(node->kwarg().get(), m_function_id); }
+	for (const auto &arg : node->posonlyargs()) { generate(arg, m_function_id); }
+	for (const auto &arg : node->args()) { generate(arg, m_function_id); }
+	for (const auto &arg : node->kwonlyargs()) { generate(arg, m_function_id); }
+	if (node->vararg()) { generate(node->vararg(), m_function_id); }
+	if (node->kwarg()) { generate(node->kwarg(), m_function_id); }
 
 	return nullptr;
 }
@@ -1102,14 +1102,14 @@ Value *BytecodeGenerator::visit(const Argument *node)
 Value *BytecodeGenerator::visit(const Starred *node)
 {
 	if (node->ctx() != ContextType::LOAD) { TODO(); }
-	return generate(node->value().get(), m_function_id);
+	return generate(node->value(), m_function_id);
 }
 
 Value *BytecodeGenerator::visit(const Return *node)
 {
 	auto *src = [&]() -> BytecodeValue * {
 		if (node->value()) {
-			return generate(node->value().get(), m_function_id);
+			return generate(node->value(), m_function_id);
 		} else {
 			auto *none_value = create_value();
 			auto *value = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
@@ -1143,7 +1143,7 @@ Value *BytecodeGenerator::visit(const Return *node)
 
 Value *BytecodeGenerator::visit(const Yield *node)
 {
-	auto *src = generate(node->value().get(), m_function_id);
+	auto *src = generate(node->value(), m_function_id);
 	ASSERT(src);
 	emit<YieldValue>(src->get_register());
 	auto *bidirectional_value = create_value();
@@ -1153,7 +1153,7 @@ Value *BytecodeGenerator::visit(const Yield *node)
 
 Value *BytecodeGenerator::visit(const ast::YieldFrom *node)
 {
-	auto *src = generate(node->value().get(), m_function_id);
+	auto *src = generate(node->value(), m_function_id);
 	ASSERT(src);
 	auto *iterator = create_value();
 	emit<GetYieldFromIter>(iterator->get_register(), src->get_register());
@@ -1167,14 +1167,14 @@ Value *BytecodeGenerator::visit(const ast::YieldFrom *node)
 
 Value *BytecodeGenerator::visit(const Assign *node)
 {
-	auto *src = generate(node->value().get(), m_function_id);
+	auto *src = generate(node->value(), m_function_id);
 	ASSERT(node->targets().size() > 0);
 
 	for (const auto &target : node->targets()) {
 		if (auto ast_name = as<Name>(target)) {
 			for (const auto &var : ast_name->ids()) { store_name(var, src); }
 		} else if (auto ast_attr = as<Attribute>(target)) {
-			auto *dst = generate(ast_attr->value().get(), m_function_id);
+			auto *dst = generate(ast_attr->value(), m_function_id);
 			emit<StoreAttr>(dst->get_register(),
 				src->get_register(),
 				load_name(ast_attr->attr(), m_function_id)->get_index());
@@ -1191,12 +1191,12 @@ Value *BytecodeGenerator::visit(const Assign *node)
 				if (auto name = as<Name>(el)) {
 					store_name(name->ids()[0], unpacked_value);
 				} else if (auto attr = as<Attribute>(el)) {
-					auto *dst_obj = generate(attr->value().get(), m_function_id);
+					auto *dst_obj = generate(attr->value(), m_function_id);
 					emit<StoreAttr>(dst_obj->get_register(),
 						unpacked_value->get_register(),
 						load_name(attr->attr(), m_function_id)->get_index());
 				} else if (auto subscript = as<Subscript>(el)) {
-					auto *dst_obj = generate(subscript->value().get(), m_function_id);
+					auto *dst_obj = generate(subscript->value(), m_function_id);
 					const auto &slice = subscript->slice();
 					const auto *index = build_slice(slice);
 					emit<StoreSubscript>(dst_obj->get_register(),
@@ -1207,7 +1207,7 @@ Value *BytecodeGenerator::visit(const Assign *node)
 				}
 			}
 		} else if (auto ast_subscript = as<Subscript>(target)) {
-			auto *obj = generate(ast_subscript->value().get(), m_function_id);
+			auto *obj = generate(ast_subscript->value(), m_function_id);
 			const auto &slice = ast_subscript->slice();
 			const auto *index = build_slice(slice);
 			emit<StoreSubscript>(obj->get_register(), index->get_register(), src->get_register());
@@ -1224,15 +1224,13 @@ Value *BytecodeGenerator::visit(const Call *node)
 	std::vector<BytecodeValue *> keyword_values;
 	std::vector<Register> keywords;
 
-	auto *func = generate(node->function().get(), m_function_id);
+	auto *func = generate(node->function(), m_function_id);
 
-	auto is_args_expansion = [](const std::shared_ptr<ast::ASTNode> &node) {
+	auto is_args_expansion = [](const ast::ASTNode *node) {
 		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 
-	auto is_kwargs_expansion = [](const std::shared_ptr<ast::Keyword> &node) {
-		return !node->arg().has_value();
-	};
+	auto is_kwargs_expansion = [](const ast::Keyword *node) { return !node->arg().has_value(); };
 
 	bool requires_args_expansion =
 		std::any_of(node->args().begin(), node->args().end(), is_args_expansion);
@@ -1251,10 +1249,10 @@ Value *BytecodeGenerator::visit(const Call *node)
 					args_lhs.clear();
 					first_args_expansion = false;
 				}
-				auto arg_value = generate(arg.get(), m_function_id);
+				auto arg_value = generate(arg, m_function_id);
 				emit<ListExtend>(list_value->get_register(), arg_value->get_register());
 			} else {
-				auto *arg_value = generate(arg.get(), m_function_id);
+				auto *arg_value = generate(arg, m_function_id);
 				if (first_args_expansion) {
 					args_lhs.push_back(arg_value->get_register());
 				} else {
@@ -1284,12 +1282,12 @@ Value *BytecodeGenerator::visit(const Call *node)
 						value_registers.clear();
 						first_kwargs_expansion = false;
 					}
-					auto *kwargs_dict = generate(el->value().get(), m_function_id);
+					auto *kwargs_dict = generate(el->value(), m_function_id);
 					emit<DictMerge>(dict_value->get_register(), kwargs_dict->get_register());
 				} else {
 					const auto &name = *el->arg();
 					auto *key = create_value();
-					auto *value = generate(el.get(), m_function_id);
+					auto *value = generate(el, m_function_id);
 					emit<LoadConst>(key->get_register(),
 						load_const(py::String{ name }, m_function_id)->get_index());
 					if (first_kwargs_expansion) {
@@ -1310,14 +1308,12 @@ Value *BytecodeGenerator::visit(const Call *node)
 		}
 	} else {
 		arg_values.reserve(node->args().size());
-		for (const auto &arg : node->args()) {
-			arg_values.push_back(generate(arg.get(), m_function_id));
-		}
+		for (const auto &arg : node->args()) { arg_values.push_back(generate(arg, m_function_id)); }
 		keyword_values.reserve(node->keywords().size());
 		keywords.reserve(node->keywords().size());
 
 		for (const auto &keyword : node->keywords()) {
-			keyword_values.push_back(generate(keyword.get(), m_function_id));
+			keyword_values.push_back(generate(keyword, m_function_id));
 			auto keyword_argname = keyword->arg();
 			if (!keyword_argname.has_value()) { TODO(); }
 			keywords.push_back(
@@ -1390,17 +1386,15 @@ Value *BytecodeGenerator::visit(const If *node)
 	auto end_label = make_label(fmt::format("IF_END_{}", if_count++), m_function_id);
 
 	// if
-	auto *test_result = generate(node->test().get(), m_function_id);
+	auto *test_result = generate(node->test(), m_function_id);
 	emit<JumpIfFalse>(test_result->get_register(), orelse_start_label);
-	for (const auto &body_statement : node->body()) {
-		generate(body_statement.get(), m_function_id);
-	}
+	for (const auto &body_statement : node->body()) { generate(body_statement, m_function_id); }
 	emit<Jump>(end_label);
 
 	// else
 	bind(orelse_start_label);
 	for (const auto &orelse_statement : node->orelse()) {
-		generate(orelse_statement.get(), m_function_id);
+		generate(orelse_statement, m_function_id);
 	}
 	bind(end_label);
 
@@ -1420,7 +1414,7 @@ Value *BytecodeGenerator::visit(const For *node)
 		make_label(fmt::format("FOR_AFTER_ELSE_END_{}", for_loop_count++), m_function_id);
 
 	// generate the iterator
-	auto *iterator_func = generate(node->iter().get(), m_function_id);
+	auto *iterator_func = generate(node->iter(), m_function_id);
 
 	auto iterator_register = allocate_register();
 	auto *iter_variable = create_value();
@@ -1466,12 +1460,12 @@ Value *BytecodeGenerator::visit(const For *node)
 	}
 
 	// body
-	for (const auto &el : node->body()) { generate(el.get(), m_function_id); }
+	for (const auto &el : node->body()) { generate(el, m_function_id); }
 	emit<Jump>(forloop_start_label);
 
 	// orelse
 	bind(forloop_end_label);
-	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
+	for (const auto &el : node->orelse()) { generate(el, m_function_id); }
 
 	bind(forloop_after_else_end_label);
 
@@ -1510,16 +1504,16 @@ Value *BytecodeGenerator::visit(const While *node)
 	auto previous_start_label = m_ctx.set_current_loop_start_label(while_loop_start_label);
 	auto previous_end_label = m_ctx.set_current_loop_end_label(while_loop_end_label);
 
-	const auto *test_result = generate(node->test().get(), m_function_id);
+	const auto *test_result = generate(node->test(), m_function_id);
 	emit<JumpIfFalse>(test_result->get_register(), while_loop_end_label);
 
 	// body
-	for (const auto &el : node->body()) { generate(el.get(), m_function_id); }
+	for (const auto &el : node->body()) { generate(el, m_function_id); }
 	emit<Jump>(while_loop_start_label);
 
 	// orelse
 	bind(while_loop_end_label);
-	for (const auto &el : node->orelse()) { generate(el.get(), m_function_id); }
+	for (const auto &el : node->orelse()) { generate(el, m_function_id); }
 
 	m_ctx.set_current_loop_start_label(previous_start_label);
 	m_ctx.set_current_loop_start_label(previous_end_label);
@@ -1529,13 +1523,13 @@ Value *BytecodeGenerator::visit(const While *node)
 
 Value *BytecodeGenerator::visit(const Compare *node)
 {
-	const auto *lhs = generate(node->lhs().get(), m_function_id);
+	const auto *lhs = generate(node->lhs(), m_function_id);
 	const auto &comparators = node->comparators();
 	const auto &ops = node->ops();
 	BytecodeValue *result{ nullptr };
 
 	for (size_t idx = 0; idx < comparators.size(); ++idx) {
-		const auto *rhs = generate(comparators[idx].get(), m_function_id);
+		const auto *rhs = generate(comparators[idx], m_function_id);
 		const auto op = ops[idx];
 		result = create_value();
 
@@ -1613,7 +1607,7 @@ Value *BytecodeGenerator::visit(const List *node)
 	element_registers.reserve(node->elements().size());
 
 	for (const auto &el : node->elements()) {
-		auto *element_value = generate(el.get(), m_function_id);
+		auto *element_value = generate(el, m_function_id);
 		element_registers.push_back(element_value->get_register());
 	}
 
@@ -1626,7 +1620,7 @@ Value *BytecodeGenerator::visit(const Tuple *node)
 	element_registers.reserve(node->elements().size());
 
 	for (const auto &el : node->elements()) {
-		auto *element_value = generate(el.get(), m_function_id);
+		auto *element_value = generate(el, m_function_id);
 		element_registers.push_back(element_value->get_register());
 	}
 
@@ -1639,7 +1633,7 @@ Value *BytecodeGenerator::visit(const Set *node)
 	element_registers.reserve(node->elements().size());
 
 	for (const auto &el : node->elements()) {
-		auto *element_value = generate(el.get(), m_function_id);
+		auto *element_value = generate(el, m_function_id);
 		element_registers.push_back(element_value->get_register());
 	}
 
@@ -1721,7 +1715,7 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	}
 
 	// the actual class definition
-	for (const auto &el : node->body()) { generate(el.get(), class_id); }
+	for (const auto &el : node->body()) { generate(el, class_id); }
 
 	if (class_scope->requires_class_ref) {
 		auto it = m_stack.top().locals.find("__class__");
@@ -1782,11 +1776,11 @@ Value *BytecodeGenerator::visit(const ClassDefinition *node)
 	arg_registers.push_back(class_name_register);
 
 	for (const auto &base : node->bases()) {
-		auto *base_value = generate(base.get(), m_function_id);
+		auto *base_value = generate(base, m_function_id);
 		arg_registers.push_back(base_value->get_register());
 	}
 	for (const auto &keyword : node->keywords()) {
-		auto *kw_value = generate(keyword.get(), m_function_id);
+		auto *kw_value = generate(keyword, m_function_id);
 		kwarg_registers.push_back(kw_value->get_register());
 		if (!keyword->arg().has_value()) { TODO(); }
 		keyword_names.push_back(
@@ -1823,14 +1817,14 @@ Value *BytecodeGenerator::visit(const Dict *node)
 
 	for (const auto &key : node->keys()) {
 		if (key) {
-			auto *key_value = generate(key.get(), m_function_id);
+			auto *key_value = generate(key, m_function_id);
 			key_registers.emplace_back(key_value->get_register());
 		} else {
 			key_registers.push_back(std::nullopt);
 		}
 	}
 	for (const auto &value : node->values()) {
-		auto *v = generate(value.get(), m_function_id);
+		auto *v = generate(value, m_function_id);
 		value_registers.push_back(v->get_register());
 	}
 
@@ -1839,7 +1833,7 @@ Value *BytecodeGenerator::visit(const Dict *node)
 
 Value *BytecodeGenerator::visit(const Attribute *node)
 {
-	auto *this_value = generate(node->value().get(), m_function_id);
+	auto *this_value = generate(node->value(), m_function_id);
 
 	const auto *parent_node = m_ctx.parent_nodes()[m_ctx.parent_nodes().size() - 2];
 	auto parent_node_type = parent_node->node_type();
@@ -1848,7 +1842,7 @@ Value *BytecodeGenerator::visit(const Attribute *node)
 	// must be a method "foo.bar()" -> .bar() is the function being called by parent AST node
 	// and this attribute
 	if (parent_node_type == ASTNodeType::Call
-		&& static_cast<const Call *>(parent_node)->function().get() == node) {
+		&& static_cast<const Call *>(parent_node)->function() == node) {
 		auto method_name = create_value();
 		emit<LoadMethod>(method_name->get_register(),
 			this_value->get_register(),
@@ -1873,7 +1867,7 @@ Value *BytecodeGenerator::visit(const Attribute *node)
 
 Value *BytecodeGenerator::visit(const Keyword *node)
 {
-	return generate(node->value().get(), m_function_id);
+	return generate(node->value(), m_function_id);
 }
 
 Value *BytecodeGenerator::visit(const AugAssign *node)
@@ -1884,11 +1878,11 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 			if (named_target->ids().size() != 1) { TODO(); }
 			return load_var(named_target->ids()[0]);
 		} else if (auto attr = as<Attribute>(node->target())) {
-			auto *r = generate(attr.get(), m_function_id);
+			auto *r = generate(attr, m_function_id);
 			ASSERT(r);
 			return r;
 		} else if (auto subscript = as<Subscript>(node->target())) {
-			const auto *value = generate(subscript->value().get(), m_function_id);
+			const auto *value = generate(subscript->value(), m_function_id);
 			const auto *index = build_slice(subscript->slice());
 			auto *result = create_value();
 			emit<BinarySubscript>(
@@ -1899,7 +1893,7 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 		}
 	}();
 
-	const auto *rhs = generate(node->value().get(), m_function_id);
+	const auto *rhs = generate(node->value(), m_function_id);
 	switch (node->op()) {
 	case BinaryOpType::PLUS: {
 		emit<InplaceOp>(lhs->get_register(), rhs->get_register(), InplaceOp::Operation::PLUS);
@@ -1946,12 +1940,12 @@ Value *BytecodeGenerator::visit(const AugAssign *node)
 		if (named_target->ids().size() != 1) { TODO(); }
 		store_name(named_target->ids()[0], lhs);
 	} else if (auto attr = as<Attribute>(node->target())) {
-		auto *obj = generate(attr->value().get(), m_function_id);
+		auto *obj = generate(attr->value(), m_function_id);
 		emit<StoreAttr>(obj->get_register(),
 			lhs->get_register(),
 			load_name(attr->attr(), m_function_id)->get_index());
 	} else if (auto subscript = as<Subscript>(node->target())) {
-		auto *obj = generate(subscript->value().get(), m_function_id);
+		auto *obj = generate(subscript->value(), m_function_id);
 		const auto *index = build_slice(subscript->slice());
 		emit<StoreSubscript>(obj->get_register(), index->get_register(), lhs->get_register());
 	} else {
@@ -2042,7 +2036,7 @@ Value *BytecodeGenerator::visit(const Module *node)
 	const auto &module_name = fs::path(node->filename()).stem();
 	create_nested_scope(module_name, module_name);
 	BytecodeValue *last = nullptr;
-	for (const auto &statement : node->body()) { last = generate(statement.get(), m_function_id); }
+	for (const auto &statement : node->body()) { last = generate(statement, m_function_id); }
 
 	// TODO: should the module return the last value if there is one?
 	last = create_value();
@@ -2056,13 +2050,13 @@ Value *BytecodeGenerator::visit(const Module *node)
 BytecodeValue *BytecodeGenerator::build_slice(const ast::Subscript::SliceType &sliceNode)
 {
 	if (std::holds_alternative<Subscript::Index>(sliceNode)) {
-		return generate(std::get<Subscript::Index>(sliceNode).value.get(), m_function_id);
+		return generate(std::get<Subscript::Index>(sliceNode).value, m_function_id);
 	} else if (std::holds_alternative<Subscript::Slice>(sliceNode)) {
 		const auto &slice = std::get<Subscript::Slice>(sliceNode);
 		auto *index = create_value();
-		auto *lower = slice.lower ? generate(slice.lower.get(), m_function_id) : nullptr;
-		auto *upper = slice.upper ? generate(slice.upper.get(), m_function_id) : nullptr;
-		auto *step = slice.step ? generate(slice.step.get(), m_function_id) : nullptr;
+		auto *lower = slice.lower ? generate(slice.lower, m_function_id) : nullptr;
+		auto *upper = slice.upper ? generate(slice.upper, m_function_id) : nullptr;
+		auto *step = slice.step ? generate(slice.step, m_function_id) : nullptr;
 		if (!lower && !upper && !step) {
 			auto *none = load_const(py::NameConstant{ py::NoneType{} }, m_function_id);
 			auto *none_value = create_value();
@@ -2109,7 +2103,7 @@ BytecodeValue *BytecodeGenerator::build_slice(const ast::Subscript::SliceType &s
 Value *BytecodeGenerator::visit(const Subscript *node)
 {
 	auto *result = create_value();
-	const auto *value = generate(node->value().get(), m_function_id);
+	const auto *value = generate(node->value(), m_function_id);
 	const auto *index = build_slice(node->slice());
 
 	switch (node->context()) {
@@ -2133,11 +2127,11 @@ Value *BytecodeGenerator::visit(const Raise *node)
 {
 	if (node->cause()) {
 		ASSERT(node->exception());
-		const auto *exception = generate(node->exception().get(), m_function_id);
-		const auto *cause = generate(node->cause().get(), m_function_id);
+		const auto *exception = generate(node->exception(), m_function_id);
+		const auto *cause = generate(node->cause(), m_function_id);
 		emit<RaiseVarargs>(exception->get_register(), cause->get_register());
 	} else if (node->exception()) {
-		const auto *exception = generate(node->exception().get(), m_function_id);
+		const auto *exception = generate(node->exception(), m_function_id);
 		emit<RaiseVarargs>(exception->get_register());
 	} else {
 		emit<RaiseVarargs>();
@@ -2157,7 +2151,7 @@ Value *BytecodeGenerator::visit(const With *node)
 	std::vector<BytecodeValue *> with_item_results;
 
 	for (const auto &item : node->items()) {
-		with_item_results.push_back(generate(item.get(), m_function_id));
+		with_item_results.push_back(generate(item, m_function_id));
 	}
 
 	emit<SetupWith>(cleanup_label);
@@ -2193,7 +2187,7 @@ Value *BytecodeGenerator::visit(const With *node)
 	{
 		ScopedWithStatement scope{ *this, with_exit_factory, m_function_id };
 
-		for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
+		for (const auto &statement : node->body()) { generate(statement, m_function_id); }
 		emit<LeaveExceptionHandling>();
 		auto *cleanup_block = allocate_block(m_function_id);
 		set_insert_point(cleanup_block);
@@ -2209,7 +2203,7 @@ Value *BytecodeGenerator::visit(const With *node)
 
 Value *BytecodeGenerator::visit(const WithItem *node)
 {
-	auto *ctx_expr_result = generate(node->context_expr().get(), m_function_id);
+	auto *ctx_expr_result = generate(node->context_expr(), m_function_id);
 	auto *enter_method = create_value();
 	auto *ctx_expr = create_value();
 	emit<Move>(ctx_expr->get_register(), ctx_expr_result->get_register());
@@ -2219,14 +2213,14 @@ Value *BytecodeGenerator::visit(const WithItem *node)
 	emit<MethodCall>(enter_method->get_register(), std::vector<Register>{});
 	auto *enter_result = create_return_value();
 
-	if (auto optional_vars = node->optional_vars()) {
-		if (auto name = as<Name>(optional_vars)) {
-			ASSERT(as<Name>(optional_vars)->ids().size() == 1);
-			store_name(as<Name>(optional_vars)->ids()[0], enter_result);
-		} else if (auto tuple = as<Tuple>(optional_vars)) {
+	if (const auto &optional_vars = node->optional_vars()) {
+		if (auto *name = as<Name>(optional_vars)) {
+			ASSERT(name->ids().size() == 1);
+			store_name(name->ids()[0], enter_result);
+		} else if (auto *tuple = as<Tuple>(optional_vars)) {
 			(void)tuple;
 			TODO();
-		} else if (auto list = as<List>(optional_vars)) {
+		} else if (auto *list = as<List>(optional_vars)) {
 			(void)list;
 			TODO();
 		} else {
@@ -2247,16 +2241,16 @@ Value *BytecodeGenerator::visit(const IfExpr *node)
 
 	auto return_value = create_value();
 	// if
-	auto *test_result = generate(node->test().get(), m_function_id);
+	auto *test_result = generate(node->test(), m_function_id);
 	emit<JumpIfFalse>(test_result->get_register(), orelse_start_label);
-	auto *if_result = generate(node->body().get(), m_function_id);
+	auto *if_result = generate(node->body(), m_function_id);
 	ASSERT(if_result);
 	emit<Move>(return_value->get_register(), if_result->get_register());
 	emit<Jump>(end_label);
 
 	// else
 	bind(orelse_start_label);
-	auto *else_result = generate(node->orelse().get(), m_function_id);
+	auto *else_result = generate(node->orelse(), m_function_id);
 	emit<Move>(return_value->get_register(), else_result->get_register());
 	bind(end_label);
 
@@ -2292,7 +2286,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 			set_insert_point(finally_block_with_reraise);
 			{
 				for (const auto &statement : node->finalbody()) {
-					generate(statement.get(), m_function_id);
+					generate(statement, m_function_id);
 				}
 			}
 		}
@@ -2303,7 +2297,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 	{
 		ScopedTryStatement try_scope{ *this, finally_code_with_exception, m_function_id };
 
-		for (const auto &statement : node->body()) { generate(statement.get(), m_function_id); }
+		for (const auto &statement : node->body()) { generate(statement, m_function_id); }
 
 		emit<LeaveExceptionHandling>();
 
@@ -2331,7 +2325,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 				next_exception_label =
 					make_label(fmt::format("TRY_EXC_COUNT_{}_{}", try_op_count, exception_count++),
 						m_function_id);
-				auto *exception_type = generate(handler->type().get(), m_function_id);
+				auto *exception_type = generate(handler->type(), m_function_id);
 				emit<JumpIfNotExceptionMatch>(exception_type->get_register(), next_exception_label);
 			}
 			auto *exception_handler_body = allocate_block(m_function_id);
@@ -2340,7 +2334,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 				ScopedClearExceptionBeforeReturn s{ *this, m_function_id };
 				// emit<LeaveExceptionHandling>();
 				m_current_exception_depth[m_function_id] = exception_depth - 1;
-				for (const auto &el : handler->body()) { generate(el.get(), m_function_id); }
+				for (const auto &el : handler->body()) { generate(el, m_function_id); }
 				m_current_exception_depth[m_function_id] = exception_depth;
 				emit<ClearExceptionState>();
 			}
@@ -2349,9 +2343,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 
 		if (!node->orelse().empty()) {
 			bind(orelse_label);
-			for (const auto &statement : node->orelse()) {
-				generate(statement.get(), m_function_id);
-			}
+			for (const auto &statement : node->orelse()) { generate(statement, m_function_id); }
 			emit<Jump>(finally_label);
 		}
 	}
@@ -2370,18 +2362,14 @@ Value *BytecodeGenerator::visit(const Try *node)
 		set_insert_point(finally_block_with_reraise);
 		{
 			ScopedClearExceptionBeforeReturn s{ *this, m_function_id };
-			for (const auto &statement : node->finalbody()) {
-				generate(statement.get(), m_function_id);
-			}
+			for (const auto &statement : node->finalbody()) { generate(statement, m_function_id); }
 		}
 		emit<ReRaise>();
 
 		bind(finally_label);
 		auto *finally_block = allocate_block(m_function_id);
 		set_insert_point(finally_block);
-		for (const auto &statement : node->finalbody()) {
-			generate(statement.get(), m_function_id);
-		}
+		for (const auto &statement : node->finalbody()) { generate(statement, m_function_id); }
 		// emit<ClearExceptionState>();
 	}
 	auto *next_block = allocate_block(m_function_id);
@@ -2394,7 +2382,7 @@ Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
 Value *BytecodeGenerator::visit(const Expression *node)
 {
-	return generate(node->value().get(), m_function_id);
+	return generate(node->value(), m_function_id);
 }
 
 Value *BytecodeGenerator::visit(const Global *) { return nullptr; }
@@ -2403,13 +2391,13 @@ Value *BytecodeGenerator::visit(const NonLocal *) { return nullptr; }
 
 Value *BytecodeGenerator::visit(const Delete *node)
 {
-	for (const auto &target : node->targets()) { generate(target.get(), m_function_id); }
+	for (const auto &target : node->targets()) { generate(target, m_function_id); }
 	return nullptr;
 }
 
 Value *BytecodeGenerator::visit(const UnaryExpr *node)
 {
-	const auto *src = generate(node->operand().get(), m_function_id);
+	const auto *src = generate(node->operand(), m_function_id);
 	auto *dst = create_value();
 	switch (node->op_type()) {
 	case UnaryOpType::ADD: {
@@ -2440,21 +2428,21 @@ Value *BytecodeGenerator::visit(const BoolOp *node)
 		auto it = node->values().begin();
 		auto end = node->values().end();
 		while (std::next(it) != end) {
-			last_result = generate((*it).get(), m_function_id);
+			last_result = generate((*it), m_function_id);
 			emit<JumpIfFalseOrPop>(last_result->get_register(), result->get_register(), end_label);
 			it++;
 		}
-		last_result = generate((*it).get(), m_function_id);
+		last_result = generate((*it), m_function_id);
 	} break;
 	case BoolOp::OpType::Or: {
 		auto it = node->values().begin();
 		auto end = node->values().end();
 		while (std::next(it) != end) {
-			last_result = generate((*it).get(), m_function_id);
+			last_result = generate((*it), m_function_id);
 			emit<JumpIfTrueOrPop>(last_result->get_register(), result->get_register(), end_label);
 			it++;
 		}
-		last_result = generate((*it).get(), m_function_id);
+		last_result = generate((*it), m_function_id);
 	}
 	}
 	emit<Move>(result->get_register(), last_result->get_register());
@@ -2468,7 +2456,7 @@ Value *BytecodeGenerator::visit(const Assert *node)
 	static size_t assert_count = 0;
 	auto end_label = make_label(fmt::format("ASSERT_END_{}", assert_count++), m_function_id);
 
-	auto *test_result = generate(node->test().get(), m_function_id);
+	auto *test_result = generate(node->test(), m_function_id);
 
 	emit<JumpIfTrue>(test_result->get_register(), end_label);
 
@@ -2476,7 +2464,7 @@ Value *BytecodeGenerator::visit(const Assert *node)
 	emit<LoadAssertionError>(assertion_function->get_register());
 
 	std::vector<Register> args;
-	if (node->msg()) { args.push_back(generate(node->msg().get(), m_function_id)->get_register()); }
+	if (node->msg()) { args.push_back(generate(node->msg(), m_function_id)->get_register()); }
 
 	emit_call(assertion_function->get_register(), std::move(args));
 	auto *exception = create_return_value();
@@ -2495,7 +2483,7 @@ Value *BytecodeGenerator::visit(const NamedExpr *node)
 	ASSERT(as<Name>(node->target())->ids().size() == 1);
 
 	auto *dst = create_value();
-	auto *src = generate(node->value().get(), m_function_id);
+	auto *src = generate(node->value(), m_function_id);
 	emit<Move>(dst->get_register(), src->get_register());
 	store_name(as<Name>(node->target())->ids()[0], src);
 
@@ -2504,8 +2492,8 @@ Value *BytecodeGenerator::visit(const NamedExpr *node)
 
 Value *BytecodeGenerator::visit(const JoinedStr *node)
 {
-	const auto only_static_strings = std::all_of(
-		node->values().begin(), node->values().end(), [](const std::shared_ptr<ASTNode> &value) {
+	const auto only_static_strings =
+		std::all_of(node->values().begin(), node->values().end(), [](const ASTNode *value) {
 			return as<Constant>(value)
 				   && std::holds_alternative<py::String>(*as<Constant>(value)->value());
 		});
@@ -2513,7 +2501,7 @@ Value *BytecodeGenerator::visit(const JoinedStr *node)
 		const auto string = std::accumulate(node->values().begin(),
 			node->values().end(),
 			py::String{},
-			[](py::String s, const std::shared_ptr<ASTNode> &value) {
+			[](py::String s, const ASTNode *value) {
 				return py::String{ s.s + std::get<py::String>(*as<Constant>(value)->value()).s };
 			});
 		auto *static_string = load_const(string, m_function_id);
@@ -2536,7 +2524,7 @@ Value *BytecodeGenerator::visit(const JoinedStr *node)
 				current_string.s.clear();
 			}
 			ASSERT(as<FormattedValue>(value));
-			auto *str_value = generate(value.get(), m_function_id);
+			auto *str_value = generate(value, m_function_id);
 			ASSERT(str_value);
 			strings.push_back(str_value->get_register());
 		}
@@ -2553,7 +2541,7 @@ Value *BytecodeGenerator::visit(const JoinedStr *node)
 Value *BytecodeGenerator::visit(const FormattedValue *node)
 {
 	if (node->format_spec()) { TODO(); }
-	auto *value = generate(node->value().get(), m_function_id);
+	auto *value = generate(node->value(), m_function_id);
 	ASSERT(value);
 	auto *dst = create_value();
 	emit<FormatValue>(
@@ -2564,8 +2552,7 @@ Value *BytecodeGenerator::visit(const FormattedValue *node)
 Value *BytecodeGenerator::visit(const Comprehension *) { TODO(); }
 
 std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>>
-	BytecodeGenerator::visit_comprehension(
-		const std::vector<std::shared_ptr<Comprehension>> &comprehensions)
+	BytecodeGenerator::visit_comprehension(const std::vector<Comprehension *> &comprehensions)
 {
 	static size_t comprehension_count = 0;
 
@@ -2577,14 +2564,14 @@ std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Labe
 	emit<LoadFast>(it->get_register(), src->get_stack_index(), ".0");
 
 	for (bool first = true; const auto &comprehension : comprehensions) {
-		auto *node = comprehension.get();
+		auto *node = comprehension;
 		auto start_label =
 			make_label(fmt::format("COMPREHENSION_START_{}", comprehension_count), m_function_id);
 		auto end_label =
 			make_label(fmt::format("COMPREHENSION_END_{}", comprehension_count++), m_function_id);
 
 		if (!first) {
-			auto iterable = generate(comprehension->iter().get(), m_function_id);
+			auto iterable = generate(comprehension->iter(), m_function_id);
 			it = create_value();
 			emit<GetIter>(it->get_register(), iterable->get_register());
 		}
@@ -2593,7 +2580,7 @@ std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Labe
 		bind(start_label);
 		emit<ForIter>(dst->get_register(), it->get_register(), end_label);
 		if (node->target()->node_type() == ASTNodeType::Name) {
-			const auto name = std::static_pointer_cast<Name>(node->target());
+			const auto *name = as<Name>(node->target());
 			ASSERT(name->ids().size() == 1);
 			store_name(name->ids()[0], dst);
 		} else if (auto target = as<Tuple>(node->target())) {
@@ -2623,7 +2610,7 @@ std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Labe
 		}
 
 		for (const auto &if_ : node->ifs()) {
-			auto *result = generate(if_.get(), m_function_id);
+			auto *result = generate(if_, m_function_id);
 			ASSERT(result);
 			emit<JumpIfFalse>(result->get_register(), start_label);
 		}
@@ -2659,7 +2646,7 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	set_insert_point(block);
 	auto *list = build_list({});
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
-	auto *element = generate(node->elt().get(), m_function_id);
+	auto *element = generate(node->elt(), m_function_id);
 	ASSERT(element);
 	emit<ListAppend>(list->get_register(), element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
@@ -2730,8 +2717,8 @@ Value *BytecodeGenerator::visit(const ListComp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
-	auto *generator = node->generators()[0].get();
-	auto *iterable = generate(generator->iter().get(), m_function_id);
+	auto *generator = node->generators()[0];
+	auto *iterable = generate(generator->iter(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
 	emit_call(f->get_register(), { iterator->get_register() });
@@ -2760,9 +2747,9 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 	set_insert_point(block);
 	auto *dict = build_dict({}, {});
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
-	auto *key = generate(node->key().get(), m_function_id);
+	auto *key = generate(node->key(), m_function_id);
 	ASSERT(key);
-	auto *value = generate(node->value().get(), m_function_id);
+	auto *value = generate(node->value(), m_function_id);
 	ASSERT(value);
 	emit<DictAdd>(dict->get_register(), key->get_register(), value->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
@@ -2833,8 +2820,8 @@ Value *BytecodeGenerator::visit(const DictComp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
-	auto *generator = node->generators()[0].get();
-	auto *iterable = generate(generator->iter().get(), m_function_id);
+	auto *generator = node->generators()[0];
+	auto *iterable = generate(generator->iter(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
 	emit_call(f->get_register(), { iterator->get_register() });
@@ -2863,7 +2850,7 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	auto *old_block = m_current_block;
 	set_insert_point(block);
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
-	auto *element = generate(node->elt().get(), m_function_id);
+	auto *element = generate(node->elt(), m_function_id);
 	ASSERT(element);
 	emit<YieldValue>(element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
@@ -2938,8 +2925,8 @@ Value *BytecodeGenerator::visit(const GeneratorExp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create(CodeFlags::Flag::GENERATOR);
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
-	auto *generator = node->generators()[0].get();
-	auto *iterable = generate(generator->iter().get(), m_function_id);
+	auto *generator = node->generators()[0];
+	auto *iterable = generate(generator->iter(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
 	emit_call(f->get_register(), { iterator->get_register() });
@@ -2968,7 +2955,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	set_insert_point(block);
 	auto *set = build_set({});
 	auto [start_labels, end_labels] = visit_comprehension(node->generators());
-	auto *element = generate(node->elt().get(), m_function_id);
+	auto *element = generate(node->elt(), m_function_id);
 	ASSERT(element);
 	emit<SetAdd>(set->get_register(), element->get_register());
 	ASSERT(start_labels.size() == end_labels.size());
@@ -3039,8 +3026,8 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 	f->function_info().function.metadata.cell2arg = {};
 	f->function_info().function.metadata.flags = CodeFlags::create();
 	make_function(f->get_register(), f->get_name(), {}, {}, captures_tuple);
-	auto *generator = node->generators()[0].get();
-	auto *iterable = generate(generator->iter().get(), m_function_id);
+	auto *generator = node->generators()[0];
+	auto *iterable = generate(generator->iter(), m_function_id);
 	auto iterator = create_value();
 	emit<GetIter>(iterator->get_register(), iterable->get_register());
 	emit_call(f->get_register(), { iterator->get_register() });
@@ -3049,7 +3036,7 @@ Value *BytecodeGenerator::visit(const SetComp *node)
 
 Value *BytecodeGenerator::visit(const Await *node)
 {
-	auto *iterable = generate(node->value().get(), m_function_id);
+	auto *iterable = generate(node->value(), m_function_id);
 	ASSERT(iterable);
 	auto iterator = create_value();
 	emit<GetAwaitable>(iterator->get_register(), iterable->get_register());
@@ -3149,14 +3136,16 @@ std::shared_ptr<Program> BytecodeGenerator::compile(std::shared_ptr<ast::Module>
 	std::vector<std::string> argv,
 	compiler::OptimizationLevel lvl)
 {
-	auto module = as<ast::Module>(node);
+	auto *module = as<ast::Module>(node.get());
 	ASSERT(module);
 
-	if (lvl > compiler::OptimizationLevel::None) { ast::optimizer::constant_folding(node); }
+	// TODO: re-enable once ConstantFolding is ported to arena ownership.
+	(void)lvl;
+	// if (lvl > compiler::OptimizationLevel::None) { ast::optimizer::constant_folding(node); }
 
 	auto generator = BytecodeGenerator();
 
-	generator.m_variable_visibility = VariablesResolver::resolve(module.get());
+	generator.m_variable_visibility = VariablesResolver::resolve(module);
 
 	for (const auto &[scope_name, scope] : generator.m_variable_visibility) {
 		spdlog::debug("Scope name: {}", scope_name);

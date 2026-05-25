@@ -214,6 +214,7 @@ bool MLIRGenerator::compile(std::shared_ptr<ast::Module> m,
 	Context &ctx)
 {
 	MLIRGenerator generator{ ctx };
+	generator.m_arena = &m->arena();
 	generator.m_variable_visibility = VariablesResolver::resolve(m.get());
 	m->codegen(&generator);
 	std::vector<mlir::StringRef> argv_ref;
@@ -514,7 +515,7 @@ void MLIRGenerator::delete_name(std::string_view name, const SourceLocation &loc
 	}
 }
 
-void MLIRGenerator::assign(const std::shared_ptr<ast::ASTNode> &target,
+void MLIRGenerator::assign(const ast::ASTNode *target,
 	MLIRValue *src,
 	const SourceLocation &source_location)
 {
@@ -954,13 +955,11 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 		}
 	}();
 
-	auto is_args_expansion = [](const std::shared_ptr<ast::ASTNode> &node) {
+	auto is_args_expansion = [](const ast::ASTNode *node) {
 		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 
-	auto is_kwargs_expansion = [](const std::shared_ptr<ast::Keyword> &node) {
-		return !node->arg().has_value();
-	};
+	auto is_kwargs_expansion = [](const ast::Keyword *node) { return !node->arg().has_value(); };
 
 	bool requires_args_expansion =
 		std::any_of(node->args().begin(), node->args().end(), is_args_expansion);
@@ -1729,7 +1728,7 @@ ast::Value *MLIRGenerator::visit(const ast::Lambda *node)
 	auto *fn = make_function("<lambda>",
 		mangled_name,
 		node->args(),
-		{ std::make_shared<ast::Return>(node->body(), node->body()->source_location()) },
+		{ m_arena->create<ast::Return>(node->body(), node->body()->source_location()) },
 		{},
 		true,
 		false,
@@ -1742,7 +1741,7 @@ ast::Value *MLIRGenerator::visit(const ast::List *node)
 {
 	std::vector<MLIRValue *> values;
 	values.reserve(node->elements().size());
-	auto requires_expansion = [](const std::shared_ptr<ast::ASTNode> &node) {
+	auto requires_expansion = [](const ast::ASTNode *node) {
 		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 	std::vector<bool> value_requires_expansion(node->elements().size(), false);
@@ -1907,7 +1906,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 	std::string_view function_name,
 	std::function<MLIRValue *()> container_factory,
 	std::function<void(MLIRValue *)> container_update,
-	const std::vector<std::shared_ptr<ast::Comprehension>> &generators,
+	const std::vector<ast::Comprehension *> &generators,
 	const SourceLocation &source_location)
 {
 	const std::string &mangled_name = Mangler::default_mangler().function_mangle(
@@ -1957,8 +1956,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 			}
 		}
 
-		auto next_generator = [this](mlir::Value iterable,
-								  const std::shared_ptr<ast::Comprehension> &generator) {
+		auto next_generator = [this](mlir::Value iterable, const ast::Comprehension *generator) {
 			auto for_loop = m_context.builder().create<mlir::py::ForLoopOp>(
 				loc(m_context.builder(), m_context.filename(), generator->source_location()),
 				iterable);
@@ -2371,7 +2369,7 @@ MLIRGenerator::RAIIScope MLIRGenerator::setup_function(mlir::func::FuncOp &f,
 // existing MLIRValue* indirection used elsewhere on MLIRGenerator's private
 // API).
 std::vector<MLIRGenerator::MLIRValue *> evaluate_expressions_for_make_function(MLIRGenerator &gen,
-	const std::vector<std::shared_ptr<ast::ASTNode>> &expressions)
+	const std::vector<ast::ASTNode *> &expressions)
 {
 	std::vector<MLIRGenerator::MLIRValue *> values;
 	values.reserve(expressions.size());
@@ -2383,16 +2381,15 @@ std::vector<MLIRGenerator::MLIRValue *> evaluate_expressions_for_make_function(M
 	return values;
 }
 
-std::vector<MLIRGenerator::MLIRValue *> evaluate_default_arguments_for_make_function(
-	MLIRGenerator &gen,
-	const std::shared_ptr<ast::Arguments> &args)
+std::vector<MLIRGenerator::MLIRValue *>
+	evaluate_default_arguments_for_make_function(MLIRGenerator &gen, const ast::Arguments *args)
 {
 	return evaluate_expressions_for_make_function(gen, args->defaults());
 }
 
 std::vector<MLIRGenerator::MLIRValue *> evaluate_keyword_default_arguments_for_make_function(
 	MLIRGenerator &gen,
-	const std::shared_ptr<ast::Arguments> &args)
+	const ast::Arguments *args)
 {
 	std::vector<MLIRGenerator::MLIRValue *> kw_defaults;
 	kw_defaults.reserve(args->kw_defaults().size());
@@ -2451,9 +2448,9 @@ std::vector<std::string> MLIRGenerator::collect_function_captures(const std::str
 
 MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &function_name,
 	const std::string &mangled_name,
-	const std::shared_ptr<ast::Arguments> &args,
-	const std::vector<std::shared_ptr<ast::ASTNode>> &body,
-	const std::vector<std::shared_ptr<ast::ASTNode>> &decorator_list,
+	const ast::Arguments *args,
+	const std::vector<ast::ASTNode *> &body,
+	const std::vector<ast::ASTNode *> &decorator_list,
 	bool is_anon,
 	bool is_async,
 	const SourceLocation &source_location)
@@ -2700,7 +2697,7 @@ ast::Value *MLIRGenerator::visit(const ast::Tuple *node)
 {
 	std::vector<MLIRValue *> values;
 	values.reserve(node->elements().size());
-	auto requires_expansion = [](const std::shared_ptr<ast::ASTNode> &node) {
+	auto requires_expansion = [](const ast::ASTNode *node) {
 		return node->node_type() == ast::ASTNodeType::Starred;
 	};
 	std::vector<bool> value_requires_expansion(node->elements().size(), false);
@@ -2884,7 +2881,7 @@ ast::Value *MLIRGenerator::visit(const ast::WithItem *node)
 		false,
 		false);
 
-	if (auto optional_vars = node->optional_vars()) {
+	if (const auto &optional_vars = node->optional_vars()) {
 		assign(optional_vars, new_value(item_result), node->source_location());
 	}
 

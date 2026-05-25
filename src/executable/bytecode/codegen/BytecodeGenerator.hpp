@@ -109,19 +109,16 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	class ASTContext
 	{
-		std::stack<std::shared_ptr<ast::Arguments>> m_local_args;
+		std::stack<const ast::Arguments *> m_local_args;
 		std::vector<const ast::ASTNode *> m_parent_nodes;
 		std::shared_ptr<Label> m_current_loop_start_label;
 		std::shared_ptr<Label> m_current_loop_end_label;
 
 	  public:
-		void push_local_args(std::shared_ptr<ast::Arguments> args)
-		{
-			m_local_args.push(std::move(args));
-		}
+		void push_local_args(const ast::Arguments *args) { m_local_args.push(args); }
 		void pop_local_args() { m_local_args.pop(); }
 		bool has_local_args() const { return !m_local_args.empty(); }
-		const std::shared_ptr<ast::Arguments> &local_args() const { return m_local_args.top(); }
+		const ast::Arguments *local_args() const { return m_local_args.top(); }
 
 		void push_node(const ast::ASTNode *node) { m_parent_nodes.push_back(node); }
 		void pop_node() { m_parent_nodes.pop_back(); }
@@ -440,7 +437,7 @@ class BytecodeGenerator : public ast::CodeGenerator
 
 	void create_nested_scope(const std::string &name, const std::string &mangled_name);
 	std::tuple<std::vector<std::shared_ptr<Label>>, std::vector<std::shared_ptr<Label>>>
-		visit_comprehension(const std::vector<std::shared_ptr<ast::Comprehension>> &comprehensions);
+		visit_comprehension(const std::vector<ast::Comprehension *> &comprehensions);
 
 	template<typename FunctionType> ast::Value *generate_function(const FunctionType *);
 };
