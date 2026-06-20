@@ -2,6 +2,8 @@
 #include "MemoryError.hpp"
 #include "PyCode.hpp"
 #include "PyFrame.hpp"
+#include "PyNone.hpp"
+#include "PyString.hpp"
 #include "PyTraceback.hpp"
 #include "PyType.hpp"
 #include "SourceManager.hpp"
@@ -133,13 +135,24 @@ PyResult<PyObject *> BaseException::__repr__() const
 	}
 }
 
+PyResult<PyObject *> BaseException::__str__() const { return PyString::create(to_string()); }
+
 namespace {
 
 	std::once_flag base_exception_flag;
 
 	std::unique_ptr<TypePrototype> register_base_exception()
 	{
-		return std::move(klass<BaseException>("BaseException").type);
+		return std::move(klass<BaseException>("BaseException")
+				.property_readonly("args",
+					[](BaseException *self) -> PyResult<PyObject *> {
+						return Ok(self->args() ? self->args() : py_none());
+					})
+				.property_readonly("__traceback__",
+					[](BaseException *self) -> PyResult<PyObject *> {
+						return Ok(self->traceback() ? self->traceback() : py_none());
+					})
+				.type);
 	}
 }// namespace
 

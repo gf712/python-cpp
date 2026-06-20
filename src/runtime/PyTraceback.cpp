@@ -1,6 +1,7 @@
 #include "PyTraceback.hpp"
 #include "MemoryError.hpp"
 #include "runtime/PyFrame.hpp"
+#include "runtime/PyInteger.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 #include "vm/VM.hpp"
@@ -48,6 +49,10 @@ namespace {
 		return std::move(klass<PyTraceback>("traceback")
 				.attr("tb_frame", &PyTraceback::m_tb_frame)
 				.attr("tb_next", &PyTraceback::m_tb_next)
+				.property_readonly("tb_lineno",
+					[](PyTraceback *self) -> PyResult<PyObject *> {
+						return PyInteger::create(static_cast<int64_t>(self->m_tb_lineno));
+					})
 				.type);
 	}
 }// namespace
