@@ -53,6 +53,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ListExtend.cpp
     executable/bytecode/instructions/ListToTuple.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
+    executable/bytecode/instructions/LoadException.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
     executable/bytecode/instructions/LoadClosure.cpp

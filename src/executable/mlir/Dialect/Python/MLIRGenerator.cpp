@@ -2643,11 +2643,6 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		if (handler->type()) {
 			auto *exception_check_block = m_context.builder().createBlock(&handler_op.getCond());
 			auto exception_type = handler->type()->codegen(this);
-			if (!handler->name().empty()) {
-				store_name(handler->name(),
-					static_cast<MLIRValue *>(exception_type),
-					handler->source_location());
-			}
 			m_context.builder().create<mlir::py::ConditionOp>(
 				loc(m_context.builder(), m_context.filename(), handler->source_location()),
 				static_cast<MLIRValue *>(exception_type)->value);
@@ -2655,6 +2650,17 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 
 		m_context.builder().createBlock(&handler_op.getHandler());
 		{
+			// `except <type> as <name>:` binds <name> to the active exception
+			// *instance* (not the type). Bind it at the start of the matched
+			// handler body via py.load_exception.
+			if (!handler->name().empty()) {
+				auto exception_instance = m_context.builder().create<mlir::py::LoadException>(
+					loc(m_context.builder(), m_context.filename(), handler->source_location()),
+					m_context->pyobject_type());
+				store_name(handler->name(),
+					new_value(exception_instance.getOutput()),
+					handler->source_location());
+			}
 			ClearExceptionBeforeReturn clear_exception_before_return{ scope() };
 			for (auto el : handler->body()) { el->codegen(this); }
 			if (m_context.builder().getBlock()->empty()

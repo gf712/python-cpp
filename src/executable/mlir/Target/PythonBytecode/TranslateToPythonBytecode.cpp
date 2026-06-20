@@ -49,6 +49,7 @@
 #include "executable/bytecode/instructions/LoadClosure.hpp"
 #include "executable/bytecode/instructions/LoadConst.hpp"
 #include "executable/bytecode/instructions/LoadDeref.hpp"
+#include "executable/bytecode/instructions/LoadException.hpp"
 #include "executable/bytecode/instructions/LoadFast.hpp"
 #include "executable/bytecode/instructions/LoadGlobal.hpp"
 #include "executable/bytecode/instructions/LoadMethod.hpp"
@@ -575,6 +576,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(Operation &op)
 			return success();
 		})
 		.Case<mlir::emitpybytecode::LoadAssertionError,
+			mlir::emitpybytecode::LoadException,
 			mlir::emitpybytecode::RaiseVarargs,
 			mlir::emitpybytecode::ReRaiseOp>([this](auto op) {
 			if (emitOperation(op).failed()) { return failure(); };
@@ -850,6 +852,13 @@ template<>
 LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::LoadAssertionError &op)
 {
 	emit<LoadAssertionError>(get_register(op.getOutput()));
+	return success();
+}
+
+template<>
+LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::LoadException &op)
+{
+	emit<LoadException>(get_register(op.getOutput()));
 	return success();
 }
 

@@ -262,6 +262,17 @@ AssertionError.
     let results = (outs Python_PyObjectType:$output);
 }
 
+def LoadException : Python_Op<"load_exception",
+        [MemoryEffects<[MemRead<PythonExceptionStateResource>]>]> {
+    let summary = [{
+Loads the currently-active exception instance, for binding `except ... as
+name`. Reads the interpreter exception state (not Pure: it must stay inside
+its handler and not be hoisted or eliminated).
+    }];
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
 def BuildDictOp : Python_Op<"build_dict", [SameVariadicOperandSize]> {
     let summary = "Builds a literal dictionary and expands the kv pairs as needed";
 

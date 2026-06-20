@@ -110,5 +110,6 @@ static constexpr uint8_t SET_UPDATE = 80;
 static constexpr uint8_t DELETE_ATTR = 81;
 static constexpr uint8_t UNPACK_EXPAND = 82;
 static constexpr uint8_t DELETE_DEREF = 83;
+static constexpr uint8_t LOAD_EXCEPTION = 84;
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer);
