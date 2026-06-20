@@ -7,6 +7,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "utilities.hpp"
@@ -89,10 +90,19 @@ class LiveAnalysis
 		// Block-level live-in / live-out via the upstream analysis.
 		mlir::Liveness liveness(fn);
 
+		// Exception edges aren't in the explicit CFG: an op inside a try body
+		// can transfer to the handler, so a value live at the handler must be
+		// treated as live across the whole try body even though no CFG edge
+		// from the body to the handler exists. mlir::Liveness only sees the
+		// SETUP_EXC_HANDLE -> handler edge, not body-op -> handler, and would
+		// otherwise let the allocator reuse a register holding a value the
+		// handler (or code after it) still needs (e.g. a FOR_ITER iterator).
+		auto handler_edges = compute_exception_handler_edges(fn, sorted_blocks);
+
 		// Materialise alive_at_timestep on top of mlir::Liveness's block
 		// results, injecting ForwardedOutputs into the live sets as needed.
 		std::map<mlir::Block *, std::pair<size_t, size_t>> blocks_span;
-		build_timesteps(sorted_blocks, block_info, liveness, blocks_span);
+		build_timesteps(sorted_blocks, block_info, liveness, handler_edges, blocks_span);
 
 		// Propagate block argument inputs through the liveness information
 		propagate_block_arguments(block_parameters_to_args, blocks_span);
@@ -209,6 +219,75 @@ class LiveAnalysis
 	}
 
 	/**
+	 * Map each block to the exception handlers protecting it.
+	 *
+	 * A SETUP_EXC_HANDLE / SETUP_WITH terminator names a try-body successor and a
+	 * handler successor. Any operation in the try body can fault and transfer to the
+	 * handler, but that edge is NOT in the explicit CFG (the VM dispatches it from the
+	 * active SETUP_* scope). `mlir::Liveness` follows only `block->getSuccessors()` and
+	 * does not consult RegionBranchOpInterface, so it never sees the body->handler
+	 * transfer and we must inject it here — this is permanent, not a stopgap, and is why
+	 * keeping try/except as a region op would not make liveness exception-aware on its
+	 * own.
+	 *
+	 * We treat every block dominated by the try-body entry as protected by the handler.
+	 * This is exact for the structured try/except/finally and `with` shapes the lowering
+	 * (TryOpLowering / WithOpLowering) produces: each try body is a single-entry region
+	 * dominated by its entry, so dominance captures exactly the body (including nested
+	 * if/else, loops, and inner try regions). Dominance is reflexive, so the entry block
+	 * is included. The handler is a *sibling* successor of the SETUP_* block — reachable
+	 * without passing through the try entry — so the try entry never dominates it and a
+	 * handler is never recorded as protecting itself; the assertion below enforces that
+	 * invariant.
+	 */
+	std::map<mlir::Block *, llvm::SmallVector<mlir::Block *, 2>> compute_exception_handler_edges(
+		mlir::func::FuncOp &fn,
+		const std::vector<mlir::Block *> &sorted_blocks)
+	{
+		std::map<mlir::Block *, llvm::SmallVector<mlir::Block *, 2>> protected_by;
+
+		bool has_handler = false;
+		for (auto *block : sorted_blocks) {
+			auto *term = block->getTerminator();
+			if (term
+				&& (mlir::isa<mlir::emitpybytecode::SetupExceptionHandle>(term)
+					|| mlir::isa<mlir::emitpybytecode::SetupWith>(term))) {
+				has_handler = true;
+				break;
+			}
+		}
+		if (!has_handler) { return protected_by; }
+
+		mlir::DominanceInfo dominance(fn);
+		for (auto *block : sorted_blocks) {
+			auto *term = block->getTerminator();
+			if (!term) { continue; }
+			mlir::Block *try_entry = nullptr;
+			mlir::Block *handler = nullptr;
+			if (auto setup = mlir::dyn_cast<mlir::emitpybytecode::SetupExceptionHandle>(term)) {
+				try_entry = setup.getBody();
+				handler = setup.getHandler();
+			} else if (auto setup = mlir::dyn_cast<mlir::emitpybytecode::SetupWith>(term)) {
+				try_entry = setup.getBody();
+				handler = setup.getHandler();
+			} else {
+				continue;
+			}
+			// The handler is a sibling of the try entry (both are successors of this
+			// SETUP_* block), so the try entry must not dominate it — otherwise the
+			// dominated-set below would mark the handler as protecting itself, signalling
+			// a malformed / unstructured try region this heuristic does not model.
+			ASSERT(!dominance.dominates(try_entry, handler));
+			for (auto *candidate : sorted_blocks) {
+				if (dominance.dominates(try_entry, candidate)) {
+					protected_by[candidate].push_back(handler);
+				}
+			}
+		}
+		return protected_by;
+	}
+
+	/**
 	 * Build alive_at_timestep from mlir::Liveness's block live-out info.
 	 *
 	 * Computes precise per-operation liveness by propagating backward within each block.
@@ -218,6 +297,7 @@ class LiveAnalysis
 	void build_timesteps(const std::vector<mlir::Block *> &sorted_blocks,
 		const std::map<mlir::Block *, BlockInfo> &block_info,
 		const mlir::Liveness &liveness,
+		const std::map<mlir::Block *, llvm::SmallVector<mlir::Block *, 2>> &handler_edges,
 		std::map<mlir::Block *, std::pair<size_t, size_t>> &blocks_span)
 	{
 		auto logger = get_regalloc_logger();
@@ -238,6 +318,15 @@ class LiveAnalysis
 			// and are added separately below.
 			ValueSet alive_after;
 			for (mlir::Value v : liveness.getLiveOut(block)) { alive_after.insert(v); }
+
+			// Add the exception edge: any op in this block (if it is in a try
+			// body) can transfer to the handler, so values live at the handler
+			// are live-out of this block too.
+			if (auto it = handler_edges.find(block); it != handler_edges.end()) {
+				for (auto *handler : it->second) {
+					for (mlir::Value v : liveness.getLiveIn(handler)) { alive_after.insert(v); }
+				}
+			}
 
 			for (size_t i = info.operations.size(); i-- > 0;) {
 				auto *op = info.operations[i];

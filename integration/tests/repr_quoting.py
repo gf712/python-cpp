@@ -19,31 +19,21 @@ assert str((1,)) == "(1,)", str((1,))
 
 
 # exception repr quotes its args; str() stays the bare message
-def check_single_arg():
-    try:
-        raise ValueError("hello")
-    except ValueError as e:
-        assert repr(e) == "ValueError('hello')", repr(e)
-        assert str(e) == "hello", str(e)
-        assert e.args == ("hello",), e.args
+try:
+    raise ValueError("hello")
+except ValueError as e:
+    assert repr(e) == "ValueError('hello')", repr(e)
+    assert str(e) == "hello", str(e)
+    assert e.args == ("hello",), e.args
 
+try:
+    raise ValueError("a", "b")
+except ValueError as e:
+    assert repr(e) == "ValueError('a', 'b')", repr(e)
 
-def check_multi_arg():
-    try:
-        raise ValueError("a", "b")
-    except ValueError as e:
-        assert repr(e) == "ValueError('a', 'b')", repr(e)
-
-
-def check_no_arg():
-    try:
-        raise ValueError
-    except ValueError as e:
-        assert repr(e) == "ValueError()", repr(e)
-
-
-check_single_arg()
-check_multi_arg()
-check_no_arg()
+try:
+    raise ValueError
+except ValueError as e:
+    assert repr(e) == "ValueError()", repr(e)
 
 print("REPR_QUOTING_OK")

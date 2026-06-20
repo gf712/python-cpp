@@ -2,10 +2,6 @@
 # crashing — Exception subclasses missing their own __new__ used to inherit
 # Exception::__new__ (which asserts the exact Exception type), and
 # ModuleNotFoundError dereferenced a null kwargs.
-#
-# NB: the per-type check lives in a helper called from the loop body rather than
-# inline, to avoid the (separate) FOR_ITER iterator-register clobber bug that a
-# heavy loop body triggers.
 
 builtin_exceptions = [
     BaseException, Exception, ValueError, KeyError, IndexError, TypeError,
@@ -15,17 +11,13 @@ builtin_exceptions = [
 ]
 
 
-def check(exc_type):
+for exc_type in builtin_exceptions:
     try:
         raise exc_type("msg")
     except BaseException as e:
         assert isinstance(e, exc_type), exc_type
         assert type(e) is exc_type, (type(e), exc_type)
         assert e.args == ("msg",), (exc_type, e.args)
-
-
-for exc_type in builtin_exceptions:
-    check(exc_type)
 
 
 # subclass relationships still hold
