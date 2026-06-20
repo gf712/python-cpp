@@ -245,15 +245,12 @@ PyResult<PyObject *> PyList::__repr__() const
 	} cleanup{ this, !visited.contains(const_cast<PyList *>(this)) };
 	visited.insert(const_cast<PyList *>(this));
 
-	auto repr = [](const auto &el) -> PyResult<PyString *> {
-		return std::visit(overloaded{
-							  [](const auto &value) { return PyString::create(value.to_string()); },
-							  [](PyObject *value) {
-								  if (visited.contains(value)) { return PyString::create("[...]"); }
-								  return value->repr();
-							  },
-						  },
-			el);
+	auto repr = [](const Value &el) -> PyResult<PyString *> {
+		if (auto *obj = std::get_if<PyObject *>(&el)) {
+			if (visited.contains(*obj)) { return PyString::create("[...]"); }
+			return (*obj)->repr();
+		}
+		return repr_value(el);
 	};
 	os << "[";
 	if (!m_elements.empty()) {

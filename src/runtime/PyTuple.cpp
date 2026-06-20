@@ -126,27 +126,21 @@ std::string PyTuple::to_string() const
 {
 	std::ostringstream os;
 
+	auto append_repr = [&os](const Value &value) {
+		auto r = repr_value(value);
+		ASSERT(r.is_ok());
+		os << r.unwrap()->to_string();
+	};
+
 	os << "(";
 	if (!m_elements.empty()) {
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
-			std::visit(overloaded{ [&os](const auto &value) { os << value; },
-						   [&os](PyObject *value) {
-							   auto r = value->repr();
-							   ASSERT(r.is_ok());
-							   os << r.unwrap()->to_string();
-						   } },
-				*it);
+			append_repr(*it);
 			std::advance(it, 1);
 			os << ", ";
 		}
-		std::visit(overloaded{ [&os](const auto &value) { os << value; },
-					   [&os](PyObject *value) {
-						   auto r = value->repr();
-						   ASSERT(r.is_ok());
-						   os << r.unwrap()->to_string();
-					   } },
-			*it);
+		append_repr(*it);
 	}
 	if (m_elements.size() == 1) { os << ','; }
 	os << ")";

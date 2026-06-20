@@ -207,21 +207,19 @@ std::string PySet::to_string() const
 	if (m_elements.empty()) {
 		os << "set()";
 	} else {
+		auto append_repr = [&os](const Value &value) {
+			auto r = repr_value(value);
+			ASSERT(r.is_ok());
+			os << r.unwrap()->to_string();
+		};
 		os << "{";
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
-			std::visit(overloaded{
-						   [&os](const auto &value) { os << value << ", "; },
-						   [&os](PyObject *value) { os << value->to_string() << ", "; },
-					   },
-				*it);
+			append_repr(*it);
+			os << ", ";
 			std::advance(it, 1);
 		}
-		std::visit(overloaded{
-					   [&os](const auto &value) { os << value; },
-					   [&os](PyObject *value) { os << value->to_string(); },
-				   },
-			*it);
+		append_repr(*it);
 		os << "}";
 	}
 
@@ -262,22 +260,12 @@ PyResult<PyObject *> PySet::__repr__() const
 		os << "{";
 		auto it = m_elements.begin();
 		while (std::next(it) != m_elements.end()) {
-			auto r = std::visit(
-				overloaded{
-					[](const auto &value) { return PyString::create(value.to_string()); },
-					[](PyObject *value) { return value->repr(); },
-				},
-				*it);
+			auto r = repr_value(*it);
 			if (r.is_err()) { return Err(r.unwrap_err()); }
 			os << r.unwrap()->value() << ", ";
 			std::advance(it, 1);
 		}
-		auto r =
-			std::visit(overloaded{
-						   [](const auto &value) { return PyString::create(value.to_string()); },
-						   [](PyObject *value) { return value->repr(); },
-					   },
-				*it);
+		auto r = repr_value(*it);
 		if (r.is_err()) { return Err(r.unwrap_err()); }
 		os << r.unwrap()->value() << "}";
 	}

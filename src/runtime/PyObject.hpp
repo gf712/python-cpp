@@ -525,6 +525,11 @@ template<> PyResult<PyObject *> PyObject::from(const Ellipsis &value);
 template<> PyResult<PyObject *> PyObject::from(const NameConstant &value);
 template<> PyResult<PyObject *> PyObject::from(const Value &value);
 
+// repr() of a (possibly unboxed) Value. Inline values are boxed first so their
+// repr matches PyObject elements (e.g. strings are quoted) — used by container
+// repr/str so str(["a"]) and str(("a",)) both render 'a' with quotes.
+PyResult<PyString *> repr_value(const Value &value);
+
 BaseException *memory_error(size_t failed_allocation_size);
 
 namespace detail {

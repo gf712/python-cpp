@@ -406,6 +406,13 @@ template<> PyResult<PyObject *> PyObject::from(const Value &value)
 	return std::visit([](const auto &v) { return PyObject::from(v); }, value);
 }
 
+PyResult<PyString *> repr_value(const Value &value)
+{
+	auto obj = PyObject::from(value);
+	if (obj.is_err()) { return Err(obj.unwrap_err()); }
+	return obj.unwrap()->repr();
+}
+
 PyObject::PyObject(const TypePrototype &type) : Cell(), m_type(type) {}
 
 PyObject::PyObject(PyType *type) : Cell(), m_type(type) { ASSERT(type); }

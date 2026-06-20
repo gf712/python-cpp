@@ -72,49 +72,33 @@ std::string PyDict::to_string() const
 	std::ostringstream os;
 	os << "{";
 
+	auto append_key = [&os](const Value &key) {
+		auto r = repr_value(key);
+		ASSERT(r.is_ok());
+		os << r.unwrap()->to_string();
+	};
+	auto append_value = [&os, this](const Value &value) {
+		if (auto *obj = std::get_if<PyObject *>(&value); obj && *obj == this) {
+			os << "{...}";
+			return;
+		}
+		auto r = repr_value(value);
+		ASSERT(r.is_ok());
+		os << r.unwrap()->to_string();
+	};
+
 	auto it = m_map.begin();
 	while (std::next(it) != m_map.end()) {
-		std::visit(overloaded{ [&os](PyObject *key) {
-								  auto r = key->repr();
-								  ASSERT(r.is_ok());
-								  os << r.unwrap()->to_string();
-							  },
-					   [&os](const auto &key) { os << key; } },
-			it->first);
+		append_key(it->first);
 		os << ": ";
-		std::visit(overloaded{ [&os, this](PyObject *value) {
-								  if (value == this) {
-									  os << "{...}";
-								  } else {
-									  auto r = value->repr();
-									  ASSERT(r.is_ok());
-									  os << r.unwrap()->to_string();
-								  }
-							  },
-					   [&os](const auto &value) { os << value; } },
-			it->second);
+		append_value(it->second);
 		os << ", ";
 
 		std::advance(it, 1);
 	}
-	std::visit(overloaded{ [&os](PyObject *key) {
-							  auto r = key->repr();
-							  ASSERT(r.is_ok());
-							  os << r.unwrap()->to_string() << ": ";
-						  },
-				   [&os](const auto &key) { os << key << ": "; } },
-		it->first);
-	std::visit(overloaded{ [&os, this](PyObject *value) {
-							  if (value == this) {
-								  os << "{...}";
-							  } else {
-								  auto r = value->repr();
-								  ASSERT(r.is_ok());
-								  os << r.unwrap()->to_string();
-							  }
-						  },
-				   [&os](const auto &value) { os << value; } },
-		it->second);
+	append_key(it->first);
+	os << ": ";
+	append_value(it->second);
 	os << "}";
 
 	return os.str();

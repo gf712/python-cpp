@@ -128,12 +128,19 @@ std::string BaseException::format_traceback() const
 
 PyResult<PyObject *> BaseException::__repr__() const
 {
-	if (auto result = PyString::create(fmt::format("{}({})", type()->name(), what()));
-		result.is_ok()) {
-		return Ok(static_cast<PyObject *>(result.unwrap()));
+	std::string args_part;
+	if (m_args && m_args->size() == 1) {
+		auto r = repr_value(m_args->elements()[0]);
+		if (r.is_err()) { return r; }
+		args_part = fmt::format("({})", r.unwrap()->to_string());
+	} else if (m_args) {
+		auto r = m_args->repr();
+		if (r.is_err()) { return r; }
+		args_part = r.unwrap()->to_string();
 	} else {
-		return Err(result.unwrap_err());
+		args_part = "()";
 	}
+	return PyString::create(fmt::format("{}{}", type()->name(), args_part));
 }
 
 PyResult<PyObject *> BaseException::__str__() const { return PyString::create(to_string()); }
