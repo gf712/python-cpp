@@ -259,6 +259,9 @@ Loads AssertionError type. This is guaranteed to be the builtin
 AssertionError.
     }];
 
+    // Packed (line, column) source position of the originating `assert`
+    let arguments = (ins OptionalAttr<I64Attr>:$assert_location);
+
     let results = (outs Python_PyObjectType:$output);
 }
 

@@ -611,9 +611,16 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 	m_context.builder().setInsertionPointToEnd(assertion_block);
 
 	auto assertion_error = [this, node]() {
+		// Packed (line, column) discriminator so asserts at distinct source
+		// positions aren't merged into one assertion block.
+		const auto &assert_start = node->source_location().start;
+		const auto assert_location =
+			static_cast<int64_t>((static_cast<uint64_t>(assert_start.row) << 32)
+								 | (static_cast<uint64_t>(assert_start.column) & 0xFFFFFFFFull));
 		auto assertion_error_fn = m_context.builder().create<mlir::py::LoadAssertionError>(
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
-			m_context->pyobject_type());
+			m_context->pyobject_type(),
+			m_context.builder().getI64IntegerAttr(assert_location));
 		if (node->msg()) {
 			auto msg = static_cast<const MLIRValue &>(*node->msg()->codegen(this)).value;
 			return m_context.builder().create<mlir::py::FunctionCallOp>(
