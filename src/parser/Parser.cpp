@@ -32,7 +32,7 @@ using namespace parser;
 		return {};                                                                          \
 	} while (0)
 
-static int hits = 0;
+[[maybe_unused]] static int hits = 0;
 
 size_t Parser::CacheHash::operator()(const Parser::CacheKey &cache) const
 {

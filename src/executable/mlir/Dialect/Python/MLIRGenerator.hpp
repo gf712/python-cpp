@@ -109,6 +109,7 @@ class MLIRGenerator : ast::CodeGenerator
 
   private:
 	MLIRGenerator(Context &);
+	~MLIRGenerator();
 
   public:
 	static bool compile(std::shared_ptr<ast::Module>, std::vector<std::string> argv, Context &);

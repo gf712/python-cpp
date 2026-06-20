@@ -202,12 +202,27 @@ Context::~Context() = default;
 
 Context Context::create() { return Context{ std::make_unique<ContextImpl>() }; }
 
+struct MLIRGenerator::MLIRValue : public ast::Value
+{
+	mlir::Value value;
+
+	static std::string get_name(const mlir::Value &v)
+	{
+		if (auto *op = v.getDefiningOp()) { return op->getName().getStringRef().str(); }
+		return "";
+	}
+
+	MLIRValue(mlir::Value value_) : ast::Value(get_name(value_)), value(std::move(value_)) {}
+};
+
 MLIRGenerator::MLIRGenerator(Context &ctx) : m_context(ctx)
 {
 	m_context.ctx().loadDialect<mlir::cf::ControlFlowDialect>();
 	m_context.ctx().loadDialect<mlir::func::FuncDialect>();
 	m_context.ctx().loadDialect<mlir::scf::SCFDialect>();
 }
+
+MLIRGenerator::~MLIRGenerator() = default;
 
 bool MLIRGenerator::compile(std::shared_ptr<ast::Module> m,
 	std::vector<std::string> argv,
@@ -240,19 +255,6 @@ bool MLIRGenerator::compile(std::shared_ptr<ast::Module> m,
 
 	return true;
 }
-
-struct MLIRGenerator::MLIRValue : public ast::Value
-{
-	mlir::Value value;
-
-	static std::string get_name(const mlir::Value &v)
-	{
-		if (auto *op = v.getDefiningOp()) { return op->getName().getStringRef().str(); }
-		return "";
-	}
-
-	MLIRValue(mlir::Value value_) : ast::Value(get_name(value_)), value(std::move(value_)) {}
-};
 
 std::optional<mlir::Block *> MLIRGenerator::unhappy_path() const
 {
