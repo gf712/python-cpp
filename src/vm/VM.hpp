@@ -57,6 +57,7 @@ struct StackFrame : NonCopyable
 	InstructionVector::const_iterator last_instruction_pointer;
 	std::vector<py::Value>::const_iterator base_pointer;
 	std::vector<py::Value>::iterator stack_pointer;
+	size_t locals_count{ 0 };
 	VirtualMachine *vm{ nullptr };
 	std::unique_ptr<State> state;
 
