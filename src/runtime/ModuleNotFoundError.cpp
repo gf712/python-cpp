@@ -17,14 +17,18 @@ PyResult<PyObject *> ModuleNotFoundError::__new__(const PyType *type, PyTuple *a
 	ASSERT(type == types::module_not_found_error());
 	auto name = [kwargs]() -> PyResult<PyObject *> {
 		auto *name = PyString::create("name").unwrap();
-		if (kwargs->map().contains(name)) { return PyObject::from(kwargs->map().at(name)); }
+		if (kwargs && kwargs->map().contains(name)) {
+			return PyObject::from(kwargs->map().at(name));
+		}
 		return Ok(py_none());
 	}();
 	if (name.is_err()) return name;
 
 	auto path = [kwargs]() -> PyResult<PyObject *> {
 		auto *path = PyString::create("path").unwrap();
-		if (kwargs->map().contains(path)) { return PyObject::from(kwargs->map().at(path)); }
+		if (kwargs && kwargs->map().contains(path)) {
+			return PyObject::from(kwargs->map().at(path));
+		}
 		return Ok(py_none());
 	}();
 	if (path.is_err()) return path;

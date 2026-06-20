@@ -5,6 +5,7 @@
 #include "PyNone.hpp"
 #include "PyString.hpp"
 #include "PyTraceback.hpp"
+#include "PyTuple.hpp"
 #include "PyType.hpp"
 #include "SourceManager.hpp"
 #include "types/api.hpp"
@@ -146,7 +147,9 @@ namespace {
 		return std::move(klass<BaseException>("BaseException")
 				.property_readonly("args",
 					[](BaseException *self) -> PyResult<PyObject *> {
-						return Ok(self->args() ? self->args() : py_none());
+						// args is always a tuple (empty when constructed without args).
+						if (auto args = self->args()) { return Ok(args); }
+						return PyTuple::create();
 					})
 				.property_readonly("__traceback__",
 					[](BaseException *self) -> PyResult<PyObject *> {
