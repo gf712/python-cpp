@@ -1,5 +1,6 @@
 #include "BaseException.hpp"
 #include "MemoryError.hpp"
+#include "PyBool.hpp"
 #include "PyCode.hpp"
 #include "PyFrame.hpp"
 #include "PyNone.hpp"
@@ -161,6 +162,38 @@ namespace {
 				.property_readonly("__traceback__",
 					[](BaseException *self) -> PyResult<PyObject *> {
 						return Ok(self->traceback() ? self->traceback() : py_none());
+					})
+				.property(
+					"__cause__",
+					[](BaseException *self) -> PyResult<PyObject *> {
+						return Ok(self->cause() ? self->cause() : py_none());
+					},
+					[](BaseException *self, PyObject *value) -> PyResult<std::monostate> {
+						// Per the data model, setting __cause__ also suppresses the
+						// implicit context display (raise ... from ...).
+						self->set_cause(value == py_none() ? nullptr : value);
+						self->set_suppress_context(true);
+						return Ok(std::monostate{});
+					})
+				.property(
+					"__context__",
+					[](BaseException *self) -> PyResult<PyObject *> {
+						return Ok(self->context() ? self->context() : py_none());
+					},
+					[](BaseException *self, PyObject *value) -> PyResult<std::monostate> {
+						self->set_context(value == py_none() ? nullptr : value);
+						return Ok(std::monostate{});
+					})
+				.property(
+					"__suppress_context__",
+					[](BaseException *self) -> PyResult<PyObject *> {
+						return Ok(self->suppress_context() ? py_true() : py_false());
+					},
+					[](BaseException *self, PyObject *value) -> PyResult<std::monostate> {
+						auto truthy = value->true_();
+						if (truthy.is_err()) { return Err(truthy.unwrap_err()); }
+						self->set_suppress_context(truthy.unwrap());
+						return Ok(std::monostate{});
 					})
 				.type);
 	}

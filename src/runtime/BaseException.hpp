@@ -48,6 +48,12 @@ class BaseException : public PyBaseObject
 	PyObject *cause() const { return m_cause; }
 	void set_cause(PyObject *cause) { m_cause = cause; }
 
+	PyObject *context() const { return m_context; }
+	void set_context(PyObject *context) { m_context = context; }
+
+	bool suppress_context() const { return m_suppress_context; }
+	void set_suppress_context(bool suppress) { m_suppress_context = suppress; }
+
 	std::string format_traceback() const;
 
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
