@@ -39,12 +39,14 @@ PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 			raised->set_cause(cause.unwrap());
 			raised->set_suppress_context(true);
 		}
-		// NB: implicit __context__ chaining (set the new exception's context to
-		// the one currently being handled) is intentionally NOT done here: the
-		// frame exception stack is not reliably popped (internally-consumed
-		// StopIterations linger — the same bug that makes a bare `raise` outside
-		// a handler re-raise a stale exception), so reading it would attach a
-		// spurious context. __context__ remains exposed and settable.
+		// Implicit __context__ chaining: if an exception is currently being
+		// handled, it becomes the context of the newly-raised one (unless it is
+		// the same object). The exception stack is now kept clean, so this only
+		// fires inside a genuine handler, not from stale internal state.
+		if (auto info = vm.interpreter().execution_frame()->exception_info();
+			info.has_value() && info->exception != raised) {
+			raised->set_context(info->exception);
+		}
 		return Err(raised);
 	} else {
 		// reraise
