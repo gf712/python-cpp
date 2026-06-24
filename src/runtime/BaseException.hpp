@@ -36,6 +36,7 @@ class BaseException : public PyBaseObject
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;
+	PyResult<PyObject *> __str__() const;
 
 	std::string to_string() const override;
 
@@ -46,6 +47,12 @@ class BaseException : public PyBaseObject
 
 	PyObject *cause() const { return m_cause; }
 	void set_cause(PyObject *cause) { m_cause = cause; }
+
+	PyObject *context() const { return m_context; }
+	void set_context(PyObject *context) { m_context = context; }
+
+	bool suppress_context() const { return m_suppress_context; }
+	void set_suppress_context(bool suppress) { m_suppress_context = suppress; }
 
 	std::string format_traceback() const;
 

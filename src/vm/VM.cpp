@@ -26,7 +26,7 @@ StackFrame::StackFrame(size_t register_count,
 	: registers(register_count, nullptr),
 	  locals(vm_->m_stack_pointer, vm_->m_stack_pointer + stack_size),
 	  return_address(return_address), base_pointer(vm_->m_stack_pointer + locals_count),
-	  stack_pointer(vm_->m_stack_pointer + locals_count), vm(vm_)
+	  stack_pointer(vm_->m_stack_pointer + locals_count), locals_count(locals_count), vm(vm_)
 {
 	state = std::make_unique<State>();
 	spdlog::debug("Added frame with {} registers and stack size {}. New stack frame count: {}",
@@ -41,8 +41,8 @@ StackFrame::StackFrame(size_t register_count,
 StackFrame::StackFrame(StackFrame &&other)
 	: registers(std::move(other.registers)), locals_storage(std::move(other.locals_storage)),
 	  return_address(other.return_address), base_pointer(other.base_pointer),
-	  stack_pointer(other.stack_pointer), vm(std::exchange(other.vm, nullptr)),
-	  state(std::exchange(other.state, nullptr))
+	  stack_pointer(other.stack_pointer), locals_count(other.locals_count),
+	  vm(std::exchange(other.vm, nullptr)), state(std::exchange(other.state, nullptr))
 {
 	if (!locals_storage.empty()) {
 		locals = std::span{ locals_storage.begin(), locals_storage.end() };
@@ -71,6 +71,7 @@ StackFrame StackFrame::clone() const
 	stack_frame.last_instruction_pointer = last_instruction_pointer;
 	stack_frame.base_pointer = base_pointer;
 	stack_frame.stack_pointer = stack_pointer;
+	stack_frame.locals_count = locals_count;
 	stack_frame.vm = vm;
 	stack_frame.state = std::make_unique<State>(*state);
 	return stack_frame;
@@ -80,8 +81,24 @@ StackFrame StackFrame::clone() const
 StackFrame &StackFrame::restore()
 {
 	ASSERT(vm);
-	auto start = stack_pointer;
-	for (const auto &el : locals_storage) { *start++ = el; }
+	// A suspended frame (e.g. a generator paused at `yield`) holds its values
+	// off-stack in locals_storage, while base_pointer/stack_pointer still point
+	// at the absolute m_stack offset where the frame was originally created.
+	// Resuming at that stale offset only works when the VM stack pointer happens
+	// to still be at/below it; from a deeper call (next()/list()) it would write
+	// into a live frame. Rebase the whole region onto the current top of stack,
+	// preserving the locals/operand split (locals_count) and the operand-stack
+	// depth captured at suspend, so push_frame's invariants hold.
+	const size_t region_size = locals_storage.size();
+	const auto operand_depth =
+		std::distance<std::vector<py::Value>::const_iterator>(base_pointer, stack_pointer);
+	ASSERT(operand_depth >= 0);
+	const auto new_start = vm->m_stack_pointer;
+	auto dst = new_start;
+	for (const auto &el : locals_storage) { *dst++ = el; }
+	locals = std::span<py::Value>{ new_start, new_start + region_size };
+	base_pointer = new_start + locals_count;
+	stack_pointer = new_start + locals_count + operand_depth;
 	vm->push_frame(*this);
 	return vm->stack().back();
 }

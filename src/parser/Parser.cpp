@@ -32,7 +32,7 @@ using namespace parser;
 		return {};                                                                          \
 	} while (0)
 
-static int hits = 0;
+[[maybe_unused]] static int hits = 0;
 
 size_t Parser::CacheHash::operator()(const Parser::CacheKey &cache) const
 {
@@ -488,26 +488,26 @@ template<typename T, typename... Args> struct equal_types<std::tuple<T, Args...>
 template<typename... Args> struct ast_nodes<std::tuple<Args...>>
 {
   private:
-	template<typename T> struct is_shared_ptr : std::false_type
+	template<typename T> struct is_ast_ptr : std::false_type
 	{
 	};
 
-	template<typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type
+	template<typename T> struct is_ast_ptr<T *> : std::true_type
 	{
 	};
 
 	template<typename... _Args> struct _nested
 	{
-		using type = std::conjunction<std::is_base_of<ASTNode, typename _Args::element_type>...>;
+		using type = std::conjunction<std::is_base_of<ASTNode, std::remove_pointer_t<_Args>>...>;
 	};
 
-	static constexpr bool _all_shared_ptr = std::conjunction_v<is_shared_ptr<Args>...>;
+	static constexpr bool _all_ast_ptr = std::conjunction_v<is_ast_ptr<Args>...>;
 
   public:
 	static constexpr bool value =
 		typename std::conditional_t<equal_types<std::tuple<Args...>>::value,
 			std::true_type,
-			std::conditional_t<_all_shared_ptr, _nested<Args...>, std::false_type>>::type{};
+			std::conditional_t<_all_ast_ptr, _nested<Args...>, std::false_type>>::type{};
 };
 
 namespace detail {
@@ -595,7 +595,7 @@ struct traits<OrPatternV2_<TypeIdx, PatternTypes...>>
 	using _result_type = std::conditional_t<same_type,
 		typename std::tuple_element_t<0, _result_types>,
 		typename std::conditional_t<ast_nodes<_result_types>::value,
-			std::shared_ptr<ASTNode>,
+			ASTNode *,
 			typename TypeExtractor_<std::tuple<PatternTypes...>>::type_variant>>;
 
   public:
@@ -1096,7 +1096,7 @@ struct StarTargetPattern;
 
 template<> struct traits<struct StarTargetPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct NAMEPattern>
@@ -1124,7 +1124,7 @@ struct NAMEPattern : PatternV2<NAMEPattern>
 
 template<> struct traits<struct StarTargetsTupleSeq>
 {
-	using result_type = std::shared_ptr<ast::Tuple>;
+	using result_type = ast::Tuple *;
 };
 
 struct StarTargetsTupleSeq : PatternV2<StarTargetsTupleSeq>
@@ -1142,7 +1142,7 @@ struct StarTargetsTupleSeq : PatternV2<StarTargetsTupleSeq>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("star_target (',' star_target )+ [',']");
 			auto [els, _] = *result;
-			return std::make_shared<ast::Tuple>(els,
+			return p.arena().create<ast::Tuple>(els,
 				ContextType::STORE,
 				SourceLocation{
 					els.front()->source_location().start, els.back()->source_location().end });
@@ -1153,7 +1153,7 @@ struct StarTargetsTupleSeq : PatternV2<StarTargetsTupleSeq>
 
 template<> struct traits<struct StarTargetsListSeq>
 {
-	using result_type = std::shared_ptr<List>;
+	using result_type = List *;
 };
 
 struct StarTargetsListSeq : PatternV2<StarTargetsListSeq>
@@ -1168,7 +1168,7 @@ struct StarTargetsListSeq : PatternV2<StarTargetsListSeq>
 			ZeroOrOnePatternV2<SingleTokenPatternV2<Token::TokenType::COMMA>>>;
 		if (auto result = pattern1::match(p)) {
 			auto [els, _] = *result;
-			return std::make_shared<List>(els,
+			return p.arena().create<List>(els,
 				ContextType::STORE,
 				SourceLocation{
 					els.front()->source_location().start, els.back()->source_location().end });
@@ -1179,12 +1179,12 @@ struct StarTargetsListSeq : PatternV2<StarTargetsListSeq>
 
 template<> struct traits<struct TargetWithStarAtomPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct StarAtomPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct StarAtomPattern : PatternV2<StarAtomPattern>
@@ -1204,7 +1204,7 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 			auto [name] = *result;
 			std::string id{ name.token.start().pointer_to_program,
 				name.token.end().pointer_to_program };
-			return std::make_shared<Name>(
+			return p.arena().create<Name>(
 				id, ContextType::STORE, SourceLocation{ name.token.start(), name.token.end() });
 		}
 
@@ -1225,13 +1225,13 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("'(' [star_targets_tuple_seq] ')'");
 			auto [l, tpl_result, r] = *result;
-			std::vector<std::shared_ptr<ASTNode>> els;
+			std::vector<ASTNode *> els;
 			if (tpl_result.has_value()) {
 				auto tpl = *tpl_result;
 				els = tpl->elements();
 			}
 			// create new tuple with the correct source location
-			return std::make_shared<ast::Tuple>(
+			return p.arena().create<ast::Tuple>(
 				els, ContextType::STORE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
@@ -1242,13 +1242,13 @@ struct StarAtomPattern : PatternV2<StarAtomPattern>
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("'(' [star_targets_list_seq] ')'");
 			auto [l, lst_result, r] = *result;
-			std::vector<std::shared_ptr<ASTNode>> els;
+			std::vector<ASTNode *> els;
 			if (lst_result.has_value()) {
 				auto lst = *lst_result;
 				els = lst->elements();
 			}
 			// create new list with the correct source location
-			return std::make_shared<List>(
+			return p.arena().create<List>(
 				els, ContextType::STORE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
@@ -1284,7 +1284,7 @@ struct TLookahead : PatternV2<TLookahead>
 
 template<> struct traits<struct AtomPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct SlicesPattern>
@@ -1294,13 +1294,13 @@ template<> struct traits<struct SlicesPattern>
 
 template<> struct traits<struct GenexPattern>
 {
-	using result_type = std::shared_ptr<GeneratorExp>;
+	using result_type = GeneratorExp *;
 };
 
 template<> struct traits<struct ArgsPattern>
 {
-	using ArgsType = std::vector<std::shared_ptr<ASTNode>>;
-	using KwargsType = std::vector<std::shared_ptr<Keyword>>;
+	using ArgsType = std::vector<ASTNode *>;
+	using KwargsType = std::vector<Keyword *>;
 	using result_type = std::pair<ArgsType, KwargsType>;
 };
 
@@ -1311,7 +1311,7 @@ template<> struct traits<struct ArgumentsPattern>
 
 template<> struct traits<struct TPrimaryPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct TPrimaryPattern : PatternV2<TPrimaryPattern>
@@ -1342,7 +1342,7 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 			std::string_view name{ name_token.token.start().pointer_to_program,
 				static_cast<size_t>(name_token.token.end().pointer_to_program
 									- name_token.token.start().pointer_to_program) };
-			return std::make_shared<Attribute>(value,
+			return p.arena().create<Attribute>(value,
 				std::string(name),
 				ContextType::LOAD,
 				SourceLocation{ value->source_location().start, name_token.token.end() });
@@ -1357,7 +1357,7 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("t_primary '[' slices ']' &t_lookahead");
 			auto [value, l, slice, r, _] = *result;
-			return std::make_shared<Subscript>(value,
+			return p.arena().create<Subscript>(value,
 				slice,
 				ContextType::LOAD,
 				SourceLocation{ value->source_location().start, r.token.end() });
@@ -1368,6 +1368,8 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("t_primary genexp &t_lookahead");
 			auto [value, genexp, _] = *result;
+			(void)value;
+			(void)genexp;
 			TODO_NO_FAIL();
 		}
 
@@ -1380,14 +1382,14 @@ struct TPrimaryPattern : PatternV2<TPrimaryPattern>
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("'(' [arguments] ')' &t_lookahead");
 			auto [function, l, arguments, r, _] = *result;
-			std::vector<std::shared_ptr<ASTNode>> args;
-			std::vector<std::shared_ptr<Keyword>> kwargs;
+			std::vector<ASTNode *> args;
+			std::vector<Keyword *> kwargs;
 			if (arguments.has_value()) {
 				auto [args_, kwargs_] = *arguments;
 				args.insert(args.end(), args_.begin(), args_.end());
 				kwargs.insert(kwargs.end(), kwargs_.begin(), kwargs_.end());
 			}
-			return std::make_shared<Call>(function,
+			return p.arena().create<Call>(function,
 				args,
 				kwargs,
 				SourceLocation{ function->source_location().start, r.token.end() });
@@ -1430,7 +1432,7 @@ struct TargetWithStarAtomPattern : PatternV2<TargetWithStarAtomPattern>
 			(void)d;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Attribute>(primary,
+			return p.arena().create<Attribute>(primary,
 				name,
 				ContextType::STORE,
 				SourceLocation{ primary->source_location().start, name_token.token.end() });
@@ -1444,7 +1446,7 @@ struct TargetWithStarAtomPattern : PatternV2<TargetWithStarAtomPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
 			auto [value, l, subscript, r, _] = *result;
-			return std::make_shared<Subscript>(value,
+			return p.arena().create<Subscript>(value,
 				subscript,
 				ContextType::STORE,
 				SourceLocation{ value->source_location().start, r.token.end() });
@@ -1464,7 +1466,7 @@ struct TargetWithStarAtomPattern : PatternV2<TargetWithStarAtomPattern>
 
 struct StarTargetPattern : PatternV2<StarTargetPattern>
 {
-	using ResultType = std::shared_ptr<ASTNode>;
+	using ResultType = ASTNode *;
 	// star_target:
 	//     | '*' (!'*' star_target)
 	//     | target_with_star_atom
@@ -1480,7 +1482,7 @@ struct StarTargetPattern : PatternV2<StarTargetPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'*' (!'*' star_target)");
 			auto [star_token, _, value] = *result;
-			return std::make_shared<Starred>(value,
+			return p.arena().create<Starred>(value,
 				ContextType::STORE,
 				SourceLocation{ star_token.token.start(), value->source_location().start });
 		}
@@ -1498,7 +1500,7 @@ struct StarTargetPattern : PatternV2<StarTargetPattern>
 
 template<> struct traits<struct StarTargetsPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct StarTargetsPattern : PatternV2<StarTargetsPattern>
@@ -1529,7 +1531,7 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("star_target (',' star_target )* [',']");
 			auto [target, targets_, _] = *result;
-			std::vector<std::shared_ptr<ASTNode>> targets;
+			std::vector<ASTNode *> targets;
 			targets.reserve(1 + targets_.size());
 			targets.push_back(target);
 			std::transform(
@@ -1537,7 +1539,7 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 					auto [_, target] = el;
 					return target;
 				});
-			return std::make_shared<ast::Tuple>(targets,
+			return p.arena().create<ast::Tuple>(targets,
 				ContextType::STORE,
 				SourceLocation{ targets.front()->source_location().start,
 					targets.back()->source_location().end });
@@ -1547,7 +1549,7 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 	}
 };
 
-std::shared_ptr<Constant> parse_bytes(Token string)
+Constant *parse_bytes(Parser &p, Token string)
 {
 	Bytes byte_collection;
 	auto *start = string.start().pointer_to_program;
@@ -1567,34 +1569,34 @@ std::shared_ptr<Constant> parse_bytes(Token string)
 			return std::string{ start + 1, end - 1 };
 		}
 	}();
-	return std::make_shared<Constant>(
+	return p.arena().create<Constant>(
 		Bytes::from_unescaped_string(value), SourceLocation{ string.start(), string.end() });
 }
 
 template<> struct traits<struct FStringReplacementFieldPattern>
 {
-	using result_type = std::pair<std::shared_ptr<FormattedValue>, std::shared_ptr<Constant>>;
+	using result_type = std::pair<FormattedValue *, Constant *>;
 };
 
 template<> struct traits<struct FStringFormatSpecPattern>
 {
-	using result_type = std::variant<typename traits<FStringReplacementFieldPattern>::result_type,
-		std::shared_ptr<Constant>>;
+	using result_type =
+		std::variant<typename traits<FStringReplacementFieldPattern>::result_type, Constant *>;
 };
 
 template<> struct traits<struct FExpressionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct YieldExpressionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct StarExpressionsPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct FExpressionPattern : PatternV2<FExpressionPattern>
@@ -1684,15 +1686,15 @@ struct FStringReplacementFieldPattern : PatternV2<FStringReplacementFieldPattern
 				std::string value{ r.token.end().pointer_to_program,
 					next->start().pointer_to_program };
 				if (!value.empty()) {
-					return { { std::make_shared<FormattedValue>(expression,
+					return { { p.arena().create<FormattedValue>(expression,
 								   c,
 								   nullptr,
 								   SourceLocation{ l.token.start(), l.token.end() }),
-						std::make_shared<Constant>(value, SourceLocation{}) } };
+						p.arena().create<Constant>(value, SourceLocation{}) } };
 				}
 			}
 			return {
-				{ std::make_shared<FormattedValue>(
+				{ p.arena().create<FormattedValue>(
 					  expression, c, nullptr, SourceLocation{ l.token.start(), l.token.end() }),
 					nullptr }
 			};
@@ -1704,8 +1706,8 @@ struct FStringReplacementFieldPattern : PatternV2<FStringReplacementFieldPattern
 
 template<> struct traits<struct FStringMiddlePattern>
 {
-	using result_type = std::variant<typename traits<FStringReplacementFieldPattern>::result_type,
-		std::shared_ptr<Constant>>;
+	using result_type =
+		std::variant<typename traits<FStringReplacementFieldPattern>::result_type, Constant *>;
 };
 
 struct FStringMiddlePattern : PatternV2<FStringMiddlePattern>
@@ -1743,7 +1745,7 @@ struct FStringMiddlePattern : PatternV2<FStringMiddlePattern>
 					str.push_back(middle_str[i]);
 				}
 			}
-			return std::make_shared<Constant>(String::from_unescaped_string(std::move(str)),
+			return p.arena().create<Constant>(String::from_unescaped_string(std::move(str)),
 				SourceLocation{ middle.token.start(), middle.token.end() });
 		}
 
@@ -1765,7 +1767,7 @@ struct FStringFormatSpecPattern : PatternV2<FStringFormatSpecPattern>
 			auto [middle] = *result;
 			std::string middle_str{ middle.token.start().pointer_to_program,
 				middle.token.end().pointer_to_program };
-			return std::make_shared<Constant>(
+			return p.arena().create<Constant>(
 				std::move(middle_str), SourceLocation{ middle.token.start(), middle.token.end() });
 		}
 
@@ -1781,7 +1783,7 @@ struct FStringFormatSpecPattern : PatternV2<FStringFormatSpecPattern>
 
 template<> struct traits<struct FStringPattern>
 {
-	using result_type = std::shared_ptr<JoinedStr>;
+	using result_type = JoinedStr *;
 };
 
 struct FStringPattern : PatternV2<FStringPattern>
@@ -1799,15 +1801,12 @@ struct FStringPattern : PatternV2<FStringPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("FSTRING_START fstring_middle* FSTRING_END");
 			auto [start, middle, end] = *result;
-			std::vector<std::shared_ptr<ASTNode>> string_nodes;
+			std::vector<ASTNode *> string_nodes;
 			string_nodes.reserve(middle.size());
 			for (const auto &n : middle) {
 				std::visit(overloaded{
-							   [&string_nodes](const std::shared_ptr<Constant> &c) {
-								   string_nodes.push_back(c);
-							   },
-							   [&string_nodes](const std::pair<std::shared_ptr<FormattedValue>,
-								   std::shared_ptr<Constant>> &p) {
+							   [&string_nodes](Constant *c) { string_nodes.push_back(c); },
+							   [&string_nodes](const std::pair<FormattedValue *, Constant *> &p) {
 								   auto [fv, c] = p;
 								   string_nodes.push_back(fv);
 								   if (c) { string_nodes.push_back(c); }
@@ -1816,10 +1815,10 @@ struct FStringPattern : PatternV2<FStringPattern>
 					n);
 			}
 			if (string_nodes.empty()) {
-				string_nodes.push_back(std::make_shared<Constant>(
+				string_nodes.push_back(p.arena().create<Constant>(
 					std::string{}, SourceLocation{ start.token.end(), end.token.start() }));
 			}
-			return std::make_shared<JoinedStr>(
+			return p.arena().create<JoinedStr>(
 				std::move(string_nodes), SourceLocation{ start.token.start(), end.token.end() });
 		}
 		return {};
@@ -1828,7 +1827,7 @@ struct FStringPattern : PatternV2<FStringPattern>
 
 template<> struct traits<struct StringPattern>
 {
-	using result_type = std::shared_ptr<Constant>;
+	using result_type = Constant *;
 };
 
 struct StringPattern : PatternV2<StringPattern>
@@ -1842,7 +1841,7 @@ struct StringPattern : PatternV2<StringPattern>
 
 		if (auto result = pattern1::match(p)) {
 			auto [str] = *result;
-			if (auto c = parse_bytes(str.token)) { return c; }
+			if (auto c = parse_bytes(p, str.token)) { return c; }
 
 			std::string_view value{ str.token.start().pointer_to_program,
 				str.token.end().pointer_to_program };
@@ -1864,10 +1863,10 @@ struct StringPattern : PatternV2<StringPattern>
 			}
 
 			if (is_raw_string) {
-				return std::make_shared<Constant>(String(std::string{ value }),
+				return p.arena().create<Constant>(String(std::string{ value }),
 					SourceLocation{ str.token.start(), str.token.end() });
 			}
-			return std::make_shared<Constant>(String::from_unescaped_string(std::string{ value }),
+			return p.arena().create<Constant>(String::from_unescaped_string(std::string{ value }),
 				SourceLocation{ str.token.start(), str.token.end() });
 		}
 		return {};
@@ -1876,7 +1875,7 @@ struct StringPattern : PatternV2<StringPattern>
 
 template<> struct traits<struct StringsPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct StringsPattern : PatternV2<StringsPattern>
@@ -1890,7 +1889,7 @@ struct StringsPattern : PatternV2<StringsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("strings: STRING+");
 			auto [strings] = *result;
-			std::vector<std::shared_ptr<ASTNode>> string_nodes;
+			std::vector<ASTNode *> string_nodes;
 			string_nodes.reserve(strings.size());
 			for (const auto &el : strings) {
 				if (auto joined_str = as<JoinedStr>(el)) {
@@ -1922,7 +1921,7 @@ struct StringsPattern : PatternV2<StringsPattern>
 						const auto &byte = std::get<Bytes>(*c->value());
 						bytes.b.insert(bytes.b.end(), byte.b.begin(), byte.b.end());
 					}
-					return std::make_shared<Constant>(bytes, sl);
+					return p.arena().create<Constant>(bytes, sl);
 				} else {
 					auto str = std::accumulate(string_nodes.begin(),
 						string_nodes.end(),
@@ -1933,10 +1932,10 @@ struct StringsPattern : PatternV2<StringsPattern>
 							ASSERT(std::holds_alternative<String>(*c->value()));
 							return acc + std::get<String>(*c->value()).s;
 						});
-					return std::make_shared<Constant>(std::move(str), sl);
+					return p.arena().create<Constant>(std::move(str), sl);
 				}
 			}
-			return std::make_shared<JoinedStr>(std::move(string_nodes), sl);
+			return p.arena().create<JoinedStr>(std::move(string_nodes), sl);
 		}
 		return {};
 	}
@@ -1944,17 +1943,17 @@ struct StringsPattern : PatternV2<StringsPattern>
 
 template<> struct traits<struct BitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct NamedExpressionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct StarNamedExpression>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct StarNamedExpression : PatternV2<StarNamedExpression>
@@ -1969,7 +1968,7 @@ struct StarNamedExpression : PatternV2<StarNamedExpression>
 			PatternMatchV2<SingleTokenPatternV2<Token::TokenType::STAR>, BitwiseOrPattern>;
 		if (auto result = pattern1::match(p)) {
 			auto [star_token, value] = *result;
-			return std::make_shared<Starred>(value,
+			return p.arena().create<Starred>(value,
 				ContextType::LOAD,
 				SourceLocation{ star_token.token.start(), value->source_location().start });
 		}
@@ -1986,7 +1985,7 @@ struct StarNamedExpression : PatternV2<StarNamedExpression>
 
 template<> struct traits<struct StarNamedExpressions>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 struct StarNamedExpressions : PatternV2<StarNamedExpressions>
@@ -2011,7 +2010,7 @@ struct StarNamedExpressions : PatternV2<StarNamedExpressions>
 
 template<> struct traits<struct ListPattern>
 {
-	using result_type = std::shared_ptr<List>;
+	using result_type = List *;
 };
 
 struct ListPattern : PatternV2<ListPattern>
@@ -2027,7 +2026,7 @@ struct ListPattern : PatternV2<ListPattern>
 			SingleTokenPatternV2<Token::TokenType::RSQB>>;
 		if (auto result = pattern1::match(p)) {
 			auto [l, els, r] = *result;
-			return std::make_shared<List>(els.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
+			return p.arena().create<List>(els.value_or(std::vector<ASTNode *>{}),
 				ContextType::LOAD,
 				SourceLocation{ l.token.start(), r.token.end() });
 		}
@@ -2037,12 +2036,12 @@ struct ListPattern : PatternV2<ListPattern>
 
 template<> struct traits<struct DisjunctionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct ForIfClausePattern>
 {
-	using result_type = std::shared_ptr<Comprehension>;
+	using result_type = Comprehension *;
 };
 
 struct ForIfClausePattern : PatternV2<ForIfClausePattern>
@@ -2068,7 +2067,7 @@ struct ForIfClausePattern : PatternV2<ForIfClausePattern>
 				DisjunctionPattern>>;
 		if (auto result = pattern2::match(p)) {
 			auto [for_token, target, _, iter, ifs_group] = *result;
-			std::vector<std::shared_ptr<ASTNode>> ifs;
+			std::vector<ASTNode *> ifs;
 			ifs.reserve(ifs_group.size());
 			std::transform(
 				ifs_group.begin(), ifs_group.end(), std::back_inserter(ifs), [](const auto &el) {
@@ -2078,7 +2077,7 @@ struct ForIfClausePattern : PatternV2<ForIfClausePattern>
 			SourceLocation sc{ .start = for_token.start(),
 				.end =
 					ifs.empty() ? iter->source_location().end : ifs.back()->source_location().end };
-			return std::make_shared<Comprehension>(target, iter, ifs, false, sc);
+			return p.arena().create<Comprehension>(target, iter, ifs, false, sc);
 		}
 		return {};
 	}
@@ -2086,7 +2085,7 @@ struct ForIfClausePattern : PatternV2<ForIfClausePattern>
 
 template<> struct traits<struct ForIfClausesPattern>
 {
-	using result_type = std::vector<std::shared_ptr<Comprehension>>;
+	using result_type = std::vector<Comprehension *>;
 };
 
 struct ForIfClausesPattern : PatternV2<ForIfClausesPattern>
@@ -2108,7 +2107,7 @@ struct ForIfClausesPattern : PatternV2<ForIfClausesPattern>
 
 template<> struct traits<struct ListCompPattern>
 {
-	using result_type = std::shared_ptr<ListComp>;
+	using result_type = ListComp *;
 };
 
 
@@ -2130,7 +2129,7 @@ struct ListCompPattern : PatternV2<ListCompPattern>
 				.start = l.token.start(),
 				.end = r.token.end(),
 			};
-			return std::make_shared<ListComp>(elt, std::move(generators), sc);
+			return p.arena().create<ListComp>(elt, std::move(generators), sc);
 		}
 		return {};
 	}
@@ -2138,7 +2137,7 @@ struct ListCompPattern : PatternV2<ListCompPattern>
 
 template<> struct traits<struct TuplePattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct TuplePattern : PatternV2<TuplePattern>
@@ -2159,18 +2158,18 @@ struct TuplePattern : PatternV2<TuplePattern>
 			auto [l, maybe_named_expression, r] = *result;
 
 			if (!maybe_named_expression.has_value()) {
-				return std::make_shared<ast::Tuple>(std::vector<std::shared_ptr<ASTNode>>{},
+				return p.arena().create<ast::Tuple>(std::vector<ASTNode *>{},
 					ContextType::LOAD,
 					SourceLocation{ l.token.start(), r.token.end() });
 			}
-			std::vector<std::shared_ptr<ASTNode>> elements;
+			std::vector<ASTNode *> elements;
 			const auto &named_expression = *maybe_named_expression;
 			auto [lhs, _, els_] = named_expression;
-			auto els = els_.value_or(std::vector<std::shared_ptr<ASTNode>>{});
+			auto els = els_.value_or(std::vector<ASTNode *>{});
 			elements.reserve(els.size() + 1);
 			elements.push_back(lhs);
 			elements.insert(elements.end(), els.begin(), els.end());
-			return std::make_shared<ast::Tuple>(
+			return p.arena().create<ast::Tuple>(
 				elements, ContextType::LOAD, SourceLocation{ l.token.start(), r.token.end() });
 		}
 		return {};
@@ -2179,7 +2178,7 @@ struct TuplePattern : PatternV2<TuplePattern>
 
 template<> struct traits<struct GroupPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct GroupPattern : PatternV2<GroupPattern>
@@ -2223,7 +2222,7 @@ struct GenexPattern : PatternV2<GenexPattern>
 				.start = l.token.start(),
 				.end = r.token.end(),
 			};
-			return std::make_shared<GeneratorExp>(expression, std::move(generators), sc);
+			return p.arena().create<GeneratorExp>(expression, std::move(generators), sc);
 		}
 		return {};
 	}
@@ -2231,7 +2230,7 @@ struct GenexPattern : PatternV2<GenexPattern>
 
 template<> struct traits<struct ExpressionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct KVPairPattern>
@@ -2320,7 +2319,7 @@ struct DoubleStarredKVPairsPattern : PatternV2<DoubleStarredKVPairsPattern>
 
 template<> struct traits<struct DictPattern>
 {
-	using result_type = std::shared_ptr<Dict>;
+	using result_type = Dict *;
 };
 
 struct DictPattern : PatternV2<DictPattern>
@@ -2340,8 +2339,8 @@ struct DictPattern : PatternV2<DictPattern>
 			DEBUG_LOG("'{' [double_starred_kvpairs] '}'");
 
 			auto [l, kv_pairs, r] = *result;
-			std::vector<std::shared_ptr<ASTNode>> keys;
-			std::vector<std::shared_ptr<ASTNode>> values;
+			std::vector<ASTNode *> keys;
+			std::vector<ASTNode *> values;
 
 			if (kv_pairs.has_value()) {
 				ASSERT(!kv_pairs->empty());
@@ -2353,7 +2352,7 @@ struct DictPattern : PatternV2<DictPattern>
 				}
 			}
 
-			auto dict = std::make_shared<Dict>(
+			auto dict = p.arena().create<Dict>(
 				keys, values, SourceLocation{ l.token.start(), r.token.end() });
 			return dict;
 		}
@@ -2364,7 +2363,7 @@ struct DictPattern : PatternV2<DictPattern>
 
 template<> struct traits<struct SetPattern>
 {
-	using result_type = std::shared_ptr<Set>;
+	using result_type = Set *;
 };
 
 struct SetPattern : PatternV2<SetPattern>
@@ -2383,7 +2382,7 @@ struct SetPattern : PatternV2<SetPattern>
 				.start = l.token.start(),
 				.end = r.token.end(),
 			};
-			return std::make_shared<Set>(std::move(set_values), ContextType::LOAD, sl);
+			return p.arena().create<Set>(std::move(set_values), ContextType::LOAD, sl);
 		}
 		return {};
 	}
@@ -2391,7 +2390,7 @@ struct SetPattern : PatternV2<SetPattern>
 
 template<> struct traits<struct DictCompPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct DictCompPattern : PatternV2<DictCompPattern>
@@ -2412,7 +2411,7 @@ struct DictCompPattern : PatternV2<DictCompPattern>
 				.end = r.token.end(),
 			};
 			auto [key, value] = kvpair;
-			return std::make_shared<DictComp>(key, value, std::move(generators), sc);
+			return p.arena().create<DictComp>(key, value, std::move(generators), sc);
 		}
 		return {};
 	}
@@ -2420,7 +2419,7 @@ struct DictCompPattern : PatternV2<DictCompPattern>
 
 template<> struct traits<struct SetCompPattern>
 {
-	using result_type = std::shared_ptr<SetComp>;
+	using result_type = SetComp *;
 };
 
 struct SetCompPattern : PatternV2<SetCompPattern>
@@ -2442,7 +2441,7 @@ struct SetCompPattern : PatternV2<SetCompPattern>
 				.start = l.token.start(),
 				.end = r.token.end(),
 			};
-			return std::make_shared<SetComp>(elt, std::move(generators), sc);
+			return p.arena().create<SetComp>(elt, std::move(generators), sc);
 		}
 		return {};
 	}
@@ -2450,7 +2449,7 @@ struct SetCompPattern : PatternV2<SetCompPattern>
 
 
 // this function assumes that we have a valid number
-std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_location)
+ASTNode *parse_number(Parser &p, std::string value, SourceLocation source_location)
 {
 	std::erase_if(value, [](const char c) { return c == '_'; });
 
@@ -2461,17 +2460,17 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 		// octal
 		std::string oct_str{ value.begin() + 2, value.end() };
 		BigIntType int_value{ oct_str, 8 };
-		return std::make_shared<Constant>(int_value, source_location);
+		return p.arena().create<Constant>(int_value, source_location);
 	} else if (value[1] == 'x' || value[1] == 'X') {
 		// hex
 		std::string hex_str{ value.begin() + 2, value.end() };
 		BigIntType int_value{ hex_str, 16 };
-		return std::make_shared<Constant>(int_value, source_location);
+		return p.arena().create<Constant>(int_value, source_location);
 	} else if (value[1] == 'b' || value[1] == 'B') {
 		// binary
 		std::string bin_str{ value.begin() + 2, value.end() };
 		BigIntType int_value{ bin_str, 2 };
-		return std::make_shared<Constant>(int_value, source_location);
+		return p.arena().create<Constant>(int_value, source_location);
 	} else if (value.find_first_of("jJ") != std::string::npos) {
 		// imaginary number
 		TODO();
@@ -2481,18 +2480,18 @@ std::shared_ptr<ASTNode> parse_number(std::string value, SourceLocation source_l
 		std::istringstream is(value);
 		double float_value;
 		is >> float_value;
-		return std::make_shared<Constant>(float_value, source_location);
+		return p.arena().create<Constant>(float_value, source_location);
 	} else if (value.find('.') != std::string::npos) {
 		// float
 		double float_value = std::stod(value);
-		return std::make_shared<Constant>(float_value, source_location);
+		return p.arena().create<Constant>(float_value, source_location);
 	} else {
 		// int
 		mpz_class big_int{ value };
 		if (big_int.fits_slong_p()) {
-			return std::make_shared<Constant>(big_int.get_si(), source_location);
+			return p.arena().create<Constant>(big_int.get_si(), source_location);
 		} else {
-			return std::make_shared<Constant>(big_int, source_location);
+			return p.arena().create<Constant>(big_int, source_location);
 		}
 	}
 }
@@ -2530,16 +2529,16 @@ struct AtomPattern : PatternV2<AtomPattern>
 			std::string name{ token.token.start().pointer_to_program,
 				token.token.end().pointer_to_program };
 			if (name == "True") {
-				return std::make_shared<Constant>(
+				return p.arena().create<Constant>(
 					true, SourceLocation{ token.token.start(), token.token.end() });
 			} else if (name == "False") {
-				return std::make_shared<Constant>(
+				return p.arena().create<Constant>(
 					false, SourceLocation{ token.token.start(), token.token.end() });
 			} else if (name == "None") {
-				return std::make_shared<Constant>(py::NameConstant{ py::NoneType{} },
+				return p.arena().create<Constant>(py::NameConstant{ py::NoneType{} },
 					SourceLocation{ token.token.start(), token.token.end() });
 			} else {
-				return std::make_shared<Name>(name,
+				return p.arena().create<Name>(name,
 					ContextType::LOAD,
 					SourceLocation{ token.token.start(), token.token.end() });
 			}
@@ -2559,7 +2558,8 @@ struct AtomPattern : PatternV2<AtomPattern>
 			auto [token] = *result;
 			std::string number{ token.token.start().pointer_to_program,
 				token.token.end().pointer_to_program };
-			return parse_number(number, SourceLocation{ token.token.start(), token.token.end() });
+			return parse_number(
+				p, number, SourceLocation{ token.token.start(), token.token.end() });
 		}
 
 		// 	| (tuple | group | genexp)
@@ -2590,7 +2590,7 @@ struct AtomPattern : PatternV2<AtomPattern>
 		using pattern11 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::ELLIPSIS>>;
 		if (auto result = pattern11::match(p)) {
 			auto [token] = *result;
-			return std::make_shared<Constant>(
+			return p.arena().create<Constant>(
 				Ellipsis{}, SourceLocation{ token.token.start(), token.token.end() });
 		}
 
@@ -2625,10 +2625,10 @@ struct NamedExpressionPattern : PatternV2<NamedExpressionPattern>
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
 
-			auto target = std::make_shared<Name>(name,
+			auto target = p.arena().create<Name>(name,
 				ContextType::STORE,
 				SourceLocation{ name_token.token.start(), name_token.token.end() });
-			return std::make_shared<NamedExpr>(target,
+			return p.arena().create<NamedExpr>(target,
 				expr,
 				SourceLocation{ target->source_location().start, expr->source_location().end });
 		}
@@ -2648,12 +2648,12 @@ struct NamedExpressionPattern : PatternV2<NamedExpressionPattern>
 
 template<> struct traits<struct StarredExpressionPattern>
 {
-	using result_type = std::shared_ptr<Starred>;
+	using result_type = Starred *;
 };
 
 template<> struct traits<struct KwargsOrStarredPattern>
 {
-	using result_type = std::shared_ptr<Keyword>;
+	using result_type = Keyword *;
 };
 
 struct KwargsOrStarredPattern : PatternV2<KwargsOrStarredPattern>
@@ -2676,7 +2676,7 @@ struct KwargsOrStarredPattern : PatternV2<KwargsOrStarredPattern>
 			auto [name_token, _, expression] = *result;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Keyword>(name,
+			return p.arena().create<Keyword>(name,
 				expression,
 				SourceLocation{ name_token.token.start(), expression->source_location().end });
 		}
@@ -2686,7 +2686,7 @@ struct KwargsOrStarredPattern : PatternV2<KwargsOrStarredPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("starred_expression");
 			auto [expression] = *result;
-			return std::make_shared<Keyword>(expression,
+			return p.arena().create<Keyword>(expression,
 				SourceLocation{
 					expression->source_location().start, expression->source_location().end });
 		}
@@ -2710,7 +2710,7 @@ struct StarredExpressionPattern : PatternV2<StarredExpressionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'*' expression");
 			auto [token, expression] = *result;
-			return std::make_shared<Starred>(expression,
+			return p.arena().create<Starred>(expression,
 				ContextType::LOAD,
 				SourceLocation{ token.token.start(), expression->source_location().end });
 		}
@@ -2720,7 +2720,7 @@ struct StarredExpressionPattern : PatternV2<StarredExpressionPattern>
 
 template<> struct traits<struct KwargsOrDoubleStarredPattern>
 {
-	using result_type = std::shared_ptr<Keyword>;
+	using result_type = Keyword *;
 };
 
 struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
@@ -2742,7 +2742,7 @@ struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
 			auto [name_token, _, expression] = *result;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Keyword>(name,
+			return p.arena().create<Keyword>(name,
 				expression,
 				SourceLocation{ name_token.token.start(), expression->source_location().end });
 		}
@@ -2752,7 +2752,7 @@ struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'**' expression");
 			auto [token, expression] = *result;
-			return std::make_shared<Keyword>(expression,
+			return p.arena().create<Keyword>(expression,
 				SourceLocation{ token.token.start(), expression->source_location().end });
 		}
 
@@ -2762,7 +2762,7 @@ struct KwargsOrDoubleStarredPattern : PatternV2<KwargsOrDoubleStarredPattern>
 
 template<> struct traits<struct KwargsPattern>
 {
-	using result_type = std::vector<std::shared_ptr<Keyword>>;
+	using result_type = std::vector<Keyword *>;
 };
 
 struct KwargsPattern : PatternV2<KwargsPattern>
@@ -2835,17 +2835,16 @@ struct ArgsPattern : PatternV2<ArgsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("','.(starred_expression | named_expression !'=')+ [',' kwargs ]");
 			auto [starred_expressions_or_named_expressions, kwargs_] = *result;
-			std::vector<std::shared_ptr<ASTNode>> args;
+			std::vector<ASTNode *> args;
 			args.reserve(starred_expressions_or_named_expressions.size());
 			std::transform(starred_expressions_or_named_expressions.begin(),
 				starred_expressions_or_named_expressions.end(),
 				std::back_inserter(args),
-				[](const auto &el) -> std::shared_ptr<ASTNode> {
-					if (std::holds_alternative<std::shared_ptr<Starred>>(el)) {
-						return std::get<std::shared_ptr<Starred>>(el);
+				[](const auto &el) -> ASTNode * {
+					if (std::holds_alternative<Starred *>(el)) {
+						return std::get<Starred *>(el);
 					} else {
-						auto el_ =
-							std::get<std::tuple<std::shared_ptr<ASTNode>, std::monostate>>(el);
+						auto el_ = std::get<std::tuple<ASTNode *, std::monostate>>(el);
 						auto [node, _] = el_;
 						return node;
 					}
@@ -2977,7 +2976,7 @@ struct SlicesPattern : PatternV2<SlicesPattern>
 
 template<> struct traits<struct PrimaryPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct PrimaryPattern : PatternV2<PrimaryPattern>
@@ -3003,7 +3002,7 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 			auto [value, _, name_token] = *result;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Attribute>(value,
+			return p.arena().create<Attribute>(value,
 				name,
 				ContextType::LOAD,
 				SourceLocation{ value->source_location().start, name_token.token.end() });
@@ -3014,9 +3013,9 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("primary genexp");
 			auto [function, arg] = *result;
-			std::vector<std::shared_ptr<ASTNode>> args{ arg };
-			std::vector<std::shared_ptr<Keyword>> kwargs;
-			return std::make_shared<Call>(function,
+			std::vector<ASTNode *> args{ arg };
+			std::vector<Keyword *> kwargs;
+			return p.arena().create<Call>(function,
 				args,
 				kwargs,
 				SourceLocation{ function->source_location().start, arg->source_location().end });
@@ -3029,15 +3028,15 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 			SingleTokenPatternV2<Token::TokenType::RPAREN>>;
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("primary '(' [arguments] ')'");
-			std::vector<std::shared_ptr<ASTNode>> args;
-			std::vector<std::shared_ptr<Keyword>> kwargs;
+			std::vector<ASTNode *> args;
+			std::vector<Keyword *> kwargs;
 			auto [function, _, arguments, r] = *result;
 			if (arguments.has_value()) {
 				auto [args_, kwargs_] = *arguments;
 				args = std::move(args_);
 				kwargs = std::move(kwargs_);
 			}
-			return std::make_shared<Call>(function,
+			return p.arena().create<Call>(function,
 				args,
 				kwargs,
 				SourceLocation{ function->source_location().start, r.token.end() });
@@ -3051,7 +3050,7 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 		if (auto result = pattern5::match(p)) {
 			DEBUG_LOG("'[' slices ']'");
 			auto [value, l, slices, r] = *result;
-			return std::make_shared<Subscript>(value,
+			return p.arena().create<Subscript>(value,
 				slices,
 				ContextType::LOAD,
 				SourceLocation{ value->source_location().start, r.token.end() });
@@ -3068,7 +3067,7 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 
 template<> struct traits<struct AwaitPrimaryPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct AwaitPrimaryPattern : PatternV2<AwaitPrimaryPattern>
@@ -3090,7 +3089,7 @@ struct AwaitPrimaryPattern : PatternV2<AwaitPrimaryPattern>
 			DEBUG_LOG("AWAIT primary");
 			auto [await_token, el] = *result;
 			SourceLocation sc{ await_token.start(), el->source_location().end };
-			return std::make_shared<Await>(std::move(el), std::move(sc));
+			return p.arena().create<Await>(std::move(el), std::move(sc));
 		}
 
 		// primary
@@ -3107,12 +3106,12 @@ struct AwaitPrimaryPattern : PatternV2<AwaitPrimaryPattern>
 
 template<> struct traits<struct FactorPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct PowerPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct PowerPattern : PatternV2<PowerPattern>
@@ -3132,7 +3131,7 @@ struct PowerPattern : PatternV2<PowerPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("await_primary '**' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::EXP,
+			return p.arena().create<BinaryExpr>(BinaryOpType::EXP,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3168,7 +3167,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'+' factor");
 			auto [start_token, el] = *result;
-			return std::make_shared<UnaryExpr>(UnaryOpType::ADD,
+			return p.arena().create<UnaryExpr>(UnaryOpType::ADD,
 				el,
 				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
@@ -3179,7 +3178,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'-' factor");
 			auto [start_token, el] = *result;
-			return std::make_shared<UnaryExpr>(UnaryOpType::SUB,
+			return p.arena().create<UnaryExpr>(UnaryOpType::SUB,
 				el,
 				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
@@ -3190,7 +3189,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("'~' factor");
 			auto [start_token, el] = *result;
-			return std::make_shared<UnaryExpr>(UnaryOpType::INVERT,
+			return p.arena().create<UnaryExpr>(UnaryOpType::INVERT,
 				el,
 				SourceLocation{ start_token.token.start(), el->source_location().end });
 		}
@@ -3208,7 +3207,7 @@ struct FactorPattern : PatternV2<FactorPattern>
 
 template<> struct traits<struct TermPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct TermPattern : PatternV2<TermPattern>
@@ -3232,7 +3231,7 @@ struct TermPattern : PatternV2<TermPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("term '*' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::MULTIPLY,
+			return p.arena().create<BinaryExpr>(BinaryOpType::MULTIPLY,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3244,7 +3243,7 @@ struct TermPattern : PatternV2<TermPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("term '/' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::SLASH,
+			return p.arena().create<BinaryExpr>(BinaryOpType::SLASH,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3256,7 +3255,7 @@ struct TermPattern : PatternV2<TermPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("term '//' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::FLOORDIV,
+			return p.arena().create<BinaryExpr>(BinaryOpType::FLOORDIV,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3268,7 +3267,7 @@ struct TermPattern : PatternV2<TermPattern>
 		if (auto result = pattern4::match(p)) {
 			DEBUG_LOG("term '%' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::MODULO,
+			return p.arena().create<BinaryExpr>(BinaryOpType::MODULO,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3279,7 +3278,7 @@ struct TermPattern : PatternV2<TermPattern>
 		if (auto result = pattern5::match(p)) {
 			DEBUG_LOG("term '@' factor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::MATMUL,
+			return p.arena().create<BinaryExpr>(BinaryOpType::MATMUL,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3298,7 +3297,7 @@ struct TermPattern : PatternV2<TermPattern>
 
 template<> struct traits<struct SumPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct SumPattern : PatternV2<SumPattern>
@@ -3320,7 +3319,7 @@ struct SumPattern : PatternV2<SumPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("sum '+' term");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
+			return p.arena().create<BinaryExpr>(BinaryOpType::PLUS,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3332,7 +3331,7 @@ struct SumPattern : PatternV2<SumPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("sum '-' term");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::MINUS,
+			return p.arena().create<BinaryExpr>(BinaryOpType::MINUS,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3353,7 +3352,7 @@ struct SumPattern : PatternV2<SumPattern>
 
 template<> struct traits<struct ShiftExprPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct ShiftExprPattern : PatternV2<ShiftExprPattern>
@@ -3374,7 +3373,7 @@ struct ShiftExprPattern : PatternV2<ShiftExprPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("shift_expr '<<' sum");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::LEFTSHIFT,
+			return p.arena().create<BinaryExpr>(BinaryOpType::LEFTSHIFT,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3386,7 +3385,7 @@ struct ShiftExprPattern : PatternV2<ShiftExprPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("shift_expr '>>' sum");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::RIGHTSHIFT,
+			return p.arena().create<BinaryExpr>(BinaryOpType::RIGHTSHIFT,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3404,7 +3403,7 @@ struct ShiftExprPattern : PatternV2<ShiftExprPattern>
 
 template<> struct traits<struct BitwiseAndPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct BitwiseAndPattern : PatternV2<BitwiseAndPattern>
@@ -3424,7 +3423,7 @@ struct BitwiseAndPattern : PatternV2<BitwiseAndPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("bitwise_and '&' shift_expr");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::AND,
+			return p.arena().create<BinaryExpr>(BinaryOpType::AND,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3443,7 +3442,7 @@ struct BitwiseAndPattern : PatternV2<BitwiseAndPattern>
 
 template<> struct traits<struct BitwiseXorPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct BitwiseXorPattern : PatternV2<BitwiseXorPattern>
@@ -3464,7 +3463,7 @@ struct BitwiseXorPattern : PatternV2<BitwiseXorPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("bitwise_xor '^' bitwise_and");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::XOR,
+			return p.arena().create<BinaryExpr>(BinaryOpType::XOR,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3501,7 +3500,7 @@ struct BitwiseOrPattern : PatternV2<BitwiseOrPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("bitwise_or '|' bitwise_xor");
 			auto [lhs, _, rhs] = *result;
-			return std::make_shared<BinaryExpr>(BinaryOpType::OR,
+			return p.arena().create<BinaryExpr>(BinaryOpType::OR,
 				lhs,
 				rhs,
 				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
@@ -3521,7 +3520,7 @@ struct BitwiseOrPattern : PatternV2<BitwiseOrPattern>
 
 template<> struct traits<struct EqBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct EqBitwiseOrPattern : PatternV2<EqBitwiseOrPattern>
@@ -3546,7 +3545,7 @@ struct EqBitwiseOrPattern : PatternV2<EqBitwiseOrPattern>
 
 template<> struct traits<struct NotEqBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct NotEqBitwiseOrPattern : PatternV2<NotEqBitwiseOrPattern>
@@ -3570,7 +3569,7 @@ struct NotEqBitwiseOrPattern : PatternV2<NotEqBitwiseOrPattern>
 
 template<> struct traits<struct LtEqBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct LtEqBitwiseOrPattern : PatternV2<LtEqBitwiseOrPattern>
@@ -3594,7 +3593,7 @@ struct LtEqBitwiseOrPattern : PatternV2<LtEqBitwiseOrPattern>
 
 template<> struct traits<struct LtBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct LtBitwiseOrPattern : PatternV2<LtBitwiseOrPattern>
@@ -3618,7 +3617,7 @@ struct LtBitwiseOrPattern : PatternV2<LtBitwiseOrPattern>
 
 template<> struct traits<struct GtEqBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct GtEqBitwiseOrPattern : PatternV2<GtEqBitwiseOrPattern>
@@ -3642,7 +3641,7 @@ struct GtEqBitwiseOrPattern : PatternV2<GtEqBitwiseOrPattern>
 
 template<> struct traits<struct GtBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct GtBitwiseOrPattern : PatternV2<GtBitwiseOrPattern>
@@ -3666,7 +3665,7 @@ struct GtBitwiseOrPattern : PatternV2<GtBitwiseOrPattern>
 
 template<> struct traits<struct InBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct InBitwiseOrPattern : PatternV2<InBitwiseOrPattern>
@@ -3691,7 +3690,7 @@ struct InBitwiseOrPattern : PatternV2<InBitwiseOrPattern>
 
 template<> struct traits<struct NotInBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct NotInBitwiseOrPattern : PatternV2<NotInBitwiseOrPattern>
@@ -3717,7 +3716,7 @@ struct NotInBitwiseOrPattern : PatternV2<NotInBitwiseOrPattern>
 
 template<> struct traits<struct IsNotBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct IsNotBitwiseOrPattern : PatternV2<IsNotBitwiseOrPattern>
@@ -3743,7 +3742,7 @@ struct IsNotBitwiseOrPattern : PatternV2<IsNotBitwiseOrPattern>
 
 template<> struct traits<struct IsBitwiseOrPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct IsBitwiseOrPattern : PatternV2<IsBitwiseOrPattern>
@@ -3768,7 +3767,7 @@ struct IsBitwiseOrPattern : PatternV2<IsBitwiseOrPattern>
 
 template<> struct traits<struct CompareOpBitwiseOrPairPattern>
 {
-	using result_type = std::pair<std::shared_ptr<ASTNode>, Compare::OpType>;
+	using result_type = std::pair<ASTNode *, Compare::OpType>;
 };
 
 struct CompareOpBitwiseOrPairPattern : PatternV2<CompareOpBitwiseOrPairPattern>
@@ -3865,7 +3864,7 @@ struct CompareOpBitwiseOrPairPattern : PatternV2<CompareOpBitwiseOrPairPattern>
 
 template<> struct traits<struct ComparissonPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct ComparissonPattern : PatternV2<ComparissonPattern>
@@ -3886,14 +3885,14 @@ struct ComparissonPattern : PatternV2<ComparissonPattern>
 			DEBUG_LOG("bitwise_or compare_op_bitwise_or_pair+");
 			auto [lhs, compare_ops] = *result;
 			std::vector<Compare::OpType> ops;
-			std::vector<std::shared_ptr<ASTNode>> comparators;
+			std::vector<ASTNode *> comparators;
 			ops.reserve(compare_ops.size());
 			comparators.reserve(compare_ops.size());
 			for (auto [comparator, op] : compare_ops) {
 				ops.push_back(op);
 				comparators.push_back(std::move(comparator));
 			}
-			return std::make_shared<Compare>(lhs,
+			return p.arena().create<Compare>(lhs,
 				std::move(ops),
 				std::move(comparators),
 				SourceLocation{
@@ -3913,7 +3912,7 @@ struct ComparissonPattern : PatternV2<ComparissonPattern>
 
 template<> struct traits<struct InversionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct InversionPattern : PatternV2<InversionPattern>
@@ -3932,7 +3931,7 @@ struct InversionPattern : PatternV2<InversionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'not' inversion");
 			auto [not_token, inversion] = *result;
-			return std::make_shared<UnaryExpr>(UnaryOpType::NOT,
+			return p.arena().create<UnaryExpr>(UnaryOpType::NOT,
 				inversion,
 				SourceLocation{ not_token.start(), inversion->source_location().end });
 		}
@@ -3951,7 +3950,7 @@ struct InversionPattern : PatternV2<InversionPattern>
 
 template<> struct traits<struct ConjunctionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct ConjunctionPattern : PatternV2<ConjunctionPattern>
@@ -3974,17 +3973,17 @@ struct ConjunctionPattern : PatternV2<ConjunctionPattern>
 			DEBUG_LOG("inversion ('and' inversion )+");
 
 			auto [inversion, inversions] = *result;
-			std::vector<std::shared_ptr<ASTNode>> values;
+			std::vector<ASTNode *> values;
 			values.reserve(1 + inversions.size());
 			values.push_back(inversion);
 			std::transform(inversions.begin(),
 				inversions.end(),
 				std::back_inserter(values),
-				[](const std::tuple<Token, std::shared_ptr<ast::ASTNode>> &el) {
+				[](const std::tuple<Token, ast::ASTNode *> &el) {
 					auto [token, val] = el;
 					return val;
 				});
-			return std::make_shared<BoolOp>(BoolOp::OpType::And,
+			return p.arena().create<BoolOp>(BoolOp::OpType::And,
 				values,
 				SourceLocation{ values.front()->source_location().start,
 					values.back()->source_location().end });
@@ -4021,17 +4020,17 @@ struct DisjunctionPattern : PatternV2<DisjunctionPattern>
 			DEBUG_LOG("conjunction ('or' conjunction )+");
 
 			auto [conjunction, conjunctions] = *result;
-			std::vector<std::shared_ptr<ASTNode>> values;
+			std::vector<ASTNode *> values;
 			values.reserve(1 + conjunctions.size());
 			values.push_back(conjunction);
 			std::transform(conjunctions.begin(),
 				conjunctions.end(),
 				std::back_inserter(values),
-				[](const std::tuple<Token, std::shared_ptr<ast::ASTNode>> &el) {
+				[](const std::tuple<Token, ast::ASTNode *> &el) {
 					auto [token, val] = el;
 					return val;
 				});
-			return std::make_shared<BoolOp>(BoolOp::OpType::Or,
+			return p.arena().create<BoolOp>(BoolOp::OpType::Or,
 				values,
 				SourceLocation{ values.front()->source_location().start,
 					values.back()->source_location().end });
@@ -4075,7 +4074,7 @@ struct LambdaParamPattern : PatternV2<LambdaParamPattern>
 
 template<> struct traits<struct LambdaParamNoDefaultPattern>
 {
-	using result_type = std::shared_ptr<Argument>;
+	using result_type = Argument *;
 };
 
 struct LambdaParamNoDefaultPattern : PatternV2<LambdaParamNoDefaultPattern>
@@ -4099,7 +4098,7 @@ struct LambdaParamNoDefaultPattern : PatternV2<LambdaParamNoDefaultPattern>
 				lambda_param.start().pointer_to_program,
 				lambda_param.end().pointer_to_program,
 			};
-			return std::make_shared<Argument>(parameter_name,
+			return p.arena().create<Argument>(parameter_name,
 				nullptr,
 				"",
 				SourceLocation{ lambda_param.start(), comma_token.token.end() });
@@ -4115,7 +4114,7 @@ struct LambdaParamNoDefaultPattern : PatternV2<LambdaParamNoDefaultPattern>
 				lambda_param.start().pointer_to_program,
 				lambda_param.end().pointer_to_program,
 			};
-			return std::make_shared<Argument>(parameter_name,
+			return p.arena().create<Argument>(parameter_name,
 				nullptr,
 				"",
 				SourceLocation{ lambda_param.start(), lambda_param.end() });
@@ -4127,12 +4126,12 @@ struct LambdaParamNoDefaultPattern : PatternV2<LambdaParamNoDefaultPattern>
 
 template<> struct traits<struct DefaultPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct LambdaParamWithDefaultPattern>
 {
-	using result_type = std::pair<std::shared_ptr<Argument>, std::shared_ptr<ASTNode>>;
+	using result_type = std::pair<Argument *, ASTNode *>;
 };
 
 struct LambdaParamWithDefaultPattern : PatternV2<LambdaParamWithDefaultPattern>
@@ -4158,7 +4157,7 @@ struct LambdaParamWithDefaultPattern : PatternV2<LambdaParamWithDefaultPattern>
 				lambda_param.end().pointer_to_program,
 			};
 			return { {
-				std::make_shared<Argument>(parameter_name,
+				p.arena().create<Argument>(parameter_name,
 					nullptr,
 					"",
 					SourceLocation{ lambda_param.start(), comma_token.token.end() }),
@@ -4178,7 +4177,7 @@ struct LambdaParamWithDefaultPattern : PatternV2<LambdaParamWithDefaultPattern>
 				lambda_param.end().pointer_to_program,
 			};
 			return { {
-				std::make_shared<Argument>(parameter_name,
+				p.arena().create<Argument>(parameter_name,
 					nullptr,
 					"",
 					SourceLocation{ lambda_param.start(), default_->source_location().end }),
@@ -4192,9 +4191,9 @@ struct LambdaParamWithDefaultPattern : PatternV2<LambdaParamWithDefaultPattern>
 
 template<> struct traits<struct LambdaStarEtcPattern>
 {
-	using result_type = std::tuple<std::optional<std::shared_ptr<Argument>>,
-		std::vector<std::pair<std::shared_ptr<Argument>, std::optional<std::shared_ptr<ASTNode>>>>,
-		std::optional<std::shared_ptr<Argument>>>;
+	using result_type = std::tuple<std::optional<Argument *>,
+		std::vector<std::pair<Argument *, std::optional<ASTNode *>>>,
+		std::optional<Argument *>>;
 };
 
 struct LambdaStarEtcPattern : PatternV2<LambdaStarEtcPattern>
@@ -4210,7 +4209,7 @@ struct LambdaStarEtcPattern : PatternV2<LambdaStarEtcPattern>
 
 template<> struct traits<struct LambdaParametersPattern>
 {
-	using result_type = std::shared_ptr<Arguments>;
+	using result_type = Arguments *;
 };
 
 struct LambdaParametersPattern : PatternV2<LambdaParametersPattern>
@@ -4233,13 +4232,13 @@ struct LambdaParametersPattern : PatternV2<LambdaParametersPattern>
 			DEBUG_LOG("lambda_param_no_default+ lambda_param_with_default* [lambda_star_etc]");
 			auto [lambda_param_no_default, lambda_param_with_default, lambda_star_etc] = *result;
 
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				lambda_param_no_default.front()->source_location().start,
 				p.lexer().peek_token(p.token_position() - 1)->end(),// too lazy to figure this out
@@ -4261,7 +4260,7 @@ struct LambdaParametersPattern : PatternV2<LambdaParametersPattern>
 				kwarg = kwarg_.value_or(nullptr);
 			}
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -4299,7 +4298,7 @@ struct LambdaParamsPattern : PatternV2<LambdaParamsPattern>
 
 template<> struct traits<struct LambDefPattern>
 {
-	using result_type = std::shared_ptr<Lambda>;
+	using result_type = Lambda *;
 };
 
 struct LambDefPattern : PatternV2<LambDefPattern>
@@ -4317,10 +4316,9 @@ struct LambDefPattern : PatternV2<LambDefPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'lambda' [lambda_params] ':' expression");
 			auto [lambda_token, params, token, body] = *result;
-			return std::make_shared<Lambda>(
-				params.value_or(
-					std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
-						SourceLocation{ lambda_token.end(), body->source_location().start })),
+			return p.arena().create<Lambda>(
+				params.value_or(p.arena().create<Arguments>(std::vector<Argument *>{},
+					SourceLocation{ lambda_token.end(), body->source_location().start })),
 				body,
 				SourceLocation{ lambda_token.start(), body->source_location().end });
 		}
@@ -4348,7 +4346,7 @@ struct ExpressionPattern : PatternV2<ExpressionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("disjunction 'if' disjunction 'else' expression");
 			auto [body, if_token, test, else_token, orelse] = *result;
-			return std::make_shared<IfExpr>(test,
+			return p.arena().create<IfExpr>(test,
 				body,
 				orelse,
 				SourceLocation{ test->source_location().start, orelse->source_location().end });
@@ -4376,7 +4374,7 @@ struct ExpressionPattern : PatternV2<ExpressionPattern>
 
 template<> struct traits<struct StarExpressionPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct StarExpressionPattern : PatternV2<StarExpressionPattern>
@@ -4420,12 +4418,12 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("star_expression (',' star_expression )+ [',']");
 			auto [expression, more_expressions, _] = *result;
-			std::vector<std::shared_ptr<ASTNode>> expressions;
+			std::vector<ASTNode *> expressions;
 			expressions.reserve(1 + more_expressions.size());
 			expressions.push_back(expression);
 			for (const auto &[_, expr] : more_expressions) { expressions.push_back(expr); }
 			auto end_token = p.lexer().peek_token(p.token_position() - 1);
-			return std::make_shared<ast::Tuple>(expressions,
+			return p.arena().create<ast::Tuple>(expressions,
 				ContextType::LOAD,
 				SourceLocation{ expression->source_location().start, end_token->end() });
 		}
@@ -4436,7 +4434,7 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("star_expression ','");
 			auto [expression, token] = *result;
-			return std::make_shared<ast::Tuple>(std::vector{ expression },
+			return p.arena().create<ast::Tuple>(std::vector{ expression },
 				ContextType::LOAD,
 				SourceLocation{ expression->source_location().start, token.token.end() });
 		}
@@ -4454,7 +4452,7 @@ struct StarExpressionsPattern : PatternV2<StarExpressionsPattern>
 
 template<> struct traits<struct SingleSubscriptAttributeTargetPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttributeTargetPattern>
@@ -4478,7 +4476,7 @@ struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttribut
 			auto [target, _, name_token, l] = *result;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Attribute>(target,
+			return p.arena().create<Attribute>(target,
 				name,
 				ContextType::STORE,
 				SourceLocation{ target->source_location().start, name_token.token.end() });
@@ -4493,7 +4491,7 @@ struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttribut
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
 			auto [target, l, slices, r, _] = *result;
-			return std::make_shared<Subscript>(target,
+			return p.arena().create<Subscript>(target,
 				slices,
 				ContextType::STORE,
 				SourceLocation{ target->source_location().start, r.token.end() });
@@ -4506,7 +4504,7 @@ struct SingleSubscriptAttributeTargetPattern : PatternV2<SingleSubscriptAttribut
 
 template<> struct traits<struct SingleTargetPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct SingleTargetPattern : PatternV2<SingleTargetPattern>
@@ -4536,7 +4534,7 @@ struct SingleTargetPattern : PatternV2<SingleTargetPattern>
 			auto [name_token] = *result;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Name>(name,
+			return p.arena().create<Name>(name,
 				ContextType::STORE,
 				SourceLocation{ name_token.token.start(), name_token.token.end() });
 		}
@@ -4706,7 +4704,7 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'yield' 'from' expression");
 			auto [yield_token, from_token, expression] = *result;
-			return std::make_shared<YieldFrom>(expression,
+			return p.arena().create<YieldFrom>(expression,
 				SourceLocation{ yield_token.start(), expression->source_location().end });
 		}
 
@@ -4717,14 +4715,14 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 		if (auto result = pattern2::match(p)) {
 			auto [yield_token, star_expressions] = *result;
 			if (star_expressions.has_value()) {
-				return std::make_shared<Yield>(*star_expressions,
+				return p.arena().create<Yield>(*star_expressions,
 					SourceLocation{
 						yield_token.start(), (*star_expressions)->source_location().end });
 			}
 			const auto end = p.lexer().peek_token(p.token_position() - 1);
-			auto value = std::make_shared<Constant>(
+			auto value = p.arena().create<Constant>(
 				NameConstant{ NoneType{} }, SourceLocation{ end->start(), end->end() });
-			return std::make_shared<Yield>(
+			return p.arena().create<Yield>(
 				value, SourceLocation{ yield_token.start(), value->source_location().end });
 		}
 
@@ -4734,7 +4732,7 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 
 template<> struct traits<struct AnnotatedRhsPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct AnnotatedRhsPattern : PatternV2<AnnotatedRhsPattern>
@@ -4768,7 +4766,7 @@ struct AnnotatedRhsPattern : PatternV2<AnnotatedRhsPattern>
 
 template<> struct traits<struct AssignmentPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct AssignmentPattern : PatternV2<AssignmentPattern>
@@ -4793,6 +4791,8 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("NAME ':' expression ['=' annotated_rhs ]");
 			auto [name_token, c, expression, _] = *result;
+			(void)c;
+			(void)expression;
 			TODO_NO_FAIL();
 		}
 
@@ -4803,11 +4803,11 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 		if (auto result = pattern3::match(p)) {
 			DEBUG_LOG("(star_targets '=' )+ (yield_expr | star_expressions) !'=' [TYPE_COMMENT]");
 			auto [els, expressions] = *result;
-			std::vector<std::shared_ptr<ASTNode>> target_elements;
+			std::vector<ASTNode *> target_elements;
 			target_elements.reserve(els.size());
 			for (const auto &[el, _] : els) { target_elements.push_back(el); }
 
-			auto targets = std::make_shared<ast::Tuple>(target_elements,
+			auto targets = p.arena().create<ast::Tuple>(target_elements,
 				ContextType::STORE,
 				SourceLocation{ target_elements.front()->source_location().start,
 					target_elements.back()->source_location().end });
@@ -4816,13 +4816,13 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 			const auto end = expressions->source_location().end;
 
 			if (targets->elements().size() == 1) {
-				return std::make_shared<Assign>(
-					std::vector<std::shared_ptr<ASTNode>>{ targets->elements().back() },
+				return p.arena().create<Assign>(
+					std::vector<ASTNode *>{ targets->elements().back() },
 					expressions,
 					"",
 					SourceLocation{ start, end });
 			} else {
-				return std::make_shared<Assign>(
+				return p.arena().create<Assign>(
 					targets->elements(), expressions, "", SourceLocation{ start, end });
 			}
 		}
@@ -4838,55 +4838,55 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 				expression->source_location().end };
 			switch (assign.token_type()) {
 			case Token::TokenType::PLUSEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::PLUS, expression, source_location);
 			} break;
 			case Token::TokenType::MINEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::MINUS, expression, source_location);
 			} break;
 			case Token::TokenType::STAREQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::MULTIPLY, expression, source_location);
 			} break;
 			case Token::TokenType::ATEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::MATMUL, expression, source_location);
 			} break;
 			case Token::TokenType::SLASHEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::SLASH, expression, source_location);
 			} break;
 			case Token::TokenType::PERCENTEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::MODULO, expression, source_location);
 			} break;
 			case Token::TokenType::AMPEREQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::AND, expression, source_location);
 			} break;
 			case Token::TokenType::VBAREQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::OR, expression, source_location);
 			} break;
 			case Token::TokenType::CIRCUMFLEXEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::XOR, expression, source_location);
 			} break;
 			case Token::TokenType::LEFTSHIFTEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::LEFTSHIFT, expression, source_location);
 			} break;
 			case Token::TokenType::RIGHTSHIFTEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::RIGHTSHIFT, expression, source_location);
 			} break;
 			case Token::TokenType::DOUBLESTAREQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::EXP, expression, source_location);
 			} break;
 			case Token::TokenType::DOUBLESLASHEQUAL: {
-				return std::make_shared<AugAssign>(
+				return p.arena().create<AugAssign>(
 					target, BinaryOpType::FLOORDIV, expression, source_location);
 			} break;
 			default:
@@ -4899,7 +4899,7 @@ struct AssignmentPattern : PatternV2<AssignmentPattern>
 
 template<> struct traits<struct ReturnStatementPattern>
 {
-	using result_type = std::shared_ptr<Return>;
+	using result_type = Return *;
 };
 
 struct ReturnStatementPattern : PatternV2<ReturnStatementPattern>
@@ -4916,10 +4916,10 @@ struct ReturnStatementPattern : PatternV2<ReturnStatementPattern>
 		if (auto result = pattern1::match(p)) {
 			auto [return_token, expressions] = *result;
 			if (expressions.has_value()) {
-				return std::make_shared<Return>(*expressions,
+				return p.arena().create<Return>(*expressions,
 					SourceLocation{ return_token.start(), (*expressions)->source_location().end });
 			}
-			return std::make_shared<Return>(
+			return p.arena().create<Return>(
 				nullptr, SourceLocation{ return_token.start(), return_token.end() });
 		}
 		return {};
@@ -5021,7 +5021,7 @@ struct DottedAsNamesPattern : PatternV2<DottedAsNamesPattern>
 
 template<> struct traits<struct ImportNamePattern>
 {
-	using result_type = std::shared_ptr<Import>;
+	using result_type = Import *;
 };
 
 struct ImportNamePattern : PatternV2<ImportNamePattern>
@@ -5064,7 +5064,7 @@ struct ImportNamePattern : PatternV2<ImportNamePattern>
 						return { names, "" };
 					}
 				});
-			return std::make_shared<Import>(std::move(aliases),
+			return p.arena().create<Import>(std::move(aliases),
 				SourceLocation{ import_token.start(),
 					dotted_as_names.back().second.has_value()
 						? dotted_as_names.back().second->end()
@@ -5187,7 +5187,7 @@ struct ImportFromTargetsPattern : PatternV2<ImportFromTargetsPattern>
 
 template<> struct traits<struct ImportFromPattern>
 {
-	using result_type = std::shared_ptr<ImportFrom>;
+	using result_type = ImportFrom *;
 };
 
 struct ImportFromPattern : PatternV2<ImportFromPattern>
@@ -5245,7 +5245,7 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 
-			return std::make_shared<ImportFrom>(module,
+			return p.arena().create<ImportFrom>(module,
 				std::move(aliases),
 				level,
 				SourceLocation{ from_token.start(),
@@ -5290,7 +5290,7 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 
-			return std::make_shared<ImportFrom>(module,
+			return p.arena().create<ImportFrom>(module,
 				std::move(aliases),
 				level,
 				SourceLocation{ from_token.start(),
@@ -5305,7 +5305,7 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 
 template<> struct traits<struct ImportStatementPattern>
 {
-	using result_type = std::shared_ptr<ImportBase>;
+	using result_type = ImportBase *;
 };
 
 struct ImportStatementPattern : PatternV2<ImportStatementPattern>
@@ -5336,7 +5336,7 @@ struct ImportStatementPattern : PatternV2<ImportStatementPattern>
 
 template<> struct traits<struct RaiseStatementPattern>
 {
-	using result_type = std::shared_ptr<Raise>;
+	using result_type = Raise *;
 };
 
 struct RaiseStatementPattern : PatternV2<RaiseStatementPattern>
@@ -5359,12 +5359,12 @@ struct RaiseStatementPattern : PatternV2<RaiseStatementPattern>
 			DEBUG_LOG("'raise' expression ['from' expression ] ");
 			auto [raise_token, exception, cause_] = *result;
 			if (!cause_.has_value()) {
-				return std::make_shared<Raise>(exception,
+				return p.arena().create<Raise>(exception,
 					nullptr,
 					SourceLocation{ raise_token.start(), exception->source_location().end });
 			} else {
 				auto [_, cause] = *cause_;
-				return std::make_shared<Raise>(exception,
+				return p.arena().create<Raise>(exception,
 					cause,
 					SourceLocation{ raise_token.start(), cause->source_location().end });
 			}
@@ -5375,7 +5375,7 @@ struct RaiseStatementPattern : PatternV2<RaiseStatementPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'raise'");
 			auto [raise_token] = *result;
-			return std::make_shared<Raise>(
+			return p.arena().create<Raise>(
 				SourceLocation{ raise_token.start(), raise_token.end() });
 		}
 		return {};
@@ -5384,17 +5384,17 @@ struct RaiseStatementPattern : PatternV2<RaiseStatementPattern>
 
 template<> struct traits<struct DeleteTargetPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 template<> struct traits<struct DeleteTargetsPattern>
 {
-	using result_type = std::pair<std::vector<std::shared_ptr<ASTNode>>, std::optional<Token>>;
+	using result_type = std::pair<std::vector<ASTNode *>, std::optional<Token>>;
 };
 
 template<> struct traits<struct DeleteAtomPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
@@ -5417,7 +5417,7 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			auto [name_token] = *result;
 			std::string name_str{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Name>(name_str,
+			return p.arena().create<Name>(name_str,
 				ContextType::DELETE,
 				SourceLocation{ name_token.token.start(), name_token.token.end() });
 		}
@@ -5429,7 +5429,7 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("'(' del_target ')'");
 			auto [l, del_target, r] = *result;
-			return std::make_shared<ast::Tuple>(std::vector{ del_target },
+			return p.arena().create<ast::Tuple>(std::vector{ del_target },
 				ContextType::DELETE,
 				SourceLocation{ l.token.start(), r.token.end() });
 		}
@@ -5442,11 +5442,11 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			DEBUG_LOG("'(' [del_targets] ')'");
 			auto [l, del_targets, r] = *result;
 			if (del_targets) {
-				return std::make_shared<ast::Tuple>(del_targets->first,
+				return p.arena().create<ast::Tuple>(del_targets->first,
 					ContextType::DELETE,
 					SourceLocation{ l.token.start(), r.token.end() });
 			}
-			return std::make_shared<ast::Tuple>(
+			return p.arena().create<ast::Tuple>(
 				ContextType::DELETE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
@@ -5458,11 +5458,11 @@ struct DeleteAtomPattern : PatternV2<DeleteAtomPattern>
 			DEBUG_LOG("'[' [del_targets] ']'");
 			auto [l, del_targets, r] = *result;
 			if (del_targets) {
-				return std::make_shared<List>(del_targets->first,
+				return p.arena().create<List>(del_targets->first,
 					ContextType::DELETE,
 					SourceLocation{ l.token.start(), r.token.end() });
 			}
-			return std::make_shared<List>(
+			return p.arena().create<List>(
 				ContextType::DELETE, SourceLocation{ l.token.start(), r.token.end() });
 		}
 
@@ -5491,7 +5491,7 @@ struct DeleteTargetPattern : PatternV2<DeleteTargetPattern>
 			(void)lookahead;
 			std::string name{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
-			return std::make_shared<Attribute>(value,
+			return p.arena().create<Attribute>(value,
 				name,
 				ContextType::DELETE,
 				SourceLocation{ value->source_location().start, name_token.token.end() });
@@ -5506,7 +5506,7 @@ struct DeleteTargetPattern : PatternV2<DeleteTargetPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("t_primary '[' slices ']' !t_lookahead");
 			auto [value, _, slices, r, lookahead] = *result;
-			return std::make_shared<Subscript>(value,
+			return p.arena().create<Subscript>(value,
 				slices,
 				ContextType::DELETE,
 				SourceLocation{ value->source_location().start, r.token.end() });
@@ -5548,7 +5548,7 @@ struct DeleteTargetsPattern : PatternV2<DeleteTargetsPattern>
 
 template<> struct traits<struct DeleteStatementPattern>
 {
-	using result_type = std::shared_ptr<Delete>;
+	using result_type = Delete *;
 };
 
 struct DeleteStatementPattern : PatternV2<DeleteStatementPattern>
@@ -5568,7 +5568,7 @@ struct DeleteStatementPattern : PatternV2<DeleteStatementPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'del' del_targets &(';' | NEWLINE)");
 			auto [delete_token, del_targets, _] = *result;
-			return std::make_shared<Delete>(del_targets.first,
+			return p.arena().create<Delete>(del_targets.first,
 				SourceLocation{ delete_token.start(),
 					del_targets.second.has_value()
 						? del_targets.second->end()
@@ -5580,7 +5580,7 @@ struct DeleteStatementPattern : PatternV2<DeleteStatementPattern>
 
 template<> struct traits<struct YieldStatementPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct YieldStatementPattern : PatternV2<YieldStatementPattern>
@@ -5604,7 +5604,7 @@ struct YieldStatementPattern : PatternV2<YieldStatementPattern>
 
 template<> struct traits<struct AssertStatementPattern>
 {
-	using result_type = std::shared_ptr<Assert>;
+	using result_type = Assert *;
 };
 
 struct AssertStatementPattern : PatternV2<AssertStatementPattern>
@@ -5627,10 +5627,10 @@ struct AssertStatementPattern : PatternV2<AssertStatementPattern>
 
 			if (msg_.has_value()) {
 				auto [_, msg] = *msg_;
-				return std::make_shared<Assert>(
+				return p.arena().create<Assert>(
 					test, msg, SourceLocation{ assert_token.start(), msg->source_location().end });
 			}
-			return std::make_shared<Assert>(
+			return p.arena().create<Assert>(
 				test, nullptr, SourceLocation{ assert_token.start(), test->source_location().end });
 		}
 
@@ -5640,7 +5640,7 @@ struct AssertStatementPattern : PatternV2<AssertStatementPattern>
 
 template<> struct traits<struct GlobalStatementPattern>
 {
-	using result_type = std::shared_ptr<Global>;
+	using result_type = Global *;
 };
 
 struct GlobalStatementPattern : PatternV2<GlobalStatementPattern>
@@ -5666,7 +5666,7 @@ struct GlobalStatementPattern : PatternV2<GlobalStatementPattern>
 					return { el.token.start().pointer_to_program,
 						el.token.end().pointer_to_program };
 				});
-			return std::make_shared<Global>(
+			return p.arena().create<Global>(
 				names, SourceLocation{ global_token.start(), name_tokens.back().token.end() });
 		}
 
@@ -5676,7 +5676,7 @@ struct GlobalStatementPattern : PatternV2<GlobalStatementPattern>
 
 template<> struct traits<struct NonLocalStatementPattern>
 {
-	using result_type = std::shared_ptr<NonLocal>;
+	using result_type = NonLocal *;
 };
 
 struct NonLocalStatementPattern : PatternV2<NonLocalStatementPattern>
@@ -5702,7 +5702,7 @@ struct NonLocalStatementPattern : PatternV2<NonLocalStatementPattern>
 					return { el.token.start().pointer_to_program,
 						el.token.end().pointer_to_program };
 				});
-			return std::make_shared<NonLocal>(
+			return p.arena().create<NonLocal>(
 				names, SourceLocation{ nonlocal_token.start(), name_tokens.back().token.end() });
 		}
 
@@ -5713,7 +5713,7 @@ struct NonLocalStatementPattern : PatternV2<NonLocalStatementPattern>
 
 template<> struct traits<struct SmallStatementPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct SmallStatementPattern : PatternV2<SmallStatementPattern>
@@ -5782,7 +5782,7 @@ struct SmallStatementPattern : PatternV2<SmallStatementPattern>
 		if (auto result = pattern6::match(p)) {
 			DEBUG_LOG("pass");
 			auto [pass_token] = *result;
-			return std::make_shared<Pass>(SourceLocation{ pass_token.start(), pass_token.end() });
+			return p.arena().create<Pass>(SourceLocation{ pass_token.start(), pass_token.end() });
 		}
 
 		// del_stmt
@@ -5815,7 +5815,7 @@ struct SmallStatementPattern : PatternV2<SmallStatementPattern>
 		if (auto result = pattern10::match(p)) {
 			DEBUG_LOG("'break'");
 			auto [break_token] = *result;
-			return std::make_shared<Break>(
+			return p.arena().create<Break>(
 				SourceLocation{ break_token.start(), break_token.end() });
 		}
 
@@ -5825,7 +5825,7 @@ struct SmallStatementPattern : PatternV2<SmallStatementPattern>
 		if (auto result = pattern11::match(p)) {
 			DEBUG_LOG("'continue'");
 			auto [continue_token] = *result;
-			return std::make_shared<Continue>(
+			return p.arena().create<Continue>(
 				SourceLocation{ continue_token.start(), continue_token.end() });
 		}
 
@@ -5850,7 +5850,7 @@ struct SmallStatementPattern : PatternV2<SmallStatementPattern>
 
 template<> struct traits<struct SimpleStatementPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 struct SimpleStatementPattern : PatternV2<SimpleStatementPattern>
@@ -5891,7 +5891,7 @@ struct SimpleStatementPattern : PatternV2<SimpleStatementPattern>
 
 template<> struct traits<struct AnnotationPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct AnnotationPattern : PatternV2<AnnotationPattern>
@@ -5917,7 +5917,7 @@ struct AnnotationPattern : PatternV2<AnnotationPattern>
 
 template<> struct traits<struct ParamPattern>
 {
-	using result_type = std::shared_ptr<Argument>;
+	using result_type = Argument *;
 };
 
 struct ParamPattern : PatternV2<ParamPattern>
@@ -5936,7 +5936,7 @@ struct ParamPattern : PatternV2<ParamPattern>
 			std::string argname{ name_token.token.start().pointer_to_program,
 				name_token.token.end().pointer_to_program };
 
-			return std::make_shared<Argument>(argname,
+			return p.arena().create<Argument>(argname,
 				annotation.value_or(nullptr),
 				"",
 				SourceLocation{ name_token.token.start(),
@@ -5950,7 +5950,7 @@ struct ParamPattern : PatternV2<ParamPattern>
 
 template<> struct traits<struct ParamNoDefaultPattern>
 {
-	using result_type = std::shared_ptr<Argument>;
+	using result_type = Argument *;
 };
 
 struct ParamNoDefaultPattern : PatternV2<ParamNoDefaultPattern>
@@ -6008,7 +6008,7 @@ struct DefaultPattern : PatternV2<DefaultPattern>
 
 template<> struct traits<struct ParamWithDefaultPattern>
 {
-	using result_type = std::pair<std::shared_ptr<Argument>, std::shared_ptr<ASTNode>>;
+	using result_type = std::pair<Argument *, ASTNode *>;
 };
 
 struct ParamWithDefaultPattern : PatternV2<ParamWithDefaultPattern>
@@ -6048,8 +6048,7 @@ struct ParamWithDefaultPattern : PatternV2<ParamWithDefaultPattern>
 
 template<> struct traits<struct ParamMaybeDefaultPattern>
 {
-	using result_type =
-		std::pair<std::shared_ptr<Argument>, std::optional<std::shared_ptr<ASTNode>>>;
+	using result_type = std::pair<Argument *, std::optional<ASTNode *>>;
 };
 
 struct ParamMaybeDefaultPattern : PatternV2<ParamMaybeDefaultPattern>
@@ -6091,7 +6090,7 @@ struct ParamMaybeDefaultPattern : PatternV2<ParamMaybeDefaultPattern>
 
 template<> struct traits<struct KeywordsPattern>
 {
-	using result_type = std::shared_ptr<Argument>;
+	using result_type = Argument *;
 };
 
 struct KeywordsPattern : PatternV2<KeywordsPattern>
@@ -6108,7 +6107,7 @@ struct KeywordsPattern : PatternV2<KeywordsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'**'param_no_default");
 			auto [token, param_no_default] = *result;
-			return std::make_shared<Argument>(param_no_default->name(),
+			return p.arena().create<Argument>(param_no_default->name(),
 				param_no_default->annotation(),
 				"",
 				SourceLocation{ token.token.start(), param_no_default->source_location().end });
@@ -6120,9 +6119,9 @@ struct KeywordsPattern : PatternV2<KeywordsPattern>
 
 template<> struct traits<struct StarEtcPattern>
 {
-	using result_type = std::tuple<std::optional<std::shared_ptr<Argument>>,
-		std::vector<std::pair<std::shared_ptr<Argument>, std::optional<std::shared_ptr<ASTNode>>>>,
-		std::optional<std::shared_ptr<Argument>>>;
+	using result_type = std::tuple<std::optional<Argument *>,
+		std::vector<std::pair<Argument *, std::optional<ASTNode *>>>,
+		std::optional<Argument *>>;
 };
 
 struct StarEtcPattern : PatternV2<StarEtcPattern>
@@ -6218,7 +6217,7 @@ struct SlashWithDefaultPattern : PatternV2<SlashWithDefaultPattern>
 
 template<> struct traits<struct SlashNoDefaultPattern>
 {
-	using result_type = std::vector<std::shared_ptr<Argument>>;
+	using result_type = std::vector<Argument *>;
 };
 
 struct SlashNoDefaultPattern : PatternV2<SlashNoDefaultPattern>
@@ -6258,7 +6257,7 @@ struct SlashNoDefaultPattern : PatternV2<SlashNoDefaultPattern>
 
 template<> struct traits<struct ParametersPattern>
 {
-	using result_type = std::shared_ptr<Arguments>;
+	using result_type = Arguments *;
 };
 
 struct ParametersPattern : PatternV2<ParametersPattern>
@@ -6284,13 +6283,13 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			DEBUG_LOG("slash_no_default param_no_default* param_with_default* [star_etc]");
 			auto [slash_no_default, params_no_default, params_with_default, star_etc] = *result;
 
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				slash_no_default.front()->source_location().start,
 				p.lexer().peek_token(p.token_position() - 1)->end(),// too lazy to figure this out
@@ -6314,7 +6313,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 				kwarg = kwarg_.value_or(nullptr);
 			}
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -6334,13 +6333,13 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			const auto &[posonly_params_without_default, posonly_params_with_default] =
 				posonly_params;
 
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				posonly_params_without_default.empty()
 					? posonly_params_with_default.front().first->source_location().start
@@ -6372,7 +6371,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 				kwarg = kwarg_.value_or(nullptr);
 			}
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -6390,13 +6389,13 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			DEBUG_LOG("param_no_default+ param_with_default* [star_etc]");
 			auto [params_no_default, params_with_default, star_etc] = *result;
 
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				params_no_default.front()->source_location().start,
 				p.lexer().peek_token(p.token_position() - 1)->end(),// too lazy to figure this out
@@ -6418,7 +6417,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 				kwarg = kwarg_.value_or(nullptr);
 			}
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -6435,13 +6434,13 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			DEBUG_LOG("param_with_default+ [star_etc]");
 			auto [params_with_default, star_etc] = *result;
 
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				params_with_default.front().first->source_location().start,
 				p.lexer().peek_token(p.token_position() - 1)->end(),
@@ -6462,7 +6461,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 				kwarg = kwarg_.value_or(nullptr);
 			}
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -6480,13 +6479,13 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 		if (auto result = pattern5::match(p)) {
 			DEBUG_LOG("star_etc");
 			auto [star_etc] = *result;
-			std::vector<std::shared_ptr<Argument>> posonlyargs;
-			std::vector<std::shared_ptr<Argument>> args;
-			std::shared_ptr<Argument> vararg;
-			std::vector<std::shared_ptr<Argument>> kwonlyargs;
-			std::vector<std::shared_ptr<ASTNode>> kw_defaults;
-			std::shared_ptr<Argument> kwarg;
-			std::vector<std::shared_ptr<ASTNode>> defaults;
+			std::vector<Argument *> posonlyargs;
+			std::vector<Argument *> args;
+			Argument *vararg{ nullptr };
+			std::vector<Argument *> kwonlyargs;
+			std::vector<ASTNode *> kw_defaults;
+			Argument *kwarg{ nullptr };
+			std::vector<ASTNode *> defaults;
 			SourceLocation source_location{
 				start,
 				p.lexer().peek_token(p.token_position() - 1)->end(),// too lazy to figure this out
@@ -6500,7 +6499,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 			}
 			kwarg = kwarg_.value_or(nullptr);
 
-			return std::make_shared<Arguments>(posonlyargs,
+			return p.arena().create<Arguments>(posonlyargs,
 				args,
 				vararg,
 				kwonlyargs,
@@ -6515,7 +6514,7 @@ struct ParametersPattern : PatternV2<ParametersPattern>
 
 template<> struct traits<struct ParamsPattern>
 {
-	using result_type = std::shared_ptr<Arguments>;
+	using result_type = Arguments *;
 };
 
 struct ParamsPattern : PatternV2<ParamsPattern>
@@ -6542,12 +6541,12 @@ struct ParamsPattern : PatternV2<ParamsPattern>
 
 template<> struct traits<struct StatementsPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 template<> struct traits<struct BlockPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 struct BlockPattern : PatternV2<BlockPattern>
@@ -6582,7 +6581,7 @@ struct BlockPattern : PatternV2<BlockPattern>
 
 template<> struct traits<struct FunctionNamePattern>
 {
-	using result_type = std::shared_ptr<Constant>;
+	using result_type = Constant *;
 };
 
 struct FunctionNamePattern : PatternV2<FunctionNamePattern>
@@ -6599,7 +6598,7 @@ struct FunctionNamePattern : PatternV2<FunctionNamePattern>
 			auto [token_name] = *result;
 			std::string function_name{ token_name.token.start().pointer_to_program,
 				token_name.token.end().pointer_to_program };
-			return std::make_shared<Constant>(
+			return p.arena().create<Constant>(
 				function_name, SourceLocation{ token_name.token.start(), token_name.token.end() });
 		}
 		return {};
@@ -6608,7 +6607,7 @@ struct FunctionNamePattern : PatternV2<FunctionNamePattern>
 
 template<> struct traits<struct FunctionDefinitionRawStatement>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement>
@@ -6645,11 +6644,11 @@ struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement
 				body] = *result;
 			std::string function_name{ name.token.start().pointer_to_program,
 				name.token.end().pointer_to_program };
-			return std::make_shared<FunctionDefinition>(function_name,
+			return p.arena().create<FunctionDefinition>(function_name,
 				params.value_or(
-					std::make_shared<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
+					p.arena().create<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
 				body,
-				std::vector<std::shared_ptr<ASTNode>>{},
+				std::vector<ASTNode *>{},
 				return_expression.has_value() ? std::get<1>(*return_expression) : nullptr,
 				"",
 				SourceLocation{ def_token.start(), body.back()->source_location().end });
@@ -6683,11 +6682,11 @@ struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement
 				body] = *result;
 			std::string function_name{ name.token.start().pointer_to_program,
 				name.token.end().pointer_to_program };
-			return std::make_shared<AsyncFunctionDefinition>(function_name,
+			return p.arena().create<AsyncFunctionDefinition>(function_name,
 				params.value_or(
-					std::make_shared<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
+					p.arena().create<Arguments>(SourceLocation{ l.token.start(), r.token.end() })),
 				body,
-				std::vector<std::shared_ptr<ASTNode>>{},
+				std::vector<ASTNode *>{},
 				return_expression.has_value() ? std::get<1>(*return_expression) : nullptr,
 				"",
 				SourceLocation{ async_token.start(), body.back()->source_location().end });
@@ -6698,7 +6697,7 @@ struct FunctionDefinitionRawStatement : PatternV2<FunctionDefinitionRawStatement
 
 template<> struct traits<struct DecoratorsPattern>
 {
-	using result_type = std::pair<Token, std::vector<std::shared_ptr<ASTNode>>>;
+	using result_type = std::pair<Token, std::vector<ASTNode *>>;
 };
 
 struct DecoratorsPattern : PatternV2<DecoratorsPattern>
@@ -6718,7 +6717,7 @@ struct DecoratorsPattern : PatternV2<DecoratorsPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("('@' named_expression NEWLINE )+");
 			auto [decorators] = *result;
-			std::vector<std::shared_ptr<ASTNode>> decorator_vector;
+			std::vector<ASTNode *> decorator_vector;
 			std::optional<Token> first_token;
 			for (bool first = true; const auto &decorator : decorators) {
 				auto [at_token, named_expression, _] = decorator;
@@ -6737,7 +6736,7 @@ struct DecoratorsPattern : PatternV2<DecoratorsPattern>
 
 template<> struct traits<struct FunctionDefinitionStatementPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct FunctionDefinitionStatementPattern : PatternV2<FunctionDefinitionStatementPattern>
@@ -6755,7 +6754,7 @@ struct FunctionDefinitionStatementPattern : PatternV2<FunctionDefinitionStatemen
 			DEBUG_LOG("decorators function_def_raw");
 			auto [decorators, function_def] = *result;
 			if (auto f = as<FunctionDefinition>(function_def)) {
-				return std::make_shared<FunctionDefinition>(f->name(),
+				return p.arena().create<FunctionDefinition>(f->name(),
 					f->args(),
 					f->body(),
 					decorators.second,
@@ -6765,7 +6764,7 @@ struct FunctionDefinitionStatementPattern : PatternV2<FunctionDefinitionStatemen
 			}
 			auto f = as<AsyncFunctionDefinition>(function_def);
 			ASSERT(f);
-			return std::make_shared<AsyncFunctionDefinition>(f->name(),
+			return p.arena().create<AsyncFunctionDefinition>(f->name(),
 				f->args(),
 				f->body(),
 				decorators.second,
@@ -6788,7 +6787,7 @@ struct FunctionDefinitionStatementPattern : PatternV2<FunctionDefinitionStatemen
 
 template<> struct traits<struct ElseBlockPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 struct ElseBlockPattern : PatternV2<ElseBlockPattern>
@@ -6817,7 +6816,7 @@ struct ElseBlockPattern : PatternV2<ElseBlockPattern>
 
 template<> struct traits<struct ElifStatementPattern>
 {
-	using result_type = std::shared_ptr<If>;
+	using result_type = If *;
 };
 
 struct ElifStatementPattern : PatternV2<ElifStatementPattern>
@@ -6841,9 +6840,9 @@ struct ElifStatementPattern : PatternV2<ElifStatementPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'elif' named_expression ':' block elif_stmt");
 			auto [elif_token, test, _, body, orelse] = *result;
-			return std::make_shared<If>(test,
+			return p.arena().create<If>(test,
 				body,
-				std::vector<std::shared_ptr<ASTNode>>{ orelse },
+				std::vector<ASTNode *>{ orelse },
 				SourceLocation{ elif_token.start(), orelse->source_location().end });
 		}
 
@@ -6858,14 +6857,14 @@ struct ElifStatementPattern : PatternV2<ElifStatementPattern>
 			DEBUG_LOG("'elif' named_expression ':' block [else_block]");
 			auto [elif_token, test, _, body, orelse] = *result;
 			if (orelse.has_value()) {
-				return std::make_shared<If>(test,
+				return p.arena().create<If>(test,
 					body,
 					*orelse,
 					SourceLocation{ elif_token.start(), orelse->back()->source_location().end });
 			} else {
-				return std::make_shared<If>(test,
+				return p.arena().create<If>(test,
 					body,
-					std::vector<std::shared_ptr<ASTNode>>{},
+					std::vector<ASTNode *>{},
 					SourceLocation{ elif_token.start(), body.back()->source_location().end });
 			}
 		}
@@ -6876,7 +6875,7 @@ struct ElifStatementPattern : PatternV2<ElifStatementPattern>
 
 template<> struct traits<struct IfStatementPattern>
 {
-	using result_type = std::shared_ptr<If>;
+	using result_type = If *;
 };
 
 struct IfStatementPattern : PatternV2<IfStatementPattern>
@@ -6900,9 +6899,9 @@ struct IfStatementPattern : PatternV2<IfStatementPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'if' named_expression ':' block elif_stmt");
 			auto [if_token, test, _, body, orelse] = *result;
-			return std::make_shared<If>(test,
+			return p.arena().create<If>(test,
 				body,
-				std::vector<std::shared_ptr<ASTNode>>{ orelse },
+				std::vector<ASTNode *>{ orelse },
 				SourceLocation{ if_token.start(), orelse->source_location().end });
 		}
 
@@ -6917,14 +6916,14 @@ struct IfStatementPattern : PatternV2<IfStatementPattern>
 			DEBUG_LOG("'if' named_expression ':' block [else_block]");
 			auto [if_token, test, _, body, orelse] = *result;
 			if (orelse.has_value()) {
-				return std::make_shared<If>(test,
+				return p.arena().create<If>(test,
 					body,
 					*orelse,
 					SourceLocation{ if_token.start(), orelse->back()->source_location().end });
 			} else {
-				return std::make_shared<If>(test,
+				return p.arena().create<If>(test,
 					body,
-					std::vector<std::shared_ptr<ASTNode>>{},
+					std::vector<ASTNode *>{},
 					SourceLocation{ if_token.start(), body.back()->source_location().end });
 			}
 		}
@@ -6935,7 +6934,7 @@ struct IfStatementPattern : PatternV2<IfStatementPattern>
 
 template<> struct traits<struct ClassDefinitionRawPattern>
 {
-	using result_type = std::shared_ptr<ClassDefinition>;
+	using result_type = ClassDefinition *;
 };
 
 struct ClassDefinitionRawPattern : PatternV2<ClassDefinitionRawPattern>
@@ -6960,8 +6959,8 @@ struct ClassDefinitionRawPattern : PatternV2<ClassDefinitionRawPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'class' NAME ['(' [arguments] ')' ] ':' block");
 			auto [class_token, class_name_token, arguments, _, body] = *result;
-			std::vector<std::shared_ptr<ASTNode>> bases;
-			std::vector<std::shared_ptr<Keyword>> keywords;
+			std::vector<ASTNode *> bases;
+			std::vector<Keyword *> keywords;
 			if (arguments.has_value()) {
 				auto [l, args, r] = *arguments;
 				if (args.has_value()) {
@@ -6970,11 +6969,11 @@ struct ClassDefinitionRawPattern : PatternV2<ClassDefinitionRawPattern>
 					keywords = keywords_;
 				}
 			}
-			std::vector<std::shared_ptr<ASTNode>> decorator_list;
+			std::vector<ASTNode *> decorator_list;
 			std::string class_name{ class_name_token.token.start().pointer_to_program,
 				class_name_token.token.end().pointer_to_program };
 
-			return std::make_shared<ClassDefinition>(class_name,
+			return p.arena().create<ClassDefinition>(class_name,
 				bases,
 				keywords,
 				body,
@@ -6988,7 +6987,7 @@ struct ClassDefinitionRawPattern : PatternV2<ClassDefinitionRawPattern>
 
 template<> struct traits<struct ClassDefinitionPattern>
 {
-	using result_type = std::shared_ptr<ClassDefinition>;
+	using result_type = ClassDefinition *;
 };
 
 struct ClassDefinitionPattern : PatternV2<ClassDefinitionPattern>
@@ -7007,7 +7006,7 @@ struct ClassDefinitionPattern : PatternV2<ClassDefinitionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("decorators class_def_raw");
 			auto [decorators, class_def] = *result;
-			return std::make_shared<ClassDefinition>(class_def->name(),
+			return p.arena().create<ClassDefinition>(class_def->name(),
 				class_def->bases(),
 				class_def->keywords(),
 				class_def->body(),
@@ -7028,7 +7027,7 @@ struct ClassDefinitionPattern : PatternV2<ClassDefinitionPattern>
 
 template<> struct traits<struct ForStatementPattern>
 {
-	using result_type = std::shared_ptr<For>;
+	using result_type = For *;
 };
 
 struct ForStatementPattern : PatternV2<ForStatementPattern>
@@ -7055,10 +7054,10 @@ struct ForStatementPattern : PatternV2<ForStatementPattern>
 			DEBUG_LOG("'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block");
 			auto [for_token, targets, in_token, iter, colon_token, body, orelse] = *result;
 			std::string type_comment;
-			return std::make_shared<For>(targets,
+			return p.arena().create<For>(targets,
 				iter,
 				body,
-				orelse.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
+				orelse.value_or(std::vector<ASTNode *>{}),
 				type_comment,
 				SourceLocation{ for_token.start(),
 					orelse.has_value() ? orelse->back()->source_location().end
@@ -7088,7 +7087,7 @@ struct ForStatementPattern : PatternV2<ForStatementPattern>
 
 template<> struct traits<struct ExceptBlockPattern>
 {
-	using result_type = std::shared_ptr<ExceptHandler>;
+	using result_type = ExceptHandler *;
 };
 
 struct ExceptBlockPattern : PatternV2<ExceptBlockPattern>
@@ -7126,7 +7125,7 @@ struct ExceptBlockPattern : PatternV2<ExceptBlockPattern>
 				}
 			}();
 
-			return std::make_shared<ExceptHandler>(type,
+			return p.arena().create<ExceptHandler>(type,
 				name,
 				body,
 				SourceLocation{ except_token.start(), body.back()->source_location().end });
@@ -7141,9 +7140,9 @@ struct ExceptBlockPattern : PatternV2<ExceptBlockPattern>
 			DEBUG_LOG("'except' ':' block");
 
 			auto [except_token, _, body] = *result;
-			std::shared_ptr<ASTNode> type;
+			ASTNode *type{ nullptr };
 			std::string name;
-			return std::make_shared<ExceptHandler>(type,
+			return p.arena().create<ExceptHandler>(type,
 				name,
 				body,
 				SourceLocation{ except_token.start(), body.back()->source_location().end });
@@ -7182,7 +7181,7 @@ struct FinallyBlockPattern : PatternV2<FinallyBlockPattern>
 
 template<> struct traits<struct TryStatementPattern>
 {
-	using result_type = std::shared_ptr<Try>;
+	using result_type = Try *;
 };
 
 struct TryStatementPattern : PatternV2<TryStatementPattern>
@@ -7207,10 +7206,10 @@ struct TryStatementPattern : PatternV2<TryStatementPattern>
 
 			auto [try_token, _, body, finally] = *result;
 
-			std::vector<std::shared_ptr<ExceptHandler>> handlers;
-			std::vector<std::shared_ptr<ASTNode>> orelse;
+			std::vector<ExceptHandler *> handlers;
+			std::vector<ASTNode *> orelse;
 
-			return std::make_shared<Try>(body,
+			return p.arena().create<Try>(body,
 				handlers,
 				orelse,
 				finally,
@@ -7230,10 +7229,10 @@ struct TryStatementPattern : PatternV2<TryStatementPattern>
 
 			auto [try_token, _, body, handlers, orelse, finally] = *result;
 			const auto end = p.lexer().peek_token(p.token_position() - 1);
-			return std::make_shared<Try>(body,
+			return p.arena().create<Try>(body,
 				handlers,
-				orelse.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
-				finally.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
+				orelse.value_or(std::vector<ASTNode *>{}),
+				finally.value_or(std::vector<ASTNode *>{}),
 				SourceLocation{ try_token.start(), end->end() });
 		}
 
@@ -7243,7 +7242,7 @@ struct TryStatementPattern : PatternV2<TryStatementPattern>
 
 template<> struct traits<struct WhileStatementPattern>
 {
-	using result_type = std::shared_ptr<While>;
+	using result_type = While *;
 };
 
 struct WhileStatementPattern : PatternV2<WhileStatementPattern>
@@ -7268,9 +7267,9 @@ struct WhileStatementPattern : PatternV2<WhileStatementPattern>
 			auto [while_token, test, _, body, orelse] = *result;
 
 			const auto end_token = p.lexer().peek_token(p.token_position() - 1);
-			return std::make_shared<While>(test,
+			return p.arena().create<While>(test,
 				body,
-				orelse.value_or(std::vector<std::shared_ptr<ASTNode>>{}),
+				orelse.value_or(std::vector<ASTNode *>{}),
 				SourceLocation{ while_token.start(), end_token->end() });
 		}
 
@@ -7280,7 +7279,7 @@ struct WhileStatementPattern : PatternV2<WhileStatementPattern>
 
 template<> struct traits<struct WithItemPattern>
 {
-	using result_type = std::shared_ptr<WithItem>;
+	using result_type = WithItem *;
 };
 
 struct WithItemPattern : PatternV2<WithItemPattern>
@@ -7303,7 +7302,7 @@ struct WithItemPattern : PatternV2<WithItemPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("expression 'as' star_target &(',' | ')' | ':')");
 			auto [context_expr, as_token, var, _] = *result;
-			return std::make_shared<WithItem>(context_expr,
+			return p.arena().create<WithItem>(context_expr,
 				var,
 				SourceLocation{
 					context_expr->source_location().start, var->source_location().end });
@@ -7313,7 +7312,7 @@ struct WithItemPattern : PatternV2<WithItemPattern>
 		if (auto result = pattern2::match(p)) {
 			DEBUG_LOG("expression");
 			auto [context_expr] = *result;
-			return std::make_shared<WithItem>(context_expr,
+			return p.arena().create<WithItem>(context_expr,
 				nullptr,
 				SourceLocation{
 					context_expr->source_location().start, context_expr->source_location().end });
@@ -7325,7 +7324,7 @@ struct WithItemPattern : PatternV2<WithItemPattern>
 
 template<> struct traits<struct WithStatementPattern>
 {
-	using result_type = std::shared_ptr<With>;
+	using result_type = With *;
 };
 
 struct WithStatementPattern : PatternV2<WithStatementPattern>
@@ -7355,7 +7354,7 @@ struct WithStatementPattern : PatternV2<WithStatementPattern>
 
 			auto [with_token, lp, with_items, trailing_comma, rp, _, body] = *result;
 
-			return std::make_shared<With>(with_items,
+			return p.arena().create<With>(with_items,
 				body,
 				"",
 				SourceLocation{ with_token.start(), body.back()->source_location().end });
@@ -7372,7 +7371,7 @@ struct WithStatementPattern : PatternV2<WithStatementPattern>
 
 			auto [with_token, with_items, _, body] = *result;
 
-			return std::make_shared<With>(with_items,
+			return p.arena().create<With>(with_items,
 				body,
 				"",
 				SourceLocation{ with_token.start(), body.back()->source_location().end });
@@ -7414,7 +7413,7 @@ struct WithStatementPattern : PatternV2<WithStatementPattern>
 
 template<> struct traits<struct CompoundStatementPattern>
 {
-	using result_type = std::shared_ptr<ASTNode>;
+	using result_type = ASTNode *;
 };
 
 struct CompoundStatementPattern : PatternV2<CompoundStatementPattern>
@@ -7492,7 +7491,7 @@ struct CompoundStatementPattern : PatternV2<CompoundStatementPattern>
 
 template<> struct traits<struct StatementPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 
@@ -7544,7 +7543,7 @@ struct StatementsPattern : PatternV2<StatementsPattern>
 
 template<> struct traits<struct ExpressionsPattern>
 {
-	using result_type = std::vector<std::shared_ptr<ASTNode>>;
+	using result_type = std::vector<ASTNode *>;
 };
 
 struct ExpressionsPattern : PatternV2<ExpressionsPattern>
@@ -7582,7 +7581,7 @@ struct ExpressionsPattern : PatternV2<ExpressionsPattern>
 
 template<> struct traits<struct FilePattern>
 {
-	using result_type = std::shared_ptr<Module>;
+	using result_type = std::shared_ptr<ast::Module>;
 };
 
 struct FilePattern : PatternV2<FilePattern>
@@ -7639,14 +7638,14 @@ PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()
 	if (result.has_value()) {
 		auto expressions = std::get<0>(*result);
 		if (expressions.size() == 1) {
-			m_module->emplace(std::make_shared<Return>(
-				expressions.back(), expressions.back()->source_location()));
+			m_module->emplace(
+				arena().create<Return>(expressions.back(), expressions.back()->source_location()));
 		} else {
-			auto result = std::make_shared<ast::Tuple>(expressions,
+			auto tuple = arena().create<ast::Tuple>(expressions,
 				ContextType::LOAD,
 				SourceLocation{ .start = expressions.front()->source_location().start,
 					.end = expressions.back()->source_location().end });
-			m_module->emplace(std::make_shared<Return>(result, result->source_location()));
+			m_module->emplace(arena().create<Return>(tuple, tuple->source_location()));
 		}
 		m_module->print_node("");
 		return Ok(m_module);
@@ -7654,7 +7653,7 @@ PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()
 	return Err(syntax_error(m_lexer.program()));
 }
 
-PyResult<std::shared_ptr<ASTNode>> Parser::parse_fstring()
+PyResult<ASTNode *> Parser::parse_fstring()
 {
 	// fstring: star_expressions
 	auto result = PatternMatchV2<StarExpressionPattern>::match(*this);

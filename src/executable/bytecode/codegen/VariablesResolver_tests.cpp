@@ -13,10 +13,10 @@ VariablesResolver::VisibilityMap generate_resolver(std::string_view program)
 	parser::Parser p{ lexer };
 	p.parse();
 
-	auto module = as<ast::Module>(p.module());
+	auto *module = as<ast::Module>(p.module().get());
 	ASSERT(module);
 
-	return VariablesResolver::resolve(module.get());
+	return VariablesResolver::resolve(module);
 }
 }// namespace
 

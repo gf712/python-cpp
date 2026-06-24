@@ -137,19 +137,11 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 	auto result = m_main_function->function()->call(*vm, interpreter);
 
 	if (result.is_err()) {
-		auto *exception = interpreter.execution_frame()->pop_exception();
-		ASSERT(exception == result.unwrap_err());
+		// The exception propagated all the way out; the eval loop already popped it
+		// off the (now-clean) exception stack as it unwound, so use the result value
+		// directly rather than popping again.
+		auto *exception = result.unwrap_err();
 		std::cout << exception->format_traceback() << std::endl;
-
-		// if (interpreter.execution_frame()->exception_info().has_value()) {
-		// 	std::cout << "During handling of the above exception, another exception occurred:\n\n";
-		// 	exception = interpreter.execution_frame()->pop_exception();
-		// 	std::cout << exception->format_traceback() << std::endl;
-		// 	if (interpreter.execution_frame()->exception_info().has_value()) {
-		// 		// how many exceptions is one meant to expect? :(
-		// 		TODO();
-		// 	}
-		// }
 	}
 
 	return result.is_ok() ? EXIT_SUCCESS : EXIT_FAILURE;

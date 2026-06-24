@@ -1,5 +1,5 @@
 set(AST_SOURCE_FILES # cmake-format: sortable
-                     ast/AST.cpp ast/optimizers/ConstantFolding.cpp)
+                     ast/AST.cpp ast/ASTArena.cpp)
 
 set(BYTECODE_SOURCE_FILES
     # cmake-format: sortable
@@ -53,6 +53,7 @@ set(BYTECODE_SOURCE_FILES
     executable/bytecode/instructions/ListExtend.cpp
     executable/bytecode/instructions/ListToTuple.cpp
     executable/bytecode/instructions/LoadAssertionError.cpp
+    executable/bytecode/instructions/LoadException.cpp
     executable/bytecode/instructions/LoadAttr.cpp
     executable/bytecode/instructions/LoadBuildClass.cpp
     executable/bytecode/instructions/LoadClosure.cpp
@@ -230,7 +231,7 @@ set(VM_SOURCE_FILES # cmake-format: sortable
 
 set(UNITTEST_SOURCES
     # cmake-format: sortable
-    ast/optimizers/Optimizers_tests.cpp
+    ast/ASTArena_tests.cpp
     executable/bytecode/Bytecode_tests.cpp
     executable/bytecode/BytecodeProgram_tests.cpp
     executable/bytecode/codegen/BytecodeGenerator_tests.cpp

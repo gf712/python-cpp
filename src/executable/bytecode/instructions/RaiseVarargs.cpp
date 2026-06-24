@@ -29,12 +29,25 @@ PyResult<Value> RaiseVarargs::execute(VirtualMachine &vm, Interpreter &) const
 		if (!exception_obj->type()->issubclass(BaseException::class_type())) {
 			return Err(type_error("exceptions must derive from BaseException"));
 		}
+		auto *raised = static_cast<BaseException *>(exception_obj);
 		if (m_cause.has_value()) {
 			auto cause = PyObject::from(vm.reg(*m_cause));
 			if (cause.is_err()) { return Err(cause.unwrap_err()); }
-			static_cast<BaseException *>(exception_obj)->set_cause(cause.unwrap());
+			// `raise X from Y` sets the explicit cause and suppresses the
+			// implicit-context display (matching the data model). `from None`
+			// keeps the suppression with a None cause.
+			raised->set_cause(cause.unwrap());
+			raised->set_suppress_context(true);
 		}
-		return Err(static_cast<BaseException *>(exception_obj));
+		// Implicit __context__ chaining: if an exception is currently being
+		// handled, it becomes the context of the newly-raised one (unless it is
+		// the same object). The exception stack is now kept clean, so this only
+		// fires inside a genuine handler, not from stale internal state.
+		if (auto info = vm.interpreter().execution_frame()->exception_info();
+			info.has_value() && info->exception != raised) {
+			raised->set_context(info->exception);
+		}
+		return Err(raised);
 	} else {
 		// reraise
 		if (!vm.interpreter().execution_frame()->exception_info().has_value()) {

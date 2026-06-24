@@ -259,6 +259,20 @@ Loads AssertionError type. This is guaranteed to be the builtin
 AssertionError.
     }];
 
+    // Packed (line, column) source position of the originating `assert`
+    let arguments = (ins OptionalAttr<I64Attr>:$assert_location);
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
+def LoadException : Python_Op<"load_exception",
+        [MemoryEffects<[MemRead<PythonExceptionStateResource>]>]> {
+    let summary = [{
+Loads the currently-active exception instance, for binding `except ... as
+name`. Reads the interpreter exception state (not Pure: it must stay inside
+its handler and not be hoisted or eliminated).
+    }];
+
     let results = (outs Python_PyObjectType:$output);
 }
 

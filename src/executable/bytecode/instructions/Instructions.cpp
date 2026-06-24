@@ -42,6 +42,7 @@
 #include "LoadClosure.hpp"
 #include "LoadConst.hpp"
 #include "LoadDeref.hpp"
+#include "LoadException.hpp"
 #include "LoadFast.hpp"
 #include "LoadGlobal.hpp"
 #include "LoadMethod.hpp"
@@ -173,6 +174,10 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 	case LOAD_ASSERTION_ERROR: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);
 		return std::make_unique<LoadAssertionError>(dst);
+	} break;
+	case LOAD_EXCEPTION: {
+		const auto dst = deserialize<uint8_t>(instruction_buffer);
+		return std::make_unique<LoadException>(dst);
 	} break;
 	case LOAD_FAST: {
 		const auto dst = deserialize<uint8_t>(instruction_buffer);

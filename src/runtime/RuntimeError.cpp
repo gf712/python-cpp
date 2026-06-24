@@ -34,6 +34,13 @@ PyResult<RuntimeError *> RuntimeError::create(PyTuple *args)
 	return Ok(obj);
 }
 
+PyResult<PyObject *> RuntimeError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
+{
+	ASSERT(type == types::runtime_error());
+	ASSERT(!kwargs || kwargs->map().empty());
+	return RuntimeError::create(args);
+}
+
 PyType *RuntimeError::static_type() const
 {
 	ASSERT(types::runtime_error());

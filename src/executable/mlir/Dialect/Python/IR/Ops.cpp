@@ -274,7 +274,7 @@ namespace py {
 		// Branching from condition: go to body or, exit or orelse if non-empty.
 		else if (predecessor_region(point) == &getCondition()) {
 			if (getOrelse().empty()) {
-				regions.emplace_back(RegionSuccessor::parent());
+				regions.emplace_back(RegionSuccessor(getOperation()));
 			} else {
 				regions.emplace_back(&getOrelse());
 			}
@@ -301,7 +301,7 @@ namespace py {
 		// Branching from condition: go to body or, exit or orelse if non-empty.
 		else if (predecessor_region(point) == &getStep()) {
 			if (getOrelse().empty()) {
-				regions.emplace_back(RegionSuccessor::parent());
+				regions.emplace_back(RegionSuccessor(getOperation()));
 			} else {
 				regions.emplace_back(&getOrelse());
 			}

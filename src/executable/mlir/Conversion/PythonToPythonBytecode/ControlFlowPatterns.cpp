@@ -55,6 +55,9 @@ namespace {
 	using LoadAssertionErrorOpLowering = detail::DirectReplaceLowering<mlir::py::LoadAssertionError,
 		mlir::emitpybytecode::LoadAssertionError>;
 
+	using LoadExceptionOpLowering =
+		detail::DirectReplaceLowering<mlir::py::LoadException, mlir::emitpybytecode::LoadException>;
+
 	using WithExceptStartOpLowering = detail::DirectReplaceLowering<mlir::py::WithExceptStartOp,
 		mlir::emitpybytecode::WithExceptStart>;
 
@@ -161,6 +164,7 @@ void populateControlFlowPatterns(mlir::RewritePatternSet &patterns)
 	patterns.add<ConditionalBranchOpLowering,
 		CondBranchSubclassOpLowering,
 		LoadAssertionErrorOpLowering,
+		LoadExceptionOpLowering,
 		RaiseOpLowering,
 		WithExceptStartOpLowering,
 		ClearExceptionStateOpLowering,

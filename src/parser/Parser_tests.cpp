@@ -10,10 +10,9 @@ using namespace py;
 
 namespace {
 
-void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected);
+void dispatch(const ASTNode *result, const ASTNode *expected);
 
-void compare_constant(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_constant(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Constant);
 	const auto result_value = as<Constant>(result)->value();
@@ -55,8 +54,7 @@ void compare_constant(const std::shared_ptr<ASTNode> &result,
 		*result_value);
 }
 
-void compare_assign(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_assign(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Assign);
 
@@ -74,7 +72,7 @@ void compare_assign(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_name(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_name(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Name);
 
@@ -86,8 +84,7 @@ void compare_name(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	ASSERT_EQ(as<Name>(result)->context_type(), as<Name>(expected)->context_type());
 }
 
-void compare_binary_expr(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_binary_expr(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::BinaryExpr);
 
@@ -106,8 +103,7 @@ void compare_binary_expr(const std::shared_ptr<ASTNode> &result,
 }
 
 
-void compare_function_definition(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_function_definition(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::FunctionDefinition);
 
@@ -140,8 +136,7 @@ void compare_function_definition(const std::shared_ptr<ASTNode> &result,
 	EXPECT_EQ(result_type_comment, expected_type_comment);
 }
 
-void compare_async_function_definition(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_async_function_definition(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::AsyncFunctionDefinition);
 
@@ -174,8 +169,7 @@ void compare_async_function_definition(const std::shared_ptr<ASTNode> &result,
 	EXPECT_EQ(result_type_comment, expected_type_comment);
 }
 
-void compare_lambda(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_lambda(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Lambda);
 
@@ -188,8 +182,7 @@ void compare_lambda(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_body, expected_body);
 }
 
-void compare_class_definition(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_class_definition(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::ClassDefinition);
 
@@ -225,8 +218,7 @@ void compare_class_definition(const std::shared_ptr<ASTNode> &result,
 }
 
 
-void compare_return(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_return(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Return);
 
@@ -235,7 +227,7 @@ void compare_return(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_yield(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_yield(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Yield);
 
@@ -244,8 +236,7 @@ void compare_yield(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	dispatch(result_value, expected_value);
 }
 
-void compare_yieldfrom(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_yieldfrom(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::YieldFrom);
 
@@ -254,7 +245,7 @@ void compare_yieldfrom(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_if(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::If);
 
@@ -277,7 +268,7 @@ void compare_if(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<AS
 	}
 }
 
-void compare_while(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_while(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::While);
 
@@ -301,7 +292,7 @@ void compare_while(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 }
 
 
-void compare_for(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_for(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::For);
 
@@ -332,7 +323,7 @@ void compare_for(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<A
 	ASSERT_EQ(result_type_comment, expected_type_comment);
 }
 
-void compare_call(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_call(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Call);
 
@@ -355,8 +346,7 @@ void compare_call(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	}
 }
 
-void compare_compare(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_compare(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Compare);
 
@@ -381,7 +371,7 @@ void compare_compare(const std::shared_ptr<ASTNode> &result,
 }
 
 
-void compare_list(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_list(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::List);
 
@@ -397,7 +387,7 @@ void compare_list(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	}
 }
 
-void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_tuple(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Tuple);
 
@@ -413,7 +403,7 @@ void compare_tuple(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 	}
 }
 
-void compare_dict(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_dict(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Dict);
 
@@ -430,8 +420,7 @@ void compare_dict(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<
 	for (size_t i = 0; i < result_keys.size(); ++i) { dispatch(result_keys[i], expected_keys[i]); }
 }
 
-void compare_attribute(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_attribute(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Attribute);
 
@@ -448,8 +437,7 @@ void compare_attribute(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_keyword(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_keyword(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Keyword);
 
@@ -463,8 +451,7 @@ void compare_keyword(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_augmented_assign(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_augmented_assign(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::AugAssign);
 
@@ -481,8 +468,7 @@ void compare_augmented_assign(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_import(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_import(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Import);
 
@@ -496,8 +482,7 @@ void compare_import(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_import_from(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_import_from(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::ImportFrom);
 
@@ -564,8 +549,7 @@ void compare_slices(const Subscript::SliceType &result, const Subscript::SliceTy
 	}
 }
 
-void compare_subscript(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_subscript(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Subscript);
 
@@ -583,7 +567,7 @@ void compare_subscript(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
-void compare_raise(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_raise(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Raise);
 
@@ -593,10 +577,12 @@ void compare_raise(const std::shared_ptr<ASTNode> &result, const std::shared_ptr
 
 	const auto result_cause = as<Raise>(result)->cause();
 	const auto expected_cause = as<Raise>(expected)->cause();
+	(void)result_cause;
+	(void)expected_cause;
 	dispatch(result_exception, expected_exception);
 }
 
-void compare_try(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void compare_try(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Try);
 
@@ -627,8 +613,7 @@ void compare_try(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<A
 	}
 }
 
-void compare_except_handler(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_except_handler(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::ExceptHandler);
 
@@ -646,8 +631,7 @@ void compare_except_handler(const std::shared_ptr<ASTNode> &result,
 	for (size_t i = 0; i < result_body.size(); ++i) { dispatch(result_body[i], expected_body[i]); }
 }
 
-void compare_assert(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_assert(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Assert);
 
@@ -660,8 +644,7 @@ void compare_assert(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_msg, expected_msg);
 }
 
-void compare_unary_op(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_unary_op(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::UnaryExpr);
 
@@ -675,8 +658,7 @@ void compare_unary_op(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_optype, expected_optype);
 }
 
-void compare_bool_op(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_bool_op(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::BoolOp);
 
@@ -693,8 +675,7 @@ void compare_bool_op(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_arguments(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_arguments(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Arguments);
 
@@ -740,8 +721,7 @@ void compare_arguments(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_argument(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_argument(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Argument);
 
@@ -757,8 +737,7 @@ void compare_argument(const std::shared_ptr<ASTNode> &result,
 }
 
 
-void compare_with_statement(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_with_statement(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::With);
 
@@ -783,8 +762,7 @@ void compare_with_statement(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_type_comment, expected_type_comment);
 }
 
-void compare_if_expression(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_if_expression(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::IfExpr);
 
@@ -801,8 +779,7 @@ void compare_if_expression(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_orelse, expected_orelse);
 }
 
-void compare_starred(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_starred(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Starred);
 
@@ -815,13 +792,12 @@ void compare_starred(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(result_ctx, expected_ctx);
 }
 
-void compare_pass(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &)
+void compare_pass(const ASTNode *result, const ASTNode *)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Pass);
 }
 
-void compare_named_expression(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_named_expression(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::NamedExpr);
 
@@ -834,8 +810,7 @@ void compare_named_expression(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_value, expected_value);
 }
 
-void compare_with_item(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_with_item(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::WithItem);
 
@@ -848,8 +823,7 @@ void compare_with_item(const std::shared_ptr<ASTNode> &result,
 	dispatch(result_optional_vars, expected_optional_vars);
 }
 
-void compare_list_comprehension(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_list_comprehension(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::ListComp);
 
@@ -865,8 +839,7 @@ void compare_list_comprehension(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_dict_comprehension(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_dict_comprehension(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::DictComp);
 
@@ -886,8 +859,7 @@ void compare_dict_comprehension(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_set_comprehension(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_set_comprehension(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::SetComp);
 
@@ -903,8 +875,7 @@ void compare_set_comprehension(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void compare_comprehension(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_comprehension(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Comprehension);
 
@@ -924,8 +895,7 @@ void compare_comprehension(const std::shared_ptr<ASTNode> &result,
 	ASSERT_EQ(as<Comprehension>(result)->is_async(), as<Comprehension>(expected)->is_async());
 }
 
-void compare_generator_expression(const std::shared_ptr<ASTNode> &result,
-	const std::shared_ptr<ASTNode> &expected)
+void compare_generator_expression(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::GeneratorExp);
 
@@ -941,7 +911,7 @@ void compare_generator_expression(const std::shared_ptr<ASTNode> &result,
 	}
 }
 
-void dispatch(const std::shared_ptr<ASTNode> &result, const std::shared_ptr<ASTNode> &expected)
+void dispatch(const ASTNode *result, const ASTNode *expected)
 {
 	if (!expected) {
 		ASSERT_FALSE(result);
@@ -1167,12 +1137,12 @@ TEST(Parser, SimplePositiveIntegerAssignment)
 {
 	constexpr std::string_view program = "a = 2\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1182,12 +1152,12 @@ TEST(Parser, MultipleAssignments)
 	constexpr std::string_view program = "a = b = 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
-			std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
+			expected_ast->arena().create<Name>("b", ContextType::STORE, SourceLocation{}),
 		},
-		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		"",
 		SourceLocation{}));
 
@@ -1199,17 +1169,17 @@ TEST(Parser, MultipleAssignmentsWithStructuredBinding)
 	constexpr std::string_view program = "a, b = 0, 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<ast::Tuple>(
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<ast::Tuple>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>("b", ContextType::STORE, SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<ast::Tuple>(
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+		expected_ast->arena().create<ast::Tuple>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			ContextType::LOAD,
 			SourceLocation{}),
 		"",
@@ -1223,12 +1193,12 @@ TEST(Parser, SingleValueAssignmentTuple)
 	constexpr std::string_view program = "_CASE_INSENSITIVE_PLATFORMS_STR_KEY = 'win',\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Name>(
 			"_CASE_INSENSITIVE_PLATFORMS_STR_KEY", ContextType::STORE, SourceLocation{}) },
-		std::make_shared<ast::Tuple>(
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(String{ "win" }, SourceLocation{}),
+		expected_ast->arena().create<ast::Tuple>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(String{ "win" }, SourceLocation{}),
 			},
 			ContextType::LOAD,
 			SourceLocation{}),
@@ -1243,15 +1213,15 @@ TEST(Parser, AssignToTuple)
 	constexpr std::string_view program = "(a, b) = foo\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<ast::Tuple>(
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<ast::Tuple>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>("b", ContextType::STORE, SourceLocation{}),
 			},
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
 		"",
 		SourceLocation{}));
 
@@ -1263,15 +1233,15 @@ TEST(Parser, AssignToList)
 	constexpr std::string_view program = "[a, b] = foo\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<List>(
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("b", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<List>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>("b", ContextType::STORE, SourceLocation{}),
 			},
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
 		"",
 		SourceLocation{}));
 
@@ -1285,18 +1255,18 @@ TEST(Parser, BlankLine)
 		"\n"
 		"b = 2\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(static_cast<int64_t>(2), SourceLocation{}),
-			"",
-			SourceLocation{}));
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "b", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(static_cast<int64_t>(2), SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(static_cast<int64_t>(2), SourceLocation{}),
+		"",
+		SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("b", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(static_cast<int64_t>(2), SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1305,12 +1275,12 @@ TEST(Parser, SimplePositiveDoubleAssignment)
 {
 	constexpr std::string_view program = "a = 2.0\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(2.0, SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(2.0, SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1319,12 +1289,12 @@ TEST(Parser, SimpleStringAssignment)
 {
 	constexpr std::string_view program = "a = \"2\"\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>("2", SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>("2", SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1333,15 +1303,15 @@ TEST(Parser, BinaryOperationWithAssignment)
 {
 	constexpr std::string_view program = "a = 1 + 2\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
-				std::make_shared<Constant>(static_cast<int64_t>(1), SourceLocation{}),
-				std::make_shared<Constant>(static_cast<int64_t>(2), SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<BinaryExpr>(BinaryOpType::PLUS,
+			expected_ast->arena().create<Constant>(static_cast<int64_t>(1), SourceLocation{}),
+			expected_ast->arena().create<Constant>(static_cast<int64_t>(2), SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1351,15 +1321,15 @@ TEST(Parser, BinaryOperationModulo)
 {
 	constexpr std::string_view program = "a = 3 % 4\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<BinaryExpr>(BinaryOpType::MODULO,
-				std::make_shared<Constant>(int64_t{ 3 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 4 }, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<BinaryExpr>(BinaryOpType::MODULO,
+			expected_ast->arena().create<Constant>(int64_t{ 3 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 4 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1368,15 +1338,15 @@ TEST(Parser, BinaryOperationAnd)
 {
 	constexpr std::string_view program = "a = 0 & 1\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<BinaryExpr>(BinaryOpType::AND,
-				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<BinaryExpr>(BinaryOpType::AND,
+			expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1385,15 +1355,15 @@ TEST(Parser, BinaryOperationOr)
 {
 	constexpr std::string_view program = "a = 0 | 1\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<BinaryExpr>(BinaryOpType::OR,
-				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<BinaryExpr>(BinaryOpType::OR,
+			expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1402,15 +1372,15 @@ TEST(Parser, BinaryOperationXor)
 {
 	constexpr std::string_view program = "a = 0 ^ 1\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<BinaryExpr>(BinaryOpType::XOR,
-				std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<BinaryExpr>(BinaryOpType::XOR,
+			expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1421,22 +1391,22 @@ TEST(Parser, FunctionDefinition)
 		"def add(a, b):\n"
 		"   return a + b\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("add",// function_name
+		expected_ast->arena().create<Arguments>(
+			std::vector<Argument *>{
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Return>(
-				std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
-					std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-					std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Return>(
+				expected_ast->arena().create<BinaryExpr>(BinaryOpType::PLUS,
+					expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+					expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
 					SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -1451,29 +1421,29 @@ TEST(Parser, FunctionDefinitionTypeAnnotation)
 		"def add(a: int, b: int) -> int:\n"
 		"   return a + b\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("add",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{
-				std::make_shared<Argument>("a",
-					std::make_shared<Name>("int", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("add",// function_name
+		expected_ast->arena().create<Arguments>(
+			std::vector<Argument *>{
+				expected_ast->arena().create<Argument>("a",
+					expected_ast->arena().create<Name>("int", ContextType::LOAD, SourceLocation{}),
 					"",
 					SourceLocation{}),
-				std::make_shared<Argument>("b",
-					std::make_shared<Name>("int", ContextType::LOAD, SourceLocation{}),
+				expected_ast->arena().create<Argument>("b",
+					expected_ast->arena().create<Name>("int", ContextType::LOAD, SourceLocation{}),
 					"",
 					SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Return>(
-				std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
-					std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-					std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Return>(
+				expected_ast->arena().create<BinaryExpr>(BinaryOpType::PLUS,
+					expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+					expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
 					SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
-		std::make_shared<Name>("int", ContextType::LOAD, SourceLocation{}),// returns
+		std::vector<ASTNode *>{},// decorator_list
+		expected_ast->arena().create<Name>("int", ContextType::LOAD, SourceLocation{}),// returns
 		"",// type_comment
 		SourceLocation{}));
 
@@ -1488,26 +1458,29 @@ TEST(Parser, MultilineFunctionDefinition)
 		"   constant = 1\n"
 		"   return a + constant\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("plus_one",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>(
+		"plus_one",// function_name
+		expected_ast->arena().create<Arguments>(
+			std::vector<Argument *>{
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-										 "constant", ContextType::STORE, SourceLocation{}) },
-				std::make_shared<Constant>(static_cast<int64_t>(1), SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Assign>(
+				std::vector<ASTNode *>{ expected_ast->arena().create<Name>(
+					"constant", ContextType::STORE, SourceLocation{}) },
+				expected_ast->arena().create<Constant>(static_cast<int64_t>(1), SourceLocation{}),
 				"",
 				SourceLocation{}),
-			std::make_shared<Return>(
-				std::make_shared<BinaryExpr>(BinaryOpType::PLUS,
-					std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-					std::make_shared<Name>("constant", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Return>(
+				expected_ast->arena().create<BinaryExpr>(BinaryOpType::PLUS,
+					expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+					expected_ast->arena().create<Name>(
+						"constant", ContextType::LOAD, SourceLocation{}),
 					SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -1522,16 +1495,16 @@ TEST(Parser, SimpleIfStatement)
 		"if True:\n"
 		"   print(\"Hello, World!\")\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<If>(std::make_shared<Constant>(true, SourceLocation{}),// test
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("Hello, World!", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
-				SourceLocation{}) },// body
-			std::vector<std::shared_ptr<ASTNode>>{},// orelse
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<If>(
+		expected_ast->arena().create<Constant>(true, SourceLocation{}),// test
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("Hello, World!", SourceLocation{}) },
+			std::vector<Keyword *>{},
+			SourceLocation{}) },// body
+		std::vector<ASTNode *>{},// orelse
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1545,21 +1518,21 @@ TEST(Parser, SimpleIfElseStatement)
 		"   print(\"Goodbye!\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<If>(std::make_shared<Constant>(true, SourceLocation{}),// test
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("Hello, World!", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
-				SourceLocation{}) },// body
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("Goodbye!", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
-				SourceLocation{}) },// orelse
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<If>(
+		expected_ast->arena().create<Constant>(true, SourceLocation{}),// test
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("Hello, World!", SourceLocation{}) },
+			std::vector<Keyword *>{},
+			SourceLocation{}) },// body
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("Goodbye!", SourceLocation{}) },
+			std::vector<Keyword *>{},
+			SourceLocation{}) },// orelse
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1572,25 +1545,26 @@ TEST(Parser, IfStatementWithComparisson)
 		"   a = 2\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(static_cast<int64_t>(1), SourceLocation{}),
-			"",
-			SourceLocation{}));
-	expected_ast->emplace(std::make_shared<If>(
-		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(static_cast<int64_t>(1), SourceLocation{}),
+		"",
+		SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<If>(
+		expected_ast->arena().create<Compare>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			std::vector{ Compare::OpType::Eq },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(static_cast<int64_t>(1), SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(static_cast<int64_t>(1), SourceLocation{}) },
 			SourceLocation{}),// test
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-										 "a", ContextType::STORE, SourceLocation{}) },
-				std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-				"",
-				SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ASTNode>>{},// orelse
+		std::vector<ASTNode *>{ expected_ast->arena().create<Assign>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+			expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+			"",
+			SourceLocation{}) },// body
+		std::vector<ASTNode *>{},// orelse
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -1601,20 +1575,20 @@ TEST(Parser, LiteralList)
 	constexpr std::string_view program = "a = [1, 2, 3, 5]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<List>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 3 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 5 }, SourceLocation{}),
-				},
-				ContextType::LOAD,
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<List>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 3 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 5 }, SourceLocation{}),
+			},
+			ContextType::LOAD,
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1624,20 +1598,20 @@ TEST(Parser, LiteralTuple)
 	constexpr std::string_view program = "a = (1, 2, 3, 5)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<ast::Tuple>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 3 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 5 }, SourceLocation{}),
-				},
-				ContextType::LOAD,
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<ast::Tuple>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 3 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 5 }, SourceLocation{}),
+			},
+			ContextType::LOAD,
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1647,21 +1621,21 @@ TEST(Parser, LiteralDict)
 	constexpr std::string_view program = "a = {\"a\": 1, b:2}\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Dict>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("a", SourceLocation{}),
-					std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-				},
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-				},
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Dict>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("a", SourceLocation{}),
+				expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+			},
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+			},
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1671,20 +1645,20 @@ TEST(Parser, LiteralSet)
 	constexpr std::string_view program = "a = {1, 2, 3, 5}\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Set>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 3 }, SourceLocation{}),
-					std::make_shared<Constant>(int64_t{ 5 }, SourceLocation{}),
-				},
-				ContextType::LOAD,
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Set>(
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 3 }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 5 }, SourceLocation{}),
+			},
+			ContextType::LOAD,
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1696,20 +1670,21 @@ TEST(Parser, SimpleForLoopWithFunctionCall)
 		"	print(x)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<For>(
-		std::make_shared<Name>("x", ContextType::STORE, SourceLocation{}),// target
-		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<For>(
+		expected_ast->arena().create<Name>("x", ContextType::STORE, SourceLocation{}),// target
+		expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("range", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}),// iter
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("x", ContextType::LOAD, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ASTNode>>{},// orelse
+		std::vector<ASTNode *>{},// orelse
 		"",// type_comment
 		SourceLocation{}));
 
@@ -1723,22 +1698,22 @@ TEST(Parser, ForLoopMultipleTargets)
 		"	print(x, y)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<For>(
-		std::make_shared<ast::Tuple>(
-			std::vector<std::shared_ptr<ast::ASTNode>>{
-				std::make_shared<Name>("x", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("y", ContextType::STORE, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<For>(
+		expected_ast->arena().create<ast::Tuple>(
+			std::vector<ast::ASTNode *>{
+				expected_ast->arena().create<Name>("x", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>("y", ContextType::STORE, SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}),// target
-		std::make_shared<Name>("z", ContextType::LOAD, SourceLocation{}),// iter
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}),
-				std::make_shared<Name>("y", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+		expected_ast->arena().create<Name>("z", ContextType::LOAD, SourceLocation{}),// iter
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("x", ContextType::LOAD, SourceLocation{}),
+				expected_ast->arena().create<Name>("y", ContextType::LOAD, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ASTNode>>{},// orelse
+		std::vector<ASTNode *>{},// orelse
 		"",// type_comment
 		SourceLocation{}));
 
@@ -1755,25 +1730,26 @@ TEST(Parser, ForLoopWithElseBlock)
 		"	print(\"ELSE!\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<For>(
-		std::make_shared<Name>("x", ContextType::STORE, SourceLocation{}),// target
-		std::make_shared<Call>(std::make_shared<Name>("range", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<For>(
+		expected_ast->arena().create<Name>("x", ContextType::STORE, SourceLocation{}),// target
+		expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("range", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}),// iter
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("x", ContextType::LOAD, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("ELSE!", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Constant>("ELSE!", SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}),
 		},// orelse
 		"",// type_comment
@@ -1790,34 +1766,34 @@ TEST(Parser, ClassDefinition)
 		"		self.value = value\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<ClassDefinition>("A",// class name
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("Base", ContextType::LOAD, SourceLocation{}) },// bases
-		std::vector{ std::make_shared<Keyword>("metaclass",
-			std::make_shared<Name>("MyMetaClass", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<ClassDefinition>("A",// class name
+		std::vector<ASTNode *>{ expected_ast->arena().create<Name>(
+			"Base", ContextType::LOAD, SourceLocation{}) },// bases
+		std::vector{ expected_ast->arena().create<Keyword>("metaclass",
+			expected_ast->arena().create<Name>("MyMetaClass", ContextType::LOAD, SourceLocation{}),
 			SourceLocation{}) },// Keywords
-		std::vector<std::shared_ptr<ast::ASTNode>>{
-			std::make_shared<FunctionDefinition>("__init__",// function_name
-				std::make_shared<Arguments>(
-					std::vector<std::shared_ptr<Argument>>{
-						std::make_shared<Argument>("self", nullptr, "", SourceLocation{}),
-						std::make_shared<Argument>("value", nullptr, "", SourceLocation{}),
-					},
-					SourceLocation{}),// args
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Assign>(
-					std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Attribute>(
-						std::make_shared<Name>("self", ContextType::LOAD, SourceLocation{}),
-						"value",
-						ContextType::STORE,
-						SourceLocation{}) },
-					std::make_shared<Name>("value", ContextType::LOAD, SourceLocation{}),
-					"",
-					SourceLocation{}) },// body
-				std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
-				nullptr,// returns
-				"",// type_comment
+		std::vector<ast::ASTNode *>{ expected_ast->arena().create<FunctionDefinition>(
+			"__init__",// function_name
+			expected_ast->arena().create<Arguments>(
+				std::vector<Argument *>{
+					expected_ast->arena().create<Argument>("self", nullptr, "", SourceLocation{}),
+					expected_ast->arena().create<Argument>("value", nullptr, "", SourceLocation{}),
+				},
+				SourceLocation{}),// args
+			std::vector<ASTNode *>{ expected_ast->arena().create<Assign>(
+				std::vector<ast::ASTNode *>{ expected_ast->arena().create<Attribute>(
+					expected_ast->arena().create<Name>("self", ContextType::LOAD, SourceLocation{}),
+					"value",
+					ContextType::STORE,
+					SourceLocation{}) },
+				expected_ast->arena().create<Name>("value", ContextType::LOAD, SourceLocation{}),
+				"",
 				SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ast::ASTNode>>{},// decorator_list
+			std::vector<ASTNode *>{},// decorator_list
+			nullptr,// returns
+			"",// type_comment
+			SourceLocation{}) },// body
+		std::vector<ast::ASTNode *>{},// decorator_list
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -1828,16 +1804,16 @@ TEST(Parser, AccessAttribute)
 	constexpr std::string_view program = "test = foo.bar\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "test", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Attribute>(
-				std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-				"bar",
-				ContextType::LOAD,
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("test", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Attribute>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			"bar",
+			ContextType::LOAD,
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1847,18 +1823,18 @@ TEST(Parser, CallMethod)
 	constexpr std::string_view program = "test = foo.bar()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "test", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Call>(
-				std::make_shared<Attribute>(
-					std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-					"bar",
-					ContextType::LOAD,
-					SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("test", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Attribute>(
+				expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+				"bar",
+				ContextType::LOAD,
 				SourceLocation{}),
-			"",
-			SourceLocation{}));
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -1868,8 +1844,9 @@ TEST(Parser, LiteralMethodCall)
 	constexpr std::string_view program = "\"foo123\".isalnum()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Call>(
-		std::make_shared<Attribute>(std::make_shared<Constant>("foo123", SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Attribute>(
+			expected_ast->arena().create<Constant>("foo123", SourceLocation{}),
 			"isalnum",
 			ContextType::LOAD,
 			SourceLocation{}),
@@ -1883,14 +1860,14 @@ TEST(Parser, FunctionCallWithKwarg)
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=',')\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>("Hello", SourceLocation{}),
-				std::make_shared<Constant>("world!", SourceLocation{}) },
-			std::vector{ std::make_shared<Keyword>(
-				"sep", std::make_shared<Constant>(",", SourceLocation{}), SourceLocation{}) },
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Constant>("Hello", SourceLocation{}),
+			expected_ast->arena().create<Constant>("world!", SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<Keyword>("sep",
+			expected_ast->arena().create<Constant>(",", SourceLocation{}),
+			SourceLocation{}) },
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -1899,16 +1876,16 @@ TEST(Parser, FunctionCallWithOnlyKwargs)
 	constexpr std::string_view program = "add(a=1, b=2)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("add", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{},
-			std::vector{ std::make_shared<Keyword>("a",
-							 std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-							 SourceLocation{}),
-				std::make_shared<Keyword>("b",
-					std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-					SourceLocation{}) },
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("add", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{},
+		std::vector{ expected_ast->arena().create<Keyword>("a",
+						 expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+						 SourceLocation{}),
+			expected_ast->arena().create<Keyword>("b",
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+				SourceLocation{}) },
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -1917,17 +1894,17 @@ TEST(Parser, FunctionCallWithKwargAsResultFromAnotherFunction)
 	constexpr std::string_view program = "print(\"Hello\", \"world!\", sep=my_separator())\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>("Hello", SourceLocation{}),
-				std::make_shared<Constant>("world!", SourceLocation{}) },
-			std::vector{ std::make_shared<Keyword>("sep",
-				std::make_shared<Call>(
-					std::make_shared<Name>("my_separator", ContextType::LOAD, SourceLocation{}),
-					SourceLocation{}),
-				SourceLocation{}) },
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Constant>("Hello", SourceLocation{}),
+			expected_ast->arena().create<Constant>("world!", SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<Keyword>("sep",
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>(
+					"my_separator", ContextType::LOAD, SourceLocation{}),
+				SourceLocation{}),
+			SourceLocation{}) },
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -1937,10 +1914,10 @@ TEST(Parser, AugmentedAssign)
 	constexpr std::string_view program = "a += b\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<AugAssign>(
-		std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<AugAssign>(
+		expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
 		BinaryOpType::PLUS,
-		std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -1951,10 +1928,10 @@ TEST(Parser, AugmentedAssignOr)
 	constexpr std::string_view program = "a |= b\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<AugAssign>(
-		std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<AugAssign>(
+		expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
 		BinaryOpType::OR,
-		std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -1970,22 +1947,23 @@ TEST(Parser, WhileLoop)
 		"  print(a)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<While>(
-		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<While>(
+		expected_ast->arena().create<Compare>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			std::vector{ Compare::OpType::LtE },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}) },
 			SourceLocation{}),
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<AugAssign>(
-			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<AugAssign>(
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
 			BinaryOpType::PLUS,
-			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}) },
 		SourceLocation{}));
 
@@ -2001,7 +1979,7 @@ TEST(Parser, Import)
 	std::vector<alias> names{ alias{
 		.name = "fibo",
 	} };
-	auto import = std::make_shared<Import>(std::move(names), SourceLocation{});
+	auto import = expected_ast->arena().create<Import>(std::move(names), SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2016,7 +1994,7 @@ TEST(Parser, ImportAs)
 		.name = "fibo",
 		.asname = "f",
 	} };
-	auto import = std::make_shared<Import>(std::move(names), SourceLocation{});
+	auto import = expected_ast->arena().create<Import>(std::move(names), SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2031,7 +2009,7 @@ TEST(Parser, ImportDottedAs)
 		.name = "fibo.nac.ci",
 		.asname = "f",
 	} };
-	auto import = std::make_shared<Import>(std::move(names), SourceLocation{});
+	auto import = expected_ast->arena().create<Import>(std::move(names), SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2056,7 +2034,7 @@ TEST(Parser, ImportMultiple)
 			.name = "foo",
 		},
 	};
-	auto import = std::make_shared<Import>(std::move(names), SourceLocation{});
+	auto import = expected_ast->arena().create<Import>(std::move(names), SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2072,7 +2050,8 @@ TEST(Parser, ImportFrom)
 			.name = "fibo",
 		},
 	};
-	auto import = std::make_shared<ImportFrom>("sequence", std::move(names), 0, SourceLocation{});
+	auto import =
+		expected_ast->arena().create<ImportFrom>("sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2086,7 +2065,7 @@ TEST(Parser, ImportFromDotted)
 	std::vector<alias> names{ alias{
 		.name = "fibo",
 	} };
-	auto import = std::make_shared<ImportFrom>(
+	auto import = expected_ast->arena().create<ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2109,7 +2088,7 @@ TEST(Parser, ImportFromDottedMutiple)
 			.name = "factorial",
 		},
 	};
-	auto import = std::make_shared<ImportFrom>(
+	auto import = expected_ast->arena().create<ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2132,7 +2111,7 @@ TEST(Parser, ImportFromDottedMutipleInParen)
 			.name = "factorial",
 		},
 	};
-	auto import = std::make_shared<ImportFrom>(
+	auto import = expected_ast->arena().create<ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2149,8 +2128,8 @@ TEST(Parser, ImportFromParent)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import =
-		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 1, SourceLocation{});
+	auto import = expected_ast->arena().create<ImportFrom>(
+		"fibonacci.impl", std::move(names), 1, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2166,8 +2145,8 @@ TEST(Parser, ImportFromParentLevel2)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import =
-		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 2, SourceLocation{});
+	auto import = expected_ast->arena().create<ImportFrom>(
+		"fibonacci.impl", std::move(names), 2, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2183,8 +2162,8 @@ TEST(Parser, ImportFromParentLevel3)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import =
-		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 3, SourceLocation{});
+	auto import = expected_ast->arena().create<ImportFrom>(
+		"fibonacci.impl", std::move(names), 3, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2200,8 +2179,8 @@ TEST(Parser, ImportFromParentLevel4)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import =
-		std::make_shared<ImportFrom>("fibonacci.impl", std::move(names), 4, SourceLocation{});
+	auto import = expected_ast->arena().create<ImportFrom>(
+		"fibonacci.impl", std::move(names), 4, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2212,9 +2191,9 @@ TEST(Parser, SubscriptIndexExpression)
 	constexpr std::string_view program = "a[0]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Subscript>(
-		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-		Subscript::Index{ std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Subscript>(
+		expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+		Subscript::Index{ expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}) },
 		ContextType::LOAD,
 		SourceLocation{}));
 
@@ -2227,13 +2206,14 @@ TEST(Parser, SubscriptIndexAssignment)
 	constexpr std::string_view program = "a[0] = 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			Subscript::Index{ std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+			Subscript::Index{
+				expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		"",
 		SourceLocation{}));
 
@@ -2245,18 +2225,19 @@ TEST(Parser, SubscriptMultiIndexAssignment)
 	constexpr std::string_view program = "a[0, 1, 2] = 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			Subscript::ExtSlice{ .dims = { Subscript::Index{ .value = std::make_shared<Constant>(
-																 int64_t{ 0 }, SourceLocation{}) },
-									 Subscript::Index{ .value = std::make_shared<Constant>(
-														   int64_t{ 1 }, SourceLocation{}) },
-									 Subscript::Index{ .value = std::make_shared<Constant>(
-														   int64_t{ 2 }, SourceLocation{}) } } },
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+			Subscript::ExtSlice{
+				.dims = { Subscript::Index{ .value = expected_ast->arena().create<Constant>(
+												int64_t{ 0 }, SourceLocation{}) },
+					Subscript::Index{ .value = expected_ast->arena().create<Constant>(
+										  int64_t{ 1 }, SourceLocation{}) },
+					Subscript::Index{ .value = expected_ast->arena().create<Constant>(
+										  int64_t{ 2 }, SourceLocation{}) } } },
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		"",
 		SourceLocation{}));
 
@@ -2270,17 +2251,19 @@ TEST(Parser, SubscriptSliceExpression)
 		"b[0:10:2]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Subscript>(
-		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-		Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-			.upper = std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Subscript>(
+		expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+		Subscript::Slice{
+			.lower = expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+			.upper = expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}) },
 		ContextType::LOAD,
 		SourceLocation{}));
-	expected_ast->emplace(std::make_shared<Subscript>(
-		std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-		Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-			.upper = std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}),
-			.step = std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Subscript>(
+		expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+		Subscript::Slice{
+			.lower = expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+			.upper = expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}),
+			.step = expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}) },
 		ContextType::LOAD,
 		SourceLocation{}));
 
@@ -2294,12 +2277,12 @@ TEST(Parser, SubscriptSliceExpressionNoStart)
 	constexpr std::string_view program = "a[:2:1]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Subscript>(
-		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Subscript>(
+		expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 		Subscript::Slice{
 			.lower = nullptr,
-			.upper = std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
-			.step = std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			.upper = expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
+			.step = expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		},
 		ContextType::LOAD,
 		SourceLocation{}));
@@ -2312,13 +2295,13 @@ TEST(Parser, SubscriptSliceExpressionNoStartOrEnd)
 	constexpr std::string_view program = "a[::-1]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Subscript>(
-		std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Subscript>(
+		expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 		Subscript::Slice{
 			.lower = nullptr,
 			.upper = nullptr,
-			.step = std::make_shared<UnaryExpr>(UnaryOpType::SUB,
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			.step = expected_ast->arena().create<UnaryExpr>(UnaryOpType::SUB,
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 				SourceLocation{}),
 		},
 		ContextType::LOAD,
@@ -2335,40 +2318,45 @@ TEST(Parser, SubscriptSliceAssignment)
 		"b[0:g:2] = f[e:h]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				.upper = std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}) },
-			ContextType::STORE,
-			SourceLocation{}) },
-		std::make_shared<Name>("c", ContextType::LOAD, SourceLocation{}),
-		"",
-		SourceLocation{}));
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-			Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				.upper = std::make_shared<Constant>(int64_t{ 10 }, SourceLocation{}),
-				.step = std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}) },
-			ContextType::STORE,
-			SourceLocation{}) },
-		std::make_shared<Name>("d", ContextType::LOAD, SourceLocation{}),
-		"",
-		SourceLocation{}));
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-			Subscript::Slice{ .lower = std::make_shared<Constant>(int64_t{ 0 }, SourceLocation{}),
-				.upper = std::make_shared<Name>("g", ContextType::LOAD, SourceLocation{}),
-				.step = std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}) },
-			ContextType::STORE,
-			SourceLocation{}) },
-		std::make_shared<Subscript>(
-			std::make_shared<Name>("f", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			Subscript::Slice{
-				.lower = std::make_shared<Name>("e", ContextType::LOAD, SourceLocation{}),
-				.upper = std::make_shared<Name>("h", ContextType::LOAD, SourceLocation{}) },
+				.lower = expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+				.upper = expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}) },
+			ContextType::STORE,
+			SourceLocation{}) },
+		expected_ast->arena().create<Name>("c", ContextType::LOAD, SourceLocation{}),
+		"",
+		SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+			Subscript::Slice{
+				.lower = expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+				.upper = expected_ast->arena().create<Constant>(int64_t{ 10 }, SourceLocation{}),
+				.step = expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}) },
+			ContextType::STORE,
+			SourceLocation{}) },
+		expected_ast->arena().create<Name>("d", ContextType::LOAD, SourceLocation{}),
+		"",
+		SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+			Subscript::Slice{
+				.lower = expected_ast->arena().create<Constant>(int64_t{ 0 }, SourceLocation{}),
+				.upper =
+					expected_ast->arena().create<Name>("g", ContextType::LOAD, SourceLocation{}),
+				.step = expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}) },
+			ContextType::STORE,
+			SourceLocation{}) },
+		expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("f", ContextType::LOAD, SourceLocation{}),
+			Subscript::Slice{ .lower = expected_ast->arena().create<Name>(
+								  "e", ContextType::LOAD, SourceLocation{}),
+				.upper =
+					expected_ast->arena().create<Name>("h", ContextType::LOAD, SourceLocation{}) },
 			ContextType::LOAD,
 			SourceLocation{}),
 		"",
@@ -2383,7 +2371,7 @@ TEST(Parser, Raise)
 	constexpr std::string_view program = "raise\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Raise>(SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Raise>(SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -2393,12 +2381,12 @@ TEST(Parser, RaiseValueError)
 	constexpr std::string_view program = "raise ValueError(\"Wrong!\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Raise>(
-		std::make_shared<Call>(
-			std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>("Wrong!", SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<Raise>(
+		expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("Wrong!", SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}),
 		nullptr,
 		SourceLocation{}));
@@ -2411,14 +2399,14 @@ TEST(Parser, RaiseValueErrorCause)
 	constexpr std::string_view program = "raise ValueError(\"Wrong!\") from exc\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Raise>(
-		std::make_shared<Call>(
-			std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>("Wrong!", SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<Raise>(
+		expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>("Wrong!", SourceLocation{}) },
+			std::vector<Keyword *>{},
 			SourceLocation{}),
-		std::make_shared<Name>("exc", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("exc", ContextType::LOAD, SourceLocation{}),
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2433,13 +2421,15 @@ TEST(Parser, TryFinally)
 		"  bar()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector<std::shared_ptr<ExceptHandler>>{},
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("bar", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector<ExceptHandler *>{},
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("bar", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2454,20 +2444,21 @@ TEST(Parser, TryExcept)
 		"  print(\"Exception\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector{ std::make_shared<ExceptHandler>(nullptr,
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<ExceptHandler>(nullptr,
 			"",
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("Exception", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+			std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Constant>("Exception", SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}) },
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{},
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2482,21 +2473,22 @@ TEST(Parser, TryExceptWithExceptionType)
 		"  print(\"Exception\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector{ std::make_shared<ExceptHandler>(
-			std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<ExceptHandler>(
+			expected_ast->arena().create<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
 			"",
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("Exception", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+			std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Constant>("Exception", SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}) },
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{},
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2511,21 +2503,22 @@ TEST(Parser, TryExceptWithExceptionTypeAndName)
 		"  print(e)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector{ std::make_shared<ExceptHandler>(
-			std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<ExceptHandler>(
+			expected_ast->arena().create<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
 			"e",
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Name>("e", ContextType::LOAD, SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+			std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Name>("e", ContextType::LOAD, SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}) },
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{},
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2544,40 +2537,46 @@ TEST(Parser, TryExceptMultipleExceptionHandlers)
 		"  print(\"Exception\")\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector{ std::make_shared<ExceptHandler>(
-						 std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<ExceptHandler>(
+						 expected_ast->arena().create<Name>(
+							 "ValueError", ContextType::LOAD, SourceLocation{}),
 						 "e",
-						 std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-							 std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-							 std::vector<std::shared_ptr<ASTNode>>{
-								 std::make_shared<Name>("e", ContextType::LOAD, SourceLocation{}) },
-							 std::vector<std::shared_ptr<Keyword>>{},
+						 std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+							 expected_ast->arena().create<Name>(
+								 "print", ContextType::LOAD, SourceLocation{}),
+							 std::vector<ASTNode *>{ expected_ast->arena().create<Name>(
+								 "e", ContextType::LOAD, SourceLocation{}) },
+							 std::vector<Keyword *>{},
 							 SourceLocation{}) },
 						 SourceLocation{}),
-			std::make_shared<ExceptHandler>(
-				std::make_shared<Name>("BaseException", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<ExceptHandler>(
+				expected_ast->arena().create<Name>(
+					"BaseException", ContextType::LOAD, SourceLocation{}),
 				"",
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-					std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Constant>("BaseException", SourceLocation{}) },
-					std::vector<std::shared_ptr<Keyword>>{},
+				std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+					expected_ast->arena().create<Name>(
+						"print", ContextType::LOAD, SourceLocation{}),
+					std::vector<ASTNode *>{
+						expected_ast->arena().create<Constant>("BaseException", SourceLocation{}) },
+					std::vector<Keyword *>{},
 					SourceLocation{}) },
 				SourceLocation{}),
-			std::make_shared<ExceptHandler>(nullptr,
+			expected_ast->arena().create<ExceptHandler>(nullptr,
 				"",
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-					std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Constant>("Exception", SourceLocation{}) },
-					std::vector<std::shared_ptr<Keyword>>{},
+				std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+					expected_ast->arena().create<Name>(
+						"print", ContextType::LOAD, SourceLocation{}),
+					std::vector<ASTNode *>{
+						expected_ast->arena().create<Constant>("Exception", SourceLocation{}) },
+					std::vector<Keyword *>{},
 					SourceLocation{}) },
 				SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{},
 		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
@@ -2595,26 +2594,27 @@ TEST(Parser, TryExceptFinally)
 		"  exit()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Try>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}), SourceLocation{}) },
-		std::vector{ std::make_shared<ExceptHandler>(
-			std::make_shared<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Try>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector{ expected_ast->arena().create<ExceptHandler>(
+			expected_ast->arena().create<Name>("ValueError", ContextType::LOAD, SourceLocation{}),
 			"e",
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-				std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Name>("e", ContextType::LOAD, SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+			std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Name>("e", ContextType::LOAD, SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}) },
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Call>(
-				std::make_shared<Name>("cleanup", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{},
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("cleanup", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}),
-			std::make_shared<Call>(
-				std::make_shared<Name>("exit", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("exit", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}) },
 		SourceLocation{}));
 
@@ -2626,8 +2626,10 @@ TEST(Parser, Assert)
 	constexpr std::string_view program = "assert False\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assert>(
-		std::make_shared<Constant>(false, SourceLocation{}), nullptr, SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assert>(
+		expected_ast->arena().create<Constant>(false, SourceLocation{}),
+		nullptr,
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -2637,10 +2639,10 @@ TEST(Parser, AssertWithMessage)
 	constexpr std::string_view program = "assert False, \"failed!\"\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assert>(std::make_shared<Constant>(false, SourceLocation{}),
-			std::make_shared<Constant>("failed!", SourceLocation{}),
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assert>(
+		expected_ast->arena().create<Constant>(false, SourceLocation{}),
+		expected_ast->arena().create<Constant>("failed!", SourceLocation{}),
+		SourceLocation{}));
 
 	assert_generates_ast(program, expected_ast);
 }
@@ -2650,14 +2652,14 @@ TEST(Parser, NegativeNumber)
 	constexpr std::string_view program = "a = -1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<UnaryExpr>(UnaryOpType::SUB,
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<UnaryExpr>(UnaryOpType::SUB,
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2666,20 +2668,20 @@ TEST(Parser, UnaryExprMix)
 	constexpr std::string_view program = "a = -+-+1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<UnaryExpr>(UnaryOpType::SUB,
-				std::make_shared<UnaryExpr>(UnaryOpType::ADD,
-					std::make_shared<UnaryExpr>(UnaryOpType::SUB,
-						std::make_shared<UnaryExpr>(UnaryOpType::ADD,
-							std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-							SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<UnaryExpr>(UnaryOpType::SUB,
+			expected_ast->arena().create<UnaryExpr>(UnaryOpType::ADD,
+				expected_ast->arena().create<UnaryExpr>(UnaryOpType::SUB,
+					expected_ast->arena().create<UnaryExpr>(UnaryOpType::ADD,
+						expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 						SourceLocation{}),
 					SourceLocation{}),
 				SourceLocation{}),
-			"",
-			SourceLocation{}));
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2688,14 +2690,14 @@ TEST(Parser, UnaryNot)
 	constexpr std::string_view program = "a = not b\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<UnaryExpr>(UnaryOpType::NOT,
-				std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<UnaryExpr>(UnaryOpType::NOT,
+			expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2704,11 +2706,12 @@ TEST(Parser, CompareIsNot)
 	constexpr std::string_view program = "assert a is not False\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assert>(
-		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assert>(
+		expected_ast->arena().create<Compare>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			std::vector{ Compare::OpType::IsNot },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(false, SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(false, SourceLocation{}) },
 			SourceLocation{}),
 		nullptr,
 		SourceLocation{}));
@@ -2721,11 +2724,12 @@ TEST(Parser, CompareIs)
 	constexpr std::string_view program = "assert a is False\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assert>(
-		std::make_shared<Compare>(std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assert>(
+		expected_ast->arena().create<Compare>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			std::vector{ Compare::OpType::Is },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(false, SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(false, SourceLocation{}) },
 			SourceLocation{}),
 		nullptr,
 		SourceLocation{}));
@@ -2737,10 +2741,10 @@ TEST(Parser, BoolOpAnd)
 	constexpr std::string_view program = "a and b\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<BoolOp>(BoolOp::OpType::And,
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<BoolOp>(BoolOp::OpType::And,
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}) },
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -2750,10 +2754,10 @@ TEST(Parser, BoolOpOr)
 	constexpr std::string_view program = "a or b\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<BoolOp>(BoolOp::OpType::Or,
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<BoolOp>(BoolOp::OpType::Or,
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}) },
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -2765,13 +2769,13 @@ TEST(Parser, WithStatement)
 		"  work()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<With>(
-		std::vector{ std::make_shared<WithItem>(
-			std::make_shared<Name>("lock", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<With>(
+		std::vector{ expected_ast->arena().create<WithItem>(
+			expected_ast->arena().create<Name>("lock", ContextType::LOAD, SourceLocation{}),
 			nullptr,
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Call>(
-			std::make_shared<Name>("work", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Call>(
+			expected_ast->arena().create<Name>("work", ContextType::LOAD, SourceLocation{}),
 			SourceLocation{}) },
 		"",
 		SourceLocation{}));
@@ -2783,18 +2787,18 @@ TEST(Parser, IfExpression)
 	constexpr std::string_view program = "a = 42 if magic() else 21\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<IfExpr>(
-				std::make_shared<Call>(
-					std::make_shared<Name>("magic", ContextType::LOAD, SourceLocation{}),
-					SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 42 }, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 21 }, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<IfExpr>(
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("magic", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}),
-			"",
-			SourceLocation{}));
+			expected_ast->arena().create<Constant>(int64_t{ 42 }, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 21 }, SourceLocation{}),
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2805,18 +2809,19 @@ TEST(Parser, ArgsKwargsFunctionDef)
 		"  return 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("foo",
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<Argument>>{},
-			std::make_shared<Argument>("args", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<ast::ASTNode>>{},
-			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<ast::ASTNode>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("foo",
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{},
+			std::vector<Argument *>{},
+			expected_ast->arena().create<Argument>("args", nullptr, "", SourceLocation{}),
+			std::vector<Argument *>{},
+			std::vector<ast::ASTNode *>{},
+			expected_ast->arena().create<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<ast::ASTNode *>{},
 			SourceLocation{}),
-		std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Return>(
-			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}), SourceLocation{}) },
-		std::vector<std::shared_ptr<ast::ASTNode>>{},
+		std::vector<ast::ASTNode *>{ expected_ast->arena().create<Return>(
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector<ast::ASTNode *>{},
 		nullptr,
 		"",
 		SourceLocation{}));
@@ -2828,16 +2833,16 @@ TEST(Parser, ArgsKwargsFunctionCall)
 	constexpr std::string_view program = "foo(*args, **kwargs)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Starred>(
-				std::make_shared<Name>("args", ContextType::LOAD, SourceLocation{}),
-				ContextType::LOAD,
-				SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{ std::make_shared<Keyword>(
-				std::make_shared<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
-				SourceLocation{}) },
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Starred>(
+			expected_ast->arena().create<Name>("args", ContextType::LOAD, SourceLocation{}),
+			ContextType::LOAD,
+			SourceLocation{}) },
+		std::vector<Keyword *>{ expected_ast->arena().create<Keyword>(
+			expected_ast->arena().create<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2846,14 +2851,14 @@ TEST(Parser, ArgKwargsFunctionCall)
 	constexpr std::string_view program = "foo(arg, **kwargs)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("arg", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{ std::make_shared<Keyword>(
-				std::make_shared<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
-				SourceLocation{}) },
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("arg", ContextType::LOAD, SourceLocation{}) },
+		std::vector<Keyword *>{ expected_ast->arena().create<Keyword>(
+			expected_ast->arena().create<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
+			SourceLocation{}) },
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2862,20 +2867,20 @@ TEST(Parser, ArgsKwargsArgFunctionCall)
 	constexpr std::string_view program = "foo(*args, **kwargs, a=1)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Starred>(
-				std::make_shared<Name>("args", ContextType::LOAD, SourceLocation{}),
-				ContextType::LOAD,
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Starred>(
+			expected_ast->arena().create<Name>("args", ContextType::LOAD, SourceLocation{}),
+			ContextType::LOAD,
+			SourceLocation{}) },
+		std::vector<Keyword *>{
+			expected_ast->arena().create<Keyword>(
+				expected_ast->arena().create<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
+				SourceLocation{}),
+			expected_ast->arena().create<Keyword>("a",
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 				SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{
-				std::make_shared<Keyword>(
-					std::make_shared<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
-					SourceLocation{}),
-				std::make_shared<Keyword>("a",
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-					SourceLocation{}) },
-			SourceLocation{}));
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -2885,29 +2890,32 @@ TEST(Parser, ComplexArgsKwargsFunctionCall)
 		"foo(*args, *more_args, bar, b=2, **kwargs, **more_kwargs, a=1)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Call>(
-		std::make_shared<Name>("foo", ContextType::LOAD, SourceLocation{}),
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Starred>(
-				std::make_shared<Name>("args", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("foo", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Starred>(
+				expected_ast->arena().create<Name>("args", ContextType::LOAD, SourceLocation{}),
 				ContextType::LOAD,
 				SourceLocation{}),
-			std::make_shared<Starred>(
-				std::make_shared<Name>("more_args", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Starred>(
+				expected_ast->arena().create<Name>(
+					"more_args", ContextType::LOAD, SourceLocation{}),
 				ContextType::LOAD,
 				SourceLocation{}),
-			std::make_shared<Name>("bar", ContextType::LOAD, SourceLocation{}) },
-		std::vector<std::shared_ptr<Keyword>>{
-			std::make_shared<Keyword>(
-				"b", std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}), SourceLocation{}),
-			std::make_shared<Keyword>(
-				std::make_shared<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Name>("bar", ContextType::LOAD, SourceLocation{}) },
+		std::vector<Keyword *>{
+			expected_ast->arena().create<Keyword>("b",
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
 				SourceLocation{}),
-			std::make_shared<Keyword>(
-				std::make_shared<Name>("more_kwargs", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Keyword>(
+				expected_ast->arena().create<Name>("kwargs", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}),
-			std::make_shared<Keyword>("a",
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			expected_ast->arena().create<Keyword>(
+				expected_ast->arena().create<Name>(
+					"more_kwargs", ContextType::LOAD, SourceLocation{}),
+				SourceLocation{}),
+			expected_ast->arena().create<Keyword>("a",
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 				SourceLocation{}) },
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
@@ -2918,14 +2926,14 @@ TEST(Parser, AugAssignAttribute)
 	constexpr std::string_view program = "a.b += 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<AugAssign>(
-		std::make_shared<Attribute>(
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<AugAssign>(
+		expected_ast->arena().create<Attribute>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
 			"b",
 			ContextType::STORE,
 			SourceLocation{}),
 		BinaryOpType::PLUS,
-		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -2935,14 +2943,15 @@ TEST(Parser, AugAssignSlices)
 	constexpr std::string_view program = "a['b'] += 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<AugAssign>(
-		std::make_shared<Subscript>(
-			std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}),
-			Subscript::Index{ .value = std::make_shared<Constant>("b", SourceLocation{}) },
+	expected_ast->emplace(expected_ast->arena().create<AugAssign>(
+		expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}),
+			Subscript::Index{
+				.value = expected_ast->arena().create<Constant>("b", SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}),
 		BinaryOpType::PLUS,
-		std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -2956,20 +2965,23 @@ TEST(Parser, FunctionDefinitionWithDecoratorList)
 		"  return None\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("get_source",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{
-				std::make_shared<Argument>("cls", nullptr, "", SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>(
+		"get_source",// function_name
+		expected_ast->arena().create<Arguments>(
+			std::vector<Argument *>{
+				expected_ast->arena().create<Argument>("cls", nullptr, "", SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Return>(
-				std::make_shared<Constant>(py::NameConstant{ py::NoneType{} }, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Return>(
+				expected_ast->arena().create<Constant>(
+					py::NameConstant{ py::NoneType{} }, SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("classmethod", ContextType::LOAD, SourceLocation{}),
-			std::make_shared<Name>("_require_frozen", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("classmethod", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Name>(
+				"_require_frozen", ContextType::LOAD, SourceLocation{}),
 		},// decorator_list
 		nullptr,// returns
 		"",// type_comment
@@ -2985,14 +2997,14 @@ TEST(Parser, ClassDefinitionWithDecoratorList)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<ClassDefinition>("Derived",// class_name
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("Base", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<ClassDefinition>("Derived",// class_name
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("Base", ContextType::LOAD, SourceLocation{}),
 		},// bases
-		std::vector<std::shared_ptr<Keyword>>{},// keyword
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>(SourceLocation{}) },// body
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("my_decorator", ContextType::LOAD, SourceLocation{}),
+		std::vector<Keyword *>{},// keyword
+		std::vector<ASTNode *>{ expected_ast->arena().create<Pass>(SourceLocation{}) },// body
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("my_decorator", ContextType::LOAD, SourceLocation{}),
 		},// decorator_list
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
@@ -3005,14 +3017,14 @@ TEST(Parser, NamedExpression)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<If>(std::make_shared<NamedExpr>(
-								 std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
-								 std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-								 SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>(SourceLocation{}) },
-			std::vector<std::shared_ptr<ASTNode>>{},
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<If>(
+		expected_ast->arena().create<NamedExpr>(
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}),
+		std::vector<ASTNode *>{ expected_ast->arena().create<Pass>(SourceLocation{}) },
+		std::vector<ASTNode *>{},
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -3023,23 +3035,23 @@ TEST(Parser, FunctionDefinitionWithDefaultKeyword)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<ast::Argument *>{},
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector<std::shared_ptr<ast::Argument>>{},
-			std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<ast::Argument *>{},
+			std::vector<ASTNode *>{},
 			nullptr,
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3053,22 +3065,23 @@ TEST(Parser, FunctionDefinitionWithKeywordOnlyArg)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<ast::Argument *>{},
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector{ std::make_shared<ast::Argument>("b", nullptr, "", SourceLocation{}) },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+			std::vector{
+				expected_ast->arena().create<ast::Argument>("b", nullptr, "", SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			nullptr,
-			std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<ASTNode *>{},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3082,24 +3095,25 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArg)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<ast::Argument *>{},
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector{ std::make_shared<ast::Argument>("c", nullptr, "", SourceLocation{}) },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}) },
-			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+			std::vector{
+				expected_ast->arena().create<ast::Argument>("c", nullptr, "", SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}) },
+			expected_ast->arena().create<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3113,24 +3127,25 @@ TEST(Parser, FunctionDefinitionWithDefaultArgsAndKeywordOnlyArgNone)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<ast::Argument>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<ast::Argument *>{},
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector{ std::make_shared<ast::Argument>("c", nullptr, "", SourceLocation{}),
-				std::make_shared<ast::Argument>("d", nullptr, "", SourceLocation{}) },
-			std::vector<std::shared_ptr<ASTNode>>{ nullptr, nullptr },
-			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+			std::vector{
+				expected_ast->arena().create<ast::Argument>("c", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<ast::Argument>("d", nullptr, "", SourceLocation{}) },
+			std::vector<ASTNode *>{ nullptr, nullptr },
+			expected_ast->arena().create<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3144,24 +3159,24 @@ TEST(Parser, FunctionDefinitionWithPositionalArgsWithoutDefault)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
 			},
 			std::vector{
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<ASTNode>>{},
-			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<Argument *>{},
+			std::vector<ASTNode *>{},
+			expected_ast->arena().create<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<ASTNode *>{},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3175,29 +3190,29 @@ TEST(Parser, FunctionDefinitionWithPositionalArgWithDefault)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
-				std::make_shared<Argument>("b", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("b", nullptr, "", SourceLocation{}),
 			},
 			std::vector{
-				std::make_shared<Argument>("c", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("c", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<ASTNode>>{},
-			std::make_shared<Argument>("kwargs", nullptr, "", SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<ast::Tuple>(
-					std::vector<std::shared_ptr<ASTNode>>{}, ContextType::LOAD, SourceLocation{}),
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+			std::vector<Argument *>{},
+			std::vector<ASTNode *>{},
+			expected_ast->arena().create<Argument>("kwargs", nullptr, "", SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<ast::Tuple>(
+					std::vector<ASTNode *>{}, ContextType::LOAD, SourceLocation{}),
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3211,23 +3226,24 @@ TEST(Parser, FunctionDefinitionWithOnlyDefaultArguments)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("f",// function_name
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{},
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("f",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{},
 			std::vector{
-				std::make_shared<Argument>("a", nullptr, "", SourceLocation{}),
+				expected_ast->arena().create<Argument>("a", nullptr, "", SourceLocation{}),
 			},
 			nullptr,
-			std::vector<std::shared_ptr<Argument>>{},
-			std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<Argument *>{},
+			std::vector<ASTNode *>{},
 			nullptr,
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(NameConstant{ NoneType{} }, SourceLocation{}),
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(
+					NameConstant{ NoneType{} }, SourceLocation{}),
 			},
 			SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Pass>(SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Pass>(SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3239,31 +3255,31 @@ TEST(Parser, AssignToAttributeSubscript)
 	constexpr std::string_view program = "sys.modules.foo[spec.name.bar] = my.module\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Subscript>(
-			std::make_shared<Attribute>(
-				std::make_shared<Attribute>(
-					std::make_shared<Name>("sys", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{ expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Attribute>(
+				expected_ast->arena().create<Attribute>(
+					expected_ast->arena().create<Name>("sys", ContextType::LOAD, SourceLocation{}),
 					"modules",
 					ContextType::LOAD,
 					SourceLocation{}),
 				"foo",
 				ContextType::LOAD,
 				SourceLocation{}),
-			Subscript::Index{
-				.value = std::make_shared<Attribute>(
-					std::make_shared<Attribute>(
-						std::make_shared<Name>("spec", ContextType::LOAD, SourceLocation{}),
-						"name",
-						ContextType::LOAD,
-						SourceLocation{}),
-					"bar",
-					ContextType::LOAD,
-					SourceLocation{}) },
+			Subscript::Index{ .value = expected_ast->arena().create<Attribute>(
+								  expected_ast->arena().create<Attribute>(
+									  expected_ast->arena().create<Name>(
+										  "spec", ContextType::LOAD, SourceLocation{}),
+									  "name",
+									  ContextType::LOAD,
+									  SourceLocation{}),
+								  "bar",
+								  ContextType::LOAD,
+								  SourceLocation{}) },
 			ContextType::STORE,
 			SourceLocation{}) },
-		std::make_shared<Attribute>(
-			std::make_shared<Name>("my", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Attribute>(
+			expected_ast->arena().create<Name>("my", ContextType::LOAD, SourceLocation{}),
 			"module",
 			ContextType::LOAD,
 			SourceLocation{}),
@@ -3277,31 +3293,31 @@ TEST(Parser, CallAttributeSubscript)
 	constexpr std::string_view program = "sys.modules.foo[spec.name.bar]()\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Call>(
-		std::make_shared<Subscript>(
-			std::make_shared<Attribute>(
-				std::make_shared<Attribute>(
-					std::make_shared<Name>("sys", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Subscript>(
+			expected_ast->arena().create<Attribute>(
+				expected_ast->arena().create<Attribute>(
+					expected_ast->arena().create<Name>("sys", ContextType::LOAD, SourceLocation{}),
 					"modules",
 					ContextType::LOAD,
 					SourceLocation{}),
 				"foo",
 				ContextType::LOAD,
 				SourceLocation{}),
-			Subscript::Index{
-				.value = std::make_shared<Attribute>(
-					std::make_shared<Attribute>(
-						std::make_shared<Name>("spec", ContextType::LOAD, SourceLocation{}),
-						"name",
-						ContextType::LOAD,
-						SourceLocation{}),
-					"bar",
-					ContextType::LOAD,
-					SourceLocation{}) },
+			Subscript::Index{ .value = expected_ast->arena().create<Attribute>(
+								  expected_ast->arena().create<Attribute>(
+									  expected_ast->arena().create<Name>(
+										  "spec", ContextType::LOAD, SourceLocation{}),
+									  "name",
+									  ContextType::LOAD,
+									  SourceLocation{}),
+								  "bar",
+								  ContextType::LOAD,
+								  SourceLocation{}) },
 			ContextType::LOAD,
 			SourceLocation{}),
-		std::vector<std::shared_ptr<ASTNode>>{},
-		std::vector<std::shared_ptr<Keyword>>{},
+		std::vector<ASTNode *>{},
+		std::vector<Keyword *>{},
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -3313,17 +3329,17 @@ TEST(Parser, WithItemVar)
 		"  pass\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<With>(
-		std::vector{ std::make_shared<WithItem>(
-			std::make_shared<Call>(
-				std::make_shared<Name>("open", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>("file.txt", SourceLocation{}) },
-				std::vector<std::shared_ptr<Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<With>(
+		std::vector{ expected_ast->arena().create<WithItem>(
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("open", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Constant>("file.txt", SourceLocation{}) },
+				std::vector<Keyword *>{},
 				SourceLocation{}),
-			std::make_shared<Name>("f", ContextType::STORE, SourceLocation{}),
+			expected_ast->arena().create<Name>("f", ContextType::STORE, SourceLocation{}),
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Pass>(SourceLocation{}) },
+		std::vector<ASTNode *>{ expected_ast->arena().create<Pass>(SourceLocation{}) },
 		"",
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
@@ -3334,23 +3350,24 @@ TEST(Parser, ListComprehension)
 	constexpr std::string_view program = "[len(sep) == 1 for sep in path_separators]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<ListComp>(
-		std::make_shared<Compare>(
-			std::make_shared<Call>(
-				std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ast::ASTNode>>{
-					std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
-				std::vector<std::shared_ptr<ast::Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<ListComp>(
+		expected_ast->arena().create<Compare>(
+			expected_ast->arena().create<Call>(
+				expected_ast->arena().create<Name>("len", ContextType::LOAD, SourceLocation{}),
+				std::vector<ast::ASTNode *>{ expected_ast->arena().create<Name>(
+					"sep", ContextType::LOAD, SourceLocation{}) },
+				std::vector<ast::Keyword *>{},
 				SourceLocation{}),
 			std::vector{ Compare::OpType::Eq },
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 			SourceLocation{}),
-		std::vector<std::shared_ptr<Comprehension>>{
-			std::make_shared<Comprehension>(
-				std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{},
+		std::vector<Comprehension *>{
+			expected_ast->arena().create<Comprehension>(
+				expected_ast->arena().create<Name>("sep", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>(
+					"path_separators", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{},
 				false,
 				SourceLocation{}),
 		},
@@ -3363,22 +3380,24 @@ TEST(Parser, ListComprehensionIf)
 	constexpr std::string_view program = "[sep for sep in path_separators if len(sep) == 1]\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<ListComp>(
-		std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}),
-		std::vector<std::shared_ptr<Comprehension>>{
-			std::make_shared<Comprehension>(
-				std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
-				std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
-				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Compare>(
-					std::make_shared<Call>(
-						std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
-						std::vector<std::shared_ptr<ast::ASTNode>>{
-							std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
-						std::vector<std::shared_ptr<ast::Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<ListComp>(
+		expected_ast->arena().create<Name>("sep", ContextType::LOAD, SourceLocation{}),
+		std::vector<Comprehension *>{
+			expected_ast->arena().create<Comprehension>(
+				expected_ast->arena().create<Name>("sep", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>(
+					"path_separators", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{ expected_ast->arena().create<Compare>(
+					expected_ast->arena().create<Call>(
+						expected_ast->arena().create<Name>(
+							"len", ContextType::LOAD, SourceLocation{}),
+						std::vector<ast::ASTNode *>{ expected_ast->arena().create<Name>(
+							"sep", ContextType::LOAD, SourceLocation{}) },
+						std::vector<ast::Keyword *>{},
 						SourceLocation{}),
 					std::vector{ Compare::OpType::Eq },
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+					std::vector<ASTNode *>{
+						expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 					SourceLocation{}) },
 				false,
 				SourceLocation{}),
@@ -3392,24 +3411,27 @@ TEST(Parser, DictComprehension)
 	constexpr std::string_view program = "{k: v for k, v in container}\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<DictComp>(std::make_shared<Name>("k", ContextType::LOAD, SourceLocation{}),
-			std::make_shared<Name>("v", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<Comprehension>>{
-				std::make_shared<Comprehension>(
-					std::make_shared<ast::Tuple>(
-						std::vector<std::shared_ptr<ASTNode>>{
-							std::make_shared<Name>("k", ContextType::STORE, SourceLocation{}),
-							std::make_shared<Name>("v", ContextType::STORE, SourceLocation{}),
-						},
-						ContextType::STORE,
-						SourceLocation{}),
-					std::make_shared<Name>("container", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ASTNode>>{},
-					false,
+	expected_ast->emplace(expected_ast->arena().create<DictComp>(
+		expected_ast->arena().create<Name>("k", ContextType::LOAD, SourceLocation{}),
+		expected_ast->arena().create<Name>("v", ContextType::LOAD, SourceLocation{}),
+		std::vector<Comprehension *>{
+			expected_ast->arena().create<Comprehension>(
+				expected_ast->arena().create<ast::Tuple>(
+					std::vector<ASTNode *>{
+						expected_ast->arena().create<Name>(
+							"k", ContextType::STORE, SourceLocation{}),
+						expected_ast->arena().create<Name>(
+							"v", ContextType::STORE, SourceLocation{}),
+					},
+					ContextType::STORE,
 					SourceLocation{}),
-			},
-			SourceLocation{}));
+				expected_ast->arena().create<Name>(
+					"container", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{},
+				false,
+				SourceLocation{}),
+		},
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -3419,30 +3441,31 @@ TEST(Parser, GeneratorExpr)
 	constexpr std::string_view program = "all(len(sep) == 1 for sep in path_separators)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Call>(
-		std::make_shared<Name>("all", ContextType::LOAD, SourceLocation{}),
-		std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<GeneratorExp>(
-			std::make_shared<Compare>(
-				std::make_shared<Call>(
-					std::make_shared<Name>("len", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ast::ASTNode>>{
-						std::make_shared<Name>("sep", ContextType::LOAD, SourceLocation{}) },
-					std::vector<std::shared_ptr<ast::Keyword>>{},
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("all", ContextType::LOAD, SourceLocation{}),
+		std::vector<ast::ASTNode *>{ expected_ast->arena().create<GeneratorExp>(
+			expected_ast->arena().create<Compare>(
+				expected_ast->arena().create<Call>(
+					expected_ast->arena().create<Name>("len", ContextType::LOAD, SourceLocation{}),
+					std::vector<ast::ASTNode *>{ expected_ast->arena().create<Name>(
+						"sep", ContextType::LOAD, SourceLocation{}) },
+					std::vector<ast::Keyword *>{},
 					SourceLocation{}),
 				std::vector{ Compare::OpType::Eq },
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}) },
+				std::vector<ASTNode *>{
+					expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}) },
 				SourceLocation{}),
-			std::vector<std::shared_ptr<Comprehension>>{
-				std::make_shared<Comprehension>(
-					std::make_shared<Name>("sep", ContextType::STORE, SourceLocation{}),
-					std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ASTNode>>{},
+			std::vector<Comprehension *>{
+				expected_ast->arena().create<Comprehension>(
+					expected_ast->arena().create<Name>("sep", ContextType::STORE, SourceLocation{}),
+					expected_ast->arena().create<Name>(
+						"path_separators", ContextType::LOAD, SourceLocation{}),
+					std::vector<ASTNode *>{},
 					false,
 					SourceLocation{}),
 			},
 			SourceLocation{}) },
-		std::vector<std::shared_ptr<ast::Keyword>>{},
+		std::vector<ast::Keyword *>{},
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -3452,17 +3475,18 @@ TEST(Parser, SetComp)
 	constexpr std::string_view program = "{s for s in path_separators}\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<SetComp>(std::make_shared<Name>("s", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<Comprehension>>{
-				std::make_shared<Comprehension>(
-					std::make_shared<Name>("s", ContextType::STORE, SourceLocation{}),
-					std::make_shared<Name>("path_separators", ContextType::LOAD, SourceLocation{}),
-					std::vector<std::shared_ptr<ASTNode>>{},
-					false,
-					SourceLocation{}),
-			},
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<SetComp>(
+		expected_ast->arena().create<Name>("s", ContextType::LOAD, SourceLocation{}),
+		std::vector<Comprehension *>{
+			expected_ast->arena().create<Comprehension>(
+				expected_ast->arena().create<Name>("s", ContextType::STORE, SourceLocation{}),
+				expected_ast->arena().create<Name>(
+					"path_separators", ContextType::LOAD, SourceLocation{}),
+				std::vector<ASTNode *>{},
+				false,
+				SourceLocation{}),
+		},
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -3471,11 +3495,11 @@ TEST(Parser, Bytes)
 	constexpr std::string_view program = "b\"hello\"\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Constant>(Bytes{ { std::byte{ 'h' },
-														 std::byte{ 'e' },
-														 std::byte{ 'l' },
-														 std::byte{ 'l' },
-														 std::byte{ 'o' } } },
+	expected_ast->emplace(expected_ast->arena().create<Constant>(Bytes{ { std::byte{ 'h' },
+																	 std::byte{ 'e' },
+																	 std::byte{ 'l' },
+																	 std::byte{ 'l' },
+																	 std::byte{ 'o' } } },
 		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
@@ -3484,14 +3508,14 @@ TEST(Parser, LambdaWithNoArgs)
 {
 	constexpr std::string_view program = "a = lambda: 1\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
 		},
-		std::make_shared<Lambda>(
-			std::make_shared<Arguments>(
-				std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
-			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
+		expected_ast->arena().create<Lambda>(
+			expected_ast->arena().create<Arguments>(
+				std::vector<Argument *>{}, SourceLocation{}),// args
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
 			SourceLocation{}),
 		"",
 		SourceLocation{}));
@@ -3503,17 +3527,17 @@ TEST(Parser, LambdaWithNoDefaultArg)
 {
 	constexpr std::string_view program = "a = lambda x: x\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<Assign>(
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Name>("a", ContextType::STORE, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}),
 		},
-		std::make_shared<Lambda>(
-			std::make_shared<Arguments>(
-				std::vector<std::shared_ptr<Argument>>{
-					std::make_shared<Argument>("x", nullptr, "", SourceLocation{}),
+		expected_ast->arena().create<Lambda>(
+			expected_ast->arena().create<Arguments>(
+				std::vector<Argument *>{
+					expected_ast->arena().create<Argument>("x", nullptr, "", SourceLocation{}),
 				},
 				SourceLocation{}),// args
-			std::make_shared<Name>("x", ContextType::LOAD, SourceLocation{}),
+			expected_ast->arena().create<Name>("x", ContextType::LOAD, SourceLocation{}),
 			SourceLocation{}),
 		"",
 		SourceLocation{}));
@@ -3527,14 +3551,14 @@ TEST(Parser, Yield)
 		"def gen():\n"
 		"   yield 1\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("gen",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Yield>(
-				std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}), SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("gen",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Yield>(
+				expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3549,15 +3573,14 @@ TEST(Parser, YieldEmpty)
 		"def gen():\n"
 		"   yield\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("gen",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Yield>(
-				std::make_shared<Constant>(NameConstant{ NoneType{} }, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("gen",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Yield>(expected_ast->arena().create<Constant>(
+													NameConstant{ NoneType{} }, SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3571,21 +3594,20 @@ TEST(Parser, YieldMutipleValues)
 		"def gen():\n"
 		"   yield 1, 2\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("gen",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<Yield>(
-				std::make_shared<ast::Tuple>(
-					std::vector<std::shared_ptr<ASTNode>>{
-						std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-						std::make_shared<Constant>(int64_t{ 2 }, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("gen",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Yield>(
+				expected_ast->arena().create<ast::Tuple>(
+					std::vector<ASTNode *>{
+						expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+						expected_ast->arena().create<Constant>(int64_t{ 2 }, SourceLocation{}),
 					},
 					ContextType::LOAD,
 					SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3599,15 +3621,14 @@ TEST(Parser, YieldFrom)
 		"def foo():\n"
 		"   yield from bar\n";
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<FunctionDefinition>("foo",// function_name
-		std::make_shared<Arguments>(
-			std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),// args
-		std::vector<std::shared_ptr<ASTNode>>{
-			std::make_shared<YieldFrom>(
-				std::make_shared<Name>("bar", ContextType::LOAD, SourceLocation{}),
+	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("foo",// function_name
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<YieldFrom>(
+				expected_ast->arena().create<Name>("bar", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}),
 		},// body
-		std::vector<std::shared_ptr<ASTNode>>{},// decorator_list
+		std::vector<ASTNode *>{},// decorator_list
 		nullptr,// returns
 		"",// type_comment
 		SourceLocation{}));
@@ -3623,11 +3644,12 @@ TEST(Parser, Coroutine)
 		"  return 1\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(std::make_shared<AsyncFunctionDefinition>("foo",
-		std::make_shared<Arguments>(std::vector<std::shared_ptr<Argument>>{}, SourceLocation{}),
-		std::vector<std::shared_ptr<ast::ASTNode>>{ std::make_shared<Return>(
-			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}), SourceLocation{}) },
-		std::vector<std::shared_ptr<ast::ASTNode>>{},
+	expected_ast->emplace(expected_ast->arena().create<AsyncFunctionDefinition>("foo",
+		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),
+		std::vector<ast::ASTNode *>{ expected_ast->arena().create<Return>(
+			expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+			SourceLocation{}) },
+		std::vector<ast::ASTNode *>{},
 		nullptr,
 		"",
 		SourceLocation{}));
@@ -3639,18 +3661,18 @@ TEST(Parser, SemiColon)
 	constexpr std::string_view program = "a = 1; print(a)\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Constant>(int64_t{ 1 }, SourceLocation{}),
-			"",
-			SourceLocation{}));
-	expected_ast->emplace(
-		std::make_shared<Call>(std::make_shared<Name>("print", ContextType::LOAD, SourceLocation{}),
-			std::vector<std::shared_ptr<ASTNode>>{
-				std::make_shared<Name>("a", ContextType::LOAD, SourceLocation{}) },
-			std::vector<std::shared_ptr<Keyword>>{},
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Constant>(int64_t{ 1 }, SourceLocation{}),
+		"",
+		SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Call>(
+		expected_ast->arena().create<Name>("print", ContextType::LOAD, SourceLocation{}),
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::LOAD, SourceLocation{}) },
+		std::vector<Keyword *>{},
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -3660,23 +3682,23 @@ TEST(Parser, UnpackKVPair)
 	constexpr std::string_view program = "a = {**b, 'foo': 'bar', **c}\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(
-		std::make_shared<Assign>(std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Name>(
-									 "a", ContextType::STORE, SourceLocation{}) },
-			std::make_shared<Dict>(
-				std::vector<std::shared_ptr<ASTNode>>{
-					nullptr,
-					std::make_shared<Constant>("foo", SourceLocation{}),
-					nullptr,
-				},
-				std::vector<std::shared_ptr<ASTNode>>{
-					std::make_shared<Name>("b", ContextType::LOAD, SourceLocation{}),
-					std::make_shared<Constant>("bar", SourceLocation{}),
-					std::make_shared<Name>("c", ContextType::LOAD, SourceLocation{}),
-				},
-				SourceLocation{}),
-			"",
-			SourceLocation{}));
+	expected_ast->emplace(expected_ast->arena().create<Assign>(
+		std::vector<ASTNode *>{
+			expected_ast->arena().create<Name>("a", ContextType::STORE, SourceLocation{}) },
+		expected_ast->arena().create<Dict>(
+			std::vector<ASTNode *>{
+				nullptr,
+				expected_ast->arena().create<Constant>("foo", SourceLocation{}),
+				nullptr,
+			},
+			std::vector<ASTNode *>{
+				expected_ast->arena().create<Name>("b", ContextType::LOAD, SourceLocation{}),
+				expected_ast->arena().create<Constant>("bar", SourceLocation{}),
+				expected_ast->arena().create<Name>("c", ContextType::LOAD, SourceLocation{}),
+			},
+			SourceLocation{}),
+		"",
+		SourceLocation{}));
 	assert_generates_ast(program, expected_ast);
 }
 
@@ -3685,20 +3707,18 @@ TEST(Parser, UnpackKVPair)
 // 	constexpr std::string_view program = "f\"sin({a}) is {sin(a):.3}\"\n";
 
 // 	auto expected_ast = create_test_module();
-// 	expected_ast->emplace(std::make_shared<JoinedStr>(std::vector<std::shared_ptr<ASTNode>>{
-// 		std::make_shared<Constant>("sin("),
-// 		std::make_shared<FormattedValue>(std::make_shared<Name>("a", ContextType::LOAD),
-// 			FormattedValue::Conversion::NONE,
-// 			nullptr),
-// 		std::make_shared<Constant>(") is "),
-// 		std::make_shared<FormattedValue>(
-// 			std::make_shared<Call>(std::make_shared<Name>("sin", ContextType::LOAD),
-// 				std::vector<std::shared_ptr<ast::ASTNode>>{
-// 					std::make_shared<Name>("a", ContextType::LOAD) },
-// 				std::vector<std::shared_ptr<ast::Keyword>>{}),
-// 			FormattedValue::Conversion::NONE,
-// 			std::make_shared<JoinedStr>(
-// 				std::vector<std::shared_ptr<ASTNode>>{ std::make_shared<Constant>(".3") }))
+// 	expected_ast->emplace(expected_ast->arena().create<JoinedStr>(std::vector<ASTNode *>{
+// 		expected_ast->arena().create<Constant>("sin("),
+// 		expected_ast->arena().create<FormattedValue>(expected_ast->arena().create<Name>("a",
+// ContextType::LOAD), 			FormattedValue::Conversion::NONE, 			nullptr),
+// 		expected_ast->arena().create<Constant>(") is "),
+// 		expected_ast->arena().create<FormattedValue>(
+// 			expected_ast->arena().create<Call>(expected_ast->arena().create<Name>("sin",
+// ContextType::LOAD), 				std::vector<ast::ASTNode *>{
+// expected_ast->arena().create<Name>("a", ContextType::LOAD) },
+// std::vector<ast::Keyword *>{}), 			FormattedValue::Conversion::NONE,
+// 			expected_ast->arena().create<JoinedStr>(
+// 				std::vector<ASTNode *>{ expected_ast->arena().create<Constant>(".3") }))
 // 	}));
 // 	assert_generates_ast(program, expected_ast);
 // }

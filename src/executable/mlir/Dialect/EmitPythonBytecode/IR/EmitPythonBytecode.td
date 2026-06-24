@@ -200,6 +200,14 @@ AssertionError.
     let results = (outs Python_PyObjectType:$output);
 }
 
+def EmitPythonBytecode_LoadException : EmitPythonBytecode_Op<"LOAD_EXCEPTION"> {
+    let summary = [{
+Loads the currently-active exception instance for `except ... as name`.
+    }];
+
+    let results = (outs Python_PyObjectType:$output);
+}
+
 def EmitPythonBytecode_RaiseVarargs : EmitPythonBytecode_Op<"RAISE_VARARGS", [Terminator]> {
     let summary = "Raises the exception";
 

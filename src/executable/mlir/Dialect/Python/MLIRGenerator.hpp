@@ -48,12 +48,12 @@ class MLIRGenerator : ast::CodeGenerator
 	// m_context / m_variable_visibility members without exposing mlir:: types
 	// in this header.
 	friend std::vector<MLIRValue *> evaluate_expressions_for_make_function(MLIRGenerator &,
-		const std::vector<std::shared_ptr<ast::ASTNode>> &);
+		const std::vector<ast::ASTNode *> &);
 	friend std::vector<MLIRValue *> evaluate_default_arguments_for_make_function(MLIRGenerator &,
-		const std::shared_ptr<ast::Arguments> &);
+		const ast::Arguments *);
 	friend std::vector<MLIRValue *> evaluate_keyword_default_arguments_for_make_function(
 		MLIRGenerator &,
-		const std::shared_ptr<ast::Arguments> &);
+		const ast::Arguments *);
 	friend void apply_decorators_for_make_function(MLIRGenerator &,
 		const std::vector<MLIRValue *> &,
 		const std::string &,
@@ -100,12 +100,16 @@ class MLIRGenerator : ast::CodeGenerator
 	std::deque<Scope> m_scope;
 
 	Context &m_context;
+	// Borrowed arena from the Module being compiled, used to allocate any
+	// synthetic AST nodes (e.g. the implicit Return wrapping a Lambda body).
+	ast::ASTArena *m_arena{ nullptr };
 	std::vector<std::unique_ptr<MLIRValue>> m_values;
 	std::unordered_map<std::string, std::unique_ptr<VariablesResolver::Scope>>
 		m_variable_visibility;
 
   private:
 	MLIRGenerator(Context &);
+	~MLIRGenerator();
 
   public:
 	static bool compile(std::shared_ptr<ast::Module>, std::vector<std::string> argv, Context &);
@@ -146,15 +150,13 @@ class MLIRGenerator : ast::CodeGenerator
 
 	void return_value(MLIRValue *, const SourceLocation &);
 
-	void assign(const std::shared_ptr<ast::ASTNode> &target,
-		MLIRValue *src,
-		const SourceLocation &source_location);
+	void assign(const ast::ASTNode *target, MLIRValue *src, const SourceLocation &source_location);
 
 	MLIRGenerator::MLIRValue *make_function(const std::string &function_name,
 		const std::string &mangled_name,
-		const std::shared_ptr<ast::Arguments> &args,
-		const std::vector<std::shared_ptr<ast::ASTNode>> &body,
-		const std::vector<std::shared_ptr<ast::ASTNode>> &decorator_list,
+		const ast::Arguments *args,
+		const std::vector<ast::ASTNode *> &body,
+		const std::vector<ast::ASTNode *> &decorator_list,
 		bool is_anon,
 		bool is_async,
 		const SourceLocation &source_location);
@@ -164,7 +166,7 @@ class MLIRGenerator : ast::CodeGenerator
 	MLIRValue *build_comprehension(std::string_view function_name,
 		std::function<MLIRValue *()> container_factory,
 		std::function<void(MLIRValue *)> container_update,
-		const std::vector<std::shared_ptr<ast::Comprehension>> &generators,
+		const std::vector<ast::Comprehension *> &generators,
 		const SourceLocation &source_location);
 
 	[[nodiscard]] RAIIScope setup_function(mlir::func::FuncOp &fn,

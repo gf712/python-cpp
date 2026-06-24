@@ -16,7 +16,7 @@ std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 	parser::Parser p{ lexer };
 	p.parse();
 
-	auto module = as<ast::Module>(p.module());
+	auto module = p.module();
 	ASSERT(module);
 
 	return std::static_pointer_cast<BytecodeProgram>(compiler::compile(

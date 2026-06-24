@@ -180,6 +180,14 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 			ASSERT(vm.state().cleanup.size() > 0);
 			if (!vm.state().cleanup.top()) {
 				ASSERT(vm.state().cleanup.size() == 1);
+				// No handler in this frame: the exception propagates to the caller,
+				// whose eval loop re-pushes it. Pop the entry we just pushed so it
+				// does not linger on the frame-shared exception stack. Otherwise
+				// internally-consumed exceptions (e.g. a generator's completion
+				// StopIteration, swallowed by the FOR_ITER that resumed it) accumulate,
+				// and a later bare `raise` or implicit __context__ lookup observes that
+				// stale exception instead of seeing an empty stack.
+				interpreter.execution_frame()->pop_exception();
 				// when a function returns without handling the exception do not copy the value
 				// to the callers the return register
 				vm.pop_frame(false);

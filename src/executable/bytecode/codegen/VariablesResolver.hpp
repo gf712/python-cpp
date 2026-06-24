@@ -103,7 +103,7 @@ class VariablesResolver : public ast::CodeGenerator
 
   private:
 	VisibilityMap m_visibility;
-	std::deque<std::pair<std::reference_wrapper<Scope>, std::shared_ptr<ast::ASTNode>>> m_to_visit;
+	std::deque<std::pair<std::reference_wrapper<Scope>, const ast::ASTNode *>> m_to_visit;
 	std::optional<std::reference_wrapper<Scope>> m_current_scope;
 
 	VariablesResolver() = default;
