@@ -22,6 +22,7 @@
 #include "executable/Program.hpp"
 #include "executable/bytecode/Bytecode.hpp"
 #include "executable/bytecode/BytecodeProgram.hpp"
+#include "utilities.hpp"
 
 #include <filesystem>
 
@@ -168,20 +169,48 @@ void Interpreter::internal_setup(const std::string &name,
 	m_codec_search_path = PyList::create().unwrap();
 	m_codec_search_path_cache = PyDict::create().unwrap();
 
+	PyModule *io_module;
 	for (const auto &[name, module_factory] : builtin_modules) {
-		if (module_factory) { m_modules->insert(String{ std::string{ name } }, module_factory()); }
+		if (module_factory) {
+			auto mod = module_factory();
+			if (name == "_io") { io_module = mod; }
+			m_modules->insert(String{ std::string{ name } }, mod);
+		}
 	}
 
 	{
-		auto open = io_module()->symbol_table()->map().at(String{ "open" });
+		ASSERT(io_module);
+		auto open = io_module->symbol_table()->map().at(String{ "open" });
 		m_builtins->add_symbol(PyString::create("open").unwrap(), open);
+		auto *file_io =
+			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "FileIO" }));
+		auto *buffered_writer =
+			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "BufferedWriter" }));
+		auto *text_io_wrapper =
+			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "TextIOWrapper" }));
+		auto py_stdout =
+			file_io->call(PyTuple::create(Number{ 1 }, String{ "wb" }).unwrap(), nullptr)
+				.and_then([buffered_writer](PyObject *stdout) {
+					return buffered_writer->call(PyTuple::create(stdout).unwrap(), nullptr);
+				})
+				.and_then([text_io_wrapper](PyObject *stdout_buffer_writer) {
+					return text_io_wrapper->call(
+						PyTuple::create(stdout_buffer_writer).unwrap(), nullptr);
+				});
+		ASSERT(py_stdout.is_ok());
+		auto py_stderr =
+			file_io->call(PyTuple::create(Number{ 2 }, String{ "wb" }).unwrap(), nullptr)
+				.and_then([buffered_writer](PyObject *stderr) {
+					return buffered_writer->call(PyTuple::create(stderr).unwrap(), nullptr);
+				})
+				.and_then([text_io_wrapper](PyObject *stderr_buffer_writer) {
+					return text_io_wrapper->call(
+						PyTuple::create(stderr_buffer_writer).unwrap(), nullptr);
+				});
+		ASSERT(py_stderr.is_ok());
+		sys->add_symbol(PyString::create("stdout").unwrap(), py_stdout.unwrap());
+		sys->add_symbol(PyString::create("stderr").unwrap(), py_stderr.unwrap());
 	}
-	// {
-	// 	auto open = io_module()->symbol_table()->map().at(String{ "open" });
-	// 	m_builtins->add_symbol(PyString::create("open").unwrap(), open);
-	// 	sys->add_symbol(PyString::create("stderr").unwrap(),
-	// 		std::get<PyObject *>(open)->call(PyTuple::create().unwrap(), nullptr).unwrap());
-	// }
 
 	if (config.requires_importlib) {
 		auto *_imp = imp_module();

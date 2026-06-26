@@ -468,12 +468,7 @@ PyResult<std::monostate> PyObject::get_buffer(PyBuffer &buffer, int flags)
 {
 	return as_buffer().and_then(
 		[&buffer, flags, this](const PyBufferProcs &bc) -> PyResult<std::monostate> {
-			(void)buffer;
-			(void)flags;
-			(void)this;
-			(void)bc;
-			return Err(not_implemented_error("get_buffer not implemented!"));
-			// return bc.getbuffer(this, buffer, flags);
+			return bc.getbuffer(this, buffer, flags);
 		});
 }
 

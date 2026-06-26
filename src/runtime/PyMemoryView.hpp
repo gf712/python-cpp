@@ -41,6 +41,9 @@ class PyMemoryView : public PyBaseObject
 
 	size_t itemsize() const { return m_view.itemsize; }
 
+	PyResult<std::monostate> __getbuffer__(PyBuffer &view, int /*flags*/);
+
+
   private:
 	static PyResult<PyBuffer> create_view(PyBuffer &main_view);
 };

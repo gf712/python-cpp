@@ -336,6 +336,25 @@ PyResult<PyObject *> PyMemoryView::tolist()
 
 PyResult<PyObject *> PyMemoryView::__repr__() const { return PyString::create(to_string()); }
 
+PyResult<std::monostate> PyMemoryView::__getbuffer__(PyBuffer &view, int /*flags*/)
+{
+	// TODO: validate flags
+	view = PyBuffer{
+		.buf = m_view.buf->view(),
+		.obj = this,
+		.len = m_view.len,
+		.itemsize = m_view.itemsize,
+		.readonly = m_view.readonly,
+		.ndim = m_view.ndim,
+		.format = m_view.format,
+		.shape = m_view.shape,
+		.strides = m_view.strides,
+		.suboffsets = m_view.suboffsets,
+		.internal = m_view.internal,
+	};
+	return Ok(std::monostate{});
+}
+
 namespace {
 	std::once_flag memoryview_flag;
 

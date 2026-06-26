@@ -67,10 +67,20 @@ static PyModule *s_builtin_module = nullptr;
 
 namespace {
 
-PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
 	std::string separator = " ";
 	std::string end = "\n";
+	// TODO: handle error case?
+	PyObject *file =
+		PyObject::from(interpreter.get_imported_module(PyString::create("sys").unwrap())
+						   ->symbol_table()
+						   ->map()
+						   .at(String{ "stdout" }))
+			.unwrap();
+	// sys.stdout may be None when FILE* stdout isn't connected
+	if (!file || file == py_none()) { return Ok(py_none()); }
+	bool flush = true;
 	if (kwargs) {
 		static const Value separator_keyword = String{ "sep" };
 		static const Value end_keyword = String{ "end" };
@@ -98,6 +108,9 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 			end = std::get<String>(maybe_str).s;
 		}
 	}
+	auto file_write_ = file->get_method(PyString::create("write").unwrap());
+	if (file_write_.is_err()) { return file_write_; }
+	auto file_write = file_write_.unwrap();
 	auto strfunc = [](const PyResult<PyObject *> &arg) -> PyResult<PyString *> {
 		if (arg.is_err()) return Err(arg.unwrap_err());
 		return arg.unwrap()->str();
@@ -106,7 +119,11 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 	auto arg_it = args->begin();
 	auto arg_it_end = args->end();
 	if (arg_it == arg_it_end) {
-		std::cout << std::endl;
+		if (flush) {
+			auto file_flush_ = file->get_method(PyString::create("flush").unwrap());
+			if (file_flush_.is_err()) { return file_flush_; }
+			return file_flush_.unwrap()->call(nullptr, nullptr);
+		}
 		return Ok(py_none());
 	}
 	--arg_it_end;
@@ -117,7 +134,10 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 		if (reprobj_.is_err()) { return reprobj_; }
 		auto reprobj = reprobj_.unwrap();
 		spdlog::debug("repr result: {}", reprobj->value());
-		std::cout << reprobj->value() << separator;
+		if (auto result = file_write->call(PyTuple::create(reprobj).unwrap(), nullptr);
+			result.is_err()) {
+			return result;
+		}
 		std::advance(arg_it, 1);
 	}
 
@@ -126,8 +146,23 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 	if (reprobj_.is_err()) { return reprobj_; }
 	auto reprobj = reprobj_.unwrap();
 	spdlog::debug("repr result: {}", reprobj->value());
-	std::cout << reprobj->value() << end;
+	if (auto result = file_write->call(PyTuple::create(reprobj).unwrap(), nullptr);
+		result.is_err()) {
+		return result;
+	}
 
+	if (!end.empty()) {
+		if (auto result =
+				file_write->call(PyTuple::create(PyString::create(end).unwrap()).unwrap(), nullptr);
+			result.is_err()) {
+			return result;
+		}
+	}
+	if (flush) {
+		auto file_flush_ = file->get_method(PyString::create("flush").unwrap());
+		if (file_flush_.is_err()) { return file_flush_; }
+		return file_flush_.unwrap()->call(nullptr, nullptr);
+	}
 	return Ok(py_none());
 }
 
