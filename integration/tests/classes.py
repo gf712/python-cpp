@@ -37,6 +37,16 @@ class C:
 c = C()
 assert c.a() == foo()
 
+def staticmethod_arity():
+    try:
+        staticmethod()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected staticmethod() with no arguments to raise TypeError"
+
+staticmethod_arity()
+
 class A:
     def __init__(self, a):
         self._a = a
@@ -51,6 +61,16 @@ class A:
 
 assert A(10).a == 20
 assert A.new(10).a == 20
+
+def classmethod_arity():
+    try:
+        classmethod()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected classmethod() with no arguments to raise TypeError"
+
+classmethod_arity()
 
 class D:
     def test(self):
@@ -78,3 +98,40 @@ def class_closure():
         assert False
 
 class_closure()
+
+def property_accessors():
+    class C:
+        @property
+        def x(self):
+            return self._x
+
+        @x.setter
+        def x(self, value):
+            self._x = value
+
+    c = C()
+    c.x = 42
+    assert c.x == 42, "property getter/setter round-trip failed"
+
+    try:
+        C.x.getter()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected property.getter() with no arguments to raise TypeError"
+
+property_accessors()
+
+def type_three_arg():
+    Foo = type("Foo", (), {})
+    assert Foo.__name__ == "Foo", "type() should set the class name"
+    assert isinstance(Foo(), Foo), "type()-created class should be instantiable"
+
+    try:
+        type("Bad", "notatuple", {})
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected type() with non-tuple bases to raise TypeError"
+
+type_three_arg()

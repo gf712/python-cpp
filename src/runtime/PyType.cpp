@@ -1,5 +1,6 @@
 #include "PyType.hpp"
 #include "AttributeError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyBoundMethod.hpp"
 #include "PyBuiltInMethod.hpp"
@@ -1424,14 +1425,13 @@ void PyType::fixup_slots()
 
 PyResult<PyObject *> PyType::__new__(const PyType *type_, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args && args->size() == 3);
-	ASSERT(!kwargs || kwargs->map().empty());
-
-	auto *name = as<PyString>(PyObject::from(args->elements()[0]).unwrap());
-	ASSERT(name);
-	auto *bases = as<PyTuple>(PyObject::from(args->elements()[1]).unwrap());
-	ASSERT(bases);
-	auto *ns = PyObject::from(args->elements()[2]).unwrap();
+	auto result = PyArgsParser<PyString *, PyTuple *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"type",
+		std::integral_constant<size_t, 3>{},
+		std::integral_constant<size_t, 3>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [name, bases, ns] = result.unwrap();
 
 	std::vector<PyType *> bases_vector;
 	for (const auto &base : bases->elements()) {

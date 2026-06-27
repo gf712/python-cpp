@@ -9,3 +9,11 @@ except StopIteration:
     raises_stop_iteration = True
 finally:
     assert raises_stop_iteration
+
+try:
+    reversed()
+except TypeError:
+    raised_type_error = True
+else:
+    raised_type_error = False
+assert raised_type_error, "Expected reversed() with no arguments to raise TypeError"

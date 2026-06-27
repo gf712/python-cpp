@@ -1,4 +1,5 @@
 #include "PyReversed.hpp"
+#include "PyArgParser.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
 
@@ -26,11 +27,13 @@ PyResult<PyObject *> PyReversed::create(PyObject *sequence)
 PyResult<PyObject *> PyReversed::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::reversed());
-	ASSERT(!kwargs || kwargs->map().empty());
-	ASSERT(args && args->size() == 1);
-	auto sequence = PyObject::from(args->elements()[0]);
-	if (sequence.is_err()) { return sequence; }
-	return PyReversed::create(sequence.unwrap());
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"reversed",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return PyReversed::create(std::get<0>(result.unwrap()));
 }
 
 PyResult<PyObject *> PyReversed::__iter__() const { TODO(); }

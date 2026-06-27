@@ -4,6 +4,7 @@
 #include "interpreter/Interpreter.hpp"
 #include "runtime/Import.hpp"
 #include "runtime/ImportError.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
@@ -32,41 +33,44 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("is_frozen").unwrap(),
 		PyNativeFunction::create("is_frozen",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"is_frozen",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *name = std::get<0>(result.unwrap());
 
-				auto arg0 = PyObject::from(args->elements()[0]);
-				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
-
-				if (!as<PyString>(arg0.unwrap())) {
-					return Err(type_error("expected name to be a string, but got {}",
-						arg0.unwrap()->type()->to_string()));
+				if (!as<PyString>(name)) {
+					return Err(type_error(
+						"expected name to be a string, but got {}", name->type()->to_string()));
 				}
 
-				return Ok(
-					find_frozen(as<PyString>(arg0.unwrap())).has_value() ? py_true() : py_false());
+				return Ok(find_frozen(as<PyString>(name)).has_value() ? py_true() : py_false());
 			})
 			.unwrap());
 
 	s_imp_module->add_symbol(PyString::create("is_frozen_package").unwrap(),
 		PyNativeFunction::create("is_frozen_package",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"is_frozen_package",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *name = std::get<0>(result.unwrap());
 
-				auto arg0 = PyObject::from(args->elements()[0]);
-				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
-
-				if (!as<PyString>(arg0.unwrap())) {
-					return Err(type_error("expected name to be a string, but got {}",
-						arg0.unwrap()->type()->to_string()));
+				if (!as<PyString>(name)) {
+					return Err(type_error(
+						"expected name to be a string, but got {}", name->type()->to_string()));
 				}
 
-				if (auto frozen_module = find_frozen(as<PyString>(arg0.unwrap()))) {
+				if (auto frozen_module = find_frozen(as<PyString>(name))) {
 					return Ok(frozen_module->get().is_package ? py_true() : py_false());
 				} else {
 					return Err(import_error(
-						"No such frozen object named {}", as<PyString>(arg0.unwrap())->value()));
+						"No such frozen object named {}", as<PyString>(name)->value()));
 				}
 			})
 			.unwrap());
@@ -74,24 +78,26 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("get_frozen_object").unwrap(),
 		PyNativeFunction::create("get_frozen_object",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"get_frozen_object",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *name = std::get<0>(result.unwrap());
 
-				auto arg0 = PyObject::from(args->elements()[0]);
-				if (arg0.is_err()) { return Err(arg0.unwrap_err()); }
-
-				if (!as<PyString>(arg0.unwrap())) {
-					return Err(type_error("expected name to be a string, but got {}",
-						arg0.unwrap()->type()->to_string()));
+				if (!as<PyString>(name)) {
+					return Err(type_error(
+						"expected name to be a string, but got {}", name->type()->to_string()));
 				}
 
-				if (auto frozen_module = find_frozen(as<PyString>(arg0.unwrap()))) {
+				if (auto frozen_module = find_frozen(as<PyString>(name))) {
 					std::shared_ptr<Program> program =
 						BytecodeProgram::deserialize(frozen_module->get().code);
 					return PyCode::create(program);
 				} else {
 					return Err(import_error(
-						"No such frozen object named {}", as<PyString>(arg0.unwrap())->value()));
+						"No such frozen object named {}", as<PyString>(name)->value()));
 				}
 			})
 			.unwrap());
@@ -117,43 +123,55 @@ PyModule *imp_module()
 	s_imp_module->add_symbol(PyString::create("is_builtin").unwrap(),
 		PyNativeFunction::create("is_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
-				auto name = PyObject::from(args->elements()[0]).unwrap();
-				ASSERT(as<PyString>(name));
+				auto result = PyArgsParser<PyString *>::unpack_tuple(args,
+					kwargs,
+					"is_builtin",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *name = std::get<0>(result.unwrap());
 
-				return is_builtin(as<PyString>(name)->value()) ? Ok(py_true()) : Ok(py_false());
+				return is_builtin(name->value()) ? Ok(py_true()) : Ok(py_false());
 			})
 			.unwrap());
 
 	s_imp_module->add_symbol(PyString::create("create_builtin").unwrap(),
 		PyNativeFunction::create("create_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
-				auto spec = PyObject::from(args->elements()[0]).unwrap();
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"create_builtin",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
 
-				return create_builtin(spec);
+				return create_builtin(std::get<0>(result.unwrap()));
 			})
 			.unwrap());
 
 	s_imp_module->add_symbol(PyString::create("exec_builtin").unwrap(),
 		PyNativeFunction::create("exec_builtin",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
-				auto mod = PyObject::from(args->elements()[0]).unwrap();
-				return exec_builtin(mod);
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"exec_builtin",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				return exec_builtin(std::get<0>(result.unwrap()));
 			})
 			.unwrap());
 
 	s_imp_module->add_symbol(PyString::create("exec_dynamic").unwrap(),
 		PyNativeFunction::create("exec_dynamic",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!args || args->size() == 1);
-				ASSERT(!kwargs || kwargs->map().size() == 0);
-				auto mod = PyObject::from(args->elements()[0]).unwrap();
-				return exec_builtin(mod);
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"exec_dynamic",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				return exec_builtin(std::get<0>(result.unwrap()));
 			})
 			.unwrap());
 

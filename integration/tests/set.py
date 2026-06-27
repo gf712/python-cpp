@@ -75,3 +75,31 @@ def set_union():
         assert False
 
 set_union()
+
+def frozenset_construction():
+    assert len(frozenset()) == 0, "frozenset() should be empty"
+    assert len(frozenset([1, 2, 3, 2])) == 3, "frozenset should drop duplicates"
+    assert 2 in frozenset([1, 2, 3]), "frozenset should contain its elements"
+
+    try:
+        frozenset([1], [2])
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected frozenset with too many arguments to raise TypeError"
+
+frozenset_construction()
+
+def set_construction():
+    assert len(set()) == 0, "set() should be empty"
+    assert len(set([1, 2, 3, 2])) == 3, "set should drop duplicates"
+    assert 2 in set([1, 2, 3]), "set should contain its elements"
+
+    try:
+        set([1], [2])
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected set with too many arguments to raise TypeError"
+
+set_construction()

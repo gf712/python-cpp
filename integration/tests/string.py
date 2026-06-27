@@ -54,7 +54,43 @@ def string_find_tests():
     assert str.find("foo123", "23", 2) == 4, "Failed to find '123' pattern in 'foo123' substring (start)"
     assert str.find("foo123", "23", 4) == 4, "Failed to find '123' pattern in 'foo123' substring (start and end)"
 
+    try:
+        str.find("foo", 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected find to raise TypeError when the pattern is not a string"
+
+    try:
+        str.find("foo")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected find to raise TypeError when called with too few arguments"
+
 string_find_tests()
+
+def string_rfind_tests():
+    assert str.rfind("foofoo", "foo") == 3, "Failed to rfind 'foo' in 'foofoo'"
+    assert str.rfind("foo", "o") == 2, "Failed to rfind 'o' in 'foo'"
+    assert str.rfind("abcabc", "bc") == 4, "Failed to rfind 'bc' in 'abcabc'"
+    assert str.rfind("foofoo", "foo", 1) == 3, "Failed to rfind 'foo' in 'foofoo' substring (start)"
+
+    try:
+        str.rfind("foo", 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected rfind to raise TypeError when the pattern is not a string"
+
+    try:
+        str.rfind("foo")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected rfind to raise TypeError when called with too few arguments"
+
+string_rfind_tests()
 
 def string_count_tests():
     assert str.count("aaa", "aa") == 1, "Failed to find pattern 'aa' once in 'aaa'"
@@ -67,6 +103,20 @@ def string_count_tests():
 
     assert str.count("foo123", "4") == 0, "Failed to find no occurences of pattern '4' in 'foo123'"
 
+    try:
+        str.count("foo", 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected count to raise TypeError when the pattern is not a string"
+
+    try:
+        str.count("foo")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected count to raise TypeError when called with too few arguments"
+
 string_count_tests()
 
 def string_endswith_tests():
@@ -74,6 +124,20 @@ def string_endswith_tests():
     # TODO: when keyword 'not' is added fix line below
     assert str.endswith("foo123", "123", 0, 3) == False, "'foo123' substring 'foo' should not end with '123'"
     assert str.endswith("foo123", "123", 3, 6), "'foo123' substring '123' should end with '123'"
+
+    try:
+        str.endswith("foo", 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected endswith to raise TypeError when the suffix is not str or tuple"
+
+    try:
+        str.endswith("foo")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected endswith to raise TypeError when called with too few arguments"
 
 string_endswith_tests()
 
@@ -87,11 +151,32 @@ def string_startswith_tests():
     a = ("foo", "bar", "baz")
     assert "bazzzz".startswith(a), "bazzzz starts with foo, bar or baz"
 
+    try:
+        str.startswith("foo", 1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected startswith to raise TypeError when the prefix is not str or tuple"
+
+    try:
+        str.startswith("foo")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected startswith to raise TypeError when called with too few arguments"
+
 string_startswith_tests()
 
 def string_join_tests():
     assert str.join(".", ["www", "python", "org"]) == "www.python.org", "Failed to create string 'www.python.org' from join"
     assert str.join("", []) == "", "Failed to create an empty string from join with empty list"
+
+    try:
+        str.join(".")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected join to raise TypeError when called with too few arguments"
 
 string_join_tests()
 
@@ -113,6 +198,20 @@ def string_rpartition_tests():
     assert a_bar_partition[0] == ""
     assert a_bar_partition[1] == ""
     assert a_bar_partition[2] == "foo.bar.baz"
+
+    try:
+        "foo".rpartition(1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected rpartition to raise TypeError when the separator is not a string"
+
+    try:
+        "foo".rpartition()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected rpartition to raise TypeError when called with too few arguments"
 
 string_rpartition_tests()
 
@@ -140,6 +239,13 @@ def test_rstrip():
     b = a.rstrip("ipz")
     assert b == "mississ"
 
+    try:
+        "foo".rstrip(1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected rstrip to raise TypeError when chars is not a string"
+
 test_rstrip()
 
 def test_strip():
@@ -148,6 +254,20 @@ def test_strip():
 
     comment_string = '#....... Section 3.2.1 Issue #32 .......'
     assert comment_string.strip('.#! ') == 'Section 3.2.1 Issue #32'
+
+    try:
+        "foo".strip(1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected strip to raise TypeError when chars is not a string"
+
+    try:
+        "foo".strip("a", "b")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected strip to raise TypeError when called with too many arguments"
 
 test_strip()
 
@@ -159,6 +279,20 @@ def test_split():
     assert '1 2 3'.split() == ['1', '2', '3']
     assert '1 2 3'.split(None, 1) == ['1', '2 3']
     assert '   1   2   3   '.split() == ['1', '2', '3']
+
+    try:
+        "1,2,3".split(1)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected split to raise TypeError when the separator is not a string"
+
+    try:
+        "1,2,3".split(",", "x")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected split to raise TypeError when maxsplit is not an integer"
 
 test_split()
 

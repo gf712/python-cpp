@@ -1,5 +1,6 @@
 #include "PyProperty.hpp"
 #include "AttributeError.hpp"
+#include "PyArgParser.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
 #include "PyNone.hpp"
@@ -89,15 +90,14 @@ PyResult<PyProperty *>
 
 PyResult<PyObject *> PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty());
-	ASSERT(args);
-	ASSERT(args->size() == 1);
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"getter",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
 
-	auto getter_ = PyObject::from(args->elements()[0]);
-
-	if (getter_.is_err()) return getter_;
-
-	return PyProperty::create(getter_.unwrap(),
+	return PyProperty::create(std::get<0>(result.unwrap()),
 		m_setter == py_none() ? py_none() : m_setter,
 		m_deleter == py_none() ? py_none() : m_deleter,
 		m_property_name);
@@ -105,33 +105,31 @@ PyResult<PyObject *> PyProperty::getter(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyProperty::setter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty());
-	ASSERT(args);
-	ASSERT(args->size() == 1);
-
-	auto setter_ = PyObject::from(args->elements()[0]);
-
-	if (setter_.is_err()) return setter_;
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"setter",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
 
 	return PyProperty::create(m_getter == py_none() ? py_none() : m_getter,
-		setter_.unwrap(),
+		std::get<0>(result.unwrap()),
 		m_deleter == py_none() ? py_none() : m_deleter,
 		m_property_name);
 }
 
 PyResult<PyObject *> PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty());
-	ASSERT(args);
-	ASSERT(args->size() == 1);
-
-	auto deleter_ = PyObject::from(args->elements()[0]);
-
-	if (deleter_.is_err()) return deleter_;
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"deleter",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
 
 	return PyProperty::create(m_setter == py_none() ? py_none() : m_setter,
 		m_setter == py_none() ? py_none() : m_setter,
-		deleter_.unwrap(),
+		std::get<0>(result.unwrap()),
 		m_property_name);
 }
 

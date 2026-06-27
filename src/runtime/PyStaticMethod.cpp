@@ -1,4 +1,5 @@
 #include "PyStaticMethod.hpp"
+#include "PyArgParser.hpp"
 #include "PyFunction.hpp"
 #include "PyString.hpp"
 #include "PyType.hpp"
@@ -14,12 +15,13 @@ PyStaticMethod::PyStaticMethod(PyType *type) : PyBaseObject(type) {}
 
 PyResult<PyObject *> PyStaticMethod::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty());
-	ASSERT(args && args->elements().size() == 1);
-
-	return PyObject::from(args->elements()[0]).and_then([](PyObject *function) {
-		return PyStaticMethod::create(function);
-	});
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"staticmethod",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return PyStaticMethod::create(std::get<0>(result.unwrap()));
 }
 
 void PyStaticMethod::visit_graph(Visitor &visitor)

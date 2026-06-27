@@ -3,6 +3,7 @@
 #include "KeyError.hpp"
 #include "MemoryError.hpp"
 #include "NotImplementedError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFloat.hpp"
@@ -440,30 +441,16 @@ size_t PyString::get_position_from_slice(int64_t pos) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
-
-	auto pattern_ = PyObject::from(args->elements()[0]);
-	if (pattern_.is_err()) return pattern_;
-	PyString *pattern = as<PyString>(pattern_.unwrap());
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
+	auto parse_result = PyArgsParser<PyString *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"find",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [pattern, start, end] = parse_result.unwrap();
 	size_t result{ std::string::npos };
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
 
 	if (!start && !end) {
 		result = m_value.find(pattern->value().c_str());
@@ -515,29 +502,15 @@ PyResult<PyObject *> PyString::find(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
-
-	auto pattern_ = PyObject::from(args->elements()[0]);
-	if (pattern_.is_err()) return pattern_;
-	PyString *pattern = as<PyString>(pattern_.unwrap());
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
+	auto parse_result = PyArgsParser<PyString *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"rfind",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [pattern, start, end] = parse_result.unwrap();
 
 	size_t start_idx = 0;
 	size_t end_idx = 0;
@@ -597,30 +570,16 @@ PyResult<PyObject *> PyString::rfind(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
-
-	auto pattern_ = PyObject::from(args->elements()[0]);
-	if (pattern_.is_err()) return pattern_;
-	PyString *pattern = as<PyString>(pattern_.unwrap());
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
+	auto parse_result = PyArgsParser<PyString *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"count",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [pattern, start, end] = parse_result.unwrap();
 	size_t result{ 0 };
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
 
 	const size_t start_ = [start, this]() {
 		if (start) {
@@ -682,49 +641,35 @@ PyResult<PyObject *> PyString::count(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
+	auto parse_result = PyArgsParser<PyObject *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"startswith",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [prefix, start, end] = parse_result.unwrap();
 
-	auto prefix_ = PyObject::from(args->elements()[0]);
-	if (prefix_.is_err()) return prefix_;
-
-	auto prefixes_ = [&prefix_]() -> PyResult<std::vector<std::string>> {
-		PyString *prefix = as<PyString>(prefix_.unwrap());
-		if (prefix) { return Ok(std::vector<std::string>{ prefix->value() }); }
-		PyTuple *prefixes = as<PyTuple>(prefix_.unwrap());
-		if (prefixes) {
+	auto prefixes_ = [prefix]() -> PyResult<std::vector<std::string>> {
+		if (auto *prefix_str = as<PyString>(prefix)) {
+			return Ok(std::vector<std::string>{ prefix_str->value() });
+		}
+		if (auto *prefixes = as<PyTuple>(prefix)) {
 			std::vector<std::string> els;
 			els.reserve(prefixes->size());
 			for (const auto &el : prefixes->elements()) {
 				auto obj = PyObject::from(el);
 				if (obj.is_err()) return Err(obj.unwrap_err());
-				PyString *prefix = as<PyString>(obj.unwrap());
-				if (!prefix) { return Err(type_error("expected tuple of objects of type str")); }
-				els.push_back(prefix->value());
+				PyString *el_str = as<PyString>(obj.unwrap());
+				if (!el_str) { return Err(type_error("expected tuple of objects of type str")); }
+				els.push_back(el_str->value());
 			}
 			return Ok(els);
 		}
 		return Err(type_error("startswith first arg must be str or a tuple of str, not '{}'",
-			prefix_.unwrap()->type()->name()));
+			prefix->type()->name()));
 	}();
-
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
 
 	if (prefixes_.is_err()) return Err(prefixes_.unwrap_err());
 
@@ -782,26 +727,15 @@ PyResult<PyObject *> PyString::startswith(PyTuple *args, PyDict *kwargs) const
 // FIXME: assumes string only has ASCII characters
 PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
-
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
+	auto parse_result = PyArgsParser<PyObject *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"endswith",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [suffix_obj, start, end] = parse_result.unwrap();
 
 	std::optional<size_t> start_;
 	std::optional<size_t> end_;
@@ -843,11 +777,9 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 		}
 	};
 
-	auto suffix_ = PyObject::from(args->elements()[0]);
-	if (suffix_.is_err()) return suffix_;
-	if (auto *suffix = as<PyString>(suffix_.unwrap())) {
+	if (auto *suffix = as<PyString>(suffix_obj)) {
 		return Ok(endswith_impl(suffix->value()) ? py_true() : py_false());
-	} else if (auto *suffix_tuple = as<PyTuple>(suffix_.unwrap())) {
+	} else if (auto *suffix_tuple = as<PyTuple>(suffix_obj)) {
 		for (const auto &el : suffix_tuple->elements()) {
 			auto obj = PyObject::from(el);
 			if (obj.is_err()) { return obj; }
@@ -860,7 +792,7 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 		}
 	} else {
 		return Err(type_error("endswith first arg must be str or a tuple of str, not '{}'",
-			suffix_.unwrap()->type()->name()));
+			suffix_obj->type()->name()));
 	}
 
 	return Ok(py_false());
@@ -868,13 +800,15 @@ PyResult<PyObject *> PyString::endswith(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::join(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() == 1);
-	ASSERT(!kwargs);
+	auto parse_result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"join",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [iterable_obj] = parse_result.unwrap();
 
-	auto iterable = PyObject::from(args->elements()[0]);
-	if (iterable.is_err()) return iterable;
-
-	auto iterator_ = iterable.unwrap()->iter();
+	auto iterator_ = iterable_obj->iter();
 	if (iterator_.is_err()) return iterator_;
 
 	auto *iterator = iterator_.unwrap();
@@ -946,13 +880,13 @@ PyResult<PyObject *> PyString::partition(PyObject *sep) const
 
 PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() == 1);
-	ASSERT(!kwargs || kwargs->size() == 0);
-
-	auto sep_ = PyObject::from(args->elements()[0]);
-	if (sep_.is_err()) return sep_;
-	auto *sep_obj = as<PyString>(sep_.unwrap());
-	ASSERT(sep_obj);
+	auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
+		kwargs,
+		"rpartition",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [sep_obj] = parse_result.unwrap();
 
 	const auto &sep = sep_obj->value();
 
@@ -971,20 +905,18 @@ PyResult<PyObject *> PyString::rpartition(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->size() == 0);
+	auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
+		kwargs,
+		"strip",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr /* chars */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [chars_str] = parse_result.unwrap();
+	const std::vector<uint32_t> chars =
+		chars_str ? chars_str->codepoints() : std::vector<uint32_t>{};
 
-	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
-		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
-		auto args0 = PyObject::from(args->elements()[0]);
-
-		auto str = as<PyString>(args0.unwrap());
-		if (!str) { return Err(type_error("")); }
-		return Ok(str->codepoints());
-	}();
-
-	if (chars.is_err()) return Err(chars.unwrap_err());
-
-	if (chars.unwrap().empty()) {
+	if (chars.empty()) {
 		const auto it_start = std::find_if(
 			m_value.begin(), m_value.end(), [](const auto &el) { return !std::isspace(el); });
 		const auto it_end = std::find_if(
@@ -997,7 +929,7 @@ PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
 		return PyString::create(result);
 	} else {
 		const auto codepoints = this->codepoints();
-		const auto patterns = chars.unwrap();
+		const auto patterns = chars;
 
 		auto contains = [patterns](const int32_t &cp) {
 			return std::find(patterns.begin(), patterns.end(), cp) != patterns.end();
@@ -1030,20 +962,18 @@ PyResult<PyObject *> PyString::strip(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->size() == 0);
+	auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
+		kwargs,
+		"rstrip",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr /* chars */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [chars_str] = parse_result.unwrap();
+	const std::vector<uint32_t> chars =
+		chars_str ? chars_str->codepoints() : std::vector<uint32_t>{};
 
-	const auto chars = [args]() -> PyResult<std::vector<uint32_t>> {
-		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
-		auto args0 = PyObject::from(args->elements()[0]);
-
-		auto str = as<PyString>(args0.unwrap());
-		if (!str) { return Err(type_error("")); }
-		return Ok(str->codepoints());
-	}();
-
-	if (chars.is_err()) return Err(chars.unwrap_err());
-
-	if (chars.unwrap().empty()) {
+	if (chars.empty()) {
 		const auto it = std::find_if(
 			m_value.rbegin(), m_value.rend(), [](const auto &el) { return !std::isspace(el); });
 		if (it != m_value.rend()) {
@@ -1057,7 +987,7 @@ PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 		const auto codepoints = this->codepoints();
 		auto codepoints_it = codepoints.rbegin();
 		size_t string_index = 0;
-		const auto patterns = chars.unwrap();
+		const auto patterns = chars;
 
 		auto contains = [patterns](const int32_t &cp) {
 			return std::find(patterns.begin(), patterns.end(), cp) != patterns.end();
@@ -1079,14 +1009,19 @@ PyResult<PyObject *> PyString::rstrip(PyTuple *args, PyDict *kwargs) const
 
 PyResult<PyList *> PyString::split(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(!kwargs || kwargs->map().empty());
+	auto parse_result = PyArgsParser<PyObject *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"split",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 2>{},
+		py_none() /* sep */,
+		nullptr /* maxsplit */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [sep_obj, maxsplit_int] = parse_result.unwrap();
 
-	const auto sep_ = [args]() -> PyResult<std::vector<uint32_t>> {
-		if (!args || args->size() == 0) { return Ok(std::vector<uint32_t>{}); }
-		auto args0 = PyObject::from(args->elements()[0]);
-
-		if (args0.unwrap() == py_none()) { return Ok(std::vector<uint32_t>{}); }
-		auto str = as<PyString>(args0.unwrap());
+	const auto sep_ = [sep_obj]() -> PyResult<std::vector<uint32_t>> {
+		if (sep_obj == py_none()) { return Ok(std::vector<uint32_t>{}); }
+		auto str = as<PyString>(sep_obj);
 		if (!str) { return Err(type_error("")); }
 		if (str->value().empty()) { return Err(value_error("empty separator")); }
 		return Ok(str->codepoints());
@@ -1099,18 +1034,11 @@ PyResult<PyList *> PyString::split(PyTuple *args, PyDict *kwargs) const
 		return PyList::create(std::vector<Value>{ PyString::create("").unwrap() });
 	}
 
-	const auto maxsplit_ = [this, args]() -> PyResult<BigIntType> {
-		if (!args || args->size() < 2) { return Ok(BigIntType{ m_value.size() }); }
-		auto args1 = PyObject::from(args->elements()[1]);
-
-		auto maxsplit = as<PyInteger>(args1.unwrap());
-		if (!maxsplit) { return Err(type_error("")); }
-		if (maxsplit->as_big_int() == -1) { return Ok(BigIntType{ m_value.size() }); }
-		return Ok(maxsplit->as_big_int());
+	const BigIntType maxsplit = [this, maxsplit_int]() -> BigIntType {
+		if (!maxsplit_int) { return BigIntType{ m_value.size() }; }
+		if (maxsplit_int->as_big_int() == -1) { return BigIntType{ m_value.size() }; }
+		return maxsplit_int->as_big_int();
 	}();
-
-	if (maxsplit_.is_err()) { return Err(maxsplit_.unwrap_err()); }
-	const auto &maxsplit = maxsplit_.unwrap();
 
 	auto result_ = PyList::create();
 	if (result_.is_err()) { return result_; }

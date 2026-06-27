@@ -1,5 +1,6 @@
 #include "PyInteger.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBytes.hpp"
 #include "PyFloat.hpp"
 #include "TypeError.hpp"
@@ -70,19 +71,15 @@ PyResult<PyInteger *> PyInteger::create(PyType *type, BigIntType value)
 
 PyResult<PyObject *> PyInteger::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().empty());
-	PyObject *value = nullptr;
-	PyObject *base = nullptr;
-	if (!args) { return PyInteger::create(0); }
-	if (args->elements().size() > 0) {
-		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
-			value = obj.unwrap();
-		} else {
-			return obj;
-		}
-	}
-
-	if (args->elements().size() > 1) { base = PyObject::from(args->elements()[1]).unwrap(); }
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"int",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 2>{},
+		nullptr /* value */,
+		nullptr /* base */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [value, base] = result.unwrap();
 
 	if (!value) {
 		return PyInteger::create(const_cast<PyType *>(type), 0);
@@ -214,29 +211,28 @@ PyResult<PyObject *> PyInteger::bit_count() const
 PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
 {
 	// FIXME: fix signature to to_bytes(length, byteorder, *, signed=False)
-	ASSERT(!kwargs || kwargs->map().empty());
+	auto parsed = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"to_bytes",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+	if (parsed.is_err()) return Err(parsed.unwrap_err());
+	auto [length_obj, byteorder_obj] = parsed.unwrap();
 
-	if (args->size() != 2) { return Err(type_error("to_bytes expected two arguments")); }
-
-	auto length_ = PyObject::from(args->elements()[0]);
-	if (length_.is_err()) return length_;
-	auto byteorder_ = PyObject::from(args->elements()[1]);
-	if (byteorder_.is_err()) return byteorder_;
-
-	if (!as<PyInteger>(length_.unwrap())) {
+	if (!as<PyInteger>(length_obj)) {
 		return Err(type_error(
-			"'{}' object cannot be interpreted as an integer", length_.unwrap()->type()->name()));
+			"'{}' object cannot be interpreted as an integer", length_obj->type()->name()));
 	}
-	if (!as<PyString>(byteorder_.unwrap())) {
-		return Err(type_error("to_bytes() argument 'byteorder' must be str, not {}",
-			byteorder_.unwrap()->type()->name()));
+	if (!as<PyString>(byteorder_obj)) {
+		return Err(type_error(
+			"to_bytes() argument 'byteorder' must be str, not {}", byteorder_obj->type()->name()));
 	}
 
-	if (as<PyInteger>(length_.unwrap())->as_i64() < 0) {
+	if (as<PyInteger>(length_obj)->as_i64() < 0) {
 		return Err(type_error("length argument must be non-negative"));
 	}
-	const auto length = as<PyInteger>(length_.unwrap())->as_size_t();
-	const auto byteorder = as<PyString>(byteorder_.unwrap())->value();
+	const auto length = as<PyInteger>(length_obj)->as_size_t();
+	const auto byteorder = as<PyString>(byteorder_obj)->value();
 	if (byteorder != "little" && byteorder != "big") {
 		return Err(value_error("byteorder must be either 'little' or 'big'"));
 	}
@@ -267,28 +263,27 @@ PyResult<PyObject *> PyInteger::to_bytes(PyTuple *args, PyDict *kwargs) const
 PyResult<PyObject *> PyInteger::from_bytes(PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	// FIXME: fix signature to from_bytes(bytes, byteorder, *, signed=False)
-	ASSERT(!kwargs || kwargs->map().empty());
-
-	if (args->size() != 2) { return Err(type_error("from_bytes expected two arguments")); }
-
 	ASSERT(type == types::integer());
 
-	auto bytes_ = PyObject::from(args->elements()[0]);
-	if (bytes_.is_err()) return bytes_;
-	auto byteorder_ = PyObject::from(args->elements()[1]);
-	if (byteorder_.is_err()) return byteorder_;
+	auto parsed = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"from_bytes",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+	if (parsed.is_err()) return Err(parsed.unwrap_err());
+	auto [bytes_obj, byteorder_obj] = parsed.unwrap();
 
-	if (!as<PyBytes>(bytes_.unwrap())) {
+	if (!as<PyBytes>(bytes_obj)) {
 		return Err(type_error(
-			"'{}' object cannot be interpreted as a bytes array", bytes_.unwrap()->type()->name()));
+			"'{}' object cannot be interpreted as a bytes array", bytes_obj->type()->name()));
 	}
-	if (!as<PyString>(byteorder_.unwrap())) {
-		return Err(type_error("to_bytes() argument 'byteorder' must be str, not {}",
-			byteorder_.unwrap()->type()->name()));
+	if (!as<PyString>(byteorder_obj)) {
+		return Err(type_error(
+			"to_bytes() argument 'byteorder' must be str, not {}", byteorder_obj->type()->name()));
 	}
 
-	const auto bytes = as<PyBytes>(bytes_.unwrap());
-	const auto byteorder = as<PyString>(byteorder_.unwrap())->value();
+	const auto bytes = as<PyBytes>(bytes_obj);
+	const auto byteorder = as<PyString>(byteorder_obj)->value();
 	if (byteorder != "little" && byteorder != "big") {
 		return Err(value_error("byteorder must be either 'little' or 'big'"));
 	}

@@ -1,5 +1,6 @@
 #include "PyByteArray.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBytes.hpp"
 #include "StopIteration.hpp"
 #include "runtime/IndexError.hpp"
@@ -289,32 +290,18 @@ PyResult<PyObject *> PyByteArray::__add__(const PyObject *other) const
 
 PyResult<PyObject *> PyByteArray::find(PyTuple *args, PyDict *kwargs) const
 {
-	ASSERT(args && args->size() <= 3 && args->size() > 0);
-	ASSERT(!kwargs);
-
-	auto pattern_ = PyObject::from(args->elements()[0]);
-	if (pattern_.is_err()) return pattern_;
-	if (!pattern_.unwrap()->type()->issubclass(types::integer())) { TODO(); }
-	const auto &pattern_int = static_cast<const PyInteger &>(*pattern_.unwrap());
+	auto parse_result = PyArgsParser<PyInteger *, PyInteger *, PyInteger *>::unpack_tuple(args,
+		kwargs,
+		"find",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* start */,
+		nullptr /* end */);
+	if (parse_result.is_err()) return Err(parse_result.unwrap_err());
+	auto [pattern, start, end] = parse_result.unwrap();
+	const auto &pattern_int = *pattern;
 	if (pattern_int.as_big_int() < 0 && pattern_int.as_big_int() > 255) { TODO(); }
-	PyInteger *start = nullptr;
-	PyInteger *end = nullptr;
 	int64_t result = -1;
-
-	if (args->size() >= 2) {
-		auto start_ = PyObject::from(args->elements()[1]);
-		if (start_.is_err()) return start_;
-		start = as<PyInteger>(start_.unwrap());
-		// TODO: raise exception when start in not a number
-		ASSERT(start);
-	}
-	if (args->size() == 3) {
-		auto end_ = PyObject::from(args->elements()[2]);
-		if (end_.is_err()) return end_;
-		end = as<PyInteger>(end_.unwrap());
-		// TODO: raise exception when end in not a number
-		ASSERT(end);
-	}
 
 	auto get_position_from_slice = [this](int64_t pos) -> PyResult<size_t> {
 		if (pos < 0) {
