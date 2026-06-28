@@ -1,6 +1,6 @@
 # Python C++ (EXPERIMENTAL + IN PROGRESS)
 
-A Python interpreter implementation in C++. The current aim is to be compliant with the Python 3.10 spec and have releases inline with future Python versions.
+A Python interpreter implementation in C++. The current aim is to be compliant with the Python 3.9 spec and have releases inline with future Python versions.
 
 # What is different from CPython?
 

@@ -29,6 +29,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "utilities.hpp"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -102,6 +104,91 @@ namespace py {
 					return WalkResult::advance();
 				};
 			region.walk<WalkOrder::PreOrder>(callback);
+		}
+
+		// Collects the loop-control (break/continue) kinds that appear directly
+		// in `region` — i.e. that belong to the enclosing loop rather than to a
+		// nested loop/try/with (whose own lowering owns them). Descends into
+		// TryHandlerOp so except-handler bodies are scanned.
+		void collect_loop_control_kinds(mlir::Region &region, llvm::SmallSet<int, 2> &kinds)
+		{
+			if (region.empty()) { return; }
+			region.walk<WalkOrder::PreOrder>([&kinds](mlir::Operation *op) {
+				if (mlir::isa<mlir::py::TryOp,
+						mlir::py::ForLoopOp,
+						mlir::py::WhileOp,
+						mlir::py::WithOp>(op)) {
+					return WalkResult::skip();
+				}
+				if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(op);
+					y && y.getKind().has_value()) {
+					kinds.insert(static_cast<int>(*y.getKind()));
+				}
+				return WalkResult::advance();
+			});
+		}
+
+		// A `break`/`continue` leaving a try/with body is represented as a
+		// `br_yield break_/continue_` marker that only the enclosing loop pass
+		// can resolve (to the loop's exit / continue target). Because try/with
+		// are flattened *before* the loops, we re-emit the marker here, after
+		// the block's exception cleanup ops, so it survives region inlining and
+		// ends up directly in the loop body region for the loop pass to lower.
+		//
+		// When the try has a `finally`, the marker cannot fire directly: the
+		// finally must run first. `finally_exits` maps each loop-control kind to
+		// the entry of a pre-built finally clone whose normal exit *is* the
+		// marker, so we branch there instead (see build_finally_loop_exits).
+		void forward_loop_control_yield(mlir::PatternRewriter &rewriter,
+			const llvm::DenseMap<int, mlir::Block *> &finally_exits,
+			mlir::py::BranchYieldOp yield_op)
+		{
+			if (finally_exits.empty()) {
+				rewriter.create<mlir::py::BranchYieldOp>(yield_op.getLoc(), yield_op.getKindAttr());
+				return;
+			}
+			auto it = finally_exits.find(static_cast<int>(*yield_op.getKind()));
+			ASSERT(it != finally_exits.end());
+			rewriter.create<mlir::cf::BranchOp>(yield_op.getLoc(), it->second);
+		}
+
+		// For each break/continue kind that escapes the try through its finally,
+		// clone the (still-pristine) finally region onto a dedicated exit path
+		// and rewrite the clone's normal-completion (kindless) terminators into
+		// the loop-control marker. The result is a per-kind entry block: branch
+		// to it to "run finally, then break/continue". Must be called before the
+		// original finally region is rewritten/inlined below.
+		llvm::DenseMap<int, mlir::Block *> build_finally_loop_exits(mlir::PatternRewriter &rewriter,
+			mlir::py::TryOp op,
+			mlir::Block *endBlock)
+		{
+			llvm::DenseMap<int, mlir::Block *> exits;
+			if (op.getFinally().empty()) { return exits; }
+
+			llvm::SmallSet<int, 2> kinds;
+			collect_loop_control_kinds(op.getBody(), kinds);
+			for (mlir::Region &handler : op.getHandlers()) {
+				collect_loop_control_kinds(handler, kinds);
+			}
+			collect_loop_control_kinds(op.getOrelse(), kinds);
+
+			for (int kind : kinds) {
+				auto kind_attr = mlir::py::LoopOpKindAttr::get(
+					rewriter.getContext(), static_cast<mlir::py::LoopOpKind>(kind));
+				mlir::IRMapping mapping;
+				rewriter.cloneRegionBefore(
+					op.getFinally(), *endBlock->getParent(), endBlock->getIterator(), mapping);
+				for (mlir::Block &orig : op.getFinally()) {
+					auto *cloned = mapping.lookup(&orig);
+					if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(cloned->getTerminator());
+						y && !y.getKind().has_value()) {
+						rewriter.setInsertionPoint(y);
+						rewriter.replaceOpWithNewOp<mlir::py::BranchYieldOp>(y, kind_attr);
+					}
+				}
+				exits[kind] = mapping.lookup(&op.getFinally().front());
+			}
+			return exits;
 		}
 
 		struct ForLoopOpLowering : public mlir::OpRewritePattern<mlir::py::ForLoopOp>
@@ -269,8 +356,10 @@ namespace py {
 						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
 						return WalkResult::skip();
 					}
-					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)
-						&& !mlir::cast<mlir::py::BranchYieldOp>(childOp).getKind().has_value()) {
+					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)) {
+						// Both normal-completion (kindless) and loop-control
+						// (break/continue) yields are surfaced; the callback
+						// dispatches on the kind.
 						callback(childOp);
 						return WalkResult::skip();
 					}
@@ -281,6 +370,31 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::py::TryOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
+				// Lower innermost-first when a finally is involved. A
+				// break/continue nested in an inner try only surfaces into this
+				// try's body once the inner try is lowered, and we must see it
+				// before pre-scanning the loop-control kinds to thread through
+				// our own finally (build_finally_loop_exits). MLIR's greedy
+				// worklist doesn't guarantee inner-first, so defer (fail this
+				// match) until any nested try in our regions has been lowered
+				// away; the driver re-tries us when the inner try rewrites.
+				// (Nested with/loops don't need this: with lowers in a later
+				// pass, and a loop consumes its own break/continue.)
+				if (!op.getFinally().empty()) {
+					bool has_nested_try = false;
+					auto scan = [&](mlir::Region &region) {
+						if (has_nested_try || region.empty()) { return; }
+						region.walk([&](mlir::py::TryOp) {
+							has_nested_try = true;
+							return WalkResult::interrupt();
+						});
+					};
+					scan(op.getBody());
+					for (mlir::Region &handler : op.getHandlers()) { scan(handler); }
+					scan(op.getOrelse());
+					if (has_nested_try) { return mlir::failure(); }
+				}
+
 				auto *initBlock = rewriter.getInsertionBlock();
 				auto initPos = rewriter.getInsertionPoint();
 
@@ -288,13 +402,27 @@ namespace py {
 
 				auto *body_start = &op.getBody().front();
 
-				replace_controlflow_yield(
-					op.getBody(), [&rewriter, &op, endBlock](mlir::Operation *childOp) {
+				// Pre-build the per-kind finally exit paths for break/continue
+				// while the finally region is still pristine (the loop below
+				// rewrites it). Empty when there is no finally.
+				const auto finally_exits = build_finally_loop_exits(rewriter, op, endBlock);
+
+				replace_controlflow_yield(op.getBody(),
+					[&rewriter, &op, &finally_exits, endBlock](mlir::Operation *childOp) {
 						auto *current = childOp->getBlock();
 						auto *next = rewriter.splitBlock(current, childOp->getIterator());
 						rewriter.setInsertionPointToEnd(current);
 						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(
 							childOp->getLoc());
+						if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
+							y.getKind().has_value()) {
+							// break/continue out of the try body: pop the
+							// exception handler, then defer to the enclosing loop
+							// (running the finally first if there is one).
+							forward_loop_control_yield(rewriter, finally_exits, y);
+							rewriter.eraseBlock(next);
+							return;
+						}
 						if (op.getHandlers().empty()) {
 							ASSERT(!op.getFinally().empty());
 							rewriter.create<mlir::cf::BranchOp>(
@@ -323,22 +451,47 @@ namespace py {
 
 					replace_controlflow_yield(op.getFinally(),
 						[&rewriter, &op, &finally_mapping, endBlock](mlir::Operation *childOp) {
+							// A break/continue written *inside* the finally overrides
+							// whatever exit the try was heading for. Its kind drives
+							// both the normal and the exceptional finally copies.
+							auto kind_attr =
+								mlir::cast<mlir::py::BranchYieldOp>(childOp).getKindAttr();
+							// Normal-completion copy: kindless yields fall through to
+							// the try's exit; an inside break/continue re-emits the
+							// loop-control marker for the enclosing loop pass.
 							{
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
-								rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
+								if (kind_attr) {
+									rewriter.create<mlir::py::BranchYieldOp>(
+										childOp->getLoc(), kind_attr);
+								} else {
+									rewriter.create<mlir::cf::BranchOp>(
+										childOp->getLoc(), endBlock);
+								}
 								rewriter.eraseBlock(next);
 							}
 
 							childOp = finally_mapping->lookup(childOp);
 							ASSERT(childOp);
+							// Exceptional copy: kindless yields re-raise the in-flight
+							// exception after the finally; an inside break/continue
+							// instead *swallows* it (Python semantics) and performs
+							// the loop control flow.
 							{
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
-								rewriter.create<mlir::emitpybytecode::ReRaiseOp>(
-									childOp->getLoc(), endBlock);
+								if (kind_attr) {
+									rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
+										childOp->getLoc());
+									rewriter.create<mlir::py::BranchYieldOp>(
+										childOp->getLoc(), kind_attr);
+								} else {
+									rewriter.create<mlir::emitpybytecode::ReRaiseOp>(
+										childOp->getLoc(), endBlock);
+								}
 								rewriter.eraseBlock(next);
 							}
 						});
@@ -393,12 +546,21 @@ namespace py {
 							rewriter.inlineRegionBefore(handler_scope.getCond(), endBlock);
 						}
 						replace_controlflow_yield(handler_scope.getHandler(),
-							[&rewriter, &op, endBlock](mlir::Operation *childOp) {
+							[&rewriter, &op, &finally_exits, endBlock](mlir::Operation *childOp) {
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
 								rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
 									op.getLoc());
+								if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
+									y.getKind().has_value()) {
+									// break/continue out of an except handler:
+									// clear the active exception, then defer to
+									// the enclosing loop.
+									forward_loop_control_yield(rewriter, finally_exits, y);
+									rewriter.eraseBlock(next);
+									return;
+								}
 								if (!op.getFinally().empty()) {
 									rewriter.create<mlir::cf::BranchOp>(
 										childOp->getLoc(), &op.getFinally().front());
@@ -439,12 +601,21 @@ namespace py {
 						}
 
 						replace_controlflow_yield(handler_scope.getHandler(),
-							[&rewriter, &op, endBlock](mlir::Operation *childOp) {
+							[&rewriter, &op, &finally_exits, endBlock](mlir::Operation *childOp) {
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
 								rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
 									op.getLoc());
+								if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
+									y.getKind().has_value()) {
+									// break/continue out of an except handler:
+									// clear the active exception, then defer to
+									// the enclosing loop.
+									forward_loop_control_yield(rewriter, finally_exits, y);
+									rewriter.eraseBlock(next);
+									return;
+								}
 								if (!op.getFinally().empty()) {
 									rewriter.create<mlir::cf::BranchOp>(
 										childOp->getLoc(), &op.getFinally().front());
@@ -458,11 +629,20 @@ namespace py {
 					}
 				}
 
-				replace_controlflow_yield(
-					op.getOrelse(), [&rewriter, &op, endBlock](mlir::Operation *childOp) {
+				replace_controlflow_yield(op.getOrelse(),
+					[&rewriter, &op, &finally_exits, endBlock](mlir::Operation *childOp) {
 						auto *current = childOp->getBlock();
 						auto *next = rewriter.splitBlock(current, childOp->getIterator());
 						rewriter.setInsertionPointToEnd(current);
+						if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
+							y.getKind().has_value()) {
+							// break/continue out of the else clause: the handler
+							// was already left when the body completed normally,
+							// so just defer to the enclosing loop.
+							forward_loop_control_yield(rewriter, finally_exits, y);
+							rewriter.eraseBlock(next);
+							return;
+						}
 						if (!op.getFinally().empty()) {
 							rewriter.create<mlir::cf::BranchOp>(
 								childOp->getLoc(), &op.getFinally().front());
@@ -497,7 +677,37 @@ namespace py {
 				auto *cleanup_block = rewriter.createBlock(endBlock);
 				auto *exit_block = rewriter.createBlock(endBlock);
 
-				op.getBody().walk<WalkOrder::PreOrder>([&rewriter, exit_block, cleanup_block](
+				// Emits the non-exceptional __exit__(None, None, None) sequence
+				// at the current insertion point. Shared by the normal-exit path
+				// and the break/continue path (both leave without an exception).
+				auto emit_normal_exit = [&rewriter, &op]() {
+					for (const auto &item : op.getItems()) {
+						auto exit = rewriter.create<mlir::py::LoadMethodOp>(item.getLoc(),
+							mlir::py::PyObjectType::get(rewriter.getContext()),
+							item,
+							"__exit__");
+						auto none = rewriter.create<mlir::py::ConstantOp>(
+							item.getLoc(), rewriter.getNoneType());
+						rewriter.create<mlir::py::FunctionCallOp>(item.getLoc(),
+							mlir::py::PyObjectType::get(rewriter.getContext()),
+							exit,
+							std::vector<mlir::Value>{ none, none, none },
+							mlir::DenseStringElementsAttr::get(
+								mlir::VectorType::get(
+									{ 0 }, mlir::StringAttr::get(rewriter.getContext()).getType()),
+								{}),
+							std::vector<mlir::Value>{},
+							false,
+							false);
+						rewriter.create<mlir::py::ClearExceptionStateOp>(item.getLoc());
+					}
+				};
+
+				op.getBody().walk<WalkOrder::PreOrder>([&rewriter,
+														   exit_block,
+														   cleanup_block,
+														   endBlock,
+														   &emit_normal_exit](
 														   mlir::Operation *childOp) {
 					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
 							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
@@ -520,13 +730,28 @@ namespace py {
 							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
 								op, BlockRange{ cleanup_block });
 						}
-					} else if (auto op = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
-						op && !op.getKind().has_value()) {
-						auto *current = op->getBlock();
-						auto *next = rewriter.splitBlock(current, op->getIterator());
+					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+						y && !y.getKind().has_value()) {
+						auto *current = y->getBlock();
+						auto *next = rewriter.splitBlock(current, y->getIterator());
 						rewriter.setInsertionPointToEnd(current);
-						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(op->getLoc());
-						rewriter.create<mlir::cf::BranchOp>(op->getLoc(), exit_block);
+						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(y->getLoc());
+						rewriter.create<mlir::cf::BranchOp>(y->getLoc(), exit_block);
+						rewriter.eraseBlock(next);
+					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+						y && y.getKind().has_value()) {
+						// break/continue out of the with body: leave the
+						// exception handler, run __exit__, then hand the marker
+						// to the enclosing loop on a dedicated exit path.
+						auto *current = y->getBlock();
+						auto *next = rewriter.splitBlock(current, y->getIterator());
+						auto *lc_block = rewriter.createBlock(endBlock);
+						rewriter.setInsertionPointToEnd(current);
+						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(y->getLoc());
+						rewriter.create<mlir::cf::BranchOp>(y->getLoc(), lc_block);
+						rewriter.setInsertionPointToStart(lc_block);
+						emit_normal_exit();
+						rewriter.create<mlir::py::BranchYieldOp>(y->getLoc(), y.getKindAttr());
 						rewriter.eraseBlock(next);
 					}
 					return WalkResult::advance();
@@ -571,30 +796,7 @@ namespace py {
 				}
 
 				rewriter.setInsertionPointToStart(exit_block);
-				for (const auto &item : op.getItems()) {
-					auto exit = rewriter.create<mlir::py::LoadMethodOp>(item.getLoc(),
-						mlir::py::PyObjectType::get(rewriter.getContext()),
-						item,
-						"__exit__");
-
-					auto none = rewriter.create<mlir::py::ConstantOp>(
-						item.getLoc(), rewriter.getNoneType());
-
-					rewriter.create<mlir::py::FunctionCallOp>(item.getLoc(),
-						mlir::py::PyObjectType::get(rewriter.getContext()),
-						exit,
-						std::vector<mlir::Value>{ none, none, none },
-						mlir::DenseStringElementsAttr::get(
-							mlir::VectorType::get(
-								{ 0 }, mlir::StringAttr::get(rewriter.getContext()).getType()),
-							{}),
-						std::vector<mlir::Value>{},
-						false,
-						false);
-
-					rewriter.create<mlir::py::ClearExceptionStateOp>(item.getLoc());
-				}
-
+				emit_normal_exit();
 				rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
 
 				rewriter.setInsertionPointToEnd(initBlock);
