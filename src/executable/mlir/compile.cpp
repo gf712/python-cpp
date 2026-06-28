@@ -62,15 +62,23 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	// own pass so we can interleave canonicalize + CSE between them. The
 	// patterns perform structural surgery (block splits, region inlining,
 	// IRMapping clones) and previously ran as part of a single greedy
-	// rewrite that couldn't simplify between them. Order: ForLoop and
-	// While first (they bake in step/condition blocks that the inner
-	// Try/With patterns may walk), then Try and With.
-	pm.addPass(::mlir::py::createConvertForLoopPass());
-	pm.addPass(::mlir::py::createConvertWhileLoopPass());
-	pm.addPass(::mlir::createCanonicalizerPass());
-	pm.addPass(::mlir::createCSEPass());
+	// rewrite that couldn't simplify between them.
+	//
+	// Try and With lower *before* ForLoop and While: a `break`/`continue`
+	// inside a try/with body becomes a `br_yield break_/continue_` marker
+	// that only the enclosing loop pass can resolve (to the loop's exit /
+	// continue target). If the loop lowered first, it would reach into the
+	// still-nested try/with region and emit a branch to a block defined in
+	// the parent region — invalid IR (a cross-region branch) that sends the
+	// later region-DCE into unbounded recursion. Flattening try/with first
+	// hoists those markers into the loop body region, so the loop pass
+	// resolves them with valid same-region branches.
 	pm.addPass(::mlir::py::createConvertTryPass());
 	pm.addPass(::mlir::py::createConvertWithPass());
+	pm.addPass(::mlir::createCanonicalizerPass());
+	pm.addPass(::mlir::createCSEPass());
+	pm.addPass(::mlir::py::createConvertForLoopPass());
+	pm.addPass(::mlir::py::createConvertWhileLoopPass());
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
