@@ -1,5 +1,6 @@
 #include "PySlice.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyInteger.hpp"
 #include "PyNone.hpp"
@@ -82,32 +83,24 @@ PyResult<PyObject *> PySlice::__new__(const PyType *type, PyTuple *, PyDict *)
 	return Err(memory_error(sizeof(PySlice)));
 }
 
-PyResult<int32_t> PySlice::__init__(PyTuple *args, PyDict *)
+PyResult<int32_t> PySlice::__init__(PyTuple *args, PyDict *kwargs)
 {
-	if (args->size() == 0) { return Err(type_error("slice expected at least 1 argument, got 0")); }
-	if (args->size() > 3) {
-		return Err(type_error("slice expected at most 3 arguments, got {}", args->size()));
-	}
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"slice",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* stop / start */,
+		nullptr /* step */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [arg0, arg1, arg2] = result.unwrap();
 
-	if (args->size() == 1) {
-		auto stop = PyObject::from(args->elements()[0]);
-		if (stop.is_err()) return Err(stop.unwrap_err());
-		m_stop = stop.unwrap();
+	if (!arg1) {
+		m_stop = arg0;
 	} else {
-		auto start = PyObject::from(args->elements()[0]);
-		if (start.is_err()) return Err(start.unwrap_err());
-		auto stop = PyObject::from(args->elements()[1]);
-		if (stop.is_err()) return Err(stop.unwrap_err());
-		auto step = [args]() -> PyResult<PyObject *> {
-			if (args->size() > 2) { return PyObject::from(args->elements()[2]); }
-			return Ok(py_none());
-		}();
-
-		if (step.is_err()) return Err(step.unwrap_err());
-
-		m_start = start.unwrap();
-		m_stop = stop.unwrap();
-		m_step = step.unwrap();
+		m_start = arg0;
+		m_stop = arg1;
+		m_step = arg2 ? arg2 : py_none();
 	}
 
 	return Ok(0);

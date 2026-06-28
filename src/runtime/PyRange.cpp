@@ -1,5 +1,6 @@
 #include "PyRange.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyDict.hpp"
 #include "PyInteger.hpp"
 #include "PyString.hpp"
@@ -20,68 +21,47 @@ PyRange::PyRange(PyType *type) : PyBaseObject(type) {}
 
 PyResult<PyObject *> PyRange::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().size() == 0);
-	ASSERT(args && args->size() > 0 && args->size() < 4);
 	ASSERT(type == types::range());
 
-	auto obj = [&]() -> std::variant<PyRange *, PyResult<PyRange *>> {
-		if (args->size() == 1) {
-			if (auto arg1 = PyObject::from(args->elements()[0]); arg1.is_ok()) {
-				auto stop = as<PyInteger>(arg1.unwrap());
-				if (!stop) {
-					return Err(type_error("'{}' object cannot be interpreted as an integer",
-						arg1.unwrap()->type()->name()));
-				}
-				return VirtualMachine::the().heap().allocate<PyRange>(stop);
-			} else {
-				return Err(arg1.unwrap_err());
-			}
-		} else if (args->size() == 2) {
-			auto start_ = PyObject::from(args->elements()[0]);
-			if (start_.is_err()) return Err(start_.unwrap_err());
-			auto *start = as<PyInteger>(start_.unwrap());
-			if (!start) {
-				return Err(type_error("'{}' object cannot be interpreted as an integer",
-					start_.unwrap()->type()->name()));
-			}
-			auto stop_ = PyObject::from(args->elements()[1]);
-			if (stop_.is_err()) return Err(stop_.unwrap_err());
-			auto *stop = as<PyInteger>(stop_.unwrap());
-			if (!stop) {
-				return Err(type_error("'{}' object cannot be interpreted as an integer",
-					stop_.unwrap()->type()->name()));
-			}
-			return VirtualMachine::the().heap().allocate<PyRange>(start, stop);
-		} else if (args->size() == 3) {
-			auto start_ = PyObject::from(args->elements()[0]);
-			if (start_.is_err()) return Err(start_.unwrap_err());
-			auto *start = as<PyInteger>(start_.unwrap());
-			if (!start) {
-				return Err(type_error("'{}' object cannot be interpreted as an integer",
-					start_.unwrap()->type()->name()));
-			}
-			auto stop_ = PyObject::from(args->elements()[1]);
-			if (stop_.is_err()) return Err(stop_.unwrap_err());
-			auto *stop = as<PyInteger>(stop_.unwrap());
-			if (!stop) {
-				return Err(type_error("'{}' object cannot be interpreted as an integer",
-					stop_.unwrap()->type()->name()));
-			}
-			auto step_ = PyObject::from(args->elements()[2]);
-			if (step_.is_err()) return Err(step_.unwrap_err());
-			auto *step = as<PyInteger>(step_.unwrap());
-			if (!step) {
-				return Err(type_error("'{}' object cannot be interpreted as an integer",
-					step_.unwrap()->type()->name()));
-			}
-			return VirtualMachine::the().heap().allocate<PyRange>(start, stop, step);
-		}
-		ASSERT_NOT_REACHED();
-	}();
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"range",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* stop / start */,
+		nullptr /* step */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [arg0, arg1, arg2] = result.unwrap();
 
-	if (std::holds_alternative<PyResult<PyRange *>>(obj)) return std::get<PyResult<PyRange *>>(obj);
-	if (!std::get<PyRange *>(obj)) { return Err(memory_error(sizeof(PyRange))); }
-	return Ok(std::get<PyRange *>(obj));
+	auto as_index = [](PyObject *obj) -> PyResult<PyInteger *> {
+		if (auto *value = as<PyInteger>(obj)) { return Ok(value); }
+		return Err(
+			type_error("'{}' object cannot be interpreted as an integer", obj->type()->name()));
+	};
+
+	PyRange *range = nullptr;
+	if (!arg1) {
+		auto stop = as_index(arg0);
+		if (stop.is_err()) return Err(stop.unwrap_err());
+		range = VirtualMachine::the().heap().allocate<PyRange>(stop.unwrap());
+	} else if (!arg2) {
+		auto start = as_index(arg0);
+		if (start.is_err()) return Err(start.unwrap_err());
+		auto stop = as_index(arg1);
+		if (stop.is_err()) return Err(stop.unwrap_err());
+		range = VirtualMachine::the().heap().allocate<PyRange>(start.unwrap(), stop.unwrap());
+	} else {
+		auto start = as_index(arg0);
+		if (start.is_err()) return Err(start.unwrap_err());
+		auto stop = as_index(arg1);
+		if (stop.is_err()) return Err(stop.unwrap_err());
+		auto step = as_index(arg2);
+		if (step.is_err()) return Err(step.unwrap_err());
+		range = VirtualMachine::the().heap().allocate<PyRange>(
+			start.unwrap(), stop.unwrap(), step.unwrap());
+	}
+	if (!range) { return Err(memory_error(sizeof(PyRange))); }
+	return Ok(range);
 }
 
 PyRange::PyRange(BigIntType start, BigIntType stop, BigIntType step)

@@ -132,30 +132,39 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 }
 
 
-PyResult<PyObject *> iter(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> iter(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	const auto &arg = args->operator[](0);
-	if (kwargs) { return Err(type_error("iter() takes no keyword arguments")); }
-	return arg.and_then([](auto *obj) { return obj->iter(); });
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"iter",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return std::get<0>(result.unwrap())->iter();
 }
 
-PyResult<PyObject *> hash(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> hash(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	const auto &arg = args->operator[](0);
-	if (kwargs) { return Err(type_error("hash() takes no keyword arguments")); }
-	return arg.and_then([](auto *obj) { return obj->hash(); }).and_then([](const size_t h) {
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"hash",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return std::get<0>(result.unwrap())->hash().and_then([](const size_t h) {
 		return PyInteger::create(h);
 	});
 }
 
-PyResult<PyObject *> next(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> next(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	if (kwargs) { return Err(type_error("next() takes no keyword arguments")); }
-	const auto &arg = args->operator[](0);
-	return arg.and_then([](auto *obj) { return obj->next(); });
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"next",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return std::get<0>(result.unwrap())->next();
 }
 
 
@@ -356,24 +365,23 @@ PyResult<PyObject *> locals(const PyTuple *, const PyDict *, Interpreter &interp
 }
 
 
-PyResult<PyObject *> len(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> len(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 1) {
-		return Err(type_error("len() takes exactly one argument ({} given)", args->size()));
-	}
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("len() takes no keyword arguments"));
-	}
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"len",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
 
-	return PyObject::from(args->elements()[0]).and_then([](PyObject *o) -> PyResult<PyObject *> {
-		auto mapping = o->as_mapping();
-		if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
-		if (auto r = mapping.unwrap().len(); r.is_ok()) {
-			return PyInteger::create(r.unwrap());
-		} else {
-			return Err(r.unwrap_err());
-		}
-	});
+	auto *o = std::get<0>(result.unwrap());
+	auto mapping = o->as_mapping();
+	if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
+	if (auto r = mapping.unwrap().len(); r.is_ok()) {
+		return PyInteger::create(r.unwrap());
+	} else {
+		return Err(r.unwrap_err());
+	}
 }
 
 PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
@@ -467,51 +475,44 @@ PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
 		static_cast<uint32_t>(as<PyInteger>(level)->as_size_t()));
 }
 
-PyResult<PyObject *> hasattr(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> hasattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 2) {
-		return Err(type_error("hasattr expected 2 arguments, got {}", args->size()));
-	}
-	auto obj_ = PyObject::from(args->elements()[0]);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
-	auto name_ = PyObject::from(args->elements()[1]);
-	if (name_.is_err()) return name_;
-	auto *name = name_.unwrap();
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"hasattr",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [obj, name] = result.unwrap();
 	if (!as<PyString>(name)) { return Err(type_error("hasattr(): attribute name must be string")); }
 
-	auto [result, found_status] = obj->lookup_attribute(name);
+	auto [lookup_result, found_status] = obj->lookup_attribute(name);
 	if (found_status == LookupAttrResult::FOUND) {
 		return Ok(py_true());
 	} else if (found_status == LookupAttrResult::NOT_FOUND) {
 		return Ok(py_false());
 	} else {
-		return result;
+		return lookup_result;
 	}
 }
 
-PyResult<PyObject *> getattr(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> getattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 2 && args->size() != 3) {
-		return Err(type_error("getattr expected 2 or 3 arguments, got {}", args->size()));
-	}
-	auto obj_ = PyObject::from(args->elements()[0]);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
-	auto name_ = PyObject::from(args->elements()[1]);
-	if (name_.is_err()) return name_;
-	auto *name = name_.unwrap();
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"getattr",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 3>{},
+		nullptr /* default */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [obj, name, default_value] = result.unwrap();
 	if (!as<PyString>(name)) { return Err(type_error("getattr(): attribute name must be string")); }
 
-	if (args->size() == 2) {
-		auto result = obj->getattribute(name);
-		if (result.is_ok()) { ASSERT(result.unwrap()); }
-		return result;
+	if (!default_value) {
+		auto attr = obj->getattribute(name);
+		if (attr.is_ok()) { ASSERT(attr.unwrap()); }
+		return attr;
 	} else {
-		auto default_value_ = PyObject::from(args->elements()[2]);
-		if (default_value_.is_err()) return default_value_;
-		auto *default_value = default_value_.unwrap();
-
 		auto [attr_value, found_status] = obj->lookup_attribute(name);
 
 		if (attr_value.is_err()) { return attr_value; }
@@ -526,36 +527,34 @@ PyResult<PyObject *> getattr(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
-PyResult<PyObject *> setattr(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> setattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 3) {
-		return Err(type_error("setattr expected 3 arguments, got {}", args->size()));
-	}
-	auto obj_ = PyObject::from(args->elements()[0]);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
-	auto name_ = PyObject::from(args->elements()[1]);
-	if (name_.is_err()) return name_;
-	auto *name = name_.unwrap();
-	auto value_ = PyObject::from(args->elements()[2]);
-	if (value_.is_err()) return value_;
-	auto *value = value_.unwrap();
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"setattr",
+		std::integral_constant<size_t, 3>{},
+		std::integral_constant<size_t, 3>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [obj, name, value] = result.unwrap();
 
 	if (!as<PyString>(name)) { return Err(type_error("setattr(): attribute name must be string")); }
 
-	if (auto result = obj->setattribute(name, value); result.is_ok()) {
+	if (auto set_result = obj->setattribute(name, value); set_result.is_ok()) {
 		return Ok(py_none());
 	} else {
-		return Err(result.unwrap_err());
+		return Err(set_result.unwrap_err());
 	}
 }
 
-PyResult<PyObject *> hex(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> hex(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	auto obj_ = args->operator[](0);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"hex",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *obj = std::get<0>(result.unwrap());
 	if (auto pynumber = PyNumber::as_number(obj)) {
 		if (std::holds_alternative<BigIntType>(pynumber->value().value)) {
 			std::ostringstream os;
@@ -572,12 +571,15 @@ PyResult<PyObject *> hex(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
-PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> ord(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	auto obj_ = args->operator[](0);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"ord",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *obj = std::get<0>(result.unwrap());
 	if (auto pystr = as<PyString>(obj)) {
 		if (auto codepoint = pystr->codepoint()) {
 			return PyObject::from(Number{ static_cast<int64_t>(*codepoint) });
@@ -595,12 +597,15 @@ PyResult<PyObject *> ord(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
-PyResult<PyObject *> chr(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> chr(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	ASSERT(args->size() == 1);
-	auto obj_ = args->operator[](0);
-	if (obj_.is_err()) return obj_;
-	auto *obj = obj_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"chr",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *obj = std::get<0>(result.unwrap());
 
 	if (auto cp = PyNumber::as_number(obj)) {
 		if (std::holds_alternative<double>(cp->value().value)) {
@@ -657,23 +662,26 @@ PyResult<PyObject *> dir(const PyTuple *args, const PyDict *, Interpreter &inter
 	return Ok(static_cast<PyObject *>(dir_list_.unwrap()));
 }
 
-PyResult<PyObject *> repr(const PyTuple *args, const PyDict *, Interpreter &)
+PyResult<PyObject *> repr(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 1) {
-		return Err(type_error("repr() takes exactly one argument ({} given)", args->size()));
-	}
-	return PyObject::from(args->elements()[0]).and_then([](auto *obj) { return obj->repr(); });
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"repr",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return std::get<0>(result.unwrap())->repr();
 }
 
-PyResult<PyObject *> abs(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> abs(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 1) {
-		return Err(type_error("abs() takes exactly one argument ({} given)", args->size()));
-	}
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("abs() takes no keyword arguments"));
-	}
-	return PyObject::from(args->elements()[0]).and_then([](auto *obj) { return obj->abs(); });
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"abs",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	return std::get<0>(result.unwrap())->abs();
 }
 
 PyResult<PyObject *> max(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
@@ -774,21 +782,15 @@ PyResult<PyObject *> min(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	}
 }
 
-PyResult<PyObject *> isinstance(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> isinstance(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 2) {
-		return Err(type_error("isinstance expected 2 arguments, got {}", args->size()));
-	}
-
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("isinstance() takes no keyword arguments"));
-	}
-	auto object_ = PyObject::from(args->elements()[0]);
-	if (object_.is_err()) return object_;
-	auto *object = object_.unwrap();
-	auto classinfo_ = PyObject::from(args->elements()[1]);
-	if (classinfo_.is_err()) return classinfo_;
-	auto *classinfo = classinfo_.unwrap();
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"isinstance",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [object, classinfo] = result.unwrap();
 
 	std::vector<PyType *> types;
 	if (auto *class_info_tuple = as<PyTuple>(classinfo)) {
@@ -807,28 +809,22 @@ PyResult<PyObject *> isinstance(const PyTuple *args, const PyDict *kwargs, Inter
 		return Err(type_error("isinstance() arg 2 must be a type or tuple of types"));
 	}
 
-	const auto result = std::any_of(types.begin(), types.end(), [object](PyType *const &t) {
+	const auto matches = std::any_of(types.begin(), types.end(), [object](PyType *const &t) {
 		return object->type()->issubclass(t);
 	});
 
-	return Ok(result ? py_true() : py_false());
+	return Ok(matches ? py_true() : py_false());
 }
 
-PyResult<PyObject *> issubclass(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> issubclass(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 2) {
-		return Err(type_error("issubclass expected 2 arguments, got {}", args->size()));
-	}
-
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("issubclass() takes no keyword arguments"));
-	}
-	auto c = PyObject::from(args->elements()[0]);
-	if (c.is_err()) return c;
-	auto *class_ = c.unwrap();
-	auto classinfo_ = PyObject::from(args->elements()[1]);
-	if (classinfo_.is_err()) return classinfo_;
-	auto *classinfo = classinfo_.unwrap();
+	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"issubclass",
+		std::integral_constant<size_t, 2>{},
+		std::integral_constant<size_t, 2>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [class_, classinfo] = result.unwrap();
 
 	auto *class_as_type = as<PyType>(class_);
 	if (!class_as_type) { return Err(type_error("issubclass() arg 1 must be a class")); }
@@ -843,18 +839,15 @@ PyResult<PyObject *> issubclass(const PyTuple *args, const PyDict *kwargs, Inter
 	}
 }
 
-PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> all(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 1) {
-		return Err(type_error("all expected 1 arguments, got {}", args->size()));
-	}
-
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("all() takes no keyword arguments"));
-	}
-	auto iterable_ = PyObject::from(args->elements()[0]);
-	if (iterable_.is_err()) return iterable_;
-	auto *iterable = iterable_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"all",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *iterable = std::get<0>(result.unwrap());
 
 	const auto &iterator = iterable->iter();
 	if (iterator.is_err()) return iterator;
@@ -874,18 +867,15 @@ PyResult<PyObject *> all(const PyTuple *args, const PyDict *kwargs, Interpreter 
 }
 
 
-PyResult<PyObject *> any(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> any(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (args->size() != 1) {
-		return Err(type_error("any expected 1 arguments, got {}", args->size()));
-	}
-
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("any() takes no keyword arguments"));
-	}
-	auto iterable_ = PyObject::from(args->elements()[0]);
-	if (iterable_.is_err()) return iterable_;
-	auto *iterable = iterable_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"any",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *iterable = std::get<0>(result.unwrap());
 
 	const auto &iterator = iterable->iter();
 	if (iterator.is_err()) return iterator;
@@ -904,31 +894,17 @@ PyResult<PyObject *> any(const PyTuple *args, const PyDict *kwargs, Interpreter 
 	}
 }
 
-PyResult<PyObject *> exec(const PyTuple *args, const PyDict *, Interpreter &interpreter)
+PyResult<PyObject *> exec(PyTuple *args, PyDict *kwargs, Interpreter &interpreter)
 {
-	ASSERT(args);
-	if (args->size() < 1) {
-		return Err(type_error("exec expected at least 1 argument, got {}", args->size()));
-	}
-	if (args->size() > 3) {
-		return Err(type_error("exec expected at most 3 arguments, got {}", args->size()));
-	}
-
-	auto source_ = PyObject::from(args->elements()[0]);
-	auto globals_ = args->size() >= 2 ? PyObject::from(args->elements()[1]) : Ok(py_none());
-	auto locals_ = args->size() == 3 ? PyObject::from(args->elements()[2]) : Ok(py_none());
-
-	if (source_.is_err()) return source_;
-	if (globals_.is_err()) return globals_;
-	if (locals_.is_err()) return locals_;
-
-	auto *source = source_.unwrap();
-	auto *globals = globals_.unwrap();
-	auto *locals = locals_.unwrap();
-
-	ASSERT(source);
-	ASSERT(globals);
-	ASSERT(locals);
+	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"exec",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 3>{},
+		py_none() /* globals */,
+		py_none() /* locals */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [source, globals, locals] = result.unwrap();
 
 	if (globals == py_none()) {
 		globals = interpreter.execution_frame()->globals();
@@ -1123,26 +1099,16 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 	}
 }
 
-PyResult<PyObject *> callable(const PyTuple *args, const PyDict *kwargs, Interpreter &)
+PyResult<PyObject *> callable(PyTuple *args, PyDict *kwargs, Interpreter &)
 {
-	if (!args) {
-		return Err(type_error("callable() takes exactly one argument (0 given)"));
-	} else if (args->size() != 1) {
-		return Err(type_error("callable() takes exactly one argument ({} given)", args->size()));
-	}
-
-	if (kwargs && kwargs->size() != 0) {
-		return Err(type_error("callable() takes no keyword arguments", args->size()));
-	}
-
-	auto obj = args->elements()[0];
-	return std::visit(overloaded{
-						  [](auto) { return false; },
-						  [](PyObject *obj) { return obj->type_prototype().__call__.has_value(); },
-					  },
-			   obj)
-			   ? Ok(py_true())
-			   : Ok(py_false());
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"callable",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *obj = std::get<0>(result.unwrap());
+	return obj->type_prototype().__call__.has_value() ? Ok(py_true()) : Ok(py_false());
 }
 
 PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)

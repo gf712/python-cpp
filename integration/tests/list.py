@@ -33,3 +33,31 @@ def list_recursive_repr():
     assert repr(a) == "[[...]]", "recursive list repr should be idempotent"
 
 list_recursive_repr()
+
+def len_arity():
+    assert len([1, 2, 3]) == 3, "len of a list failed"
+    try:
+        len()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected len() with no arguments to raise TypeError"
+    try:
+        len([], [])
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected len() with too many arguments to raise TypeError"
+
+len_arity()
+
+def list_class_getitem():
+    assert str(list[int]) == "list[int]", "list[int] generic alias failed"
+    try:
+        list.__class_getitem__()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected list.__class_getitem__ to raise TypeError with no arguments"
+
+list_class_getitem()

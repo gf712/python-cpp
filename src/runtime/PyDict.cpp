@@ -1,6 +1,7 @@
 #include "PyDict.hpp"
 #include "KeyError.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyNone.hpp"
 #include "PyString.hpp"
@@ -427,45 +428,40 @@ namespace {
 		return std::move(klass<PyDict>("dict")
 				.def(
 					"get",
-					+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-						ASSERT(args);
-						ASSERT(!kwargs || kwargs->size() == 0);
-						auto key_ = PyObject::from(args->elements()[0]);
-						if (key_.is_err()) return key_;
-						PyObject *key = key_.unwrap();
-						PyObject *default_value = nullptr;
-						if (args->elements().size() == 2) {
-							auto default_value_ = PyObject::from(args->elements()[1]);
-							if (default_value_.is_err()) return default_value_;
-							default_value = default_value_.unwrap();
-						}
+					+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+							kwargs,
+							"get",
+							std::integral_constant<size_t, 1>{},
+							std::integral_constant<size_t, 2>{},
+							nullptr /* default */);
+						if (result.is_err()) return Err(result.unwrap_err());
+						auto [key, default_value] = result.unwrap();
 						return self->get(key, default_value);
 					})
 				.def(
 					"pop",
-					+[](PyDict *self, PyTuple *args, PyDict *kwargs) {
-						ASSERT(args);
-						ASSERT(!kwargs || kwargs->size() == 0);
-						auto key_ = PyObject::from(args->elements()[0]);
-						if (key_.is_err()) return key_;
-						PyObject *key = key_.unwrap();
-						PyObject *default_value = nullptr;
-						if (args->elements().size() == 2) {
-							auto default_value_ = PyObject::from(args->elements()[1]);
-							if (default_value_.is_err()) return default_value_;
-							default_value = default_value_.unwrap();
-						}
+					+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+							kwargs,
+							"pop",
+							std::integral_constant<size_t, 1>{},
+							std::integral_constant<size_t, 2>{},
+							nullptr /* default */);
+						if (result.is_err()) return Err(result.unwrap_err());
+						auto [key, default_value] = result.unwrap();
 						return self->pop(key, default_value);
 					})
 				.def(
 					"update",
 					+[](PyDict *self, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-						ASSERT(args);
-						ASSERT(!kwargs || kwargs->size() == 0);
-						auto other_ = PyObject::from(args->elements()[0]);
-						if (other_.is_err()) return other_;
-						auto *other = other_.unwrap();
-						return self->update(other);
+						auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+							kwargs,
+							"update",
+							std::integral_constant<size_t, 1>{},
+							std::integral_constant<size_t, 1>{});
+						if (result.is_err()) return Err(result.unwrap_err());
+						return self->update(std::get<0>(result.unwrap()));
 					})
 				.def(
 					"items",
@@ -479,26 +475,14 @@ namespace {
 					"fromkeys",
 					+[](PyType *cls, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
 						ASSERT(cls == types::dict());
-						ASSERT(args && args->elements().size() > 0);
-						ASSERT(!kwargs || kwargs->map().size());
-
-						auto iterable_ = PyObject::from(args->elements()[0]);
-						if (iterable_.is_err()) return iterable_;
-						auto *iterable = iterable_.unwrap();
-
-						auto value_ = [args]() -> PyResult<PyObject *> {
-							if (args->elements().size() == 2) {
-								return PyObject::from(args->elements()[1]);
-							} else if (args->elements().size() == 3) {
-								TODO();
-							} else {
-								return Ok(nullptr);
-							}
-						}();
-
-						if (value_.is_err()) return value_;
-						auto *value = value_.unwrap();
-
+						auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+							kwargs,
+							"fromkeys",
+							std::integral_constant<size_t, 1>{},
+							std::integral_constant<size_t, 2>{},
+							nullptr /* value */);
+						if (result.is_err()) return Err(result.unwrap_err());
+						auto [iterable, value] = result.unwrap();
 						return PyDict::fromkeys(iterable, value);
 					})
 				.type);

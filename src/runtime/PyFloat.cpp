@@ -1,5 +1,6 @@
 #include "PyFloat.hpp"
 #include "MemoryError.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyNumber.hpp"
 #include "runtime/Value.hpp"
 #include "runtime/forward.hpp"
@@ -32,15 +33,14 @@ PyResult<PyObject *> PyFloat::__new__(const PyType *type, PyTuple *args, PyDict 
 	// TODO: support inheriting from float
 	ASSERT(type == types::float_());
 
-	ASSERT(!kwargs || kwargs->map().empty());
-	PyObject *value = nullptr;
-	if (args->elements().size() > 0) {
-		if (auto obj = PyObject::from(args->elements()[0]); obj.is_ok()) {
-			value = obj.unwrap();
-		} else {
-			return obj;
-		}
-	}
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"float",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *value = std::get<0>(result.unwrap());
 
 	if (!value) {
 		return PyFloat::create(0.0);

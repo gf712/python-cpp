@@ -1,4 +1,5 @@
 #include "PyBool.hpp"
+#include "PyArgParser.hpp"
 #include "PyString.hpp"
 #include "types/api.hpp"
 #include "types/builtin.hpp"
@@ -32,18 +33,19 @@ bool PyBool::value() const
 
 PyResult<PyObject *> PyBool::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(!kwargs || kwargs->map().size() == 0);
-	ASSERT(args && args->size() == 1);
 	ASSERT(type == types::bool_());
 
-	const auto &value = PyObject::from(args->elements()[0]);
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"bool",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *value = std::get<0>(result.unwrap());
 
-	if (value.is_err()) return value;
+	if (value->type() == types::bool_()) return Ok(value);
 
-	if (value.unwrap()->type() == types::bool_()) return value;
-
-	return value.unwrap()->true_().and_then(
-		[](const auto &v) { return Ok(v ? py_true() : py_false()); });
+	return value->true_().and_then([](const auto &v) { return Ok(v ? py_true() : py_false()); });
 }
 
 PyResult<PyObject *> PyBool::__repr__() const { return PyString::create(to_string()); }

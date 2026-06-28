@@ -1,5 +1,6 @@
 #include "PyModule.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyDict.hpp"
 #include "PyList.hpp"
 #include "PyString.hpp"
@@ -52,30 +53,34 @@ PyResult<PyObject *> PyModule::__repr__() const
 PyResult<PyObject *> PyModule::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::module());
-	ASSERT(!kwargs || kwargs->map().empty());
 
 	auto symbol_table = PyDict::create();
 	if (symbol_table.is_err()) return symbol_table;
 
-	auto *name = args->size() > 0 ? PyObject::from(args->elements()[0]).unwrap() : nullptr;
-	auto *doc = args->size() > 1 ? PyObject::from(args->elements()[1]).unwrap() : py_none();
-	if (!name) { TODO(); }
-	if (!as<PyString>(name)) { TODO(); }
+	auto result = PyArgsParser<PyString *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"module",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 2>{},
+		py_none() /* doc */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [name, doc] = result.unwrap();
 
-	return PyModule::create(symbol_table.unwrap(), as<PyString>(name), doc);
+	return PyModule::create(symbol_table.unwrap(), name, doc);
 }
 
 PyResult<int32_t> PyModule::__init__(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args);
-	ASSERT(!kwargs || kwargs->map().empty());
+	auto result = PyArgsParser<PyString *, PyObject *>::unpack_tuple(args,
+		kwargs,
+		"module",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 2>{},
+		py_none() /* doc */);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto [name, doc] = result.unwrap();
 
-	auto *name = args->size() > 0 ? PyObject::from(args->elements()[0]).unwrap() : nullptr;
-	auto *doc = args->size() > 1 ? PyObject::from(args->elements()[1]).unwrap() : py_none();
-	if (!name) { TODO(); }
-	if (!as<PyString>(name)) { TODO(); }
-
-	m_module_name = as<PyString>(name);
+	m_module_name = name;
 	m_doc = doc;
 
 	auto attr = PyDict::create();

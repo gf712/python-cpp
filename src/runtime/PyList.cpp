@@ -1,6 +1,7 @@
 #include "PyList.hpp"
 #include "IndexError.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFunction.hpp"
@@ -672,12 +673,14 @@ namespace {
 				.def("sort", &PyList::sort)
 				.classmethod(
 					"__class_getitem__",
-					+[](PyType *type, PyTuple *args, PyDict *kwargs) {
-						ASSERT(args && args->elements().size() == 1);
-						ASSERT(!kwargs || kwargs->map().empty());
-						return PyObject::from(args->elements()[0]).and_then([type](PyObject *arg) {
-							return PyGenericAlias::create(type, arg);
-						});
+					+[](PyType *type, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+							kwargs,
+							"__class_getitem__",
+							std::integral_constant<size_t, 1>{},
+							std::integral_constant<size_t, 1>{});
+						if (result.is_err()) return Err(result.unwrap_err());
+						return PyGenericAlias::create(type, std::get<0>(result.unwrap()));
 					})
 				.def("__reversed__", &PyList::__reversed__)
 				.def("insert", &PyList::insert)

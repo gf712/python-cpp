@@ -1,5 +1,6 @@
 #include "PyFrozenSet.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PySet.hpp"
 #include "StopIteration.hpp"
 #include "types/api.hpp"
@@ -73,54 +74,52 @@ std::string PyFrozenSet::to_string() const
 	return os.str();
 }
 
-PyResult<PyObject *> PyFrozenSet::__new__(const PyType *type, PyTuple *args, PyDict *)
+PyResult<PyObject *> PyFrozenSet::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
 {
 	ASSERT(type == types::frozenset());
 
-	ASSERT(args);
-	if (args->size() == 0) {
-		return PyFrozenSet::create();
-	} else if (args->size() == 1) {
-		auto iterable_ = PyObject::from(args->elements()[0]);
-		if (iterable_.is_err()) return iterable_;
-		auto *iterable = iterable_.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"frozenset",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *iterable = std::get<0>(result.unwrap());
 
-		auto iterator_ = iterable->iter();
-		if (iterator_.is_err()) return iterator_;
-		auto *iterator = iterator_.unwrap();
+	if (!iterable) { return PyFrozenSet::create(); }
 
-		auto value_ = iterator->next();
+	auto iterator_ = iterable->iter();
+	if (iterator_.is_err()) return iterator_;
+	auto *iterator = iterator_.unwrap();
 
-		SetType set;
-		while (!value_.is_err()) {
-			set.insert(value_.unwrap());
-			value_ = iterator->next();
-		}
+	auto value_ = iterator->next();
 
-		if (value_.unwrap_err()->type() != stop_iteration()->type()) { return value_; }
-
-		return PyFrozenSet::create(set);
-	} else {
-		return Err(type_error("frozenset expected at most 1 argument, got {}", args->size()));
+	SetType set;
+	while (!value_.is_err()) {
+		set.insert(value_.unwrap());
+		value_ = iterator->next();
 	}
+
+	if (value_.unwrap_err()->type() != stop_iteration()->type()) { return value_; }
+
+	return PyFrozenSet::create(set);
 }
 
 PyResult<int32_t> PyFrozenSet::__init__(PyTuple *args, PyDict *kwargs)
 {
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("frozenset() takes no keyword arguments"));
-	}
-	if (!args || args->elements().size() == 0) { return Ok(0); }
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"frozenset",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *iterable_obj = std::get<0>(result.unwrap());
 
-	if (args->elements().size() != 1) {
-		return Err(
-			type_error("frozenset expected at most 1 argument, got {}", args->elements().size()));
-	}
+	if (!iterable_obj) { return Ok(0); }
 
-	auto iterable = PyObject::from(args->elements()[0]);
-	if (iterable.is_err()) return Err(iterable.unwrap_err());
-
-	auto iterator = iterable.unwrap()->iter();
+	auto iterator = iterable_obj->iter();
 	if (iterator.is_err()) return Err(iterator.unwrap_err());
 
 	auto value = iterator.unwrap()->next();

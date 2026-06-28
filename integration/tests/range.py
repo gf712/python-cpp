@@ -35,3 +35,27 @@ def test_subscript():
     assert r[5] == 10
 
 test_subscript()
+
+def test_range_errors():
+    try:
+        range()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected range() with no arguments to raise TypeError"
+
+    try:
+        range("a")
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected range with a non-integer argument to raise TypeError"
+
+    try:
+        range(1, 2, 3, 4)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected range with too many arguments to raise TypeError"
+
+test_range_errors()

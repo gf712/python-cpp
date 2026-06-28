@@ -57,3 +57,20 @@ def bar():
 
 assert bar() == 21
 assert bar == new_bar
+
+def misc_builtin_arity():
+    it = iter([1, 2, 3])
+    assert next(it) == 1, "iter/next should yield the first element"
+    assert hash(1) == hash(1), "hash should be stable"
+    assert callable(len), "len should be callable"
+    assert not callable(5), "an int should not be callable"
+
+    for fn in [iter, hash, next, callable]:
+        try:
+            fn()
+        except TypeError:
+            assert True
+        else:
+            assert False, "Expected a 1-argument builtin to raise TypeError with no arguments"
+
+misc_builtin_arity()

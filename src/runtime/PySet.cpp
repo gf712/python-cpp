@@ -1,6 +1,7 @@
 #include "PySet.hpp"
 #include "KeyError.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "PyDict.hpp"
 #include "PyFrozenSet.hpp"
@@ -235,18 +236,17 @@ PyResult<PyObject *> PySet::__new__(const PyType *type, PyTuple *, PyDict *)
 
 PyResult<int32_t> PySet::__init__(PyTuple *args, PyDict *kwargs)
 {
-	if (kwargs && !kwargs->map().empty()) {
-		return Err(type_error("set() takes no keyword arguments"));
-	}
-	if (!args || args->elements().size() == 0) { return Ok(0); }
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"set",
+		std::integral_constant<size_t, 0>{},
+		std::integral_constant<size_t, 1>{},
+		nullptr);
+	if (result.is_err()) return Err(result.unwrap_err());
+	auto *iterable = std::get<0>(result.unwrap());
 
-	if (args->elements().size() != 1) {
-		return Err(type_error("set expected at most 1 argument, got {}", args->elements().size()));
-	}
-
-	auto iterable = PyObject::from(args->elements()[0]);
-	if (iterable.is_err()) return Err(iterable.unwrap_err());
-	return from_iterable(iterable.unwrap(), std::inserter(m_elements, m_elements.begin()))
+	if (!iterable) { return Ok(0); }
+	return from_iterable(iterable, std::inserter(m_elements, m_elements.begin()))
 		.and_then([](auto) { return Ok(0); });
 }
 

@@ -1,5 +1,6 @@
 #include "PyBytes.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyBool.hpp"
 #include "StopIteration.hpp"
 #include "runtime/IndexError.hpp"
@@ -260,35 +261,36 @@ namespace {
 		return std::move(klass<PyBytes>("bytes")
 				.def("decode",
 					[](PyBytes *obj, PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+						auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
+							kwargs,
+							"decode",
+							std::integral_constant<size_t, 0>{},
+							std::integral_constant<size_t, 2>{},
+							nullptr /* encoding */,
+							nullptr /* errors */);
+						if (result.is_err()) return Err(result.unwrap_err());
+						auto [encoding_obj, errors_obj] = result.unwrap();
+
 						std::optional<std::string> encoding;
 						std::optional<std::string> errors;
-						if (args) {
-							if (args->size() > 2) {
-								return Err(type_error(
-									"decode() takes at most 2 arguments ({} given)", args->size()));
-							}
-							if (args->size() > 0) {
-								auto arg0 = PyObject::from(args->elements()[0]).unwrap();
-								if (auto enc = as<PyString>(arg0)) {
-									encoding = enc->value();
-								} else {
-									return Err(type_error(
-										"decode() argument 'encoding' must be str, not {}",
-										arg0->type()->to_string()));
-								}
-							}
-							if (args->size() > 1) {
-								auto arg1 = PyObject::from(args->elements()[1]).unwrap();
-								if (auto err = as<PyString>(arg1)) {
-									errors = err->value();
-								} else {
-									return Err(
-										type_error("decode() argument 'errors' must be str, not {}",
-											arg1->type()->to_string()));
-								}
+						if (encoding_obj) {
+							if (auto enc = as<PyString>(encoding_obj)) {
+								encoding = enc->value();
+							} else {
+								return Err(
+									type_error("decode() argument 'encoding' must be str, not {}",
+										encoding_obj->type()->to_string()));
 							}
 						}
-						if (kwargs) { TODO(); }
+						if (errors_obj) {
+							if (auto err = as<PyString>(errors_obj)) {
+								errors = err->value();
+							} else {
+								return Err(
+									type_error("decode() argument 'errors' must be str, not {}",
+										errors_obj->type()->to_string()));
+							}
+						}
 						return obj->decode(encoding.value_or("utf-8"), errors.value_or("strict"));
 					})
 				.type);

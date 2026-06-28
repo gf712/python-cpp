@@ -17,3 +17,19 @@ def invalid_eval():
     else:
         assert False, "Wrong exception"
 invalid_eval()
+
+def exec_arity():
+    try:
+        exec()
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected exec() with no arguments to raise TypeError"
+
+    try:
+        exec(1, 2, 3, 4)
+    except TypeError:
+        assert True
+    else:
+        assert False, "Expected exec() with too many arguments to raise TypeError"
+exec_arity()

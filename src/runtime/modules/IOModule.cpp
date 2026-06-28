@@ -3042,26 +3042,29 @@ PyModule *io_module()
 
 	s_io_module->add_symbol(PyString::create("open").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"open", [](PyTuple *args, PyDict *kwargs) {
-				ASSERT(!kwargs || kwargs->map().empty());
-				ASSERT(args && args->elements().size() == 2);
-				auto arg0 = PyObject::from(args->elements()[0]).unwrap();
-				auto arg1 = PyObject::from(args->elements()[1]).unwrap();
+			"open", [](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				auto result = PyArgsParser<PyObject *, PyString *>::unpack_tuple(args,
+					kwargs,
+					"open",
+					std::integral_constant<size_t, 2>{},
+					std::integral_constant<size_t, 2>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto [file, mode] = result.unwrap();
 
-				ASSERT(as<PyString>(arg1));
-				const std::string rawmode = as<PyString>(arg1)->value();
-
-				return open(arg0, rawmode);
+				return open(file, mode->value());
 			}));
 
 	s_io_module->add_symbol(PyString::create("open_code").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"open_code", [](PyTuple *args, PyDict *kwargs) {
-				ASSERT(!kwargs || kwargs->map().empty());
-				ASSERT(args && args->elements().size() == 1);
-				auto arg0 = PyObject::from(args->elements()[0]).unwrap();
+			"open_code", [](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"open_code",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
 
-				return open(arg0, "rb");
+				return open(std::get<0>(result.unwrap()), "rb");
 			}));
 
 	// C++ standard streams currently do not provide an API to get default buffer size, and C's

@@ -1,4 +1,5 @@
 #include "Modules.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
@@ -185,22 +186,18 @@ PyModule *posix_module()
 	s_posix_module->add_symbol(PyString::create("stat").unwrap(),
 		PyNativeFunction::create("stat",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!kwargs || kwargs->map().empty());
-
-				if (!args) { return Err(type_error("posix.stat() takes one argument (0 given)")); }
-
-				if (args->size() != 1) {
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"posix.stat",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *path_obj = std::get<0>(result.unwrap());
+				if (!as<PyString>(path_obj)) {
 					return Err(
-						type_error("posix.stat() takes one argument ({} given)", args->size()));
+						type_error("expected to be string but got '{}'", path_obj->type()->name()));
 				}
-
-				const auto path = PyObject::from(args->elements()[0]);
-				if (path.is_err()) return path;
-				if (!as<PyString>(path.unwrap())) {
-					return Err(type_error(
-						"expected to be string but got '{}'", path.unwrap()->type()->name()));
-				}
-				const auto *path_cstr = as<PyString>(path.unwrap())->value().c_str();
+				const auto *path_cstr = as<PyString>(path_obj)->value().c_str();
 				auto stat_ = std::make_unique<struct stat>();
 				stat(path_cstr, stat_.get());
 				// FIXME: handle errors
@@ -212,22 +209,24 @@ PyModule *posix_module()
 	s_posix_module->add_symbol(PyString::create("listdir").unwrap(),
 		PyNativeFunction::create("listdir",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!kwargs || kwargs->map().empty());
+				auto parsed = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"posix.listdir",
+					std::integral_constant<size_t, 0>{},
+					std::integral_constant<size_t, 1>{},
+					nullptr);
+				if (parsed.is_err()) return Err(parsed.unwrap_err());
+				auto *path_obj = std::get<0>(parsed.unwrap());
 
-				if (args->size() > 1) {
-					return Err(type_error(
-						"posix.listdir() takes at most one argument ({} given)", args->size()));
+				std::string dir_name;
+				if (!path_obj) {
+					dir_name = ".";
+				} else if (auto *path_str = as<PyString>(path_obj)) {
+					dir_name = path_str->value();
+				} else {
+					return Err(
+						type_error("expected to be string but got '{}'", path_obj->type()->name()));
 				}
-
-				const auto path = args->size() == 1 ? PyObject::from(args->elements()[0])
-													: PyObject::from(String{ "." });
-				if (path.is_err()) return path;
-				if (!as<PyString>(path.unwrap())) {
-					return Err(type_error(
-						"expected to be string but got '{}'", path.unwrap()->type()->name()));
-				}
-
-				const auto dir_name = as<PyString>(path.unwrap())->value();
 				const auto dir = fs::path(dir_name);
 
 				{
@@ -259,25 +258,19 @@ PyModule *posix_module()
 	s_posix_module->add_symbol(PyString::create("fspath").unwrap(),
 		PyNativeFunction::create("fspath",
 			[](PyTuple *args, PyDict *kwargs) -> py::PyResult<py::PyObject *> {
-				ASSERT(!kwargs || kwargs->map().empty());
-
-				if (!args) {
-					return Err(type_error("posix.fspath() takes one argument (0 given)"));
-				}
-
-				if (args->size() != 1) {
-					return Err(
-						type_error("posix.fspath() takes one argument ({} given)", args->size()));
-				}
-
-				const auto path = PyObject::from(args->elements()[0]);
-				if (path.is_err()) return path;
-				if (!as<PyString>(path.unwrap()) && !as<PyBytes>(path.unwrap())) {
+				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+					kwargs,
+					"posix.fspath",
+					std::integral_constant<size_t, 1>{},
+					std::integral_constant<size_t, 1>{});
+				if (result.is_err()) return Err(result.unwrap_err());
+				auto *path_obj = std::get<0>(result.unwrap());
+				if (!as<PyString>(path_obj) && !as<PyBytes>(path_obj)) {
 					// should check __fspath__ slot if not string or bytes
 					return Err(type_error("expected str, bytes or os.PathLike object, not {}",
-						path.unwrap()->type()->name()));
+						path_obj->type()->name()));
 				}
-				return path;
+				return Ok(path_obj);
 			})
 			.unwrap());
 

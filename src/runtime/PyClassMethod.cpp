@@ -1,5 +1,6 @@
 #include "PyClassMethod.hpp"
 #include "MemoryError.hpp"
+#include "PyArgParser.hpp"
 #include "PyDict.hpp"
 #include "PyString.hpp"
 #include "PyTuple.hpp"
@@ -32,12 +33,13 @@ PyResult<PyObject *> PyClassMethod::__new__(const PyType *type, PyTuple *, PyDic
 
 PyResult<int32_t> PyClassMethod::__init__(PyTuple *args, PyDict *kwargs)
 {
-	ASSERT(args && args->size() == 1);
-	ASSERT(!kwargs || kwargs->map().empty());
-
-	auto callable = PyObject::from(args->elements()[0]);
-	if (callable.is_err()) return Err(callable.unwrap_err());
-	m_callable = callable.unwrap();
+	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+		kwargs,
+		"classmethod",
+		std::integral_constant<size_t, 1>{},
+		std::integral_constant<size_t, 1>{});
+	if (result.is_err()) return Err(result.unwrap_err());
+	m_callable = std::get<0>(result.unwrap());
 
 	return Ok(0);
 }
