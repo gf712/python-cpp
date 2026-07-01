@@ -433,6 +433,7 @@ class PyObject : public Cell
 	PyResult<PySequenceWrapper> as_sequence();
 	PyResult<PyBufferProcs> as_buffer();
 
+	// TODO: add strongly typed flags
 	PyResult<std::monostate> get_buffer(PyBuffer &, int flags);
 
 	PyResult<PyObject *> getattribute(PyObject *attribute) const;

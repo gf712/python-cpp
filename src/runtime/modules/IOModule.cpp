@@ -2,11 +2,15 @@
 #include "runtime/MemoryError.hpp"
 #include "runtime/NotImplementedError.hpp"
 #include "runtime/OSError.hpp"
+#include "runtime/PyArgParser.hpp"
 #include "runtime/PyBool.hpp"
 #include "runtime/PyBytes.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFunction.hpp"
+#include "runtime/PyInteger.hpp"
 #include "runtime/PyList.hpp"
+#include "runtime/PyMemoryView.hpp"
+#include "runtime/PyNone.hpp"
 #include "runtime/PyObject.hpp"
 #include "runtime/PyString.hpp"
 #include "runtime/PyTuple.hpp"
@@ -18,6 +22,8 @@
 #include "runtime/types/builtin.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
+#include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <variant>
 
@@ -556,7 +562,10 @@ class RawIOBase : public IOBase
 		return Err(not_implemented_error("_RawIOBase.readinto"));
 	}
 
-	PyResult<PyObject *> write() const { return Err(not_implemented_error("_RawIOBase.write")); }
+	PyResult<PyObject *> write(PyObject *) const
+	{
+		return Err(not_implemented_error("_RawIOBase.write"));
+	}
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -796,9 +805,9 @@ struct Buffered
 	bool fast_closed_checks{ false };
 	std::unique_ptr<std::streambuf> buffer;
 
-	bool valid_readbuffer() { return readable_ && buffer && buffer->in_avail() != -1; }
+	bool valid_readbuffer() const { return readable_ && buffer && buffer->in_avail() != -1; }
 
-	int64_t readahead() { return valid_readbuffer() ? buffer->in_avail() : 0; }
+	int64_t readahead() const { return valid_readbuffer() ? buffer->in_avail() : 0; }
 
 	PyResult<std::monostate> check_initialized() const
 	{
@@ -810,6 +819,12 @@ struct Buffered
 			}
 		}
 
+		return Ok(std::monostate{});
+	}
+
+	PyResult<std::monostate> check_closed(std::string_view err_msg) const
+	{
+		if (is_closed() && readahead() == 0) { return Err(value_error(std::string{ err_msg })); }
 		return Ok(std::monostate{});
 	}
 
@@ -837,6 +852,8 @@ struct Buffered
 			return flush->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 		});
 	}
+
+	PyResult<PyObject *> flush_and_rewind();
 
 	PyResult<bool> closed() const
 	{
@@ -1326,11 +1343,85 @@ class BufferedWriter
 		});
 	}
 
+	PyResult<PyObject *> raw_write(const char *data, size_t len)
+	{
+		auto *raw_bytes = bit_cast<std::byte *>(data);
+		auto bytes = PyBytes::create(Bytes{ .b = { raw_bytes, raw_bytes + len } });
+		auto memobj = PyMemoryView::create(bytes.unwrap());
+		if (memobj.is_err()) { return memobj; }
+		return raw->get_method(PyString::create("write").unwrap())
+			.and_then([memobj](PyObject *write) {
+				return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
+			})
+			.and_then([](auto) { return Ok(py_none()); });
+	}
+
+	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
+	{
+		auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
+			kwargs,
+			"write",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 1>{});
+		if (result.is_err()) { return Err(result.unwrap_err()); }
+		auto [arg] = result.unwrap();
+		PyBuffer buffer;
+		if (auto r = arg->get_buffer(buffer, 0); r.is_err()) { return Err(r.unwrap_err()); }
+		if (!buffer.is_ccontiguous()) {
+			return Err(type_error(
+				"write() argument must be contiguous buffer, not {}", arg->type()->name()));
+		}
+
+		// implementation
+		if (Buffered<BufferedWriter>::is_closed()) {
+			return Err(value_error("write to closed file"));
+		}
+
+		auto written =
+			this->buffer->sputn(static_cast<char *>(buffer.buf->get_buffer()), buffer.len);
+		if (written == buffer.len) {
+			// fast path: everything was written - we are done
+			return PyInteger::create(written);
+		}
+
+		// flush our internal buffer to raw
+		if (auto r = flush(); r.is_err()) { return r; }
+
+		// TODO: this currently writes to internal buffer and then immediately makes a copy in
+		// write_raw. This is because streambuf doesn't tell us how much capacity it has left, so we
+		// just give it as much as we can each time
+		ssize_t remaining = buffer.len;
+		char *start = static_cast<char *>(buffer.buf->get_buffer());
+		// TODO: use a buffer that actually tells us how much we can write to it, rather than
+		// hardcode 4096
+		while (remaining > 4096) {
+			// flush our internal buffer to raw
+			auto r = raw_write(start + written, remaining);
+			if (r.is_err()) { return r; }
+			ASSERT(as<PyInteger>(r.unwrap()));
+			const auto count = as<PyInteger>(r.unwrap())->as_size_t();
+			written += count;
+			remaining -= count;
+		}
+
+		// put the rest in our buffer. Assumes that we can write 4096 bytes
+		const auto count = this->buffer->sputn(start + written, remaining);
+		ASSERT(remaining - count == 0);
+
+		return PyInteger::create(written);
+	}
+
+
+	PyResult<PyObject *> flush();
+
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_buffered_writer) {
 			s_io_buffered_writer =
-				klass<BufferedWriter>(module, "BufferedWriter", s_io_buffered_io_base).finalize();
+				klass<BufferedWriter>(module, "BufferedWriter", s_io_buffered_io_base)
+					.def("write", &BufferedWriter::write)
+					.def("flush", &BufferedWriter::flush)
+					.finalize();
 		}
 		module->add_symbol(PyString::create("BufferedWriter").unwrap(), s_io_buffered_writer);
 		return s_io_buffered_writer;
@@ -1346,6 +1437,37 @@ class BufferedWriter
 		visit_graph_buffered(visitor);
 	}
 };
+
+template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
+{
+	if (readable_) { return Ok(py_none()); }
+	return static_cast<BufferedWriter *>(this)->flush();
+}
+
+PyResult<PyObject *> BufferedWriter::flush()
+{
+	if (!writable_) { return Ok(py_none()); }
+	std::array<char, BUFSIZ> to_write;
+
+	while (true) {
+		// very innefficient - we shouldn't be getting data from buffer, create an intermediate
+		// bytes buffer copy just to then get a view of it.
+		auto written = buffer->sgetn(to_write.data(), BUFSIZ);
+		if (written <= 0) { break; }
+		auto *raw_bytes = bit_cast<std::byte *>(to_write.data());
+		auto bytes = PyBytes::create(Bytes{ .b = { raw_bytes, raw_bytes + written } });
+		auto memobj = PyMemoryView::create(bytes.unwrap());
+		if (memobj.is_err()) { return memobj; }
+		if (auto r = raw->get_method(PyString::create("write").unwrap())
+				.and_then([memobj](PyObject *write) {
+					return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
+				});
+			r.is_err()) {
+			return r;
+		}
+	}
+	return Ok(py_none());
+}
 
 template<> BufferedReader *as(PyObject *obj)
 {
@@ -1906,7 +2028,7 @@ class FileIO : public RawIOBase
 	friend ::Heap;
 
 	int m_file_descriptor{ -1 };
-	std::fstream m_filestream;
+	__gnu_cxx::stdio_filebuf<char> m_filebuffer;
 	bool m_created{ false };
 	bool m_readable{ false };
 	bool m_writable{ false };
@@ -1962,10 +2084,14 @@ class FileIO : public RawIOBase
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
 		ASSERT(!kwargs || kwargs->map().empty());
-		if (args->elements().size() != 2) { TODO(); }
+		if (args->elements().empty()) { TODO(); }
 		auto *filename = PyObject::from(args->elements()[0]).unwrap();
-		auto *mode_ = PyObject::from(args->elements()[1]).unwrap();
-		if (!as<PyString>(filename)) { TODO(); }
+		PyObject *mode_ = nullptr;
+		if (args->elements().size() > 1) {
+			mode_ = PyObject::from(args->elements()[1]).unwrap();
+		} else {
+			mode_ = PyString::create("r").unwrap();
+		}
 		if (!as<PyString>(mode_)) { TODO(); }
 
 		return read_flags(as<PyString>(mode_)->value())
@@ -1974,7 +2100,7 @@ class FileIO : public RawIOBase
 
 	std::string to_string() const override
 	{
-		if (!m_filestream.is_open()) { return "<_io.FileIO [closed]>"; }
+		if (!m_filebuffer.is_open()) { return "<_io.FileIO [closed]>"; }
 		return fmt::format("<_io.FileIO fd={} mode={}>", m_file_descriptor, mode_string());
 	}
 
@@ -1984,25 +2110,23 @@ class FileIO : public RawIOBase
 
 	PyResult<PyObject *> readall()
 	{
-		if (!m_filestream.is_open()) { return Err(value_error("I/O operation on closed file")); }
+		if (!m_filebuffer.is_open()) { return Err(value_error("I/O operation on closed file")); }
 
-		m_filestream.seekg(0);
+		m_filebuffer.pubseekpos(0, std::ios::in);
 
-		if (m_filestream.fail()) { TODO(); }
-		const auto initial_position = m_filestream.tellg();
+		// TODO: if (m_filestream.fail()) { TODO(); }
+		const auto initial_position = m_filebuffer.pubseekoff(0, std::ios::cur, std::ios::in);
 		if (initial_position == -1) { TODO(); }
 
-		m_filestream.seekg(0, std::ios_base::end);
-		if (m_filestream.fail()) { TODO(); }
-		const auto end_position = m_filestream.tellg();
+		const auto end_position = m_filebuffer.pubseekoff(0, std::ios::end, std::ios::in);
 		if (end_position == -1) { TODO(); }
 
-		m_filestream.seekg(0);
-		if (m_filestream.fail()) { TODO(); }
+		m_filebuffer.pubseekpos(0, std::ios::in);
+		// TODO: if (m_filestream.fail()) { TODO(); }
 
 		const auto file_size = end_position - initial_position;
 		if (file_size == 0) {
-			m_filestream.seekg(0, std::ios_base::end);
+			m_filebuffer.pubseekoff(0, std::ios::end, std::ios::in);
 			return PyBytes::create();
 		}
 		std::vector<std::byte> result;
@@ -2011,20 +2135,15 @@ class FileIO : public RawIOBase
 		const auto buffer_size = file_size;
 
 		do {
-			if (m_filestream.fail()) { TODO(); }
-			m_filestream.read(::bit_cast<char *>(result.data()), buffer_size);
-			bytes_read += m_filestream.gcount();
-		} while (!m_filestream.eof());
+			if (std::ferror(m_filebuffer.file())) { TODO(); }
+			const auto got = m_filebuffer.sgetn(::bit_cast<char *>(result.data()), buffer_size);
+			if (got <= 0) { break; }
+			bytes_read += got;
+		} while (true);
 
-		// we expect failbit to be set when we read up to eof, but not badbit to be set
-		if (m_filestream.rdstate() & std::ios_base::badbit) { TODO(); }
+		if (std::ferror(m_filebuffer.file())) { TODO(); }
 		// we should always reach the end of the file, otherwise something went wrong
 		if (bytes_read != file_size) { TODO(); }
-
-		// set to eof, which removes the failbit
-		m_filestream.clear(std::ios_base::eofbit);
-		// make sure that we are not failing anymore
-		if (m_filestream.fail()) { TODO(); }
 
 		return PyBytes::create(Bytes{ std::move(result) });
 	}
@@ -2032,11 +2151,25 @@ class FileIO : public RawIOBase
 	PyResult<PyObject *> close()
 	{
 		// RawIOBase::close(this);
-		if (m_filestream.fail()) { TODO(); }
-		if (!m_filestream.is_open()) { return Ok(py_none()); }
-		m_filestream.close();
-		if (m_filestream.fail()) { TODO(); }
+		if (!m_filebuffer.is_open()) { return Ok(py_none()); }
+		// file() is only non-null while the underlying C FILE is open; after close()
+		// it is reset to nullptr, so any ferror() check must happen before closing.
+		if (auto *fp = m_filebuffer.file(); fp && std::ferror(fp)) { TODO(); }
+		m_filebuffer.close();
 		return Ok(py_none());
+	}
+
+	PyResult<PyObject *> write(PyObject *bytes)
+	{
+		PyBuffer buffer;
+		if (auto result = bytes->get_buffer(buffer, 0); result.is_err()) {
+			return Err(result.unwrap_err());
+		}
+		auto *data = static_cast<char *>(buffer.buf->get_buffer());
+		const auto written = m_filebuffer.sputn(data, buffer.len);
+		// TODO: should we always flush?
+		m_filebuffer.pubsync();
+		return PyInteger::create(written);
 	}
 
 	static PyType *register_type(PyModule *module)
@@ -2044,7 +2177,9 @@ class FileIO : public RawIOBase
 		if (!s_io_fileio) {
 			s_io_fileio = klass<FileIO>(module, "FileIO", s_io_raw_iobase)
 							  .def("readall", &FileIO::readall)
+							  .def("write", &FileIO::write)
 							  .def("close", &FileIO::close)
+							  .def("flush", &FileIO::flush)
 							  .finalize();
 		}
 		module->add_symbol(PyString::create("FileIO").unwrap(), s_io_fileio);
@@ -2052,35 +2187,20 @@ class FileIO : public RawIOBase
 	}
 
   private:
-	PyResult<int32_t> init(PyObject *filename, const std::bitset<8> &rawmode)
+	PyResult<int32_t> init(PyObject *name, const std::bitset<8> &rawmode)
 	{
 		auto mode_result = get_mode(rawmode);
 		if (mode_result.is_err()) return Err(mode_result.unwrap_err());
 		const auto mode = mode_result.unwrap();
 
-
-		const fs::path filepath = as<PyString>(filename)->value();
-		m_filestream.open(filepath, mode);
-		if (m_filestream.fail()) {
-			// FIXME: can we avoid using errno, and figure out the error using fs::perms
-			auto *msg = strerror(errno);
-			// FIXME: should be OSError
-			return Err(value_error("{}", msg));
-		}
-
-		if (auto *file_ptr = cfile(m_filestream)) {
-#if defined(__linux__)
-			m_file_descriptor = file_ptr->_fileno;
-#elif defined(__APPLE__)
-			m_file_descriptor = file_ptr->_file;
-#else
-			static_assert(false, "unsupported platform");
-#endif
-		} else {
-			m_file_descriptor = -1;
-		}
-
-		{
+		if (auto *filename = as<PyString>(name)) {
+			const fs::path filepath = as<PyString>(filename)->value();
+			m_filebuffer.open(filepath, mode);
+			if (std::ferror(m_filebuffer.file())) {
+				auto *msg = strerror(errno);
+				// FIXME: should be OSError
+				return Err(value_error("{}", msg));
+			}
 			std::error_code ec;
 			if (fs::is_directory(filepath, ec) && !ec) {
 				// FIXME: can this error message be provided by the standard library?
@@ -2088,7 +2208,18 @@ class FileIO : public RawIOBase
 				// FIXME: should be OSError
 				return Err(value_error("{}", msg));
 			}
+			m_file_descriptor = m_filebuffer.fd();
+		} else if (auto *fd = as<PyInteger>(name)) {
+			m_file_descriptor = static_cast<int>(fd->as_i64());
+
+			std::string mode_str;
+			if (mode & std::ios::in) { mode_str.push_back('r'); }
+			if (mode & std::ios::out) { mode_str.push_back('w'); }
+			if (mode & std::ios::app) { mode_str.push_back('a'); }
+			FILE *fp = fdopen(m_file_descriptor, mode_str.c_str());
+			m_filebuffer = __gnu_cxx::stdio_filebuf<char>{ fp, mode };
 		}
+
 
 		if (auto dict = PyDict::create(); dict.is_ok()) {
 			m_attributes = dict.unwrap();
@@ -2096,7 +2227,7 @@ class FileIO : public RawIOBase
 			return Err(dict.unwrap_err());
 		}
 
-		if (auto err = setattribute(PyString::create("name").unwrap(), filename); err.is_err()) {
+		if (auto err = setattribute(PyString::create("name").unwrap(), name); err.is_err()) {
 			return Err(err.unwrap_err());
 		}
 
@@ -2118,7 +2249,7 @@ class FileIO : public RawIOBase
 			rwa = true;
 			m_created = true;
 			m_writable = true;
-			mode |= std::ios_base::out;
+			mode |= std::ios::out;
 		}
 		if (rawmode.test(Mode::READ)) {
 			if (rwa) {
@@ -2128,7 +2259,7 @@ class FileIO : public RawIOBase
 			}
 			rwa = true;
 			m_readable = true;
-			mode |= std::ios_base::in;
+			mode |= std::ios::in;
 		}
 
 		if (rawmode.test(Mode::WRITE)) {
@@ -2139,7 +2270,7 @@ class FileIO : public RawIOBase
 			}
 			rwa = true;
 			m_writable = true;
-			mode |= std::ios_base::out;
+			mode |= std::ios::out;
 		}
 
 		if (rawmode.test(Mode::APPEND)) {
@@ -2151,8 +2282,8 @@ class FileIO : public RawIOBase
 			rwa = true;
 			m_writable = true;
 			m_appending = true;
-			mode |= std::ios_base::out;
-			mode |= std::ios_base::app;
+			mode |= std::ios::out;
+			mode |= std::ios::app;
 		}
 
 		if (rawmode.test(Mode::BINARY)) { mode |= std::ios_base::binary; }
@@ -2166,8 +2297,8 @@ class FileIO : public RawIOBase
 			plus = true;
 			m_readable = true;
 			m_writable = true;
-			mode |= std::ios_base::in;
-			mode |= std::ios_base::out;
+			mode |= std::ios::in;
+			mode |= std::ios::out;
 		}
 
 		if (!rwa) {
@@ -2698,6 +2829,8 @@ class TextIOWrapper : public TextIOBase
 
 	std::optional<Bytes> m_buffer_bytes;
 	size_t m_position;
+	std::optional<Bytes> m_pending_bytes;// bytes to be written
+	size_t m_pending_bytes_count;
 
 	TextIOWrapper(PyType *type) : TextIOBase(type) {}
 
@@ -2883,6 +3016,49 @@ class TextIOWrapper : public TextIOBase
 		return Ok(result);
 	}
 
+	PyResult<size_t> writeflush()
+	{
+		if (!m_pending_bytes.has_value()) { return Ok(0); }
+		auto written =
+			m_buffer->get_method(PyString::create("write").unwrap())
+				.and_then([this](PyObject *write) {
+					return write->call(PyTuple::create(m_pending_bytes.value()).unwrap(), nullptr);
+				});
+		if (written.is_err()) { return Err(written.unwrap_err()); }
+		m_pending_bytes = {};
+		m_pending_bytes_count = 0;
+		return Ok(0);
+	}
+
+	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
+	{
+		ASSERT(!kwargs || kwargs->map().empty());
+		ASSERT(args && args->elements().size() == 1);
+		auto *text = PyObject::from(args->elements()[0]).unwrap();
+		ASSERT(as<PyString>(text));
+		const auto text_len = as<PyString>(text)->size();
+		// TODO: Should use encoder
+		m_pending_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
+		m_pending_bytes_count = m_pending_bytes->b.size();
+		auto result = writeflush();
+		while (result.is_ok()) {
+			ASSERT(m_pending_bytes_count >= result.unwrap());
+			m_pending_bytes_count -= result.unwrap();
+			if (m_pending_bytes_count == 0) { break; }
+			result = writeflush();
+		}
+		if (result.is_err()) { return Err(result.unwrap_err()); }
+
+		return PyInteger::create(text_len);
+	}
+
+	PyResult<PyObject *> flush()
+	{
+		if (auto result = writeflush(); result.is_err()) { return Err(result.unwrap_err()); }
+		return m_buffer->get_method(PyString::create("flush").unwrap())
+			.and_then([](PyObject *flush_fn) { return flush_fn->call(nullptr, nullptr); });
+	}
+
 	PyType *static_type() const override { return s_io_textiowrapper; }
 
 	static PyType *register_type(PyModule *module)
@@ -2891,9 +3067,11 @@ class TextIOWrapper : public TextIOBase
 			s_io_textiowrapper = klass<TextIOWrapper>(module, "TextIOWrapper", s_io_textiobase)
 									 .def("readline", &TextIOWrapper::readline)
 									 .def("readlines", &TextIOWrapper::readlines)
+									 .def("write", &TextIOWrapper::write)
+									 .def("flush", &TextIOWrapper::flush)
 									 .finalize();
 		}
-		module->add_symbol(PyString::create("StringIO").unwrap(), s_io_textiowrapper);
+		module->add_symbol(PyString::create("TextIOWrapper").unwrap(), s_io_textiowrapper);
 		return s_io_textiowrapper;
 	}
 
@@ -2921,6 +3099,7 @@ class TextIOWrapper : public TextIOBase
 		m_line_buffering = line_buffering;
 		m_write_through = write_through;
 		m_newline = newline.value_or("'\n");
+		m_pending_bytes_count = 0;
 
 		return Ok(1);
 	}
@@ -3042,29 +3221,26 @@ PyModule *io_module()
 
 	s_io_module->add_symbol(PyString::create("open").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"open", [](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				auto result = PyArgsParser<PyObject *, PyString *>::unpack_tuple(args,
-					kwargs,
-					"open",
-					std::integral_constant<size_t, 2>{},
-					std::integral_constant<size_t, 2>{});
-				if (result.is_err()) return Err(result.unwrap_err());
-				auto [file, mode] = result.unwrap();
+			"open", [](PyTuple *args, PyDict *kwargs) {
+				ASSERT(!kwargs || kwargs->map().empty());
+				ASSERT(args && args->elements().size() == 2);
+				auto arg0 = PyObject::from(args->elements()[0]).unwrap();
+				auto arg1 = PyObject::from(args->elements()[1]).unwrap();
 
-				return open(file, mode->value());
+				ASSERT(as<PyString>(arg1));
+				const std::string rawmode = as<PyString>(arg1)->value();
+
+				return open(arg0, rawmode);
 			}));
 
 	s_io_module->add_symbol(PyString::create("open_code").unwrap(),
 		VirtualMachine::the().heap().allocate<PyNativeFunction>(
-			"open_code", [](PyTuple *args, PyDict *kwargs) -> PyResult<PyObject *> {
-				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
-					kwargs,
-					"open_code",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
-				if (result.is_err()) return Err(result.unwrap_err());
+			"open_code", [](PyTuple *args, PyDict *kwargs) {
+				ASSERT(!kwargs || kwargs->map().empty());
+				ASSERT(args && args->elements().size() == 1);
+				auto arg0 = PyObject::from(args->elements()[0]).unwrap();
 
-				return open(std::get<0>(result.unwrap()), "rb");
+				return open(arg0, "rb");
 			}));
 
 	// C++ standard streams currently do not provide an API to get default buffer size, and C's
