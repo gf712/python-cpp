@@ -69,8 +69,8 @@ namespace {
 
 PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interpreter &interpreter)
 {
-	std::string separator = " ";
-	std::string end = "\n";
+	auto *separator = PyString::create(" ").unwrap();
+	auto *end = PyString::create("\n").unwrap();
 	// TODO: handle error case?
 	PyObject *file =
 		PyObject::from(interpreter.get_imported_module(PyString::create("sys").unwrap())
@@ -94,7 +94,7 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 				return Err(type_error(
 					"sep must be None or a string, not {}", obj.unwrap()->type()->name()));
 			}
-			separator = std::get<String>(maybe_str).s;
+			separator = PyString::create(std::get<String>(maybe_str).s).unwrap();
 		}
 		if (auto it = kwargs->map().find(end_keyword); it != kwargs->map().end()) {
 			auto maybe_str = it->second;
@@ -105,7 +105,7 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 				return Err(type_error(
 					"end must be None or a string, not {}", obj.unwrap()->type()->name()));
 			}
-			end = std::get<String>(maybe_str).s;
+			end = PyString::create(std::get<String>(maybe_str).s).unwrap();
 		}
 	}
 	auto file_write_ = file->get_method(PyString::create("write").unwrap());
@@ -119,6 +119,11 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 	auto arg_it = args->begin();
 	auto arg_it_end = args->end();
 	if (arg_it == arg_it_end) {
+		if (auto result =
+				file_write->call(PyTuple::create(PyString::create(end).unwrap()).unwrap(), nullptr);
+			result.is_err()) {
+			return result;
+		}
 		if (flush) {
 			auto file_flush_ = file->get_method(PyString::create("flush").unwrap());
 			if (file_flush_.is_err()) { return file_flush_; }
@@ -138,6 +143,10 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 			result.is_err()) {
 			return result;
 		}
+		if (auto result = file_write->call(PyTuple::create(separator).unwrap(), nullptr);
+			result.is_err()) {
+			return result;
+		}
 		std::advance(arg_it, 1);
 	}
 
@@ -151,12 +160,10 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 		return result;
 	}
 
-	if (!end.empty()) {
-		if (auto result =
-				file_write->call(PyTuple::create(PyString::create(end).unwrap()).unwrap(), nullptr);
-			result.is_err()) {
-			return result;
-		}
+	if (auto result =
+			file_write->call(PyTuple::create(PyString::create(end).unwrap()).unwrap(), nullptr);
+		result.is_err()) {
+		return result;
 	}
 	if (flush) {
 		auto file_flush_ = file->get_method(PyString::create("flush").unwrap());

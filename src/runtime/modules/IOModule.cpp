@@ -1343,25 +1343,17 @@ class BufferedWriter
 		});
 	}
 
-	PyResult<PyObject *> raw_write()
+	PyResult<PyObject *> raw_write(const char *data, size_t len)
 	{
-		std::array<char, BUFSIZ> to_write;
-
-		while (true) {
-			// very innefficient - we shouldn't be getting data from buffer, create an intermediate
-			// bytes buffer copy just to then get a view of it.
-			auto written = buffer->sgetn(to_write.data(), BUFSIZ);
-			if (written <= 0) { break; }
-			auto *raw_bytes = bit_cast<std::byte *>(to_write.data());
-			auto bytes = PyBytes::create(Bytes{ .b = { raw_bytes, raw_bytes + written } });
-			auto memobj = PyMemoryView::create(bytes.unwrap());
-			if (memobj.is_err()) { return memobj; }
-			return raw->get_method(PyString::create("write").unwrap())
-				.and_then([memobj](PyObject *write) {
-					return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
-				});
-		}
-		return Ok(py_none());
+		auto *raw_bytes = bit_cast<std::byte *>(data);
+		auto bytes = PyBytes::create(Bytes{ .b = { raw_bytes, raw_bytes + len } });
+		auto memobj = PyMemoryView::create(bytes.unwrap());
+		if (memobj.is_err()) { return memobj; }
+		return raw->get_method(PyString::create("write").unwrap())
+			.and_then([memobj](PyObject *write) {
+				return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
+			})
+			.and_then([](auto) { return Ok(py_none()); });
 	}
 
 	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
@@ -1393,24 +1385,29 @@ class BufferedWriter
 		}
 
 		// flush our internal buffer to raw
-		if (auto r = raw_write(); r.is_err()) { return r; }
+		if (auto r = flush(); r.is_err()) { return r; }
 
 		// TODO: this currently writes to internal buffer and then immediately makes a copy in
 		// write_raw. This is because streambuf doesn't tell us how much capacity it has left, so we
 		// just give it as much as we can each time
 		ssize_t remaining = buffer.len;
 		char *start = static_cast<char *>(buffer.buf->get_buffer());
-		while (remaining > written) {
-			const auto count = this->buffer->sputn(start + written, buffer.len);
+		// TODO: use a buffer that actually tells us how much we can write to it, rather than
+		// hardcode 4096
+		while (remaining > 4096) {
 			// flush our internal buffer to raw
-			if (auto r = raw_write(); r.is_err()) { return r; }
+			auto r = raw_write(start + written, remaining);
+			if (r.is_err()) { return r; }
+			ASSERT(as<PyInteger>(r.unwrap()));
+			const auto count = as<PyInteger>(r.unwrap())->as_size_t();
 			written += count;
 			remaining -= count;
 		}
 
-		// now we are done copying everything from buffer to our internal buffer
-		// and we also have written it all out to raw (since we don't look up internal buffer
-		// capacity before write)
+		// put the rest in our buffer. Assumes that we can write 4096 bytes
+		const auto count = this->buffer->sputn(start + written, remaining);
+		ASSERT(remaining - count == 0);
+
 		return PyInteger::create(written);
 	}
 
@@ -1449,11 +1446,27 @@ template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
 
 PyResult<PyObject *> BufferedWriter::flush()
 {
-	if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
-	if (auto err = Buffered<BufferedWriter>::check_closed(""); err.is_err()) {
-		return Err(err.unwrap_err());
+	if (!writable_) { return Ok(py_none()); }
+	std::array<char, BUFSIZ> to_write;
+
+	while (true) {
+		// very innefficient - we shouldn't be getting data from buffer, create an intermediate
+		// bytes buffer copy just to then get a view of it.
+		auto written = buffer->sgetn(to_write.data(), BUFSIZ);
+		if (written <= 0) { break; }
+		auto *raw_bytes = bit_cast<std::byte *>(to_write.data());
+		auto bytes = PyBytes::create(Bytes{ .b = { raw_bytes, raw_bytes + written } });
+		auto memobj = PyMemoryView::create(bytes.unwrap());
+		if (memobj.is_err()) { return memobj; }
+		if (auto r = raw->get_method(PyString::create("write").unwrap())
+				.and_then([memobj](PyObject *write) {
+					return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
+				});
+			r.is_err()) {
+			return r;
+		}
 	}
-	return raw_write().and_then([](auto) { return Ok(py_none()); });
+	return Ok(py_none());
 }
 
 template<> BufferedReader *as(PyObject *obj)
@@ -2166,7 +2179,7 @@ class FileIO : public RawIOBase
 							  .def("readall", &FileIO::readall)
 							  .def("write", &FileIO::write)
 							  .def("close", &FileIO::close)
-							  .def("close", &FileIO::flush)
+							  .def("flush", &FileIO::flush)
 							  .finalize();
 		}
 		module->add_symbol(PyString::create("FileIO").unwrap(), s_io_fileio);
