@@ -1,6 +1,9 @@
 #include "GarbageCollector.hpp"
 #include "Heap_test.hpp"
 
+#include <cstdint>
+#include <cstring>
+
 namespace {
 
 static int64_t g_counter = 0;
@@ -49,6 +52,23 @@ static_assert(false, "compiler not supported");
 	ASSERT_EQ(ptr4->foo, 4);
 	ASSERT_EQ(ptr5->foo, 5);
 }
+
+// Overwrites the stack region just vacated by a popped frame. Unoptimized
+// builds give every temporary its own slot and the collector's call chain
+// does not reliably overwrite all of them before the conservative scan runs,
+// so a stale copy of a dead GC pointer can be picked up as a root. Zeroing
+// the dead region makes collection of unreachable objects deterministic.
+// no_stack_protector: the scrub zeroes everything between `buffer` and the
+// frame header (alignment padding can hold a word of residue), which would
+// destroy a stack-protector canary placed in that range.
+__attribute__((noinline, no_stack_protector)) void scrub_dead_stack()
+{
+	uint8_t buffer[16 * 1024];
+	auto *frame_top = static_cast<uint8_t *>(__builtin_frame_address(0));
+	std::memset(buffer, 0, static_cast<size_t>(frame_top - buffer));
+	// keep the memset from being eliminated as a dead store
+	asm volatile("" ::"r"(buffer) : "memory");
+}
 }// namespace
 
 TEST_F(TestHeap, GarbageCollectorDoesNotDeallocateGCPointersOnTheStack)
@@ -74,6 +94,7 @@ TEST_F(TestHeap, GarbageCollectorDeallocatesGCPointersWhenStackFrameIsPopped)
 
 	new_stack_frame_function(*m_heap);
 
+	scrub_dead_stack();
 	m_heap->collect_garbage();
 
 	ASSERT_EQ(g_counter, 5);
@@ -122,6 +143,7 @@ TEST_F(TestHeap, MutuallyReferencingObjectsAreCollected)
 
 	allocate_cycle_in_popped_frame(*m_heap, counter);
 
+	scrub_dead_stack();
 	m_heap->collect_garbage();
 
 	ASSERT_EQ(counter, 2);
