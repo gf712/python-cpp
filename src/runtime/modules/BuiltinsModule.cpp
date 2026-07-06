@@ -71,22 +71,33 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 {
 	auto *separator = PyString::create(" ").unwrap();
 	auto *end = PyString::create("\n").unwrap();
-	// TODO: handle error case?
-	PyObject *file =
-		PyObject::from(interpreter.get_imported_module(PyString::create("sys").unwrap())
-						   ->symbol_table()
-						   ->map()
-						   .at(String{ "stdout" }))
-			.unwrap();
-	// sys.stdout may be None when FILE* stdout isn't connected
-	if (!file || file == py_none()) { return Ok(py_none()); }
+	// an explicit file argument wins; file=None (or no file argument) falls
+	// back to sys.stdout
+	PyObject *file = nullptr;
+	static const Value file_keyword = String{ "file" };
+	if (kwargs) {
+		if (auto it = kwargs->map().find(file_keyword); it != kwargs->map().end()) {
+			auto file_ = PyObject::from(it->second);
+			if (file_.is_err()) { return file_; }
+			if (file_.unwrap() != py_none()) { file = file_.unwrap(); }
+		}
+	}
+	if (!file) {
+		// TODO: handle error case?
+		file = PyObject::from(interpreter.get_imported_module(PyString::create("sys").unwrap())
+								  ->symbol_table()
+								  ->map()
+								  .at(String{ "stdout" }))
+				   .unwrap();
+		// sys.stdout may be None when FILE* stdout isn't connected
+		if (!file || file == py_none()) { return Ok(py_none()); }
+	}
 	// TODO: flush should be false, but for now we keep it as true, since there is no flush at
 	// interpreter shutdown
 	bool flush = true;
 	if (kwargs) {
 		static const Value separator_keyword = String{ "sep" };
 		static const Value end_keyword = String{ "end" };
-		static const Value file_keyword = String{ "file" };
 		static const Value flush_keyword = String{ "flush" };
 
 		if (auto it = kwargs->map().find(separator_keyword); it != kwargs->map().end()) {
@@ -110,11 +121,6 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 					"end must be None or a string, not {}", obj.unwrap()->type()->name()));
 			}
 			end = PyString::create(std::get<String>(maybe_str).s).unwrap();
-		}
-		if (auto it = kwargs->map().find(file_keyword); it != kwargs->map().end()) {
-			auto file_ = PyObject::from(it->second);
-			if (file_.is_err()) { return file_; }
-			file = file_.unwrap();
 		}
 		if (auto it = kwargs->map().find(flush_keyword); it != kwargs->map().end()) {
 			auto flush_ = PyObject::from(it->second);

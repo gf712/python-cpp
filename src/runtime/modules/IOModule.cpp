@@ -990,12 +990,17 @@ struct Buffered
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 
-		if (n < -1) { return Err(value_error("read length must be non-negative or -1")); }
+		if (n < 0) {
+			// TODO: determine actual buffer size
+			n = 4096;
+		}
 
 		if (is_closed()) { return Err(value_error("read of closed file")); }
 
+		if (n == 0) { return PyBytes::create(); }
+
 		const auto have = readahead();
-		if (have > 0) { return static_cast<T *>(this)->readfast(n); }
+		if (have > 0) { return static_cast<T *>(this)->readfast(std::min<int64_t>(n, have)); }
 		Bytes b;
 		b.b.resize(n);
 		auto result = static_cast<T *>(this)->raw_read(std::span{ b.b.begin(), b.b.end() });
@@ -1150,8 +1155,8 @@ class BufferedReader
 		if (static_cast<int64_t>(n) <= current_size) {
 			ASSERT(buffer);
 			std::vector<std::byte> data;
-			data.resize(current_size);
-			buffer->sgetn(::bit_cast<char *>(data.begin().base()), current_size);
+			data.resize(n);
+			buffer->sgetn(::bit_cast<char *>(data.begin().base()), n);
 			return PyBytes::create(Bytes{ std::move(data) });
 		}
 		return Ok(py_none());
@@ -2207,8 +2212,6 @@ class FileIO : public RawIOBase
 	{
 		if (!m_filebuffer.is_open()) { return Err(value_error("I/O operation on closed file")); }
 
-		m_filebuffer.pubseekpos(0, std::ios::in);
-
 		// TODO: if (m_filestream.fail()) { TODO(); }
 		const auto initial_position = m_filebuffer.pubseekoff(0, std::ios::cur, std::ios::in);
 		if (initial_position == -1) { TODO(); }
@@ -2216,7 +2219,7 @@ class FileIO : public RawIOBase
 		const auto end_position = m_filebuffer.pubseekoff(0, std::ios::end, std::ios::in);
 		if (end_position == -1) { TODO(); }
 
-		m_filebuffer.pubseekpos(0, std::ios::in);
+		m_filebuffer.pubseekpos(initial_position, std::ios::in);
 		// TODO: if (m_filestream.fail()) { TODO(); }
 
 		const auto file_size = end_position - initial_position;
@@ -3118,45 +3121,61 @@ class TextIOWrapper : public TextIOBase
 			std::numeric_limits<size_t>::max());
 		if (result.is_err()) { return Err(result.unwrap_err()); }
 		auto [limit] = result.unwrap();
+		return readline_impl(limit);
+	}
 
+	PyResult<PyObject *> readline_impl(size_t limit)
+	{
 		if (auto result = writeflush(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		// Lines in the input can end in \'\\n\', \'\\r\', or \'\\r\\n\'
 		auto is_line_end = [](std::string_view remaining) {
-			if (remaining.starts_with("\n") || remaining.starts_with("\r")) {
-				return 1;
-			} else if (remaining.starts_with("\r\n")) {
-				return 2;
-			}
+			if (remaining.starts_with("\r\n")) { return 2; }
+			if (remaining.starts_with("\n") || remaining.starts_with("\r")) { return 1; }
 			return 0;
 		};
-		while (!m_buffer_bytes.has_value() || m_buffer_bytes->b.empty()) {
-			auto chunk = read_chunk(0);
-			if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
-			if (chunk.unwrap() == 0) { break; }
-		}
-
-		std::string_view remaining{ bit_cast<const char *>(m_buffer_bytes->b.data()) + m_position,
-			m_buffer_bytes->b.size() - m_position };
-
-		// TODO: use utf8 codepoints
-		const char *start = remaining.data();
-		size_t len = 0;
-		limit = std::min(limit, remaining.size());
-		for (; len < limit; ++len) {
-			if (auto chars = is_line_end(remaining)) {
-				// TODO: what if len becomes greater than limit due to \r\n?
-				len += chars;
-				break;
+		std::string line;
+		bool found_nl = false;
+		while (!found_nl && line.size() < limit) {
+			if (!m_buffer_bytes.has_value() || m_buffer_bytes->b.empty()) {
+				auto chunk = read_chunk(0);
+				if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
+				if (!chunk.unwrap()) { break; }
 			}
-			remaining = remaining.substr(1);
-		}
-		std::string line{ start, start + len };
-		std::rotate(
-			m_buffer_bytes->b.begin(), m_buffer_bytes->b.begin() + len, m_buffer_bytes->b.end());
-		m_position = 0;
-		m_buffer_bytes->b.resize(m_buffer_bytes->b.size() - line.size());
 
+			// a trailing '\r' may be the first byte of a "\r\n" that straddles the
+			// chunk boundary; read ahead so is_line_end can see the full terminator
+			while (m_buffer_bytes->b.back() == std::byte{ '\r' }) {
+				auto chunk = read_chunk(0);
+				if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
+				if (!chunk.unwrap()) { break; }
+			}
+
+			std::string_view remaining{ bit_cast<const char *>(m_buffer_bytes->b.data())
+											+ m_position,
+				m_buffer_bytes->b.size() - m_position };
+
+			// TODO: use utf8 codepoints
+			const char *start = remaining.data();
+			size_t len = 0;
+			const size_t budget = limit - line.size();
+			const size_t scan_limit = std::min(budget, remaining.size());
+			for (; len < scan_limit; ++len) {
+				if (auto chars = is_line_end(remaining)) {
+					// the terminator may extend past the caller's limit (e.g. a
+					// "\r\n" straddling it); consume only up to the limit and
+					// leave the rest buffered for the next call
+					len = std::min(len + chars, budget);
+					found_nl = true;
+					break;
+				}
+				remaining = remaining.substr(1);
+			}
+			line.insert(line.end(), start, start + len);
+			m_buffer_bytes->b.erase(
+				m_buffer_bytes->b.begin(), m_buffer_bytes->b.begin() + m_position + len);
+			m_position = 0;
+		}
 		return PyString::create(std::move(line));
 	}
 
@@ -3167,7 +3186,7 @@ class TextIOWrapper : public TextIOBase
 		if (result_.is_err()) { return result_; }
 		auto *result = result_.unwrap();
 		while (m_position < m_buffer_bytes->b.size()) {
-			auto line = readline(nullptr, nullptr);
+			auto line = readline_impl(std::numeric_limits<size_t>::max());
 			if (line.is_err()) { return line; }
 			if (auto appended = result->append(line.unwrap()); appended.is_err()) {
 				return Err(appended.unwrap_err());
