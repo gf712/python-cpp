@@ -1,6 +1,9 @@
 #include "GarbageCollector.hpp"
 #include "Heap_test.hpp"
 
+#include <cstdint>
+#include <cstring>
+
 namespace {
 
 static int64_t g_counter = 0;
@@ -49,6 +52,35 @@ static_assert(false, "compiler not supported");
 	ASSERT_EQ(ptr4->foo, 4);
 	ASSERT_EQ(ptr5->foo, 5);
 }
+
+// Overwrites the stack region just vacated by a popped frame. Unoptimized
+// builds give every temporary its own slot and the collector's call chain
+// does not reliably overwrite all of them before the conservative scan runs,
+// so a stale copy of a dead GC pointer can be picked up as a root. Zeroing
+// the dead region makes collection of unreachable objects deterministic.
+// The scrub stays within `buffer`, which cannot reach the last few words
+// below this function's frame header (alignment padding and compiler-placed
+// slots sit there); callers must run the allocating helper through
+// call_in_padded_frame so its residue lands below that blind spot.
+__attribute__((noinline)) void scrub_dead_stack()
+{
+	uint8_t buffer[16 * 1024];
+	std::memset(buffer, 0, sizeof(buffer));
+	// keep the memset from being eliminated as a dead store
+	asm volatile("" ::"r"(buffer) : "memory");
+}
+
+// Runs fn with its stack frame pushed at least sizeof(pad) bytes deeper than
+// the caller's, so every slot fn writes lies inside the span that
+// scrub_dead_stack can zero without stepping past its buffer's bounds.
+template<typename Fn> __attribute__((noinline)) void call_in_padded_frame(Fn &&fn)
+{
+	volatile uint8_t pad[256] = {};
+	fn();
+	// volatile read keeps pad live across the call, preventing a tail call
+	// that would collapse this frame into fn's
+	(void)pad[0];
+}
 }// namespace
 
 TEST_F(TestHeap, GarbageCollectorDoesNotDeallocateGCPointersOnTheStack)
@@ -72,8 +104,9 @@ TEST_F(TestHeap, GarbageCollectorDeallocatesGCPointersWhenStackFrameIsPopped)
 	ASSERT_EQ(g_counter, 0);
 	m_heap->collect_garbage();
 
-	new_stack_frame_function(*m_heap);
+	call_in_padded_frame([this] { new_stack_frame_function(*m_heap); });
 
+	scrub_dead_stack();
 	m_heap->collect_garbage();
 
 	ASSERT_EQ(g_counter, 5);
@@ -120,8 +153,9 @@ TEST_F(TestHeap, MutuallyReferencingObjectsAreCollected)
 	int64_t counter = 0;
 	m_heap->garbage_collector().set_frequency(1);
 
-	allocate_cycle_in_popped_frame(*m_heap, counter);
+	call_in_padded_frame([&] { allocate_cycle_in_popped_frame(*m_heap, counter); });
 
+	scrub_dead_stack();
 	m_heap->collect_garbage();
 
 	ASSERT_EQ(counter, 2);
