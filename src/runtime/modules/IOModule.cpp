@@ -22,8 +22,10 @@
 #include "runtime/types/builtin.hpp"
 #include "utilities.hpp"
 #include "vm/VM.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <optional>
 #include <variant>
 
@@ -557,7 +559,7 @@ class RawIOBase : public IOBase
 			});
 	}
 
-	PyResult<PyObject *> readinto() const
+	PyResult<PyObject *> readinto(PyObject *) const
 	{
 		return Err(not_implemented_error("_RawIOBase.readinto"));
 	}
@@ -984,6 +986,24 @@ struct Buffered
 		}
 	}
 
+	PyResult<PyObject *> read1(int64_t n)
+	{
+		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+
+		if (n < -1) { return Err(value_error("read length must be non-negative or -1")); }
+
+		if (is_closed()) { return Err(value_error("read of closed file")); }
+
+		const auto have = readahead();
+		if (have > 0) { return static_cast<T *>(this)->readfast(n); }
+		Bytes b;
+		b.b.resize(n);
+		auto result = static_cast<T *>(this)->raw_read(std::span{ b.b.begin(), b.b.end() });
+		if (result.is_err()) { return Err(result.unwrap_err()); }
+		b.b.resize(result.unwrap());
+		return PyBytes::create(std::move(b));
+	}
+
 	void visit_graph_buffered(Cell::Visitor &visitor)
 	{
 		if (raw) { visitor.visit(*raw); }
@@ -1137,9 +1157,62 @@ class BufferedReader
 		return Ok(py_none());
 	}
 
-	PyResult<PyObject *> readgeneric(size_t)
+	PyResult<size_t> raw_read(std::span<std::byte> data)
 	{
-		return Err(not_implemented_error("BufferedReader.readgeneric"));
+		PyBuffer buffer{
+			.buf = std::make_unique<NonOwningStorage<std::byte>>(data.data()),
+			.obj = nullptr,
+			.len = static_cast<int64_t>(data.size()),
+			.itemsize = 1,
+			.readonly = false,
+			.ndim = 1,
+			.format = "B",
+		};
+		auto memobj = PyMemoryView::create(std::move(buffer)).unwrap();
+		return raw->get_method(PyString::create("readinto").unwrap())
+			.and_then([memobj](PyObject *read_into) {
+				return read_into->call(PyTuple::create(memobj).unwrap(), nullptr);
+			})
+			.and_then([](PyObject *n) -> PyResult<size_t> {
+				if (!as<PyInteger>(n)) {
+					return Err(value_error("expected 'int' got '{}'", n->type()->name()));
+				}
+				return Ok(as<PyInteger>(n)->as_size_t());
+			});
+	}
+
+	PyResult<PyObject *> readgeneric(size_t n)
+	{
+		if (auto result = readfast(n); result.is_ok() && result.unwrap() != py_none()) {
+			return result;
+		}
+		Bytes bytes;
+		bytes.b.resize(n);
+		const auto current_size = readahead();
+		auto remaining = n;
+		size_t written = 0;
+		if (current_size > 0) {
+			buffer->sgetn(bit_cast<char *>(bytes.b.data()), current_size);
+			remaining -= current_size;
+			written += current_size;
+		}
+
+		// TODO: read and writable buffer?
+		// if (auto result = flush_and_rewind(); result.is_err()) { return result; }
+
+		while (remaining > 0) {
+			std::span<std::byte> view{ bytes.b.data() + written, remaining };
+			if (auto result = raw_read(view); result.is_err()) {
+				return Err(result.unwrap_err());
+			} else {
+				if (result.unwrap() == 0) { break; }
+				ASSERT(result.unwrap() <= remaining);
+				remaining -= result.unwrap();
+				written += result.unwrap();
+			}
+		}
+		bytes.b.resize(written);
+		return PyBytes::create(std::move(bytes));
 	}
 
 	PyResult<PyObject *> __repr__() const
@@ -1194,9 +1267,9 @@ class BufferedReader
 							ASSERT(!kwargs || kwargs->map().empty());
 							int64_t n = -1;
 							if (args && args->elements().size() > 1) {
-								return Err(value_error(
-									"BaseIO.readlines expected at most one argument (got {})",
-									args->elements().size()));
+								return Err(
+									value_error("read expected at most one argument (got {})",
+										args->elements().size()));
 							} else if (args && args->elements().size() == 1) {
 								auto arg0 = PyObject::from(args->elements()[0]);
 								if (arg0.is_err()) return arg0;
@@ -1211,9 +1284,31 @@ class BufferedReader
 							}
 							return static_cast<Buffered<BufferedReader> *>(self)->read(n);
 						})
+					.def("read1",
+						[](BufferedReader *self,
+							PyTuple *args,
+							PyDict *kwargs) -> PyResult<PyObject *> {
+							ASSERT(!kwargs || kwargs->map().empty());
+							int64_t n = -1;
+							if (args && args->elements().size() > 1) {
+								return Err(value_error("read1 at most one argument (got {})",
+									args->elements().size()));
+							} else if (args && args->elements().size() == 1) {
+								auto arg0 = PyObject::from(args->elements()[0]);
+								if (arg0.is_err()) return arg0;
+								if (!as<PyInteger>(arg0.unwrap()) && arg0.unwrap() != py_none()) {
+									return Err(
+										type_error("argument should be integer or None, not '{}'",
+											arg0.unwrap()->type()->name()));
+								}
+								if (arg0.unwrap() != py_none()) {
+									n = as<PyInteger>(arg0.unwrap())->as_i64();
+								}
+							}
+							return static_cast<Buffered<BufferedReader> *>(self)->read1(n);
+						})
 					.def("readall", &BufferedReader::readall)
 					// .def("peek", &BufferedReader::peek)
-					// .def("read1", &BufferedReader::read1)
 					// .def("readinto", &BufferedReader::readinto)
 					// .def("readinto1", &BufferedReader::readinto1)
 					// .def("readline", &BufferedReader::readline)
@@ -2172,6 +2267,27 @@ class FileIO : public RawIOBase
 		return PyInteger::create(written);
 	}
 
+	PyResult<PyObject *> readinto(PyObject *bytes)
+	{
+		PyBuffer buffer;
+		if (auto result = bytes->get_buffer(buffer, 1); result.is_err()) {
+			return Err(result.unwrap_err());
+		}
+		if (!buffer.is_ccontiguous()) {
+			return Err(type_error(
+				"readinto() argument must be contiguous buffer, not {}", bytes->type()->name()));
+		}
+		auto *data = static_cast<char *>(buffer.buf->get_buffer());
+		// prime the buffer
+		m_filebuffer.sgetc();
+		const auto to_read = std::min(buffer.len, m_filebuffer.in_avail());
+		if (to_read > 0) {
+			const auto read = m_filebuffer.sgetn(data, to_read);
+			return PyInteger::create(read);
+		}
+		return PyInteger::create(0);
+	}
+
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_fileio) {
@@ -2180,6 +2296,7 @@ class FileIO : public RawIOBase
 							  .def("write", &FileIO::write)
 							  .def("close", &FileIO::close)
 							  .def("flush", &FileIO::flush)
+							  .def("readinto", &FileIO::readinto)
 							  .finalize();
 		}
 		module->add_symbol(PyString::create("FileIO").unwrap(), s_io_fileio);
@@ -2828,9 +2945,11 @@ class TextIOWrapper : public TextIOBase
 	bool m_write_through;
 
 	std::optional<Bytes> m_buffer_bytes;
-	size_t m_position;
+	size_t m_position{ 0 };
 	std::optional<Bytes> m_pending_bytes;// bytes to be written
-	size_t m_pending_bytes_count;
+	size_t m_pending_bytes_count{ 0 };
+
+	size_t m_chunk_size{ 8192 };
 
 	TextIOWrapper(PyType *type) : TextIOBase(type) {}
 
@@ -2963,12 +3082,44 @@ class TextIOWrapper : public TextIOBase
 			write_through == py_true());
 	}
 
+	PyResult<bool> read_chunk(size_t size_hint)
+	{
+		// TODO: handle decoding
+		const auto chunk_size = std::max(size_hint, m_chunk_size);
+		auto input_chunk =
+			this->m_buffer->get_method(PyString::create("read1").unwrap())
+				.and_then([chunk_size](auto *read) {
+					return read->call(PyTuple::create(Number{ chunk_size }).unwrap(), nullptr);
+				});
+		if (input_chunk.is_err()) { return Err(input_chunk.unwrap_err()); }
+		PyBuffer out;
+		if (auto result = input_chunk.unwrap()->get_buffer(out, 0); result.is_err()) {
+			return Err(result.unwrap_err());
+		}
+
+		if (out.len == 0) { return Ok(false); }
+
+		auto *chunk_bytes = static_cast<std::byte *>(out.buf->get_buffer());
+		if (m_buffer_bytes.has_value()) {
+			m_buffer_bytes->b.insert(m_buffer_bytes->b.end(), chunk_bytes, chunk_bytes + out.len);
+		} else {
+			m_buffer_bytes = Bytes{ .b = { chunk_bytes, chunk_bytes + out.len } };
+		}
+		return Ok(true);
+	}
+
 	PyResult<PyObject *> readline(PyTuple *args, PyDict *kwargs)
 	{
-		ASSERT(!args || args->size() == 0);
-		ASSERT(!kwargs || kwargs->map().empty());
+		auto result = PyArgsParser<size_t>::unpack_tuple(args,
+			kwargs,
+			"readline",
+			std::integral_constant<size_t, 0>{},
+			std::integral_constant<size_t, 1>{},
+			std::numeric_limits<size_t>::max());
+		if (result.is_err()) { return Err(result.unwrap_err()); }
+		auto [limit] = result.unwrap();
 
-		if (auto err = setup_buffer(); err.is_err()) { return Err(err.unwrap_err()); }
+		if (auto result = writeflush(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		// Lines in the input can end in \'\\n\', \'\\r\', or \'\\r\\n\'
 		auto is_line_end = [](std::string_view remaining) {
@@ -2979,22 +3130,32 @@ class TextIOWrapper : public TextIOBase
 			}
 			return 0;
 		};
+		while (!m_buffer_bytes.has_value() || m_buffer_bytes->b.empty()) {
+			auto chunk = read_chunk(0);
+			if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
+			if (chunk.unwrap() == 0) { break; }
+		}
 
 		std::string_view remaining{ bit_cast<const char *>(m_buffer_bytes->b.data()) + m_position,
 			m_buffer_bytes->b.size() - m_position };
 
 		// TODO: use utf8 codepoints
-		std::string line;
-		while (!remaining.empty()) {
+		const char *start = remaining.data();
+		size_t len = 0;
+		limit = std::min(limit, remaining.size());
+		for (; len < limit; ++len) {
 			if (auto chars = is_line_end(remaining)) {
-				m_position += chars;
-				line.insert(line.end(), remaining.begin(), remaining.begin() + chars);
-				return PyString::create(line);
+				// TODO: what if len becomes greater than limit due to \r\n?
+				len += chars;
+				break;
 			}
-			line.push_back(remaining[0]);
 			remaining = remaining.substr(1);
-			m_position++;
 		}
+		std::string line{ start, start + len };
+		std::rotate(
+			m_buffer_bytes->b.begin(), m_buffer_bytes->b.begin() + len, m_buffer_bytes->b.end());
+		m_position = 0;
+		m_buffer_bytes->b.resize(m_buffer_bytes->b.size() - line.size());
 
 		return PyString::create(std::move(line));
 	}
@@ -3029,6 +3190,7 @@ class TextIOWrapper : public TextIOBase
 		m_pending_bytes_count = 0;
 		return Ok(0);
 	}
+
 
 	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
 	{

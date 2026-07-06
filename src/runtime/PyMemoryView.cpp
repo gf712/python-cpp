@@ -246,6 +246,13 @@ PyResult<PyObject *> PyMemoryView::create(PyObject *object)
 		type_error("memoryview: a bytes-like object is required, not {}", object->type()->name()));
 }
 
+PyResult<PyObject *> PyMemoryView::create(PyBuffer buffer)
+{
+	auto obj = VirtualMachine::the().heap().allocate<PyMemoryView>(std::move(buffer));
+	if (!obj) { return Err(memory_error(sizeof(PyMemoryView))); }
+	return Ok(obj);
+}
+
 PyResult<PyObject *> PyMemoryView::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
