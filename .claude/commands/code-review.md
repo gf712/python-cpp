@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment
+allowed-tools: Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh api repos/gf712/python-cpp/pulls/:*), mcp__github_inline_comment__create_inline_comment
 description: Code review a pull request, posting inline comments on the relevant lines
 ---
 
@@ -13,19 +13,22 @@ To do this, follow these steps precisely:
    - The pull request is closed
    - The pull request is a draft
    - The pull request does not need code review (e.g. automated PR, trivial change that is obviously correct)
-   - You have already submitted a code review on this pull request
 
    If any condition is true, stop and do not proceed.
 
+   A review submitted on an earlier run does NOT stop the process: every push re-triggers this command and the new head must be reviewed again. Step 2 collects the earlier findings so they are not posted twice.
+
 Note: Still review Claude generated PR's.
 
-2. Launch a haiku agent to return a list of file paths (not their contents) for all relevant CLAUDE.md files including:
+2. Launch a haiku agent to list the inline review comments already posted on this pull request by claude[bot]. It must use exactly this command (only this URL form is permitted, with no leading slash): `gh api repos/gf712/python-cpp/pulls/{number}/comments`. For each comment, return the file path, line, and a one-sentence summary of the issue. Return an empty list if there are none. This list is used in step 7 to filter out findings that were already reported by a previous run.
+
+3. Launch a haiku agent to return a list of file paths (not their contents) for all relevant CLAUDE.md files including:
    - The root CLAUDE.md file, if it exists
    - Any CLAUDE.md files in directories containing files modified by the pull request
 
-3. Launch a sonnet agent to view the pull request and return a summary of the changes
+4. Launch a sonnet agent to view the pull request and return a summary of the changes
 
-4. Launch 4 agents in parallel to independently review the changes. Each agent should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "CLAUDE.md adherence", "bug"). The agents should do the following:
+5. Launch 4 agents in parallel to independently review the changes. Each agent should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "CLAUDE.md adherence", "bug"). The agents should do the following:
 
    Agents 1 + 2: CLAUDE.md compliance sonnet agents
    Audit changes for CLAUDE.md compliance in parallel. Note: When evaluating CLAUDE.md compliance for a file, you should only consider CLAUDE.md files that share a file path with the file or parents.
@@ -50,11 +53,11 @@ Note: Still review Claude generated PR's.
 
    In addition to the above, each subagent should be told the PR title and description. This will help provide context regarding the author's intent.
 
-5. For each issue found in the previous step by agents 3 and 4, launch parallel subagents to validate the issue. These subagents should get the PR title and description along with a description of the issue. The agent's job is to review the issue to validate that the stated issue is truly an issue with high confidence. For example, if an issue such as "variable is not defined" was flagged, the subagent's job would be to validate that is actually true in the code. Another example would be CLAUDE.md issues. The agent should validate that the CLAUDE.md rule that was violated is scoped for this file and is actually violated. Use Opus subagents for bugs and logic issues, and sonnet agents for CLAUDE.md violations.
+6. For each issue found in the previous step by agents 3 and 4, launch parallel subagents to validate the issue. These subagents should get the PR title and description along with a description of the issue. The agent's job is to review the issue to validate that the stated issue is truly an issue with high confidence. For example, if an issue such as "variable is not defined" was flagged, the subagent's job would be to validate that is actually true in the code. Another example would be CLAUDE.md issues. The agent should validate that the CLAUDE.md rule that was violated is scoped for this file and is actually violated. Use Opus subagents for bugs and logic issues, and sonnet agents for CLAUDE.md violations.
 
-6. Filter out any issues that were not validated in step 5. This step will give us our list of high signal issues for our review.
+7. Filter out any issues that were not validated in step 6. Then drop every issue that is already covered by an earlier claude[bot] comment from step 2 — the same underlying defect counts as covered even if the line numbers have shifted since the comment was posted. What remains is the list of new high signal issues for this run.
 
-7. Finally, post the review on the pull request as inline comments, one per validated issue.
+8. Finally, post the review on the pull request as inline comments, one per new issue from step 7.
    For each issue, use the `mcp__github_inline_comment__create_inline_comment` tool to attach a comment to the exact file and line(s) where the issue occurs. Pass `confirmed: true`.
    When writing each inline comment, follow these guidelines:
    a. Keep your output brief
@@ -63,7 +66,7 @@ Note: Still review Claude generated PR's.
    d. When citing CLAUDE.md violations, you MUST quote the exact text from CLAUDE.md that is being violated (e.g., CLAUDE.md says: "Use snake_case for variable names")
    e. Only post GitHub comments — do not submit the review text as a chat/message response
 
-Use this list when evaluating issues in Steps 4 and 5 (these are false positives, do NOT flag):
+Use this list when evaluating issues in Steps 5 and 6 (these are false positives, do NOT flag):
 
 - Pre-existing issues
 - Something that appears to be a bug but is actually correct
@@ -89,22 +92,22 @@ Notes:
 
 ---
 
-- After posting the inline comments, post one brief summary comment via `gh pr comment` using the following format precisely (assuming for this example that you found 3 issues):
+- After posting the inline comments, post one brief summary comment via `gh pr comment` using the following format precisely (assuming for this example that this run found 3 new issues; count only the comments posted in this run):
 
 ---
 
 ## Code review
 
-Found 3 issues — see the inline comments.
+Found 3 new issues — see the inline comments.
 
 ---
 
-- Or, if you found no issues, post a single summary comment via `gh pr comment` and do not post any inline comments:
+- Or, if this run posted no inline comments, post a single summary comment via `gh pr comment` and do not post any inline comments:
 
 ---
 
 ## Auto code review
 
-No issues found. Checked for bugs and CLAUDE.md compliance.
+No new issues found. Checked for bugs and CLAUDE.md compliance.
 
 ---
