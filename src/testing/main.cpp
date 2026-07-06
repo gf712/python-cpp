@@ -5,6 +5,22 @@
 
 #include <cxxopts.hpp>
 
+#if defined(__SANITIZE_ADDRESS__)
+#define PYTHON_ASAN_ENABLED
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define PYTHON_ASAN_ENABLED
+#endif
+#endif
+
+#ifdef PYTHON_ASAN_ENABLED
+// The garbage collector finds roots by conservatively scanning the machine
+// stack. ASan's use-after-return detection relocates locals to a heap-backed
+// fake stack that the scan never sees, so live GC pointers go unnoticed and
+// stale ones linger, breaking the collector's reachability tests.
+extern "C" const char *__asan_default_options() { return "detect_stack_use_after_return=0"; }
+#endif
+
 class PythonVMEnvironment : public ::testing::Environment
 {
 	char **m_argv;
