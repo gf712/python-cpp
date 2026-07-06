@@ -5,6 +5,8 @@ description: Code review a pull request, posting inline comments on the relevant
 
 Provide a code review for the given pull request.
 
+IMPORTANT: This command runs in a headless CI job. Launch every agent synchronously (in the foreground, `run_in_background: false`) and wait for its result before moving to the next step. Never end your turn while agents are still running: if the turn ends with agents pending, the job terminates immediately and the review is silently lost.
+
 To do this, follow these steps precisely:
 
 1. Launch a haiku agent to check if any of the following are true:
