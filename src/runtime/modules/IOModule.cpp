@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <limits>
 #include <optional>
+#include <unistd.h>
 #include <variant>
 
 #if defined(__GLIBCXX__) || defined(__GLIBCPP__)
@@ -898,7 +899,7 @@ struct Buffered
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("seekable").unwrap())
+			->raw->get_method(PyString::create("seekable").unwrap())
 			.and_then([](PyObject *seekable) -> PyResult<PyObject *> {
 				return seekable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -908,7 +909,7 @@ struct Buffered
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("writable").unwrap())
+			->raw->get_method(PyString::create("writable").unwrap())
 			.and_then([](PyObject *writable) -> PyResult<PyObject *> {
 				return writable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -928,7 +929,7 @@ struct Buffered
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("fileno").unwrap())
+			->raw->get_method(PyString::create("fileno").unwrap())
 			.and_then([](PyObject *fileno) -> PyResult<PyObject *> {
 				return fileno->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -938,9 +939,9 @@ struct Buffered
 	{
 		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("isatty").unwrap())
+			->raw->get_method(PyString::create("isatty").unwrap())
 			.and_then([](PyObject *isatty) -> PyResult<PyObject *> {
-				return isatty->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
+				return isatty->call(nullptr, nullptr);
 			});
 	}
 
@@ -1521,6 +1522,7 @@ class BufferedWriter
 				klass<BufferedWriter>(module, "BufferedWriter", s_io_buffered_io_base)
 					.def("write", &BufferedWriter::write)
 					.def("flush", &BufferedWriter::flush)
+					.def("isatty", &Buffered<BufferedWriter>::isatty)
 					.finalize();
 		}
 		module->add_symbol(PyString::create("BufferedWriter").unwrap(), s_io_buffered_writer);
@@ -2293,6 +2295,11 @@ class FileIO : public RawIOBase
 		return PyInteger::create(0);
 	}
 
+	PyResult<PyObject *> isatty() const
+	{
+		return Ok(::isatty(m_file_descriptor) == 1 ? py_true() : py_false());
+	}
+
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_fileio) {
@@ -2302,6 +2309,7 @@ class FileIO : public RawIOBase
 							  .def("close", &FileIO::close)
 							  .def("flush", &FileIO::flush)
 							  .def("readinto", &FileIO::readinto)
+							  .def("isatty", &FileIO::isatty)
 							  .finalize();
 		}
 		module->add_symbol(PyString::create("FileIO").unwrap(), s_io_fileio);
@@ -3266,6 +3274,13 @@ class TextIOWrapper : public TextIOBase
 			.and_then([](PyObject *flush_fn) { return flush_fn->call(nullptr, nullptr); });
 	}
 
+	PyResult<PyObject *> isatty()
+	{
+		return m_buffer->get_method(PyString::create("isatty").unwrap()).and_then([](auto *isatty) {
+			return isatty->call(nullptr, nullptr);
+		});
+	}
+
 	PyType *static_type() const override { return s_io_textiowrapper; }
 
 	static PyType *register_type(PyModule *module)
@@ -3276,6 +3291,7 @@ class TextIOWrapper : public TextIOBase
 									 .def("readlines", &TextIOWrapper::readlines)
 									 .def("write", &TextIOWrapper::write)
 									 .def("flush", &TextIOWrapper::flush)
+									 .def("isatty", &TextIOWrapper::isatty)
 									 .finalize();
 		}
 		module->add_symbol(PyString::create("TextIOWrapper").unwrap(), s_io_textiowrapper);
