@@ -43,9 +43,11 @@ PyResult<PyObject *> PyBoundMethod::__call__(PyTuple *args, PyDict *kwargs)
 {
 	// first create new args tuple -> (self, *args)
 	std::vector<Value> new_args_vector;
-	new_args_vector.reserve(args->size() + 1);
+	new_args_vector.reserve((args ? args->size() : 0) + 1);
 	new_args_vector.push_back(m_self);
-	for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
+	if (args) {
+		for (const auto &arg : args->elements()) { new_args_vector.push_back(arg); }
+	}
 	auto args_ = PyTuple::create(new_args_vector);
 	if (args_.is_err()) { return args_; }
 	return m_method->call(args_.unwrap(), kwargs);
