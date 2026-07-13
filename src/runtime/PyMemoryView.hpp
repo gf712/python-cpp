@@ -24,6 +24,7 @@ class PyMemoryView : public PyBaseObject
 
   public:
 	static PyResult<PyObject *> create(PyObject *object);
+	static PyResult<PyObject *> create(PyBuffer buffer);
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 	PyResult<PyObject *> __repr__() const;

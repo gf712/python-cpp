@@ -246,6 +246,13 @@ PyResult<PyObject *> PyMemoryView::create(PyObject *object)
 		type_error("memoryview: a bytes-like object is required, not {}", object->type()->name()));
 }
 
+PyResult<PyObject *> PyMemoryView::create(PyBuffer buffer)
+{
+	auto obj = VirtualMachine::the().heap().allocate<PyMemoryView>(std::move(buffer));
+	if (!obj) { return Err(memory_error(sizeof(PyMemoryView))); }
+	return Ok(obj);
+}
+
 PyResult<PyObject *> PyMemoryView::__new__(const PyType *, PyTuple *args, PyDict *kwargs)
 {
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
@@ -336,9 +343,13 @@ PyResult<PyObject *> PyMemoryView::tolist()
 
 PyResult<PyObject *> PyMemoryView::__repr__() const { return PyString::create(to_string()); }
 
-PyResult<std::monostate> PyMemoryView::__getbuffer__(PyBuffer &view, int /*flags*/)
+PyResult<std::monostate> PyMemoryView::__getbuffer__(PyBuffer &view, int flags)
 {
-	// TODO: validate flags
+	// PyBUF_WRITABLE == 1
+	if ((flags & 1) && m_view.readonly) {
+		return Err(type_error("cannot use a read-only memoryview as a read-write buffer"));
+	}
+	// TODO: validate the remaining flags
 	view = PyBuffer{
 		.buf = m_view.buf->view(),
 		.obj = this,

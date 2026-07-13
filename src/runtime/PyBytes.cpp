@@ -230,8 +230,10 @@ PyResult<PyObject *> PyBytes::__getitem__(PyObject *index)
 	}
 }
 
-PyResult<std::monostate> PyBytes::__getbuffer__(PyBuffer &view, int /*flags*/)
+PyResult<std::monostate> PyBytes::__getbuffer__(PyBuffer &view, int flags)
 {
+	// PyBUF_WRITABLE == 1; bytes objects are immutable
+	if (flags & 1) { return Err(type_error("cannot use bytes as a read-write buffer")); }
 	view.obj = this;
 	view.buf = std::make_unique<NonOwningStorage<std::byte>>(m_value.b.data());
 	view.len = m_value.b.size();

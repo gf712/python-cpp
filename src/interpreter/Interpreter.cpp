@@ -24,7 +24,9 @@
 #include "executable/bytecode/BytecodeProgram.hpp"
 #include "utilities.hpp"
 
+#include <cstdio>
 #include <filesystem>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 using namespace py;
@@ -186,10 +188,23 @@ void Interpreter::internal_setup(const std::string &name,
 			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "FileIO" }));
 		auto *buffered_writer =
 			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "BufferedWriter" }));
+		auto *buffered_reader =
+			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "BufferedReader" }));
 		auto *text_io_wrapper =
 			std::get<PyObject *>(io_module->symbol_table()->map().at(String{ "TextIOWrapper" }));
+		auto py_stdin =
+			file_io->call(PyTuple::create(Number{ STDIN_FILENO }, String{ "rb" }).unwrap(), nullptr)
+				.and_then([buffered_reader](PyObject *stdin) {
+					return buffered_reader->call(PyTuple::create(stdin).unwrap(), nullptr);
+				})
+				.and_then([text_io_wrapper](PyObject *stdin_buffer_writer) {
+					return text_io_wrapper->call(
+						PyTuple::create(stdin_buffer_writer).unwrap(), nullptr);
+				});
+		ASSERT(py_stdin.is_ok());
 		auto py_stdout =
-			file_io->call(PyTuple::create(Number{ 1 }, String{ "wb" }).unwrap(), nullptr)
+			file_io->call(
+					   PyTuple::create(Number{ STDOUT_FILENO }, String{ "wb" }).unwrap(), nullptr)
 				.and_then([buffered_writer](PyObject *stdout) {
 					return buffered_writer->call(PyTuple::create(stdout).unwrap(), nullptr);
 				})
@@ -199,7 +214,8 @@ void Interpreter::internal_setup(const std::string &name,
 				});
 		ASSERT(py_stdout.is_ok());
 		auto py_stderr =
-			file_io->call(PyTuple::create(Number{ 2 }, String{ "wb" }).unwrap(), nullptr)
+			file_io->call(
+					   PyTuple::create(Number{ STDERR_FILENO }, String{ "wb" }).unwrap(), nullptr)
 				.and_then([buffered_writer](PyObject *stderr) {
 					return buffered_writer->call(PyTuple::create(stderr).unwrap(), nullptr);
 				})
@@ -208,6 +224,7 @@ void Interpreter::internal_setup(const std::string &name,
 						PyTuple::create(stderr_buffer_writer).unwrap(), nullptr);
 				});
 		ASSERT(py_stderr.is_ok());
+		sys->add_symbol(PyString::create("stdin").unwrap(), py_stdin.unwrap());
 		sys->add_symbol(PyString::create("stdout").unwrap(), py_stdout.unwrap());
 		sys->add_symbol(PyString::create("stderr").unwrap(), py_stderr.unwrap());
 	}
