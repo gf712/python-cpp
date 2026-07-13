@@ -4,6 +4,7 @@
 #include "runtime/Import.hpp"
 #include "runtime/KeyError.hpp"
 #include "runtime/NameError.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFrame.hpp"
@@ -209,8 +210,13 @@ void Interpreter::internal_setup(const std::string &name,
 					return buffered_writer->call(PyTuple::create(stdout).unwrap(), nullptr);
 				})
 				.and_then([text_io_wrapper](PyObject *stdout_buffer_writer) {
+					PyObject *line_buffering =
+						::isatty(STDOUT_FILENO) == 1 ? py_true() : py_false();
 					return text_io_wrapper->call(
-						PyTuple::create(stdout_buffer_writer).unwrap(), nullptr);
+						PyTuple::create(
+							stdout_buffer_writer, py_none(), py_none(), py_none(), line_buffering)
+							.unwrap(),
+						nullptr);
 				});
 		ASSERT(py_stdout.is_ok());
 		auto py_stderr =
