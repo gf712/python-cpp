@@ -686,7 +686,7 @@ class BufferedIOBase : public IOBase
 			data_bytes.size(),
 			static_cast<std::byte *>(buffer.buf->get_buffer()));
 
-		return data;
+		return PyInteger::create(static_cast<int64_t>(len));
 	}
 
 	PyResult<PyObject *> readinto(PyBuffer &buffer) const
@@ -2274,7 +2274,9 @@ class FileIO : public RawIOBase
 	{
 		PyBuffer buffer;
 		if (auto result = bytes->get_buffer(buffer, 1); result.is_err()) {
-			return Err(result.unwrap_err());
+			return Err(
+				type_error("readinto() argument must be read-write bytes-like object, not {}",
+					bytes->type()->name()));
 		}
 		if (!buffer.is_ccontiguous()) {
 			return Err(type_error(
@@ -2954,6 +2956,10 @@ class TextIOWrapper : public TextIOBase
 
 	size_t m_chunk_size{ 8192 };
 
+	// line terminators recognised by readline; universal newlines for now
+	// TODO: derive the set from the newline constructor argument
+	std::vector<std::string> m_line_delimiters{ "\r\n", "\r", "\n" };
+
 	TextIOWrapper(PyType *type) : TextIOBase(type) {}
 
   public:
@@ -3128,27 +3134,38 @@ class TextIOWrapper : public TextIOBase
 	{
 		if (auto result = writeflush(); result.is_err()) { return Err(result.unwrap_err()); }
 
-		// Lines in the input can end in \'\\n\', \'\\r\', or \'\\r\\n\'
-		auto is_line_end = [](std::string_view remaining) {
-			if (remaining.starts_with("\r\n")) { return 2; }
-			if (remaining.starts_with("\n") || remaining.starts_with("\r")) { return 1; }
-			return 0;
+		// length of the longest line delimiter at the start of text, 0 if none
+		auto match_delimiter = [this](std::string_view text) -> size_t {
+			size_t longest = 0;
+			for (const auto &delimiter : m_line_delimiters) {
+				if (delimiter.size() > longest && text.starts_with(delimiter)) {
+					longest = delimiter.size();
+				}
+			}
+			return longest;
+		};
+		// text runs to the end of the available input; a proper prefix of a
+		// delimiter cannot be classified until more input arrives
+		auto is_delimiter_prefix = [this](std::string_view text) {
+			for (const auto &delimiter : m_line_delimiters) {
+				if (delimiter.size() > text.size()
+					&& std::string_view{ delimiter }.starts_with(text)) {
+					return true;
+				}
+			}
+			return false;
 		};
 		std::string line;
 		bool found_nl = false;
+		bool eof = false;
+		bool need_more = false;
 		while (!found_nl && line.size() < limit) {
-			if (!m_buffer_bytes.has_value() || m_buffer_bytes->b.empty()) {
+			if (need_more || !m_buffer_bytes.has_value() || m_buffer_bytes->b.empty()) {
+				need_more = false;
 				auto chunk = read_chunk(0);
 				if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
-				if (!chunk.unwrap()) { break; }
-			}
-
-			// a trailing '\r' may be the first byte of a "\r\n" that straddles the
-			// chunk boundary; read ahead so is_line_end can see the full terminator
-			while (m_buffer_bytes->b.back() == std::byte{ '\r' }) {
-				auto chunk = read_chunk(0);
-				if (chunk.is_err()) { return Err(chunk.unwrap_err()); }
-				if (!chunk.unwrap()) { break; }
+				eof = !chunk.unwrap();
+				if (eof && (!m_buffer_bytes.has_value() || m_buffer_bytes->b.empty())) { break; }
 			}
 
 			std::string_view remaining{ bit_cast<const char *>(m_buffer_bytes->b.data())
@@ -3161,8 +3178,16 @@ class TextIOWrapper : public TextIOBase
 			const size_t budget = limit - line.size();
 			const size_t scan_limit = std::min(budget, remaining.size());
 			for (; len < scan_limit; ++len) {
-				if (auto chars = is_line_end(remaining)) {
-					// the terminator may extend past the caller's limit (e.g. a
+				// the rest of the buffer may hold an incomplete delimiter (e.g. the
+				// '\r' of a "\r\n" straddling the chunk boundary); fetch more input
+				// before classifying it, unless the size limit would clamp the
+				// consumed length to the same result either way
+				if (!eof && len + 1 < budget && is_delimiter_prefix(remaining)) {
+					need_more = true;
+					break;
+				}
+				if (auto chars = match_delimiter(remaining)) {
+					// the delimiter may extend past the caller's limit (e.g. a
 					// "\r\n" straddling it); consume only up to the limit and
 					// leave the rest buffered for the next call
 					len = std::min(len + chars, budget);
@@ -3181,13 +3206,14 @@ class TextIOWrapper : public TextIOBase
 
 	PyResult<PyObject *> readlines()
 	{
-		if (auto err = setup_buffer(); err.is_err()) { return Err(err.unwrap_err()); }
 		auto result_ = PyList::create();
 		if (result_.is_err()) { return result_; }
 		auto *result = result_.unwrap();
-		while (m_position < m_buffer_bytes->b.size()) {
+		while (true) {
 			auto line = readline_impl(std::numeric_limits<size_t>::max());
 			if (line.is_err()) { return line; }
+			// readline only returns an empty string at EOF
+			if (as<PyString>(line.unwrap())->value().empty()) { break; }
 			if (auto appended = result->append(line.unwrap()); appended.is_err()) {
 				return Err(appended.unwrap_err());
 			}
@@ -3283,22 +3309,6 @@ class TextIOWrapper : public TextIOBase
 		m_pending_bytes_count = 0;
 
 		return Ok(1);
-	}
-
-	PyResult<std::monostate> setup_buffer()
-	{
-		// TODO: read in chunks!
-		if (!m_buffer_bytes.has_value()) {
-			auto buffer_ =
-				m_buffer->get_method(PyString::create("readall").unwrap())
-					.and_then([](auto *readall) { return readall->call(nullptr, nullptr); });
-			if (buffer_.is_err()) { return Err(buffer_.unwrap_err()); }
-			auto *buffer = buffer_.unwrap();
-
-			ASSERT(buffer->type()->issubclass(types::bytes()));
-			m_buffer_bytes = Bytes{ static_cast<const PyBytes &>(*buffer).value() };
-		}
-		return Ok(std::monostate{});
 	}
 };
 
