@@ -3255,6 +3255,15 @@ class TextIOWrapper : public TextIOBase
 		// TODO: Should use encoder
 		m_pending_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
 		m_pending_bytes_count = m_pending_bytes->b.size();
+		const auto should_flush = [this]() -> bool {
+			if (!m_line_buffering) { return false; }
+			if (std::ranges::find(m_pending_bytes->b, std::byte{ '\n' })
+				!= m_pending_bytes->b.end()) {
+				return true;
+			}
+			return std::ranges::find(m_pending_bytes->b, std::byte{ '\r' })
+				   != m_pending_bytes->b.end();
+		}();
 		auto result = writeflush();
 		while (result.is_ok()) {
 			ASSERT(m_pending_bytes_count >= result.unwrap());
@@ -3264,6 +3273,13 @@ class TextIOWrapper : public TextIOBase
 		}
 		if (result.is_err()) { return Err(result.unwrap_err()); }
 
+		if (should_flush) {
+			if (auto r = m_buffer->get_method(PyString::create("flush").unwrap())
+					.and_then([](PyObject *f) { return f->call(nullptr, nullptr); });
+				r.is_err()) {
+				return Err(r.unwrap_err());
+			}
+		}
 		return PyInteger::create(text_len);
 	}
 
