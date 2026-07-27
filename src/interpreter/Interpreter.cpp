@@ -227,13 +227,30 @@ void Interpreter::internal_setup(const std::string &name,
 					return buffered_writer->call(PyTuple::create(stderr).unwrap(), nullptr);
 				})
 				.and_then([text_io_wrapper](PyObject *stderr_buffer_writer) {
+					auto *line_buffering = py_true();
 					return text_io_wrapper->call(
-						PyTuple::create(stderr_buffer_writer).unwrap(), nullptr);
+						PyTuple::create(
+							stderr_buffer_writer, py_none(), py_none(), py_none(), line_buffering)
+							.unwrap(),
+						nullptr);
 				});
 		ASSERT(py_stderr.is_ok());
-		sys->add_symbol(PyString::create("stdin").unwrap(), py_stdin.unwrap());
-		sys->add_symbol(PyString::create("stdout").unwrap(), py_stdout.unwrap());
-		sys->add_symbol(PyString::create("stderr").unwrap(), py_stderr.unwrap());
+
+		for (auto [name, obj] : std::views::zip(std::array{ "stdin", "stdout", "stderr" },
+				 std::array{ py_stdin.unwrap(), py_stdout.unwrap(), py_stderr.unwrap() })) {
+			sys->add_symbol(PyString::create(name).unwrap(), obj);
+			register_callback(PyNativeFunction::create(
+								  std::string{ name } + "_exit",
+								  [obj](PyTuple *, PyDict *) -> PyResult<PyObject *> {
+									  return obj->get_method(PyString::create("flush").unwrap())
+										  .and_then([](PyObject *flush) {
+											  return flush->call(nullptr, nullptr);
+										  });
+								  },
+								  obj)
+								  .unwrap(),
+				nullptr);
+		}
 	}
 
 	if (config.requires_importlib) {

@@ -2959,8 +2959,7 @@ class TextIOWrapper : public TextIOBase
 
 	std::optional<Bytes> m_buffer_bytes;
 	size_t m_position{ 0 };
-	std::optional<Bytes> m_pending_bytes;// bytes to be written
-	size_t m_pending_bytes_count{ 0 };
+	Bytes m_pending_bytes;
 
 	size_t m_chunk_size{ 8192 };
 
@@ -3230,18 +3229,17 @@ class TextIOWrapper : public TextIOBase
 		return Ok(result);
 	}
 
-	PyResult<size_t> writeflush()
+	PyResult<std::monostate> writeflush()
 	{
-		if (!m_pending_bytes.has_value()) { return Ok(0); }
+		if (m_pending_bytes.b.empty()) { return Ok(std::monostate{}); }
 		auto written =
 			m_buffer->get_method(PyString::create("write").unwrap())
 				.and_then([this](PyObject *write) {
-					return write->call(PyTuple::create(m_pending_bytes.value()).unwrap(), nullptr);
+					return write->call(PyTuple::create(m_pending_bytes).unwrap(), nullptr);
 				});
 		if (written.is_err()) { return Err(written.unwrap_err()); }
 		m_pending_bytes = {};
-		m_pending_bytes_count = 0;
-		return Ok(0);
+		return Ok(std::monostate{});
 	}
 
 
@@ -3252,26 +3250,25 @@ class TextIOWrapper : public TextIOBase
 		auto *text = PyObject::from(args->elements()[0]).unwrap();
 		ASSERT(as<PyString>(text));
 		const auto text_len = as<PyString>(text)->size();
+
 		// TODO: Should use encoder
-		m_pending_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
-		m_pending_bytes_count = m_pending_bytes->b.size();
+		auto new_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
+		m_pending_bytes.b.insert(m_pending_bytes.b.end(), new_bytes.b.begin(), new_bytes.b.end());
+
 		const auto should_flush = [this]() -> bool {
 			if (!m_line_buffering) { return false; }
-			if (std::ranges::find(m_pending_bytes->b, std::byte{ '\n' })
-				!= m_pending_bytes->b.end()) {
+			if (std::ranges::find(m_pending_bytes.b, std::byte{ '\n' })
+				!= m_pending_bytes.b.end()) {
 				return true;
 			}
-			return std::ranges::find(m_pending_bytes->b, std::byte{ '\r' })
-				   != m_pending_bytes->b.end();
+			return std::ranges::find(m_pending_bytes.b, std::byte{ '\r' })
+				   != m_pending_bytes.b.end();
 		}();
-		auto result = writeflush();
-		while (result.is_ok()) {
-			ASSERT(m_pending_bytes_count >= result.unwrap());
-			m_pending_bytes_count -= result.unwrap();
-			if (m_pending_bytes_count == 0) { break; }
-			result = writeflush();
+
+		if (m_pending_bytes.b.size() >= m_chunk_size || should_flush || m_write_through) {
+			auto result = writeflush();
+			if (result.is_err()) { return Err(result.unwrap_err()); }
 		}
-		if (result.is_err()) { return Err(result.unwrap_err()); }
 
 		if (should_flush) {
 			if (auto r = m_buffer->get_method(PyString::create("flush").unwrap())
@@ -3337,8 +3334,7 @@ class TextIOWrapper : public TextIOBase
 
 		m_line_buffering = line_buffering;
 		m_write_through = write_through;
-		m_newline = newline.value_or("'\n");
-		m_pending_bytes_count = 0;
+		m_newline = newline.value_or("\n");
 
 		return Ok(1);
 	}

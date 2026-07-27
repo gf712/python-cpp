@@ -92,9 +92,7 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 		// sys.stdout may be None when FILE* stdout isn't connected
 		if (!file || file == py_none()) { return Ok(py_none()); }
 	}
-	// TODO: flush should be false, but for now we keep it as true, since there is no flush at
-	// interpreter shutdown
-	bool flush = true;
+	bool flush = false;
 	if (kwargs) {
 		static const Value separator_keyword = String{ "sep" };
 		static const Value end_keyword = String{ "end" };
