@@ -144,6 +144,11 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 		std::cout << exception->format_traceback() << std::endl;
 	}
 
+	{
+		[[maybe_unused]] auto push_result = vm->push_frame(1, 0, 0);
+		[[maybe_unused]] auto final_result = interpreter.finalise();
+	}
+
 	return result.is_ok() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

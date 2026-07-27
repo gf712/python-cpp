@@ -27,6 +27,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <ranges>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -495,4 +496,32 @@ void Interpreter::visit_graph(::Cell::Visitor &visitor)
 	if (m_codec_error_registry) visitor.visit(*m_codec_error_registry);
 	if (m_codec_search_path) visitor.visit(*m_codec_search_path);
 	if (m_codec_search_path_cache) visitor.visit(*m_codec_search_path_cache);
+
+	for (auto [callback, args] : m_callbacks) {
+		if (callback) visitor.visit(*callback);
+		if (args) visitor.visit(*args);
+	}
+}
+
+void Interpreter::register_callback(PyObject *callback, PyTuple *args)
+{
+	m_callbacks.emplace_back(callback, args);
+}
+
+void Interpreter::unregister_callback(PyObject *callback)
+{
+	m_callbacks.erase(
+		std::ranges::remove(m_callbacks, callback, [](const auto &el) { return std::get<0>(el); })
+			.begin(),
+		m_callbacks.end());
+}
+
+PyResult<std::monostate> Interpreter::finalise()
+{
+	// TODO: capture exceptions, and raise last one
+	for (auto [callback, args] : m_callbacks) {
+		[[maybe_unused]] auto result = callback->call(args, nullptr);
+	}
+
+	return Ok(std::monostate{});
 }
