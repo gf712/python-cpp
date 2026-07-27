@@ -54,9 +54,7 @@ PyResult<Value> JumpIfExceptionMatch::execute(VirtualMachine &vm, Interpreter &i
 }
 
 void JumpIfExceptionMatch::relocate(size_t instruction_idx)
-{
-	m_offset = m_label->position() - instruction_idx - 1;
-}
+{ m_offset = m_label->position() - instruction_idx - 1; }
 
 std::vector<uint8_t> JumpIfExceptionMatch::serialize() const
 {

@@ -179,16 +179,12 @@ PyResult<PyObject *> PyBytes::__eq__(const PyObject *obj) const
 }
 
 PyResult<PyObject *> PyBytes::__iter__() const
-{
-	return PyBytesIterator::create(const_cast<PyBytes *>(this));
-}
+{ return PyBytesIterator::create(const_cast<PyBytes *>(this)); }
 
 PyResult<PyObject *> PyBytes::__repr__() const { return PyString::create(to_string()); }
 
 PyResult<PyObject *> PyBytes::decode(const std::string &encoding, const std::string &errors) const
-{
-	return PyString::from_encoded_object(this, encoding, errors);
-}
+{ return PyString::from_encoded_object(this, encoding, errors); }
 
 PyResult<PyObject *> PyBytes::__getitem__(int64_t index)
 {
@@ -323,9 +319,7 @@ PyResult<PyBytesIterator *> PyBytesIterator::create(PyBytes *bytes)
 }
 
 std::string PyBytesIterator::to_string() const
-{
-	return fmt::format("<bytes_iterator object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<bytes_iterator object at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyBytesIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -349,9 +343,7 @@ namespace {
 	std::once_flag bytes_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_bytes_iterator()
-	{
-		return std::move(klass<PyBytesIterator>("bytes_iterator").type);
-	}
+	{ return std::move(klass<PyBytesIterator>("bytes_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyBytesIterator::type_factory()

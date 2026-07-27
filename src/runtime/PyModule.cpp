@@ -164,9 +164,7 @@ void PyModule::visit_graph(Visitor &visitor)
 }
 
 std::string PyModule::to_string() const
-{
-	return fmt::format("<module '{}'>", m_module_name->to_string());
-}
+{ return fmt::format("<module '{}'>", m_module_name->to_string()); }
 
 PyResult<PyModule *> PyModule::create(PyDict *symbol_table, PyString *module_name, PyObject *doc)
 {
@@ -186,9 +184,7 @@ namespace {
 	std::once_flag module_flag;
 
 	std::unique_ptr<TypePrototype> register_module()
-	{
-		return std::move(klass<PyModule>("module").attr("__dict__", &PyModule::m_dict).type);
-	}
+	{ return std::move(klass<PyModule>("module").attr("__dict__", &PyModule::m_dict).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyModule::type_factory()

@@ -17,9 +17,7 @@ PyResult<Value> Jump::execute(VirtualMachine &vm, Interpreter &) const
 
 
 void Jump::relocate(size_t instruction_idx)
-{
-	m_offset = m_label->position() - instruction_idx - 1;
-}
+{ m_offset = m_label->position() - instruction_idx - 1; }
 
 std::vector<uint8_t> Jump::serialize() const
 {

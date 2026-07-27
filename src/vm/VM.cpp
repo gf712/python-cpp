@@ -237,9 +237,7 @@ void VirtualMachine::clear()
 
 void VirtualMachine::set_cleanup(State::CleanupLogic cleanup_type,
 	InstructionVector::const_iterator exit_instruction)
-{
-	m_state->cleanup.push(std::make_pair(cleanup_type, exit_instruction));
-}
+{ m_state->cleanup.push(std::make_pair(cleanup_type, exit_instruction)); }
 
 void VirtualMachine::leave_cleanup_handling()
 {
@@ -301,9 +299,7 @@ void VirtualMachine::push_frame(StackFrame &frame)
 }
 
 std::deque<std::vector<const py::Value *>> VirtualMachine::stack_objects() const
-{
-	return m_stack_objects;
-}
+{ return m_stack_objects; }
 
 void VirtualMachine::pop_frame(bool should_return_value)
 {

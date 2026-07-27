@@ -26,18 +26,14 @@ template<typename T> struct klass
 		requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> && ...)
 	klass(PyModule *module, std::string_view name, BaseType &&...bases)
 		: type(TypePrototype::create<T>(name)), m_module(module)
-	{
-		type->__bases__ = std::vector<PyType *>{ bases... };
-	}
+	{ type->__bases__ = std::vector<PyType *>{ bases... }; }
 
 	klass(std::string_view name) : type(TypePrototype::create<T>(name)) {}
 
 	template<typename... BaseType>
 		requires(std::is_same_v<std::remove_reference_t<BaseType>, PyType *> && ...)
 	klass(std::string_view name, BaseType &&...bases) : type(TypePrototype::create<T>(name))
-	{
-		type->__bases__ = std::vector<PyType *>{ bases... };
-	}
+	{ type->__bases__ = std::vector<PyType *>{ bases... }; }
 
 	using AttributeGetterType = std::function<PyResult<PyObject *>(T *)>;
 	using AttributeSetterType = std::function<PyResult<std::monostate>(T *, PyObject *)>;
@@ -79,9 +75,7 @@ template<typename T> struct klass
 	}
 
 	klass &property_readonly(std::string_view name, std::optional<AttributeGetterType> &&getter)
-	{
-		return property(name, std::move(getter), {});
-	}
+	{ return property(name, std::move(getter), {}); }
 
 	template<typename ClassMemberType>
 	klass &attr(std::string_view name, ClassMemberType &&member)

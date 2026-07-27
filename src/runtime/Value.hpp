@@ -101,16 +101,12 @@ struct Bytes
 	static Bytes from_unescaped_string(const std::string &);
 
 	friend std::ostream &operator<<(std::ostream &os, const Bytes &bytes)
-	{
-		return os << bytes.to_string();
-	}
+	{ return os << bytes.to_string(); }
 
 	std::string to_string() const;
 
 	bool operator==(const Bytes &rhs) const
-	{
-		return std::equal(b.begin(), b.end(), rhs.b.begin(), rhs.b.end());
-	}
+	{ return std::equal(b.begin(), b.end(), rhs.b.begin(), rhs.b.end()); }
 	bool operator==(const PyObject *other) const;
 	bool operator==(const String &) const { return false; }
 	bool operator==(const Ellipsis &) const { return false; }
@@ -123,9 +119,7 @@ struct Ellipsis
 {
 	static constexpr std::string_view ellipsis_repr = "...";
 	friend std::ostream &operator<<(std::ostream &os, const Ellipsis &)
-	{
-		return os << Ellipsis::ellipsis_repr;
-	}
+	{ return os << Ellipsis::ellipsis_repr; }
 
 	std::string to_string() const { return std::string(ellipsis_repr); }
 
@@ -153,9 +147,7 @@ struct NameConstant
 {
 	std::variant<bool, NoneType> value;
 	friend std::ostream &operator<<(std::ostream &os, const NameConstant &val)
-	{
-		return os << val.to_string();
-	}
+	{ return os << val.to_string(); }
 
 	bool operator==(const NoneType &) const { return false; }
 	bool operator==(const NameConstant &other) const;
@@ -245,9 +237,7 @@ template<typename T> class [[nodiscard]] PyResult
 	PyResult(Ok<T> result_) : result(std::move(result_.value)) {}
 	template<typename U>
 	constexpr PyResult(Ok<U> result_) : result(static_cast<T>(std::move(result_.value)))
-	{
-		static_assert(std::is_convertible_v<U, T>);
-	}
+	{ static_assert(std::is_convertible_v<U, T>); }
 	constexpr PyResult(Err result_) : result(std::unexpected(result_.exc)) {}
 
 	template<typename U>

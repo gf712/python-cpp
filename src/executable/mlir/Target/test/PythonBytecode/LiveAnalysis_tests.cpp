@@ -79,9 +79,7 @@ class LiveAnalysisTest : public ::testing::Test
 	}
 
 	mlir::OwningOpRef<mlir::ModuleOp> parseLiveAnalysisIR()
-	{
-		return mlir::parseSourceString<mlir::ModuleOp>(kLiveAnalysis, &m_context);
-	}
+	{ return mlir::parseSourceString<mlir::ModuleOp>(kLiveAnalysis, &m_context); }
 };
 }// namespace
 

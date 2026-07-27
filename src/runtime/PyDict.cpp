@@ -153,9 +153,7 @@ PyResult<PyObject *> PyDict::__eq__(const PyObject *other) const
 PyResult<size_t> PyDict::__len__() const { return Ok(m_map.size()); }
 
 PyDictItems *PyDict::items() const
-{
-	return VirtualMachine::the().heap().allocate<PyDictItems>(*this);
-}
+{ return VirtualMachine::the().heap().allocate<PyDictItems>(*this); }
 
 std::optional<Value> PyDict::operator[](Value key) const
 {
@@ -554,9 +552,7 @@ namespace {
 	std::once_flag dict_items_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_items()
-	{
-		return std::move(klass<PyDictItems>("dict_items").type);
-	}
+	{ return std::move(klass<PyDictItems>("dict_items").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictItems::type_factory()
@@ -624,9 +620,7 @@ namespace {
 	std::once_flag dict_keys_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_keys()
-	{
-		return std::move(klass<PyDictKeys>("dict_keys").type);
-	}
+	{ return std::move(klass<PyDictKeys>("dict_keys").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictKeys::type_factory()
@@ -741,9 +735,7 @@ namespace {
 	std::once_flag dict_values_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_values()
-	{
-		return std::move(klass<PyDictValues>("dict_values").type);
-	}
+	{ return std::move(klass<PyDictValues>("dict_values").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictValues::type_factory()
@@ -767,9 +759,7 @@ PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items)
 
 PyDictItemsIterator::PyDictItemsIterator(const PyDictItems &pydict_items, size_t position)
 	: PyDictItemsIterator(pydict_items)
-{
-	std::advance(m_current_iterator, position);
-}
+{ std::advance(m_current_iterator, position); }
 
 
 PyResult<PyDictItemsIterator *> PyDictItemsIterator::create(const PyDictItems &pydict_items)
@@ -803,9 +793,7 @@ void PyDictItemsIterator::visit_graph(Visitor &visitor)
 }
 
 std::string PyDictItemsIterator::to_string() const
-{
-	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -845,9 +833,7 @@ namespace {
 	std::once_flag dict_items_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_items_iterator()
-	{
-		return std::move(klass<PyDictItemsIterator>("dict_itemiterator").type);
-	}
+	{ return std::move(klass<PyDictItemsIterator>("dict_itemiterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictItemsIterator::type_factory()
@@ -868,9 +854,7 @@ PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys)
 
 PyDictKeyIterator::PyDictKeyIterator(const PyDictKeys &pydict_keys, size_t position)
 	: PyDictKeyIterator(pydict_keys)
-{
-	std::advance(m_current_iterator, position);
-}
+{ std::advance(m_current_iterator, position); }
 
 
 PyResult<PyDictKeyIterator *> PyDictKeyIterator::create(const PyDictKeys &pydict_keys)
@@ -900,9 +884,7 @@ void PyDictKeyIterator::visit_graph(Visitor &visitor)
 }
 
 std::string PyDictKeyIterator::to_string() const
-{
-	return fmt::format("<dict_keyiterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<dict_keyiterator at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyDictKeyIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -942,9 +924,7 @@ namespace {
 	std::once_flag dict_key_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_key_iterator()
-	{
-		return std::move(klass<PyDictKeyIterator>("dict_keyiterator").type);
-	}
+	{ return std::move(klass<PyDictKeyIterator>("dict_keyiterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictKeyIterator::type_factory()
@@ -965,9 +945,7 @@ PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values)
 
 PyDictValueIterator::PyDictValueIterator(const PyDictValues &pydict_values, size_t position)
 	: PyDictValueIterator(pydict_values)
-{
-	std::advance(m_current_iterator, position);
-}
+{ std::advance(m_current_iterator, position); }
 
 PyResult<PyDictValueIterator *> PyDictValueIterator::create(const PyDictValues &pydict_values)
 {
@@ -996,9 +974,7 @@ void PyDictValueIterator::visit_graph(Visitor &visitor)
 }
 
 std::string PyDictValueIterator::to_string() const
-{
-	return fmt::format("<dict_valueiterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<dict_valueiterator at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyDictValueIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -1038,9 +1014,7 @@ namespace {
 	std::once_flag dict_value_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_dict_value_iterator()
-	{
-		return std::move(klass<PyDictValueIterator>("dict_valueiterator").type);
-	}
+	{ return std::move(klass<PyDictValueIterator>("dict_valueiterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyDictValueIterator::type_factory()

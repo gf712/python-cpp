@@ -72,8 +72,6 @@ std::function<std::unique_ptr<TypePrototype>()> PyCoroutine::type_factory()
 PyType *PyCoroutine::static_type() const { return types::coroutine(); }
 
 void PyCoroutine::visit_graph(Visitor &visitor)
-{
-	GeneratorInterface<PyCoroutine>::visit_graph(visitor);
-}
+{ GeneratorInterface<PyCoroutine>::visit_graph(visitor); }
 
 }// namespace py

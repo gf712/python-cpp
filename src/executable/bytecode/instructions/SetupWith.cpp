@@ -15,9 +15,7 @@ PyResult<Value> SetupWith::execute(VirtualMachine &vm, Interpreter &) const
 }
 
 void SetupWith::relocate(size_t instruction_idx)
-{
-	m_offset = m_label->position() - instruction_idx - 1;
-}
+{ m_offset = m_label->position() - instruction_idx - 1; }
 
 std::vector<uint8_t> SetupWith::serialize() const
 {

@@ -38,9 +38,7 @@ namespace {
 	std::once_flag index_error_flag;
 
 	std::unique_ptr<TypePrototype> register_index_error()
-	{
-		return std::move(klass<IndexError>("IndexError", LookupError::class_type()).type);
-	}
+	{ return std::move(klass<IndexError>("IndexError", LookupError::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> IndexError::type_factory()

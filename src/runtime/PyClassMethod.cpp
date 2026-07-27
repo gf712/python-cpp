@@ -49,9 +49,7 @@ PyClassMethod::PyClassMethod() : PyBaseObject(types::BuiltinTypes::the().classme
 PyClassMethod::PyClassMethod(PyType *type) : PyBaseObject(type) {}
 
 std::string PyClassMethod::to_string() const
-{
-	return fmt::format("<classmethod object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<classmethod object at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyClassMethod *> PyClassMethod::create()
 {
@@ -61,9 +59,7 @@ PyResult<PyClassMethod *> PyClassMethod::create()
 }
 
 PyResult<PyObject *> PyClassMethod::__repr__() const
-{
-	return PyString::create(PyClassMethod::to_string());
-}
+{ return PyString::create(PyClassMethod::to_string()); }
 
 PyResult<PyObject *> PyClassMethod::__get__(PyObject *instance, PyObject *owner) const
 {

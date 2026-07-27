@@ -14,9 +14,7 @@ class WithExceptStart final : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("WITH_EXCEPT_START r{:<3} r{:<3}", m_result, m_exit_method);
-	}
+	{ return fmt::format("WITH_EXCEPT_START r{:<3} r{:<3}", m_result, m_exit_method); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 

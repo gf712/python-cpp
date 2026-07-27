@@ -793,9 +793,7 @@ void compare_starred(const ASTNode *result, const ASTNode *expected)
 }
 
 void compare_pass(const ASTNode *result, const ASTNode *)
-{
-	ASSERT_EQ(result->node_type(), ASTNodeType::Pass);
-}
+{ ASSERT_EQ(result->node_type(), ASTNodeType::Pass); }
 
 void compare_named_expression(const ASTNode *result, const ASTNode *expected)
 {
@@ -1128,9 +1126,7 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 }
 
 std::shared_ptr<Module> create_test_module()
-{
-	return std::make_shared<Module>("_parser_test_.py");
-}
+{ return std::make_shared<Module>("_parser_test_.py"); }
 }// namespace
 
 TEST(Parser, SimplePositiveIntegerAssignment)

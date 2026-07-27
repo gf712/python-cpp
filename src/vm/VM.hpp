@@ -42,9 +42,7 @@ struct StackFrame : NonCopyable
 
   public:
 	template<typename... Args> static std::unique_ptr<StackFrame> create(Args &&...args)
-	{
-		return std::unique_ptr<StackFrame>(new StackFrame{ std::forward<Args>(args)... });
-	}
+	{ return std::unique_ptr<StackFrame>(new StackFrame{ std::forward<Args>(args)... }); }
 
 	Registers registers;
 	std::vector<py::Value> locals_storage;
@@ -178,9 +176,7 @@ class VirtualMachine
 	}
 
 	const InstructionVector::const_iterator &instruction_pointer() const
-	{
-		return m_instruction_pointer;
-	}
+	{ return m_instruction_pointer; }
 
 	const py::Value *sp() const { return &*m_stack_pointer; }
 	const py::Value *bp() const { return &*m_base_pointer; }

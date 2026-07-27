@@ -80,14 +80,10 @@
 using namespace py;
 
 Instruction::RAIIStoreNonCallInstructionData::RAIIStoreNonCallInstructionData()
-{
-	reg0 = VirtualMachine::the().reg(0);
-}
+{ reg0 = VirtualMachine::the().reg(0); }
 
 Instruction::RAIIStoreNonCallInstructionData::~RAIIStoreNonCallInstructionData()
-{
-	VirtualMachine::the().reg(0) = std::move(reg0);
-}
+{ VirtualMachine::the().reg(0) = std::move(reg0); }
 
 std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_buffer)
 {

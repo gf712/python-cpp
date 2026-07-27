@@ -14,9 +14,7 @@ class FormatValue final : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("FORMAT_VALUE    r{:<3} r{:<3} {}", m_dst, m_src, m_conversion);
-	}
+	{ return fmt::format("FORMAT_VALUE    r{:<3} r{:<3} {}", m_dst, m_src, m_conversion); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 

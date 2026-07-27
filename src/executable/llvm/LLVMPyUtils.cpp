@@ -43,8 +43,6 @@ PyObject *create_llvm_function(const std::string &name,
 }
 
 int64_t from_args_i64(uint8_t *args, int64_t idx)
-{
-	return from_args<int64_t>(bit_cast<PyTuple *>(args), idx);
-}
+{ return from_args<int64_t>(bit_cast<PyTuple *>(args), idx); }
 
 uint8_t *from_i64(int64_t value) { return bit_cast<uint8_t *>(from<int64_t>(value)); }

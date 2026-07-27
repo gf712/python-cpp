@@ -41,9 +41,7 @@ namespace {
 	std::once_flag assertion_error_flag;
 
 	std::unique_ptr<TypePrototype> register_assertion_error()
-	{
-		return std::move(klass<AssertionError>("AssertionError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<AssertionError>("AssertionError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> AssertionError::type_factory()

@@ -52,9 +52,7 @@ namespace {
 	std::once_flag reversed_flag;
 
 	std::unique_ptr<TypePrototype> register_reversed()
-	{
-		return std::move(klass<PyReversed>("reversed").type);
-	}
+	{ return std::move(klass<PyReversed>("reversed").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyReversed::type_factory()

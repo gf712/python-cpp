@@ -42,9 +42,7 @@ namespace {
 std::once_flag deprecation_warning_flag;
 
 std::unique_ptr<TypePrototype> register_deprecation_warning()
-{
-	return std::move(klass<DeprecationWarning>("DeprecationWarning", types::warning()).type);
-}
+{ return std::move(klass<DeprecationWarning>("DeprecationWarning", types::warning()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> DeprecationWarning::type_factory()

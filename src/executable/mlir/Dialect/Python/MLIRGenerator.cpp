@@ -192,9 +192,7 @@ mlir::OpBuilder &Context::builder() { return *m_impl->m_builder; }
 mlir::ModuleOp &Context::module() { return m_impl->m_module; }
 
 std::string_view Context::filename() const
-{
-	return mlir::cast<mlir::FileLineColLoc>(m_impl->m_module.getLoc()).getFilename().strref();
-}
+{ return mlir::cast<mlir::FileLineColLoc>(m_impl->m_module.getLoc()).getFilename().strref(); }
 
 Context::Context(std::unique_ptr<ContextImpl> impl) : m_impl(std::move(impl)) {}
 
@@ -263,9 +261,7 @@ std::optional<mlir::Block *> MLIRGenerator::unhappy_path() const
 }
 
 template<typename... Args> MLIRGenerator::MLIRValue *MLIRGenerator::new_value(Args &&...args)
-{
-	return m_values.emplace_back(std::make_unique<MLIRValue>(std::forward<Args>(args)...)).get();
-}
+{ return m_values.emplace_back(std::make_unique<MLIRValue>(std::forward<Args>(args)...)).get(); }
 
 
 ast::Value *MLIRGenerator::visit(const ast::Argument *node)
@@ -2392,9 +2388,7 @@ std::vector<MLIRGenerator::MLIRValue *> evaluate_expressions_for_make_function(M
 
 std::vector<MLIRGenerator::MLIRValue *>
 	evaluate_default_arguments_for_make_function(MLIRGenerator &gen, const ast::Arguments *args)
-{
-	return evaluate_expressions_for_make_function(gen, args->defaults());
-}
+{ return evaluate_expressions_for_make_function(gen, args->defaults()); }
 
 std::vector<MLIRGenerator::MLIRValue *> evaluate_keyword_default_arguments_for_make_function(
 	MLIRGenerator &gen,

@@ -89,9 +89,7 @@ namespace {
 	std::once_flag bool_flag;
 
 	std::unique_ptr<TypePrototype> register_bool()
-	{
-		return std::move(klass<PyBool>("bool", types::integer()).type);
-	}
+	{ return std::move(klass<PyBool>("bool", types::integer()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyBool::type_factory()

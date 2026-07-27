@@ -394,9 +394,7 @@ PySetIterator::PySetIterator(const PyFrozenSet &pyset)
 {}
 
 std::string PySetIterator::to_string() const
-{
-	return fmt::format("<set_iterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<set_iterator at {}>", static_cast<const void *>(this)); }
 
 void PySetIterator::visit_graph(Visitor &visitor)
 {
@@ -438,9 +436,7 @@ namespace {
 	std::once_flag set_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_set_iterator()
-	{
-		return std::move(klass<PySetIterator>("set_iterator").type);
-	}
+	{ return std::move(klass<PySetIterator>("set_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PySetIterator::type_factory()

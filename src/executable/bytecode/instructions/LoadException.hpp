@@ -9,9 +9,7 @@ class LoadException final : public Instruction
 	LoadException(Register destination) : m_destination(destination) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("LOAD_EXCEPTION  r{}", m_destination);
-	}
+	{ return fmt::format("LOAD_EXCEPTION  r{}", m_destination); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

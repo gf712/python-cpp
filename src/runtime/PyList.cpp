@@ -540,9 +540,7 @@ PyResult<PyObject *> PyList::__eq__(const PyObject *other) const
 }
 
 PyResult<PyObject *> PyList::__reversed__() const
-{
-	return PyListReverseIterator::create(*const_cast<PyList *>(this));
-}
+{ return PyListReverseIterator::create(*const_cast<PyList *>(this)); }
 
 PyResult<PyObject *> PyList::sort(PyTuple *args, PyDict *kwargs)
 {
@@ -703,9 +701,7 @@ PyListIterator::PyListIterator(const PyList &pylist)
 {}
 
 std::string PyListIterator::to_string() const
-{
-	return fmt::format("<list_iterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<list_iterator at {}>", static_cast<const void *>(this)); }
 
 void PyListIterator::visit_graph(Visitor &visitor)
 {
@@ -733,9 +729,7 @@ namespace {
 	std::once_flag list_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_list_iterator()
-	{
-		return std::move(klass<PyListIterator>("list_iterator").type);
-	}
+	{ return std::move(klass<PyListIterator>("list_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyListIterator::type_factory()
@@ -769,9 +763,7 @@ void PyListReverseIterator::visit_graph(Visitor &visitor)
 }
 
 PyResult<PyObject *> PyListReverseIterator::__iter__() const
-{
-	return Ok(const_cast<PyListReverseIterator *>(this));
-}
+{ return Ok(const_cast<PyListReverseIterator *>(this)); }
 
 PyResult<PyObject *> PyListReverseIterator::__next__()
 {
@@ -791,9 +783,7 @@ namespace {
 	std::once_flag list_reverseiterator_flag;
 
 	std::unique_ptr<TypePrototype> register_list_reverseiterator()
-	{
-		return std::move(klass<PyListReverseIterator>("list_reverseiterator").type);
-	}
+	{ return std::move(klass<PyListReverseIterator>("list_reverseiterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyListReverseIterator::type_factory()

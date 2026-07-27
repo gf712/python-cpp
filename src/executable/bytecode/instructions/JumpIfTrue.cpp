@@ -28,9 +28,7 @@ PyResult<Value> JumpIfTrue::execute(VirtualMachine &vm, Interpreter &interpreter
 }
 
 void JumpIfTrue::relocate(size_t instruction_idx)
-{
-	m_offset = m_label->position() - instruction_idx - 1;
-}
+{ m_offset = m_label->position() - instruction_idx - 1; }
 
 std::vector<uint8_t> JumpIfTrue::serialize() const
 {

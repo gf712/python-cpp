@@ -118,9 +118,7 @@ namespace {
 	std::once_flag method_wrapper_flag;
 
 	std::unique_ptr<TypePrototype> register_method_wrapper()
-	{
-		return std::move(klass<PyMethodDescriptor>("method_descriptor").type);
-	}
+	{ return std::move(klass<PyMethodDescriptor>("method_descriptor").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyMethodDescriptor::type_factory()

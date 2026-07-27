@@ -13,9 +13,7 @@ class UnpackSequence final : public Instruction
 		: m_destination(std::move(destination)), m_source(source)
 	{}
 	std::string to_string() const final
-	{
-		return fmt::format("UNPACK_SEQUENCE {} r{:<3}", m_destination.size(), m_source);
-	}
+	{ return fmt::format("UNPACK_SEQUENCE {} r{:<3}", m_destination.size(), m_source); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

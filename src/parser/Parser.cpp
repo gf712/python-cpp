@@ -643,9 +643,7 @@ template<typename... PatternTypes> struct OrPatternV2 : PatternV2<OrPatternV2<Pa
 	using ResultType = typename traits<OrPatternV2<PatternTypes...>>::result_type;
 
 	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		return OrPatternV2_<0, PatternTypes...>::match(p);
-	}
+	{ return OrPatternV2_<0, PatternTypes...>::match(p); }
 };
 
 template<typename... PatternTypes> struct GroupPatternsV2;
@@ -663,9 +661,7 @@ struct GroupPatternsV2 : PatternV2<GroupPatternsV2<PatternTypes...>>
 	using ResultType = typename traits<GroupPatternsV2<PatternTypes...>>::result_type;
 
 	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		return PatternMatchV2<PatternTypes...>::match(p);
-	}
+	{ return PatternMatchV2<PatternTypes...>::match(p); }
 };
 
 template<typename PatternsType> struct SingleTokenPattern_
@@ -809,9 +805,7 @@ struct AnyToken : PatternV2<AnyToken>
 
 	static constexpr size_t advance_by = 1;
 	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		return p.lexer().peek_token(p.token_position());
-	}
+	{ return p.lexer().peek_token(p.token_position()); }
 };
 
 
@@ -841,9 +835,7 @@ template<typename lhs, typename rhs> struct AndLiteralV2 : PatternV2<AndLiteralV
 	template<typename PatternType>
 	static bool matches_(std::string_view token)
 		requires(!is_tuple_v<PatternType>)
-	{
-		return PatternType::matches(token);
-	}
+	{ return PatternType::matches(token); }
 
 	template<typename PatternTypes>
 	static bool matches_(std::string_view token)
@@ -874,9 +866,7 @@ template<typename lhs, typename rhs> struct AndNotLiteralV2 : PatternV2<AndNotLi
 	template<typename PatternType>
 	static bool matches_(std::string_view token)
 		requires(!is_tuple_v<PatternType>)
-	{
-		return !PatternType::matches(token);
-	}
+	{ return !PatternType::matches(token); }
 
 	template<typename PatternTypes>
 	static bool matches_(std::string_view token)

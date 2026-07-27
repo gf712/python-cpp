@@ -37,9 +37,7 @@ namespace {
 	std::once_flag exception_flag;
 
 	std::unique_ptr<TypePrototype> register_exception()
-	{
-		return std::move(klass<Exception>("Exception", BaseException::class_type()).type);
-	}
+	{ return std::move(klass<Exception>("Exception", BaseException::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> Exception::type_factory()

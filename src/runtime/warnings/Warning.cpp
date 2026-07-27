@@ -40,9 +40,7 @@ namespace {
 	std::once_flag warning_flag;
 
 	std::unique_ptr<TypePrototype> register_warning()
-	{
-		return std::move(klass<Warning>("Warning", Exception::class_type()).type);
-	}
+	{ return std::move(klass<Warning>("Warning", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> Warning::type_factory()

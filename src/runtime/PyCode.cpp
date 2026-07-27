@@ -512,9 +512,7 @@ namespace {
 	std::once_flag code_flag;
 
 	std::unique_ptr<TypePrototype> register_code()
-	{
-		return std::move(klass<PyCode>("code").attr("co_consts", &PyCode::m_consts).type);
-	}
+	{ return std::move(klass<PyCode>("code").attr("co_consts", &PyCode::m_consts).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyCode::type_factory()

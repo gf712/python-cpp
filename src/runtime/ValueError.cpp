@@ -56,9 +56,7 @@ namespace {
 	std::once_flag value_error_flag;
 
 	std::unique_ptr<TypePrototype> register_value_error()
-	{
-		return std::move(klass<ValueError>("ValueError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<ValueError>("ValueError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> ValueError::type_factory()

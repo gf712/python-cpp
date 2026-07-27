@@ -14,9 +14,7 @@ class LoadGlobal final : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("LOAD_GLOBAL     r{:<3} \"{}\"", m_destination, m_object_name);
-	}
+	{ return fmt::format("LOAD_GLOBAL     r{:<3} \"{}\"", m_destination, m_object_name); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

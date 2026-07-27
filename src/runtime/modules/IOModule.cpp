@@ -141,9 +141,7 @@ class IOBase : public PyBaseObject
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return IOBase::create(type);
-	}
+	{ return IOBase::create(type); }
 
 	PyResult<PyObject *> __iter__() const
 	{
@@ -190,9 +188,7 @@ class IOBase : public PyBaseObject
 	}
 
 	PyResult<PyObject *> fileno() const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "fileno" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "fileno" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> flush() const
 	{
@@ -313,9 +309,7 @@ class IOBase : public PyBaseObject
 	}
 
 	PyResult<PyObject *> truncate() const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "truncate" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "truncate" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> writable() const { return Ok(py_false()); }
 
@@ -523,9 +517,7 @@ class RawIOBase : public IOBase
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return RawIOBase::create(type);
-	}
+	{ return RawIOBase::create(type); }
 
 	PyType *static_type() const override { return s_io_raw_iobase; }
 
@@ -560,14 +552,10 @@ class RawIOBase : public IOBase
 	}
 
 	PyResult<PyObject *> readinto(PyObject *) const
-	{
-		return Err(not_implemented_error("_RawIOBase.readinto"));
-	}
+	{ return Err(not_implemented_error("_RawIOBase.readinto")); }
 
 	PyResult<PyObject *> write(PyObject *) const
-	{
-		return Err(not_implemented_error("_RawIOBase.write"));
-	}
+	{ return Err(not_implemented_error("_RawIOBase.write")); }
 
 	static PyType *register_type(PyModule *module)
 	{
@@ -640,24 +628,16 @@ class BufferedIOBase : public IOBase
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BufferedIOBase::create(type);
-	}
+	{ return BufferedIOBase::create(type); }
 
 	PyResult<PyObject *> detach() const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> read(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> read1(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "read1" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "read1" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> readinto_generic(PyBuffer &buffer, bool readinto1) const
 	{
@@ -690,19 +670,13 @@ class BufferedIOBase : public IOBase
 	}
 
 	PyResult<PyObject *> readinto(PyBuffer &buffer) const
-	{
-		return readinto_generic(buffer, false);
-	}
+	{ return readinto_generic(buffer, false); }
 
 	PyResult<PyObject *> readinto1(PyBuffer &buffer) const
-	{
-		return readinto_generic(buffer, true);
-	}
+	{ return readinto_generic(buffer, true); }
 
 	PyResult<PyObject *> write(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr)); }
 
 	PyType *static_type() const override { return s_io_buffered_io_base; }
 
@@ -1065,9 +1039,7 @@ class BufferedReader
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BufferedReader::create(const_cast<PyType *>(type));
-	}
+	{ return BufferedReader::create(const_cast<PyType *>(type)); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
@@ -1403,9 +1375,7 @@ class BufferedWriter
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BufferedWriter::create(const_cast<PyType *>(type));
-	}
+	{ return BufferedWriter::create(const_cast<PyType *>(type)); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
@@ -1630,9 +1600,7 @@ class BufferedRWPair : public BufferedIOBase
 		"DEFAULT_BUFFER_SIZE.";
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BufferedRWPair::create(const_cast<PyType *>(type));
-	}
+	{ return BufferedRWPair::create(const_cast<PyType *>(type)); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
@@ -1834,9 +1802,7 @@ class BufferedRandom
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BufferedRandom::create(const_cast<PyType *>(type));
-	}
+	{ return BufferedRandom::create(const_cast<PyType *>(type)); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
@@ -1942,9 +1908,7 @@ class BytesIO : public BufferedIOBase
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return BytesIO::create(const_cast<PyType *>(type));
-	}
+	{ return BytesIO::create(const_cast<PyType *>(type)); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
@@ -2481,29 +2445,19 @@ class TextIOBase : public IOBase
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return TextIOBase::create(type);
-	}
+	{ return TextIOBase::create(type); }
 
 	PyResult<PyObject *> detach() const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "detach" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> read(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "read" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> readline(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "readline" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "readline" }).unwrap(), nullptr)); }
 
 	PyResult<PyObject *> write(PyTuple *, PyDict *) const
-	{
-		return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr));
-	}
+	{ return Err(unsupported_operation(PyTuple::create(String{ "write" }).unwrap(), nullptr)); }
 
 	PyType *static_type() const override { return s_io_textiobase; }
 
@@ -2561,9 +2515,7 @@ class IncrementalNewlineDecoder : public PyBaseObject
 	}
 
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *, PyDict *)
-	{
-		return IncrementalNewlineDecoder::create(type);
-	}
+	{ return IncrementalNewlineDecoder::create(type); }
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{

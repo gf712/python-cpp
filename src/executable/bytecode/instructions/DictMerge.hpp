@@ -14,9 +14,7 @@ class DictMerge final : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("DICT_MERGE      r{:<3} r{:<3}", m_this_dict, m_other_dict);
-	}
+	{ return fmt::format("DICT_MERGE      r{:<3} r{:<3}", m_this_dict, m_other_dict); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

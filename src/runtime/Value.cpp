@@ -796,9 +796,7 @@ PyResult<Value> floordiv(const Value &lhs, const Value &rhs, Interpreter &)
 }
 
 PyResult<Value> equals(const Value &lhs, const Value &rhs, Interpreter &)
-{
-	return equals(lhs, rhs);
-}
+{ return equals(lhs, rhs); }
 
 PyResult<Value> equals(const Value &lhs, const Value &rhs)
 {

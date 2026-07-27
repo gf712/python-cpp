@@ -45,9 +45,7 @@ inline void add_identifier_to(mlir::func::FuncOp fn,
 
 inline void
 	add_identifier(mlir::func::FuncOp fn, mlir::StringRef identifier, mlir::OpBuilder &builder)
-{
-	add_identifier_to(fn, "names", identifier, builder);
-}
+{ add_identifier_to(fn, "names", identifier, builder); }
 
 // Categorizes how a Load/Store/Delete pattern should register its name
 // with the parent FuncOp before lowering.

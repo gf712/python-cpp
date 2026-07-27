@@ -13,11 +13,7 @@
 using namespace py;
 
 CustomPyObject::CustomPyObject(const PyType *type) : PyBaseObject(const_cast<PyType *>(type))
-{
-	m_attributes = PyDict::create().unwrap();
-}
+{ m_attributes = PyDict::create().unwrap(); }
 
 std::string CustomPyObject::to_string() const
-{
-	return fmt::format("CustomPyObject of type \"{}\"", type()->to_string());
-}
+{ return fmt::format("CustomPyObject of type \"{}\"", type()->to_string()); }

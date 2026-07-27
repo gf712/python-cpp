@@ -72,9 +72,7 @@ namespace {
 std::once_flag iterator_flag;
 
 std::unique_ptr<TypePrototype> register_iterator()
-{
-	return std::move(klass<PyIterator>("iterator").disable_new().type);
-}
+{ return std::move(klass<PyIterator>("iterator").disable_new().type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyIterator::type_factory()

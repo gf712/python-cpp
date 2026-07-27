@@ -490,9 +490,7 @@ void assert_generates_ast(std::string_view program,
 }
 
 std::shared_ptr<Module> create_test_module()
-{
-	return std::make_shared<Module>("_optimizers_dummy_.py");
-}
+{ return std::make_shared<Module>("_optimizers_dummy_.py"); }
 }// namespace
 
 TEST(Optimizer, ConstantFoldIntegerAddition)

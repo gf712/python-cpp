@@ -33,9 +33,7 @@ class PyTuple
 	static PyResult<PyTuple *> create(PyType *type, const std::vector<PyObject *> &elements);
 
 	template<typename... Args> static PyResult<PyTuple *> create(Args &&...args)
-	{
-		return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... });
-	}
+	{ return PyTuple::create(std::vector<Value>{ std::forward<Args>(args)... }); }
 
 	std::string to_string() const override;
 

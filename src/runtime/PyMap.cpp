@@ -12,9 +12,7 @@ PyMap::PyMap(PyType *type, PyObject *func, PyTuple *iters)
 {}
 
 std::string PyMap::to_string() const
-{
-	return fmt::format("<map object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<map object at {}>", static_cast<const void *>(this)); }
 
 
 PyResult<PyObject *> PyMap::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)

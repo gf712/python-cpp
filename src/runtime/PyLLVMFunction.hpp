@@ -27,9 +27,7 @@ class PyLLVMFunction : public PyBaseObject
 	template<typename... Args>
 	PyLLVMFunction(std::string &&name, FunctionType &&function, Args &&...args)
 		: PyLLVMFunction(std::move(name), std::move(function))
-	{
-		m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... };
-	}
+	{ m_captures = std::vector<PyObject *>{ std::forward<Args>(args)... }; }
 
   public:
 	template<typename... Args>

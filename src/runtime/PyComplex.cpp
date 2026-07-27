@@ -22,9 +22,7 @@ namespace {
 std::once_flag complex_flag;
 
 std::unique_ptr<TypePrototype> register_complex()
-{
-	return std::move(klass<PyComplex>("complex").type);
-}
+{ return std::move(klass<PyComplex>("complex").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyComplex::type_factory()

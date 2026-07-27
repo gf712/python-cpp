@@ -264,9 +264,7 @@ namespace {
 	std::once_flag frame_flag;
 
 	std::unique_ptr<TypePrototype> register_frame()
-	{
-		return std::move(klass<PyFrame>("frame").type);
-	}
+	{ return std::move(klass<PyFrame>("frame").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyFrame::type_factory()

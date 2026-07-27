@@ -99,9 +99,7 @@ namespace {
 	std::once_flag method_wrapper_flag;
 
 	std::unique_ptr<TypePrototype> register_member_descriptor()
-	{
-		return std::move(klass<PyMemberDescriptor>("member_descriptor").type);
-	}
+	{ return std::move(klass<PyMemberDescriptor>("member_descriptor").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyMemberDescriptor::type_factory()

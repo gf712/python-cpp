@@ -360,29 +360,19 @@ template<> PyResult<PyObject *> PyObject::from(PyObject *const &value)
 }
 
 template<> PyResult<PyObject *> PyObject::from(const Number &value)
-{
-	return PyNumber::create(value);
-}
+{ return PyNumber::create(value); }
 
 template<> PyResult<PyObject *> PyObject::from(const int64_t &value)
-{
-	return PyNumber::create(Number{ value });
-}
+{ return PyNumber::create(Number{ value }); }
 
 template<> PyResult<PyObject *> PyObject::from(const size_t &value)
-{
-	return PyNumber::create(Number{ value });
-}
+{ return PyNumber::create(Number{ value }); }
 
 template<> PyResult<PyObject *> PyObject::from(const String &value)
-{
-	return PyString::create(value.s);
-}
+{ return PyString::create(value.s); }
 
 template<> PyResult<PyObject *> PyObject::from(const Bytes &value)
-{
-	return PyBytes::create(value);
-}
+{ return PyBytes::create(value); }
 
 template<> PyResult<PyObject *> PyObject::from(const Ellipsis &) { return Ok(py_ellipsis()); }
 
@@ -397,9 +387,7 @@ template<> PyResult<PyObject *> PyObject::from(const NameConstant &value)
 }
 
 template<> PyResult<PyObject *> PyObject::from(const Tuple &tuple)
-{
-	return PyTuple::create(tuple.elements);
-}
+{ return PyTuple::create(tuple.elements); }
 
 template<> PyResult<PyObject *> PyObject::from(const Value &value)
 {
@@ -1154,9 +1142,7 @@ PyResult<std::monostate> PyObject::delitem(PyObject *key)
 
 
 PyResult<PyObject *> PyObject::__eq__(const PyObject *other) const
-{
-	return Ok(this == other ? py_true() : not_implemented());
-}
+{ return Ok(this == other ? py_true() : not_implemented()); }
 
 PyResult<PyObject *> PyObject::__ne__(const PyObject *other) const
 {
@@ -1439,9 +1425,7 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 }
 
 std::string PyObject::to_string() const
-{
-	return fmt::format("PyObject at {}", static_cast<const void *>(this));
-}
+{ return fmt::format("PyObject at {}", static_cast<const void *>(this)); }
 
 PyType *PyObject::type() const
 {

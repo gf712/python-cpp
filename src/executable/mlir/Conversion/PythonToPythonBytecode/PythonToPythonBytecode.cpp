@@ -816,9 +816,7 @@ namespace py {
 			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PythonToPythonBytecodePass)
 
 			void getDependentDialects(DialectRegistry &registry) const override
-			{
-				registry.insert<PythonDialect, emitpybytecode::EmitPythonBytecodeDialect>();
-			}
+			{ registry.insert<PythonDialect, emitpybytecode::EmitPythonBytecodeDialect>(); }
 
 			StringRef getArgument() const final { return "python-to-pythonbytecode"; }
 
@@ -835,9 +833,7 @@ namespace py {
 		struct SinglePatternConversionPass : public PassWrapper<Derived, OperationPass<ModuleOp>>
 		{
 			void getDependentDialects(DialectRegistry &registry) const override
-			{
-				registry.insert<PythonDialect, emitpybytecode::EmitPythonBytecodeDialect>();
-			}
+			{ registry.insert<PythonDialect, emitpybytecode::EmitPythonBytecodeDialect>(); }
 
 			StringRef getArgument() const final { return Argument; }
 
@@ -938,9 +934,7 @@ namespace py {
 			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MaterialiseReturnNonePass)
 
 			void getDependentDialects(DialectRegistry &registry) const override
-			{
-				registry.insert<emitpybytecode::EmitPythonBytecodeDialect>();
-			}
+			{ registry.insert<emitpybytecode::EmitPythonBytecodeDialect>(); }
 
 			StringRef getArgument() const final { return "materialise-return-none"; }
 
@@ -992,28 +986,20 @@ namespace py {
 	}
 
 	std::unique_ptr<Pass> createPythonToPythonBytecodePass()
-	{
-		return std::make_unique<PythonToPythonBytecodePass>();
-	}
+	{ return std::make_unique<PythonToPythonBytecodePass>(); }
 
 	std::unique_ptr<Pass> createConvertForLoopPass()
-	{
-		return std::make_unique<ConvertForLoopPass>();
-	}
+	{ return std::make_unique<ConvertForLoopPass>(); }
 
 	std::unique_ptr<Pass> createConvertWhileLoopPass()
-	{
-		return std::make_unique<ConvertWhileLoopPass>();
-	}
+	{ return std::make_unique<ConvertWhileLoopPass>(); }
 
 	std::unique_ptr<Pass> createConvertTryPass() { return std::make_unique<ConvertTryPass>(); }
 
 	std::unique_ptr<Pass> createConvertWithPass() { return std::make_unique<ConvertWithPass>(); }
 
 	std::unique_ptr<Pass> createMaterialiseReturnNonePass()
-	{
-		return std::make_unique<MaterialiseReturnNonePass>();
-	}
+	{ return std::make_unique<MaterialiseReturnNonePass>(); }
 
 }// namespace py
 }// namespace mlir

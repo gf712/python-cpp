@@ -243,9 +243,7 @@ namespace types {
 		TypePrototype &deprecation_warning() const { return get_type(m_deprecation_warning); }
 		TypePrototype &import_warning() const { return get_type(m_import_warning); }
 		TypePrototype &pending_deprecation_warning() const
-		{
-			return get_type(m_pending_deprecation_warning);
-		}
+		{ return get_type(m_pending_deprecation_warning); }
 		TypePrototype &resource_warning() const { return get_type(m_resource_warning); }
 		TypePrototype &syntax_error() const { return get_type(m_syntax_error); }
 		TypePrototype &memory_error() const { return get_type(m_memory_error); }

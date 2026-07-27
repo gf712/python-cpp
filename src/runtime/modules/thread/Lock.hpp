@@ -98,9 +98,7 @@ class Lock : public PyBaseObject
 	}
 
 	PyResult<PyObject *> acquire(PyTuple *args, PyDict *kwargs)
-	{
-		return acquire_lock(args, kwargs);
-	}
+	{ return acquire_lock(args, kwargs); }
 
 	PyResult<PyObject *> release_lock()
 	{
@@ -117,9 +115,7 @@ class Lock : public PyBaseObject
 	PyResult<PyObject *> locked() { return locked_lock(); }
 
 	PyResult<PyObject *> __enter__(PyTuple *args, PyDict *kwargs)
-	{
-		return acquire_lock(args, kwargs);
-	}
+	{ return acquire_lock(args, kwargs); }
 
 	PyResult<PyObject *> __exit__(PyTuple *, PyDict *) { return release_lock(); }
 

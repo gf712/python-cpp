@@ -41,9 +41,7 @@ namespace {
 std::once_flag resource_warning_flag;
 
 std::unique_ptr<TypePrototype> register_resource_warning()
-{
-	return std::move(klass<ResourceWarning>("ResourceWarning", types::warning()).type);
-}
+{ return std::move(klass<ResourceWarning>("ResourceWarning", types::warning()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> ResourceWarning::type_factory()

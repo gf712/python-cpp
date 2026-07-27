@@ -52,9 +52,7 @@ namespace {
 	std::once_flag runtime_error_flag;
 
 	std::unique_ptr<TypePrototype> register_runtime_error()
-	{
-		return std::move(klass<RuntimeError>("RuntimeError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<RuntimeError>("RuntimeError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> RuntimeError::type_factory()

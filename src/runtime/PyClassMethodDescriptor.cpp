@@ -52,9 +52,7 @@ std::string PyClassMethodDescriptor::to_string() const
 }
 
 PyResult<PyObject *> PyClassMethodDescriptor::__repr__() const
-{
-	return PyString::create(to_string());
-}
+{ return PyString::create(to_string()); }
 
 PyResult<PyObject *> PyClassMethodDescriptor::__call__(PyTuple *args, PyDict *kwargs)
 {
@@ -124,9 +122,7 @@ namespace {
 	std::once_flag classmethod_wrapper_flag;
 
 	std::unique_ptr<TypePrototype> register_classmethod_wrapper()
-	{
-		return std::move(klass<PyClassMethodDescriptor>("classmethod_descriptor").type);
-	}
+	{ return std::move(klass<PyClassMethodDescriptor>("classmethod_descriptor").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyClassMethodDescriptor::type_factory()

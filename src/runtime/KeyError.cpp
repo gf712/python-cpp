@@ -56,9 +56,7 @@ namespace {
 	std::once_flag key_error_flag;
 
 	std::unique_ptr<TypePrototype> register_key_error()
-	{
-		return std::move(klass<KeyError>("KeyError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<KeyError>("KeyError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> KeyError::type_factory()

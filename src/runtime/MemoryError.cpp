@@ -54,9 +54,7 @@ namespace {
 	std::once_flag memory_error_flag;
 
 	std::unique_ptr<TypePrototype> register_memory_error()
-	{
-		return std::move(klass<MemoryError>("MemoryError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<MemoryError>("MemoryError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> MemoryError::type_factory()

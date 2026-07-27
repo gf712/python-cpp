@@ -178,9 +178,7 @@ PyObject *BytecodeProgram::as_pyfunction(const std::string &function_name,
 PyObject *BytecodeProgram::main_function() { return m_main_function; }
 
 void BytecodeProgram::add_backend(std::shared_ptr<Program> other)
-{
-	m_backends.push_back(std::move(other));
-}
+{ m_backends.push_back(std::move(other)); }
 
 std::string FunctionBlock::to_string() const
 {

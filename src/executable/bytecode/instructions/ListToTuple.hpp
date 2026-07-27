@@ -12,9 +12,7 @@ class ListToTuple final : public Instruction
 	ListToTuple(Register tuple, Register list) : m_tuple(tuple), m_list(list) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("LIST_TO_TUPLE   r{:<3} r{:<3}", m_tuple, m_list);
-	}
+	{ return fmt::format("LIST_TO_TUPLE   r{:<3} r{:<3}", m_tuple, m_list); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

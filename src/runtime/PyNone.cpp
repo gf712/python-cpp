@@ -37,9 +37,7 @@ namespace {
 	std::once_flag none_flag;
 
 	std::unique_ptr<TypePrototype> register_none()
-	{
-		return std::move(klass<PyNone>("NoneType").type);
-	}
+	{ return std::move(klass<PyNone>("NoneType").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyNone::type_factory()

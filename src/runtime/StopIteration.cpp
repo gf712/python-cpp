@@ -50,9 +50,7 @@ namespace {
 	std::once_flag stop_iteration_flag;
 
 	std::unique_ptr<TypePrototype> register_stop_iteration()
-	{
-		return std::move(klass<StopIteration>("StopIteration", Exception::class_type()).type);
-	}
+	{ return std::move(klass<StopIteration>("StopIteration", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> StopIteration::type_factory()

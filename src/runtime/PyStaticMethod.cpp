@@ -63,9 +63,7 @@ namespace {
 	std::once_flag static_method_flag;
 
 	std::unique_ptr<TypePrototype> register_static_method()
-	{
-		return std::move(klass<PyStaticMethod>("staticmethod").type);
-	}
+	{ return std::move(klass<PyStaticMethod>("staticmethod").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyStaticMethod::type_factory()

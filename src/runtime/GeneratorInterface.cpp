@@ -39,19 +39,13 @@ template<typename T> std::string GeneratorInterface<T>::to_string() const
 }
 
 template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__repr__() const
-{
-	return PyString::create(to_string());
-}
+{ return PyString::create(to_string()); }
 
 template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__iter__() const
-{
-	return Ok(static_cast<T *>(const_cast<GeneratorInterface<T> *>(this)));
-}
+{ return Ok(static_cast<T *>(const_cast<GeneratorInterface<T> *>(this))); }
 
 template<typename T> PyResult<PyObject *> GeneratorInterface<T>::__next__()
-{
-	return send(py_none());
-}
+{ return send(py_none()); }
 
 template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send(PyObject *value)
 {

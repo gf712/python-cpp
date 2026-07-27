@@ -11,9 +11,7 @@ class StoreFast final : public Instruction
 	StoreFast(Register stack_index, Register src) : m_stack_index(stack_index), m_src(src) {}
 	~StoreFast() override {}
 	std::string to_string() const final
-	{
-		return fmt::format("STORE_FAST       {} r{:<3}", m_stack_index, m_src);
-	}
+	{ return fmt::format("STORE_FAST       {} r{:<3}", m_stack_index, m_src); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &) const final;
 

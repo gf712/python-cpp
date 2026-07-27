@@ -22,9 +22,7 @@ class MakeFunction : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name);
-	}
+	{ return fmt::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

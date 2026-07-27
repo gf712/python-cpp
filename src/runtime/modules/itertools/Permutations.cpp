@@ -80,9 +80,7 @@ namespace itertools {
 	}
 
 	PyResult<PyObject *> Permutations::__iter__() const
-	{
-		return Ok(const_cast<Permutations *>(this));
-	}
+	{ return Ok(const_cast<Permutations *>(this)); }
 
 	PyResult<PyObject *> Permutations::__next__()
 	{

@@ -303,9 +303,7 @@ namespace {
 	std::once_flag tuple_flag;
 
 	std::unique_ptr<TypePrototype> register_tuple()
-	{
-		return std::move(klass<PyTuple>("tuple").type);
-	}
+	{ return std::move(klass<PyTuple>("tuple").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyTuple::type_factory()
@@ -323,9 +321,7 @@ PyTupleIterator::PyTupleIterator(const PyTuple &pytuple)
 {}
 
 PyTupleIterator::PyTupleIterator(const PyTuple &pytuple, size_t position) : PyTupleIterator(pytuple)
-{
-	m_current_index = position;
-}
+{ m_current_index = position; }
 
 PyResult<PyTupleIterator *> PyTupleIterator::create(const PyTuple &pytuple)
 {
@@ -336,9 +332,7 @@ PyResult<PyTupleIterator *> PyTupleIterator::create(const PyTuple &pytuple)
 }
 
 std::string PyTupleIterator::to_string() const
-{
-	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyTupleIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -351,9 +345,7 @@ PyResult<PyObject *> PyTupleIterator::__next__()
 }
 
 bool PyTupleIterator::operator==(const PyTupleIterator &other) const
-{
-	return &m_pytuple == &other.m_pytuple && m_current_index == other.m_current_index;
-}
+{ return &m_pytuple == &other.m_pytuple && m_current_index == other.m_current_index; }
 
 PyTupleIterator &PyTupleIterator::operator++()
 {
@@ -387,9 +379,7 @@ namespace {
 	std::once_flag tuple_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_tuple_iterator()
-	{
-		return std::move(klass<PyTupleIterator>("tuple_iterator").type);
-	}
+	{ return std::move(klass<PyTupleIterator>("tuple_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyTupleIterator::type_factory()

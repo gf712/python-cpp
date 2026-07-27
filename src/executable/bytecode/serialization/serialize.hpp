@@ -46,14 +46,10 @@ template<typename T> inline void serialize(const T &value, std::vector<uint8_t> 
 template<> inline void serialize<Value>(const Value &value, std::vector<uint8_t> &result);
 
 template<> inline void serialize<bool>(const bool &value, std::vector<uint8_t> &result)
-{
-	result.push_back(value ? 1 : 0);
-}
+{ result.push_back(value ? 1 : 0); }
 
 template<> inline void serialize<std::byte>(const std::byte &value, std::vector<uint8_t> &result)
-{
-	result.push_back(::bit_cast<uint8_t>(value));
-}
+{ result.push_back(::bit_cast<uint8_t>(value)); }
 
 template<>
 inline void serialize<std::string>(const std::string &value, std::vector<uint8_t> &result)

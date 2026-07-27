@@ -93,9 +93,7 @@ namespace {
 	std::once_flag float_flag;
 
 	std::unique_ptr<TypePrototype> register_float()
-	{
-		return std::move(klass<PyFloat>("float").def("__round__", &PyFloat::__round__).type);
-	}
+	{ return std::move(klass<PyFloat>("float").def("__round__", &PyFloat::__round__).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyFloat::type_factory()

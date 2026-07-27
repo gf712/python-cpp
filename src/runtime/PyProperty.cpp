@@ -76,9 +76,7 @@ PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject 
 {}
 
 std::string PyProperty::to_string() const
-{
-	return fmt::format("<property object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<property object at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyProperty *>
 	PyProperty::create(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject *name)
@@ -134,9 +132,7 @@ PyResult<PyObject *> PyProperty::deleter(PyTuple *args, PyDict *kwargs) const
 }
 
 PyResult<PyObject *> PyProperty::__repr__() const
-{
-	return PyString::create(PyProperty::to_string());
-}
+{ return PyString::create(PyProperty::to_string()); }
 
 PyResult<PyObject *> PyProperty::__get__(PyObject *instance, PyObject *) const
 {

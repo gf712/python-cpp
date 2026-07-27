@@ -12,9 +12,7 @@ class ListAppend final : public Instruction
 	ListAppend(Register list, Register value) : m_list(list), m_value(value) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("LIST_APPEND     r{:<3} r{:<3}", m_list, m_value);
-	}
+	{ return fmt::format("LIST_APPEND     r{:<3} r{:<3}", m_list, m_value); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

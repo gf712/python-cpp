@@ -300,9 +300,7 @@ void Interpreter::setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&prog
 }
 
 void Interpreter::raise_exception(py::BaseException *exception)
-{
-	m_current_frame->push_exception(exception);
-}
+{ m_current_frame->push_exception(exception); }
 
 PyModule *Interpreter::get_imported_module(PyString *name) const
 {

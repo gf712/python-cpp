@@ -29,9 +29,7 @@ PyResult<Value> JumpIfTrueOrPop::execute(VirtualMachine &vm, Interpreter &interp
 }
 
 void JumpIfTrueOrPop::relocate(size_t instruction_idx)
-{
-	m_offset = m_label->position() - instruction_idx - 1;
-}
+{ m_offset = m_label->position() - instruction_idx - 1; }
 
 std::vector<uint8_t> JumpIfTrueOrPop::serialize() const
 {

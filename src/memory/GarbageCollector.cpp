@@ -105,9 +105,7 @@ bool is_static_memory(uint8_t *cell_start, const Heap &heap)
 }// namespace
 
 void GarbageCollector::remove_weakref(Heap &heap, uint8_t *obj) const
-{
-	heap.m_weakrefs.erase(obj);
-}
+{ heap.m_weakrefs.erase(obj); }
 
 std::stack<Cell *> MarkSweepGC::collect_roots(const Heap &heap) const
 {

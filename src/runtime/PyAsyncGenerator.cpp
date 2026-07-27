@@ -74,8 +74,6 @@ std::function<std::unique_ptr<TypePrototype>()> PyAsyncGenerator::type_factory()
 PyType *PyAsyncGenerator::static_type() const { return types::async_generator(); }
 
 void PyAsyncGenerator::visit_graph(Visitor &visitor)
-{
-	GeneratorInterface<PyAsyncGenerator>::visit_graph(visitor);
-}
+{ GeneratorInterface<PyAsyncGenerator>::visit_graph(visitor); }
 
 }// namespace py

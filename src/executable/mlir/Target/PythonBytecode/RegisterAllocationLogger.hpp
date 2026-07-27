@@ -21,9 +21,7 @@ using ForwardedOutput = std::pair<mlir::Operation *, size_t>;
 template<> struct fmt::formatter<mlir::Value, char>
 {
 	template<class ParseContext> constexpr ParseContext::iterator parse(ParseContext &ctx)
-	{
-		return ctx.begin();
-	}
+	{ return ctx.begin(); }
 
 	template<class FmtContext> FmtContext::iterator format(mlir::Value value, FmtContext &ctx) const
 	{
@@ -39,9 +37,7 @@ template<> struct fmt::formatter<mlir::Value, char>
 template<> struct fmt::formatter<codegen::ForwardedOutput, char>
 {
 	template<class ParseContext> constexpr ParseContext::iterator parse(ParseContext &ctx)
-	{
-		return ctx.begin();
-	}
+	{ return ctx.begin(); }
 
 	template<class FmtContext>
 	FmtContext::iterator format(codegen::ForwardedOutput output, FmtContext &ctx) const
@@ -60,9 +56,7 @@ template<> struct fmt::formatter<std::variant<mlir::Value, codegen::ForwardedOut
 {
 
 	template<class ParseContext> constexpr ParseContext::iterator parse(ParseContext &ctx)
-	{
-		return ctx.begin();
-	}
+	{ return ctx.begin(); }
 
 	template<class FmtContext>
 	FmtContext::iterator format(std::variant<mlir::Value, codegen::ForwardedOutput> value,

@@ -164,9 +164,7 @@ namespace {
 }// namespace
 
 PyMemoryView::PyMemoryView(PyType *type) : PyBaseObject(type)
-{
-	ASSERT(type == types::memoryview());
-}
+{ ASSERT(type == types::memoryview()); }
 
 PyMemoryView::PyMemoryView(PyBuffer buffer)
 	: PyBaseObject(types::memoryview()), m_view(std::move(buffer))
@@ -404,8 +402,6 @@ void PyMemoryView::visit_graph(Visitor &visitor)
 }
 
 std::string PyMemoryView::to_string() const
-{
-	return fmt::format("<memory at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<memory at {}>", static_cast<const void *>(this)); }
 
 }// namespace py

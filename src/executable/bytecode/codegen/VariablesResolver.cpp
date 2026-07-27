@@ -9,9 +9,7 @@ using namespace ast;
 
 namespace {
 bool captured_by_closure(VariablesResolver::Visibility v)
-{
-	return v == VariablesResolver::Visibility::CELL || v == VariablesResolver::Visibility::FREE;
-}
+{ return v == VariablesResolver::Visibility::CELL || v == VariablesResolver::Visibility::FREE; }
 }// namespace
 
 

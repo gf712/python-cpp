@@ -83,9 +83,7 @@ namespace emitpybytecode {
 
 	void BuildDict::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
 		mlir::MLIRContext *context)
-	{
-		patterns.add<ExpandLargeBuildDict>(context);
-	}
+	{ patterns.add<ExpandLargeBuildDict>(context); }
 
 	namespace {
 		// Register-pressure relief for all-constants list literals
@@ -124,9 +122,7 @@ namespace emitpybytecode {
 
 	void BuildList::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
 		mlir::MLIRContext *context)
-	{
-		patterns.add<FoldAllConstBuildListIntoExtend>(context);
-	}
+	{ patterns.add<FoldAllConstBuildListIntoExtend>(context); }
 
 	mlir::LogicalResult ConstantOp::verify()
 	{

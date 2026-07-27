@@ -60,9 +60,7 @@ namespace {
 	std::once_flag os_error_flag;
 
 	std::unique_ptr<TypePrototype> register_os_error()
-	{
-		return std::move(klass<OSError>("OSError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<OSError>("OSError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> OSError::type_factory()

@@ -35,9 +35,7 @@ template<> struct fmt::formatter<Position>
 	constexpr auto parse(format_parse_context &ctx) { return ctx.end(); }
 
 	template<typename FormatContext> auto format(const Position &pos, FormatContext &ctx)
-	{
-		return format_to(ctx.out(), "{}:{}", pos.row + 1, pos.column);
-	}
+	{ return format_to(ctx.out(), "{}:{}", pos.row + 1, pos.column); }
 };
 
 
@@ -147,9 +145,7 @@ class Token
 	}
 
 	friend std::ostream &operator<<(std::ostream &os, const Token &t)
-	{
-		return os << t.to_string();
-	}
+	{ return os << t.to_string(); }
 
 	static std::string_view stringify_token_type(const TokenType token_type)
 	{
@@ -212,9 +208,7 @@ class Lexer
 
   public:
 	static Lexer create(std::string program, std::string filename)
-	{
-		return Lexer(std::move(program), std::move(filename));
-	}
+	{ return Lexer(std::move(program), std::move(filename)); }
 
 	static Lexer create(std::string filename)
 	{

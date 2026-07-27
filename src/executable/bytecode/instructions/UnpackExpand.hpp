@@ -16,9 +16,7 @@ class UnpackExpand final : public Instruction
 	{}
 
 	std::string to_string() const final
-	{
-		return fmt::format("UNPACK_EXPAND   {} r{:<3}", m_destination.size(), m_source);
-	}
+	{ return fmt::format("UNPACK_EXPAND   {} r{:<3}", m_destination.size(), m_source); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

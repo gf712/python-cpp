@@ -115,9 +115,7 @@ PyResult<PyObject *> PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 }
 
 std::string PyFunction::to_string() const
-{
-	return fmt::format("<function {} at {}>", m_name->value(), (void *)this);
-}
+{ return fmt::format("<function {} at {}>", m_name->value(), (void *)this); }
 
 namespace {
 	std::once_flag function_flag;
@@ -208,9 +206,7 @@ namespace {
 	std::once_flag native_function_flag;
 
 	std::unique_ptr<TypePrototype> register_native_function()
-	{
-		return std::move(klass<PyNativeFunction>("builtin_function_or_method").type);
-	}
+	{ return std::move(klass<PyNativeFunction>("builtin_function_or_method").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyNativeFunction::type_factory()

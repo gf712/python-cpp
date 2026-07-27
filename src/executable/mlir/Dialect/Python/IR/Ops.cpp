@@ -74,16 +74,12 @@ namespace py {
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
 		mlir::StringAttr str)
-	{
-		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), str);
-	}
+	{ ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), str); }
 
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
 		mlir::IntegerAttr int_attr)
-	{
-		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), int_attr);
-	}
+	{ ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), int_attr); }
 
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
@@ -100,9 +96,7 @@ namespace py {
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
 		mlir::py::EllipsisAttr value)
-	{
-		ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), value);
-	}
+	{ ConstantOp::build(builder, state, PyObjectType::get(builder.getContext()), value); }
 
 	void ConstantOp::build(mlir::OpBuilder &builder,
 		mlir::OperationState &state,
@@ -115,9 +109,7 @@ namespace py {
 	}
 
 	EllipsisAttr EllipsisAttr::get(mlir::MLIRContext *context)
-	{
-		return mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(context);
-	}
+	{ return mlir::detail::AttributeUniquer::get<mlir::py::EllipsisAttr>(context); }
 
 	mlir::LogicalResult ConstantOp::verify()
 	{
@@ -258,9 +250,7 @@ namespace py {
 		// not threaded through the parent successor. Return empty in all
 		// cases.
 		mlir::ValueRange region_or_block_arguments(mlir::Operation *, mlir::RegionSuccessor)
-		{
-			return mlir::ValueRange{};
-		}
+		{ return mlir::ValueRange{}; }
 	}// namespace
 
 	// Based on CIR loop interface implementation
@@ -319,14 +309,10 @@ namespace py {
 	}
 
 	mlir::ValueRange WhileOp::getSuccessorInputs(mlir::RegionSuccessor successor)
-	{
-		return region_or_block_arguments(getOperation(), successor);
-	}
+	{ return region_or_block_arguments(getOperation(), successor); }
 
 	mlir::ValueRange ForLoopOp::getSuccessorInputs(mlir::RegionSuccessor successor)
-	{
-		return region_or_block_arguments(getOperation(), successor);
-	}
+	{ return region_or_block_arguments(getOperation(), successor); }
 
 	void TryOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
@@ -481,14 +467,10 @@ namespace py {
 	}
 
 	mlir::ValueRange TryOp::getSuccessorInputs(mlir::RegionSuccessor successor)
-	{
-		return region_or_block_arguments(getOperation(), successor);
-	}
+	{ return region_or_block_arguments(getOperation(), successor); }
 
 	mlir::ValueRange TryHandlerOp::getSuccessorInputs(mlir::RegionSuccessor successor)
-	{
-		return region_or_block_arguments(getOperation(), successor);
-	}
+	{ return region_or_block_arguments(getOperation(), successor); }
 
 	void TryHandlerOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
@@ -546,9 +528,7 @@ namespace py {
 
 	void LoadFastOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
 		mlir::MLIRContext *context)
-	{
-		patterns.add<ForwardStoreFastToLoadFast>(context);
-	}
+	{ patterns.add<ForwardStoreFastToLoadFast>(context); }
 }// namespace py
 }// namespace mlir
 

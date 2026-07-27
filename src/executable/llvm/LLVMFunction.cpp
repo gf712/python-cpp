@@ -12,6 +12,4 @@ py::PyResult<py::Value> LLVMFunction::call(VirtualMachine &, Interpreter &) cons
 
 py::PyResult<py::Value> LLVMFunction::call_without_setup(VirtualMachine &vm,
 	Interpreter &interpreter) const
-{
-	return call(vm, interpreter);
-}
+{ return call(vm, interpreter); }

@@ -11,9 +11,7 @@ class BuildSet final : public Instruction
 	BuildSet(Register dst, size_t size) : m_dst(dst), m_size(size) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("BUILD_SET       r{:<3} ({})", m_dst, m_size);
-	}
+	{ return fmt::format("BUILD_SET       r{:<3} ({})", m_dst, m_size); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 

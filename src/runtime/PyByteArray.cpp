@@ -133,9 +133,7 @@ std::string PyByteArray::to_string() const
 PyResult<size_t> PyByteArray::__len__() const { return Ok(m_value.b.size()); }
 
 PyResult<PyObject *> PyByteArray::__iter__() const
-{
-	return PyByteArrayIterator::create(const_cast<PyByteArray *>(this));
-}
+{ return PyByteArrayIterator::create(const_cast<PyByteArray *>(this)); }
 
 PyResult<PyObject *> PyByteArray::__repr__() const { return PyString::create(to_string()); }
 
@@ -521,9 +519,7 @@ PyResult<PyByteArrayIterator *> PyByteArrayIterator::create(PyByteArray *bytes_a
 }
 
 std::string PyByteArrayIterator::to_string() const
-{
-	return fmt::format("<bytearray_iterator object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<bytearray_iterator object at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyByteArrayIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -539,9 +535,7 @@ namespace {
 	std::once_flag bytearray_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_bytearray_iterator()
-	{
-		return std::move(klass<PyByteArrayIterator>("bytearray_iterator").type);
-	}
+	{ return std::move(klass<PyByteArrayIterator>("bytearray_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyByteArrayIterator::type_factory()

@@ -77,9 +77,7 @@ namespace {
 	std::once_flag builtin_method_flag;
 
 	std::unique_ptr<TypePrototype> register_builtin_method()
-	{
-		return std::move(klass<PyBuiltInMethod>("builtin_method").type);
-	}
+	{ return std::move(klass<PyBuiltInMethod>("builtin_method").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyBuiltInMethod::type_factory()

@@ -201,9 +201,7 @@ template<typename T> struct OwningStorage : Storage
 	void set_buffer(void *ptr) final { m_storage = static_cast<T *>(ptr); }
 
 	std::unique_ptr<Storage> view() final
-	{
-		return std::make_unique<NonOwningStorage<T>>(m_storage);
-	}
+	{ return std::make_unique<NonOwningStorage<T>>(m_storage); }
 
 	T *m_storage;
 };
@@ -219,9 +217,7 @@ template<typename T> struct NonOwningStorage : Storage
 	void set_buffer(void *ptr) final { m_storage = static_cast<T *>(ptr); }
 
 	std::unique_ptr<Storage> view() final
-	{
-		return std::make_unique<NonOwningStorage<T>>(m_storage);
-	}
+	{ return std::make_unique<NonOwningStorage<T>>(m_storage); }
 
 	T *m_storage;
 };
@@ -270,9 +266,7 @@ struct TypePrototype
 	TypePrototype() = default;
 
 	std::unique_ptr<TypePrototype> clone() const
-	{
-		return std::unique_ptr<TypePrototype>(new TypePrototype{ *this });
-	}
+	{ return std::unique_ptr<TypePrototype>(new TypePrototype{ *this }); }
 
   public:
 	std::string __name__;

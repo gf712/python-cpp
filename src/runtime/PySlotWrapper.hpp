@@ -56,9 +56,7 @@ class Slot
 		std::optional<std::variant<std::function<FnType>, PyObject *>> TypePrototypeWrapper::*slot,
 		std::optional<std::string_view> doc_)
 		: name(name_), doc(doc_), flags(Flags::None)
-	{
-		initialize<Flags::None>(slot);
-	}
+	{ initialize<Flags::None>(slot); }
 
 	template<typename FnType>
 	static Slot with_keyword(std::string_view name_,

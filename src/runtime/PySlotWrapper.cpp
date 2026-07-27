@@ -13,9 +13,7 @@ namespace py {
 PySlotWrapper::PySlotWrapper(PyType *type) : PyBaseObject(type) {}
 
 std::string PySlotWrapper::to_string() const
-{
-	return fmt::format("<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_type->name());
-}
+{ return fmt::format("<slot wrapper '{}' of '{}' objects>", m_name->to_string(), m_type->name()); }
 
 void PySlotWrapper::visit_graph(Visitor &visitor)
 {
@@ -94,9 +92,7 @@ namespace {
 	std::once_flag slot_wrapper_flag;
 
 	std::unique_ptr<TypePrototype> register_slot_wrapper()
-	{
-		return std::move(klass<PySlotWrapper>("slot_wrapper").type);
-	}
+	{ return std::move(klass<PySlotWrapper>("slot_wrapper").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PySlotWrapper::type_factory()

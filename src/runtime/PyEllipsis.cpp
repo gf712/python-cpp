@@ -40,9 +40,7 @@ namespace {
 	std::once_flag ellipsis_flag;
 
 	std::unique_ptr<TypePrototype> register_ellipsis()
-	{
-		return std::move(klass<PyEllipsis>("ellipsis").type);
-	}
+	{ return std::move(klass<PyEllipsis>("ellipsis").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyEllipsis::type_factory()

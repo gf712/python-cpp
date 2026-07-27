@@ -60,9 +60,7 @@ namespace {
 	std::once_flag bound_method_flag;
 
 	std::unique_ptr<TypePrototype> register_bound_method()
-	{
-		return std::move(klass<PyBoundMethod>("bound_method").type);
-	}
+	{ return std::move(klass<PyBoundMethod>("bound_method").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyBoundMethod::type_factory()

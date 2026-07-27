@@ -829,9 +829,7 @@ Value *BytecodeGenerator::visit(const FunctionDefinition *node) { return generat
 
 
 Value *BytecodeGenerator::visit(const AsyncFunctionDefinition *node)
-{
-	return generate_function(node);
-}
+{ return generate_function(node); }
 
 Value *BytecodeGenerator::visit(const Lambda *node)
 {
@@ -1866,9 +1864,7 @@ Value *BytecodeGenerator::visit(const Attribute *node)
 }
 
 Value *BytecodeGenerator::visit(const Keyword *node)
-{
-	return generate(node->value(), m_function_id);
-}
+{ return generate(node->value(), m_function_id); }
 
 Value *BytecodeGenerator::visit(const AugAssign *node)
 {
@@ -2381,9 +2377,7 @@ Value *BytecodeGenerator::visit(const Try *node)
 Value *BytecodeGenerator::visit(const ExceptHandler *) { TODO(); }
 
 Value *BytecodeGenerator::visit(const Expression *node)
-{
-	return generate(node->value(), m_function_id);
-}
+{ return generate(node->value(), m_function_id); }
 
 Value *BytecodeGenerator::visit(const Global *) { return nullptr; }
 
@@ -3050,9 +3044,7 @@ Value *BytecodeGenerator::visit(const Await *node)
 
 FunctionInfo::FunctionInfo(size_t function_id_, FunctionBlock &f, BytecodeGenerator *generator_)
 	: function_id(function_id_), function(f), generator(generator_)
-{
-	generator->enter_function();
-}
+{ generator->enter_function(); }
 
 BytecodeGenerator::BytecodeGenerator()
 {

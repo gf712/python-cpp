@@ -28,9 +28,7 @@ namespace {
 	std::once_flag syntax_error_flag;
 
 	std::unique_ptr<TypePrototype> register_syntax_error()
-	{
-		return std::move(klass<SyntaxError>("SyntaxError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<SyntaxError>("SyntaxError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> SyntaxError::type_factory()

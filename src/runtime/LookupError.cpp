@@ -42,9 +42,7 @@ namespace {
 	std::once_flag lookup_error_flag;
 
 	std::unique_ptr<TypePrototype> register_lookup_error()
-	{
-		return std::move(klass<LookupError>("LookupError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<LookupError>("LookupError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> LookupError::type_factory()

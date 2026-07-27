@@ -114,9 +114,7 @@ LLVMGenerator::LLVMValue *LLVMGenerator::generate(const ast::ASTNode *node)
 }
 
 ast::Value *LLVMGenerator::create_value(llvm::Value *value)
-{
-	return m_values.emplace_back(std::make_unique<LLVMGenerator::LLVMValue>(value)).get();
-}
+{ return m_values.emplace_back(std::make_unique<LLVMGenerator::LLVMValue>(value)).get(); }
 
 ast::Value *LLVMGenerator::visit(const ast::Argument *node) { TODO(); }
 

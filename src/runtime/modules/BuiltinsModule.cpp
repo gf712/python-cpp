@@ -418,15 +418,11 @@ PyResult<PyObject *>
 }
 
 PyResult<PyObject *> globals(const PyTuple *, const PyDict *, Interpreter &interpreter)
-{
-	return Ok(interpreter.execution_frame()->globals());
-}
+{ return Ok(interpreter.execution_frame()->globals()); }
 
 
 PyResult<PyObject *> locals(const PyTuple *, const PyDict *, Interpreter &interpreter)
-{
-	return Ok(interpreter.execution_frame()->locals());
-}
+{ return Ok(interpreter.execution_frame()->locals()); }
 
 
 PyResult<PyObject *> len(PyTuple *args, PyDict *kwargs, Interpreter &)

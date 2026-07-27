@@ -167,9 +167,7 @@ namespace {
 	std::once_flag range_flag;
 
 	std::unique_ptr<TypePrototype> register_range()
-	{
-		return std::move(klass<PyRange>("range").def("__reversed__", &PyRange::__reversed__).type);
-	}
+	{ return std::move(klass<PyRange>("range").def("__reversed__", &PyRange::__reversed__).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyRange::type_factory()
@@ -188,9 +186,7 @@ PyRangeIterator::PyRangeIterator(const PyRange &pyrange)
 {}
 
 std::string PyRangeIterator::to_string() const
-{
-	return fmt::format("<range_iterator at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<range_iterator at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyRangeIterator::__repr__() const { return PyString::create(to_string()); }
 
@@ -212,9 +208,7 @@ PyResult<PyObject *> PyRangeIterator::__next__()
 }
 
 PyResult<PyObject *> PyRangeIterator::__iter__() const
-{
-	return Ok(const_cast<PyRangeIterator *>(this));
-}
+{ return Ok(const_cast<PyRangeIterator *>(this)); }
 
 PyType *PyRangeIterator::static_type() const { return types::range_iterator(); }
 
@@ -229,9 +223,7 @@ namespace {
 	std::once_flag range_iterator_flag;
 
 	std::unique_ptr<TypePrototype> register_range_iterator()
-	{
-		return std::move(klass<PyRangeIterator>("range_iterator").type);
-	}
+	{ return std::move(klass<PyRangeIterator>("range_iterator").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyRangeIterator::type_factory()

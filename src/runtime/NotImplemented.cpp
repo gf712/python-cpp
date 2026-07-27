@@ -25,9 +25,7 @@ namespace {
 	std::once_flag not_implemented_flag;
 
 	std::unique_ptr<TypePrototype> register_not_implemented()
-	{
-		return std::move(klass<NotImplemented>("NotImplemented").type);
-	}
+	{ return std::move(klass<NotImplemented>("NotImplemented").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> NotImplemented::type_factory()

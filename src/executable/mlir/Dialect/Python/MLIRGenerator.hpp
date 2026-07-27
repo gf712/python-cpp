@@ -72,9 +72,7 @@ class MLIRGenerator : ast::CodeGenerator
 	struct ClearExceptionBeforeReturn
 	{
 		ClearExceptionBeforeReturn(Scope &scope) : scope(scope)
-		{
-			scope.clear_exception_before_return.push_back(true);
-		}
+		{ scope.clear_exception_before_return.push_back(true); }
 
 		~ClearExceptionBeforeReturn()
 		{

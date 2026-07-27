@@ -110,9 +110,7 @@ namespace {
 	std::once_flag getset_descriptor_flag;
 
 	std::unique_ptr<TypePrototype> register_getset_descriptor()
-	{
-		return std::move(klass<PyGetSetDescriptor>("getset_descriptor").type);
-	}
+	{ return std::move(klass<PyGetSetDescriptor>("getset_descriptor").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyGetSetDescriptor::type_factory()

@@ -34,9 +34,7 @@ template<> struct fmt::formatter<SourceLocation>
 	constexpr auto parse(format_parse_context &ctx) { return ctx.end(); }
 
 	template<typename FormatContext> auto format(const SourceLocation &sc, FormatContext &ctx)
-	{
-		return format_to(ctx.out(), "[{}-{}]", sc.start, sc.end);
-	}
+	{ return format_to(ctx.out(), "[{}-{}]", sc.start, sc.end); }
 };
 
 
@@ -602,9 +600,7 @@ class Arguments : public ASTNode
 	Arguments(SourceLocation source_location) : ASTNode(ASTNodeType::Arguments, source_location) {}
 	Arguments(std::vector<Argument *> args, SourceLocation source_location)
 		: Arguments(source_location)
-	{
-		m_args = std::move(args);
-	}
+	{ m_args = std::move(args); }
 
 	Arguments(std::vector<Argument *> posonlyargs,
 		std::vector<Argument *> args,
@@ -640,9 +636,7 @@ class Arguments : public ASTNode
 	void push_default(ASTNode *default_value) { m_defaults.push_back(std::move(default_value)); }
 
 	void push_kwarg_default(ASTNode *default_value)
-	{
-		m_kw_defaults.push_back(std::move(default_value));
-	}
+	{ m_kw_defaults.push_back(std::move(default_value)); }
 
 	void set_arg(Argument *arg) { m_vararg = std::move(arg); }
 	void set_kwarg(Argument *arg) { m_kwarg = std::move(arg); }
@@ -1268,9 +1262,7 @@ class Assert : public ASTNode
 	Assert(ASTNode *test, ASTNode *msg, SourceLocation source_location)
 		: ASTNode(ASTNodeType::Assert, source_location), m_test(std::move(test)),
 		  m_msg(std::move(msg))
-	{
-		ASSERT(m_test);
-	}
+	{ ASSERT(m_test); }
 
 	ASTNode *test() const { return m_test; }
 	ASTNode *msg() const { return m_msg; }
@@ -1302,9 +1294,7 @@ class BoolOp : public ASTNode
   public:
 	BoolOp(OpType op, std::vector<ASTNode *> values, SourceLocation source_location)
 		: ASTNode(ASTNodeType::BoolOp, source_location), m_op(op), m_values(std::move(values))
-	{
-		ASSERT(m_values.size() >= 2);
-	}
+	{ ASSERT(m_values.size() >= 2); }
 
 	OpType op() const { return m_op; }
 	const std::vector<ASTNode *> &values() const { return m_values; }

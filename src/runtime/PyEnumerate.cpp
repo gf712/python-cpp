@@ -61,9 +61,7 @@ namespace {
 	std::once_flag enumerate_flag;
 
 	std::unique_ptr<TypePrototype> register_enumerate()
-	{
-		return std::move(klass<PyEnumerate>("enumerate").type);
-	}
+	{ return std::move(klass<PyEnumerate>("enumerate").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyEnumerate::type_factory()

@@ -12,9 +12,7 @@ class StoreDeref final : public Instruction
 	StoreDeref(Register dst, Register src) : m_dst(dst), m_src(src) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("STORE_DEREF     f{:<3} r{:<3}", m_dst, m_src);
-	}
+	{ return fmt::format("STORE_DEREF     f{:<3} r{:<3}", m_dst, m_src); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

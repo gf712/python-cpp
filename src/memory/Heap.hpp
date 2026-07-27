@@ -375,9 +375,7 @@ class Heap
 	[[nodiscard]] ScopedGCPause scoped_gc_pause() { return ScopedGCPause(*m_gc); }
 
 	[[nodiscard]] ScopedStaticAllocation scoped_static_allocation()
-	{
-		return ScopedStaticAllocation(*this);
-	}
+	{ return ScopedStaticAllocation(*this); }
 
 	bool has_weakref_object(uint8_t *obj) const { return m_weakrefs.contains(obj); }
 	size_t weakref_count(uint8_t *obj) const

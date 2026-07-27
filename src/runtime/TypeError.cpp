@@ -27,9 +27,7 @@ namespace {
 	std::once_flag type_error_flag;
 
 	std::unique_ptr<TypePrototype> register_type_error()
-	{
-		return std::move(klass<TypeError>("TypeError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<TypeError>("TypeError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> TypeError::type_factory()

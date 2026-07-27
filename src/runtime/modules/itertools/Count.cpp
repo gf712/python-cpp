@@ -39,9 +39,7 @@ namespace itertools {
 	PyResult<PyObject *> Count::create() { return create(Number{ 0 }, Number{ 1 }); }
 
 	PyResult<PyObject *> Count::create(Number start)
-	{
-		return create(std::move(start), Number{ 1 });
-	}
+	{ return create(std::move(start), Number{ 1 }); }
 
 	PyResult<PyObject *> Count::create(Number start, Number step)
 	{

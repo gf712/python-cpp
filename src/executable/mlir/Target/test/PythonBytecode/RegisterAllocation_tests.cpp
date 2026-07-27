@@ -158,9 +158,7 @@ class RegisterAllocationTest : public ::testing::Test
 
 	// Parse the MLIR IR that reproduces the FOR_ITER bug
 	mlir::OwningOpRef<mlir::ModuleOp> parseForIterBugIR()
-	{
-		return mlir::parseSourceString<mlir::ModuleOp>(FORITER_BUG_MLIR, &m_context);
-	}
+	{ return mlir::parseSourceString<mlir::ModuleOp>(FORITER_BUG_MLIR, &m_context); }
 };
 
 /**

@@ -12,9 +12,7 @@ class SetAdd final : public Instruction
 	SetAdd(Register set, Register value) : m_set(set), m_value(value) {}
 
 	std::string to_string() const final
-	{
-		return fmt::format("SET_ADD         r{:<3} r{:<3}", m_set, m_value);
-	}
+	{ return fmt::format("SET_ADD         r{:<3} r{:<3}", m_set, m_value); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

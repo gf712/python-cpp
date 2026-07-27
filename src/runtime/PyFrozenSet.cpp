@@ -177,9 +177,7 @@ namespace {
 	std::once_flag frozenset_flag;
 
 	std::unique_ptr<TypePrototype> register_frozenset()
-	{
-		return std::move(klass<PyFrozenSet>("frozenset").type);
-	}
+	{ return std::move(klass<PyFrozenSet>("frozenset").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyFrozenSet::type_factory()

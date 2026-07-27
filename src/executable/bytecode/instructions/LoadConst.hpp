@@ -14,9 +14,7 @@ class LoadConst final : public Instruction
 	{}
 	~LoadConst() override {}
 	std::string to_string() const final
-	{
-		return fmt::format("LOAD_CONST      r{:<3} s{:<3}", m_destination, m_static_value_index);
-	}
+	{ return fmt::format("LOAD_CONST      r{:<3} s{:<3}", m_destination, m_static_value_index); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

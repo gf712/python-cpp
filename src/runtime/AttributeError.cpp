@@ -35,9 +35,7 @@ namespace {
 	std::once_flag attribute_error_flag;
 
 	std::unique_ptr<TypePrototype> register_attribute_error()
-	{
-		return std::move(klass<AttributeError>("AttributeError", Exception::class_type()).type);
-	}
+	{ return std::move(klass<AttributeError>("AttributeError", Exception::class_type()).type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> AttributeError::type_factory()

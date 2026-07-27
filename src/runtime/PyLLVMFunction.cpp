@@ -13,14 +13,10 @@ PyLLVMFunction::PyLLVMFunction(std::string &&name, FunctionType &&function)
 {}
 
 std::string PyLLVMFunction::to_string() const
-{
-	return fmt::format("LLVM JIT function {} at {}", m_name, (void *)this);
-}
+{ return fmt::format("LLVM JIT function {} at {}", m_name, (void *)this); }
 
 PyResult<PyObject *> PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs)
-{
-	return (*this)(args, kwargs);
-}
+{ return (*this)(args, kwargs); }
 
 PyResult<PyObject *> PyLLVMFunction::__repr__() const { return PyString::create(to_string()); }
 
@@ -36,9 +32,7 @@ namespace {
 	std::once_flag llvm_function_flag;
 
 	std::unique_ptr<TypePrototype> register_llvm_function()
-	{
-		return std::move(klass<PyLLVMFunction>("llvm_function_or_method").type);
-	}
+	{ return std::move(klass<PyLLVMFunction>("llvm_function_or_method").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyLLVMFunction::type_factory()

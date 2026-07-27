@@ -45,15 +45,11 @@ PyResult<PyGenericAlias *>
 }
 
 PyResult<PyGenericAlias *> PyGenericAlias::create(PyObject *origin, PyObject *args)
-{
-	return PyGenericAlias::create(origin, args, nullptr);
-}
+{ return PyGenericAlias::create(origin, args, nullptr); }
 
 
 std::string PyGenericAlias::to_string() const
-{
-	return fmt::format("<generic_alias object at {}>", static_cast<const void *>(this));
-}
+{ return fmt::format("<generic_alias object at {}>", static_cast<const void *>(this)); }
 
 PyResult<PyObject *> PyGenericAlias::__repr__() const
 {
@@ -76,9 +72,7 @@ namespace {
 	std::once_flag generic_alias_flag;
 
 	std::unique_ptr<TypePrototype> register_generic_alias()
-	{
-		return std::move(klass<PyGenericAlias>("types.GenericAlias").type);
-	}
+	{ return std::move(klass<PyGenericAlias>("types.GenericAlias").type); }
 }// namespace
 
 std::function<std::unique_ptr<TypePrototype>()> PyGenericAlias::type_factory()

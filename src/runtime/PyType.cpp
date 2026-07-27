@@ -321,9 +321,7 @@ std::function<std::unique_ptr<TypePrototype>()> PyType::type_factory()
 
 namespace {
 	bool descriptor_is_data(const PyObject *obj)
-	{
-		return obj->type()->underlying_type().__set__.has_value();
-	}
+	{ return obj->type()->underlying_type().__set__.has_value(); }
 }// namespace
 
 PyResult<PyObject *> PyType::__getattribute__(PyObject *attribute) const
@@ -1599,9 +1597,7 @@ PyResult<PyObject *> PyType::__call__(PyTuple *args, PyDict *kwargs) const
 }
 
 std::string PyType::to_string() const
-{
-	return fmt::format("<class '{}'>", underlying_type().__name__);
-}
+{ return fmt::format("<class '{}'>", underlying_type().__name__); }
 
 PyResult<PyObject *> PyType::__repr__() const { return PyString::create(to_string()); }
 
