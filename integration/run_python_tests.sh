@@ -31,4 +31,19 @@ for file in $(find $SCRIPT_DIR/tests/ -maxdepth 1 -type f -name "*.py"); do
     fi
 done
 
+# An uncaught exception must exit non-zero, and the exit-time flush of the
+# buffered sys.stdout must run before the traceback is printed, so with a
+# redirected stdout the script's own output comes first.
+file=$SCRIPT_DIR/tests/expected_failures/print_then_raise.py
+output=$(timeout 10s $PYTHON_EXECUTABLE $file --gc-frequency $GC_FREQUENCY 2>&1)
+if [ $? -eq 0 ]; then
+    echo $file "... FAILED! (expected a non-zero exit code)"
+    exit_code=1
+elif [ "$(echo "$output" | head -n 1)" != "before-raise" ]; then
+    echo $file "... FAILED! (script output must precede the traceback, got: ${output})"
+    exit_code=1
+else
+    echo $file "... PASSED!"
+fi
+
 exit $exit_code
