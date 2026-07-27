@@ -137,4 +137,24 @@ for method in (
     except ValueError:
         pass
 
+# 12. the oversized path calls back into Python once per chunk; a raw whose
+#     write() reallocates the source object's storage must not leave the write
+#     loop walking freed memory
+ba = bytearray(b"A" * 100)
+chunks = []
+
+
+class MutatingWriter:
+    def write(self, b):
+        # reallocates ba's backing storage mid-write
+        ba[0:1] = b"B" * 200000
+        chunks.append(1)
+        return 1
+
+
+w = _io.BufferedWriter(MutatingWriter(), 8)
+assert w.write(ba) == 100
+# 100 bytes, one accepted per call, until the 8 byte tail is buffered instead
+assert len(chunks) == 92, len(chunks)
+
 print("buffered_writer: ok")
