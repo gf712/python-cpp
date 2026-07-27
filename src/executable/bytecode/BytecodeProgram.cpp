@@ -2,7 +2,7 @@
 #include "Bytecode.hpp"
 #include "executable/Function.hpp"
 #include "executable/Mangler.hpp"
-#include "interpreter/InterpreterSession.hpp"
+#include "interpreter/Interpreter.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyFrame.hpp"
 #include "runtime/PyFunction.hpp"
@@ -136,17 +136,17 @@ int BytecodeProgram::execute(VirtualMachine *vm)
 
 	auto result = m_main_function->function()->call(*vm, interpreter);
 
+	{
+		ScopedStack scoped_stack{ vm->push_frame(1, 0, 0) };
+		[[maybe_unused]] auto final_result = interpreter.finalise();
+	}
+
 	if (result.is_err()) {
 		// The exception propagated all the way out; the eval loop already popped it
 		// off the (now-clean) exception stack as it unwound, so use the result value
 		// directly rather than popping again.
 		auto *exception = result.unwrap_err();
 		std::cout << exception->format_traceback() << std::endl;
-	}
-
-	{
-		[[maybe_unused]] auto push_result = vm->push_frame(1, 0, 0);
-		[[maybe_unused]] auto final_result = interpreter.finalise();
 	}
 
 	return result.is_ok() ? EXIT_SUCCESS : EXIT_FAILURE;

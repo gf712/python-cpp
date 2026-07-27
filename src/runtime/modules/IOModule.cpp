@@ -41,23 +41,25 @@ namespace fs = std::filesystem;
 namespace py {
 
 namespace {
-	static PyType *s_io_base = nullptr;
-	static PyType *s_io_raw_iobase = nullptr;
-	static PyType *s_io_buffered_io_base = nullptr;
-	static PyType *s_io_buffered_reader = nullptr;
-	static PyType *s_io_buffered_writer = nullptr;
-	static PyType *s_io_buffered_rwpair = nullptr;
-	static PyType *s_io_buffered_random = nullptr;
-	static PyType *s_io_textiobase = nullptr;
-	static PyType *s_io_incremental_newline_decoder = nullptr;
-	static PyType *s_io_bytesio = nullptr;
-	static PyType *s_io_fileio = nullptr;
-	static PyType *s_io_stringio = nullptr;
-	static PyType *s_io_textiowrapper = nullptr;
+	PyType *s_io_base = nullptr;
+	PyType *s_io_raw_iobase = nullptr;
+	PyType *s_io_buffered_io_base = nullptr;
+	PyType *s_io_buffered_reader = nullptr;
+	PyType *s_io_buffered_writer = nullptr;
+	PyType *s_io_buffered_rwpair = nullptr;
+	PyType *s_io_buffered_random = nullptr;
+	PyType *s_io_textiobase = nullptr;
+	PyType *s_io_incremental_newline_decoder = nullptr;
+	PyType *s_io_bytesio = nullptr;
+	PyType *s_io_fileio = nullptr;
+	PyType *s_io_stringio = nullptr;
+	PyType *s_io_textiowrapper = nullptr;
 
-	static PyType *s_blocking_io_error = nullptr;
-	static PyType *s_unsupported_operation_type = nullptr;
+	PyType *s_blocking_io_error = nullptr;
+	PyType *s_unsupported_operation_type = nullptr;
 }// namespace
+
+static constexpr size_t s_default_buffer_size = 8192;
 
 Exception *unsupported_operation(PyTuple *args, PyDict *kwargs)
 {
@@ -814,7 +816,7 @@ struct Buffered
 
 	PyResult<std::monostate> check_initialized() const
 	{
-		if (!ok) {
+		if (!ok || !raw) {
 			if (detached) {
 				return Err(value_error("raw stream has been detached"));
 			} else {
@@ -1029,7 +1031,8 @@ class BufferedReader
 		this->readable_ = true;
 		this->writable_ = false;
 		this->fast_closed_checks = false;
-		this->ok = true;
+		// the object only becomes usable once __init__ provides a raw stream
+		this->ok = raw != nullptr;
 	}
 
 	BufferedReader(PyType *type) : BufferedReader(type, nullptr, 0) {}
@@ -1359,11 +1362,13 @@ class BufferedWriter
 	BufferedWriter(PyType *type, PyObject *raw, int buffer_size) : BufferedIOBase(type)
 	{
 		this->raw = raw;
-		(void)buffer_size;
+		if (buffer_size > 0) { m_buffer_size = static_cast<size_t>(buffer_size); }
 		this->readable_ = false;
 		this->writable_ = true;
 		this->fast_closed_checks = false;
-		this->ok = true;
+		// the object only becomes usable once __init__ provides a raw stream
+		this->ok = raw != nullptr;
+		this->buffer = std::make_unique<std::stringbuf>();
 	}
 
 	BufferedWriter(PyType *type) : BufferedWriter(type, nullptr, 0) {}
@@ -1397,7 +1402,7 @@ class BufferedWriter
 	static PyResult<BufferedWriter *> create(PyObject *raw, int buffer_size)
 	{
 		auto &heap = VirtualMachine::the().heap();
-		if (auto *obj = heap.allocate<BufferedWriter>(s_io_buffered_reader, raw, buffer_size)) {
+		if (auto *obj = heap.allocate<BufferedWriter>(s_io_buffered_writer, raw, buffer_size)) {
 			return Ok(obj);
 		}
 		return Err(memory_error(sizeof(BufferedWriter)));
@@ -1410,21 +1415,24 @@ class BufferedWriter
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
-		ASSERT(!kwargs || kwargs->map().empty());
-		if (!args || args->elements().empty()) {
-			return Err(type_error("missing required argument 'raw'"));
-		}
-		if (args->elements().size() > 1) { TODO(); }
-		return PyObject::from(args->elements()[0])
-			.and_then([this](PyObject *raw) -> PyResult<int32_t> {
-				this->raw = raw;
-				this->readable_ = false;
-				this->writable_ = true;
-				this->fast_closed_checks = false;
-				this->ok = true;
-				this->buffer = std::make_unique<std::stringbuf>();
-				return Ok(0);
-			});
+		auto parse_result = PyArgsParser<PyObject *, int64_t>::unpack_tuple(args,
+			kwargs,
+			"BufferedWriter",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 2>{},
+			static_cast<int64_t>(s_default_buffer_size));
+		if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
+		auto [raw, buffer_size] = parse_result.unwrap();
+		if (buffer_size <= 0) { return Err(value_error("buffer size must be strictly positive")); }
+		this->raw = raw;
+		this->readable_ = false;
+		this->writable_ = true;
+		this->fast_closed_checks = false;
+		this->ok = true;
+		this->buffer = std::make_unique<std::stringbuf>();
+		m_buffer_size = static_cast<size_t>(buffer_size);
+		m_buffered_bytes = 0;
+		return Ok(0);
 	}
 
 	PyResult<PyObject *> __repr__() const
@@ -1453,8 +1461,7 @@ class BufferedWriter
 		return raw->get_method(PyString::create("write").unwrap())
 			.and_then([memobj](PyObject *write) {
 				return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
-			})
-			.and_then([](auto) { return Ok(py_none()); });
+			});
 	}
 
 	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
@@ -1473,41 +1480,66 @@ class BufferedWriter
 				"write() argument must be contiguous buffer, not {}", arg->type()->name()));
 		}
 
-		// implementation
+		if (auto err = check_initialized(); err.is_err()) { return Err(err.unwrap_err()); }
+
 		if (Buffered<BufferedWriter>::is_closed()) {
 			return Err(value_error("write to closed file"));
 		}
 
-		auto written =
-			this->buffer->sputn(static_cast<char *>(buffer.buf->get_buffer()), buffer.len);
-		if (written == buffer.len) {
-			// fast path: everything was written - we are done
-			return PyInteger::create(written);
+		const char *start = static_cast<char *>(buffer.buf->get_buffer());
+		const auto len = static_cast<size_t>(buffer.len);
+
+		// fast path: the data fits in the buffer's free space, so it is only buffered and does
+		// not reach the raw stream
+		if (m_buffered_bytes + len <= m_buffer_size) {
+			const auto written = this->buffer->sputn(start, len);
+			ASSERT(static_cast<size_t>(written) == len);
+			m_buffered_bytes += len;
+			return PyInteger::create(len);
 		}
 
-		// flush our internal buffer to raw
+		// the data does not fit: drain our buffer to raw first
 		if (auto r = flush(); r.is_err()) { return r; }
 
-		// TODO: this currently writes to internal buffer and then immediately makes a copy in
-		// write_raw. This is because streambuf doesn't tell us how much capacity it has left, so we
-		// just give it as much as we can each time
-		ssize_t remaining = buffer.len;
-		char *start = static_cast<char *>(buffer.buf->get_buffer());
-		// TODO: use a buffer that actually tells us how much we can write to it, rather than
-		// hardcode 4096
-		while (remaining > 4096) {
-			// flush our internal buffer to raw
+		// write oversized data directly to raw, bypassing the buffer
+		size_t written = 0;
+		size_t remaining = len;
+		while (remaining > m_buffer_size) {
 			auto r = raw_write(start + written, remaining);
 			if (r.is_err()) { return r; }
-			ASSERT(as<PyInteger>(r.unwrap()));
-			const auto count = as<PyInteger>(r.unwrap())->as_size_t();
-			written += count;
-			remaining -= count;
+			if (r.unwrap() == py_none()) {
+				// TODO: raise BlockingIOError
+				// a non-blocking raw stream accepted no data
+				return Err(os_error("write could not complete without blocking"));
+			}
+			if (!as<PyInteger>(r.unwrap())) {
+				return Err(type_error(
+					"'{}' object cannot be interpreted as an integer", r.unwrap()->type()->name()));
+			}
+			const auto &count = as<PyInteger>(r.unwrap())->as_big_int();
+			if (count < 0 || count > remaining) {
+				return Err(
+					os_error("raw write() returned invalid length {} (should have been "
+							 "between 0 and {})",
+						count.get_str(),
+						remaining));
+			}
+			if (count == 0) {
+				// TODO: retry with a zero-byte raw write until a signal interrupts
+				// it. We have no signal check in this loop yet
+				return Err(os_error("write could not complete without blocking"));
+			}
+			written += count.get_ui();
+			remaining -= count.get_ui();
 		}
 
-		// put the rest in our buffer. Assumes that we can write 4096 bytes
-		const auto count = this->buffer->sputn(start + written, remaining);
-		ASSERT(remaining - count == 0);
+		// buffer the tail, which is now guaranteed to fit
+		if (remaining > 0) {
+			const auto count = this->buffer->sputn(start + written, remaining);
+			ASSERT(static_cast<size_t>(count) == remaining);
+			m_buffered_bytes += remaining;
+			written += remaining;
+		}
 
 		return PyInteger::create(written);
 	}
@@ -1538,6 +1570,10 @@ class BufferedWriter
 		PyObject::visit_graph(visitor);
 		visit_graph_buffered(visitor);
 	}
+
+  private:
+	size_t m_buffer_size{ s_default_buffer_size };
+	size_t m_buffered_bytes{ 0 };
 };
 
 template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
@@ -1548,6 +1584,7 @@ template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
 
 PyResult<PyObject *> BufferedWriter::flush()
 {
+	if (auto err = check_initialized(); err.is_err()) { return Err(err.unwrap_err()); }
 	if (!writable_) { return Ok(py_none()); }
 	std::array<char, BUFSIZ> to_write;
 
@@ -1568,6 +1605,7 @@ PyResult<PyObject *> BufferedWriter::flush()
 			return r;
 		}
 	}
+	m_buffered_bytes = 0;
 	return Ok(py_none());
 }
 
@@ -3462,9 +3500,8 @@ PyModule *io_module()
 				return open(arg0, "rb");
 			}));
 
-	// C++ standard streams currently do not provide an API to get default buffer size, and C's
-	// BUFSIZE doesn't have to be respected
-	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(), Number{ 0 });
+	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(),
+		Number{ static_cast<int64_t>(s_default_buffer_size) });
 
 	// >> type("UnsupportedOperation", (_io.OSError, ValueError), {})
 	auto unsupported_operation_type = types::type()->call(
