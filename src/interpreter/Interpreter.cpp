@@ -4,6 +4,7 @@
 #include "runtime/Import.hpp"
 #include "runtime/KeyError.hpp"
 #include "runtime/NameError.hpp"
+#include "runtime/PyBool.hpp"
 #include "runtime/PyCode.hpp"
 #include "runtime/PyDict.hpp"
 #include "runtime/PyFrame.hpp"
@@ -26,6 +27,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <ranges>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -209,8 +211,13 @@ void Interpreter::internal_setup(const std::string &name,
 					return buffered_writer->call(PyTuple::create(stdout).unwrap(), nullptr);
 				})
 				.and_then([text_io_wrapper](PyObject *stdout_buffer_writer) {
+					PyObject *line_buffering =
+						::isatty(STDOUT_FILENO) == 1 ? py_true() : py_false();
 					return text_io_wrapper->call(
-						PyTuple::create(stdout_buffer_writer).unwrap(), nullptr);
+						PyTuple::create(
+							stdout_buffer_writer, py_none(), py_none(), py_none(), line_buffering)
+							.unwrap(),
+						nullptr);
 				});
 		ASSERT(py_stdout.is_ok());
 		auto py_stderr =
@@ -220,13 +227,30 @@ void Interpreter::internal_setup(const std::string &name,
 					return buffered_writer->call(PyTuple::create(stderr).unwrap(), nullptr);
 				})
 				.and_then([text_io_wrapper](PyObject *stderr_buffer_writer) {
+					auto *line_buffering = py_true();
 					return text_io_wrapper->call(
-						PyTuple::create(stderr_buffer_writer).unwrap(), nullptr);
+						PyTuple::create(
+							stderr_buffer_writer, py_none(), py_none(), py_none(), line_buffering)
+							.unwrap(),
+						nullptr);
 				});
 		ASSERT(py_stderr.is_ok());
-		sys->add_symbol(PyString::create("stdin").unwrap(), py_stdin.unwrap());
-		sys->add_symbol(PyString::create("stdout").unwrap(), py_stdout.unwrap());
-		sys->add_symbol(PyString::create("stderr").unwrap(), py_stderr.unwrap());
+
+		for (auto [name, obj] : std::views::zip(std::array{ "stdin", "stdout", "stderr" },
+				 std::array{ py_stdin.unwrap(), py_stdout.unwrap(), py_stderr.unwrap() })) {
+			sys->add_symbol(PyString::create(name).unwrap(), obj);
+			register_callback(PyNativeFunction::create(
+								  std::string{ name } + "_exit",
+								  [obj](PyTuple *, PyDict *) -> PyResult<PyObject *> {
+									  return obj->get_method(PyString::create("flush").unwrap())
+										  .and_then([](PyObject *flush) {
+											  return flush->call(nullptr, nullptr);
+										  });
+								  },
+								  obj)
+								  .unwrap(),
+				nullptr);
+		}
 	}
 
 	if (config.requires_importlib) {
@@ -489,4 +513,32 @@ void Interpreter::visit_graph(::Cell::Visitor &visitor)
 	if (m_codec_error_registry) visitor.visit(*m_codec_error_registry);
 	if (m_codec_search_path) visitor.visit(*m_codec_search_path);
 	if (m_codec_search_path_cache) visitor.visit(*m_codec_search_path_cache);
+
+	for (auto [callback, args] : m_callbacks) {
+		if (callback) visitor.visit(*callback);
+		if (args) visitor.visit(*args);
+	}
+}
+
+void Interpreter::register_callback(PyObject *callback, PyTuple *args)
+{
+	m_callbacks.emplace_back(callback, args);
+}
+
+void Interpreter::unregister_callback(PyObject *callback)
+{
+	m_callbacks.erase(
+		std::ranges::remove(m_callbacks, callback, [](const auto &el) { return std::get<0>(el); })
+			.begin(),
+		m_callbacks.end());
+}
+
+PyResult<std::monostate> Interpreter::finalise()
+{
+	// TODO: capture exceptions, and raise last one
+	for (auto [callback, args] : m_callbacks) {
+		[[maybe_unused]] auto result = callback->call(args, nullptr);
+	}
+
+	return Ok(std::monostate{});
 }

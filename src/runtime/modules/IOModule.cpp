@@ -1,3 +1,4 @@
+#include "IOChecks.hpp"
 #include "Modules.hpp"
 #include "runtime/MemoryError.hpp"
 #include "runtime/NotImplementedError.hpp"
@@ -27,6 +28,7 @@
 #include <cstdio>
 #include <limits>
 #include <optional>
+#include <unistd.h>
 #include <variant>
 
 #if defined(__GLIBCXX__) || defined(__GLIBCPP__)
@@ -40,23 +42,25 @@ namespace fs = std::filesystem;
 namespace py {
 
 namespace {
-	static PyType *s_io_base = nullptr;
-	static PyType *s_io_raw_iobase = nullptr;
-	static PyType *s_io_buffered_io_base = nullptr;
-	static PyType *s_io_buffered_reader = nullptr;
-	static PyType *s_io_buffered_writer = nullptr;
-	static PyType *s_io_buffered_rwpair = nullptr;
-	static PyType *s_io_buffered_random = nullptr;
-	static PyType *s_io_textiobase = nullptr;
-	static PyType *s_io_incremental_newline_decoder = nullptr;
-	static PyType *s_io_bytesio = nullptr;
-	static PyType *s_io_fileio = nullptr;
-	static PyType *s_io_stringio = nullptr;
-	static PyType *s_io_textiowrapper = nullptr;
+	PyType *s_io_base = nullptr;
+	PyType *s_io_raw_iobase = nullptr;
+	PyType *s_io_buffered_io_base = nullptr;
+	PyType *s_io_buffered_reader = nullptr;
+	PyType *s_io_buffered_writer = nullptr;
+	PyType *s_io_buffered_rwpair = nullptr;
+	PyType *s_io_buffered_random = nullptr;
+	PyType *s_io_textiobase = nullptr;
+	PyType *s_io_incremental_newline_decoder = nullptr;
+	PyType *s_io_bytesio = nullptr;
+	PyType *s_io_fileio = nullptr;
+	PyType *s_io_stringio = nullptr;
+	PyType *s_io_textiowrapper = nullptr;
 
-	static PyType *s_blocking_io_error = nullptr;
-	static PyType *s_unsupported_operation_type = nullptr;
+	PyType *s_blocking_io_error = nullptr;
+	PyType *s_unsupported_operation_type = nullptr;
 }// namespace
+
+static constexpr size_t s_default_buffer_size = 8192;
 
 Exception *unsupported_operation(PyTuple *args, PyDict *kwargs)
 {
@@ -796,7 +800,7 @@ class BufferedIOBase : public IOBase
 
 template<typename T>
 // requires(std::is_base_of_v<PyObject, T>)
-struct Buffered
+struct Buffered : IOChecks<Buffered<T>>
 {
 	PyObject *raw{ nullptr };
 	bool ok{ false };
@@ -811,18 +815,9 @@ struct Buffered
 
 	int64_t readahead() const { return valid_readbuffer() ? buffer->in_avail() : 0; }
 
-	PyResult<std::monostate> check_initialized() const
-	{
-		if (!ok) {
-			if (detached) {
-				return Err(value_error("raw stream has been detached"));
-			} else {
-				return Err(value_error("I/O operation on uninitialized object"));
-			}
-		}
+	bool is_initialized() const { return ok && raw; }
 
-		return Ok(std::monostate{});
-	}
+	bool is_detached() const { return detached; }
 
 	PyResult<std::monostate> check_closed(std::string_view err_msg) const
 	{
@@ -848,7 +843,7 @@ struct Buffered
 
 	PyResult<PyObject *> simple_flush() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 
 		return raw->get_method(PyString::create("flush").unwrap()).and_then([](PyObject *flush) {
 			return flush->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
@@ -859,7 +854,7 @@ struct Buffered
 
 	PyResult<bool> closed() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return raw->get_attribute(PyString::create("closed").unwrap())
 			.and_then([](PyObject *closed) {
 				return truthy(closed, VirtualMachine::the().interpreter());
@@ -868,7 +863,7 @@ struct Buffered
 
 	PyResult<PyObject *> close()
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 
 		// FIXME add lock
 		auto r = closed();
@@ -896,9 +891,9 @@ struct Buffered
 
 	PyResult<PyObject *> seekable() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("seekable").unwrap())
+			->raw->get_method(PyString::create("seekable").unwrap())
 			.and_then([](PyObject *seekable) -> PyResult<PyObject *> {
 				return seekable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -906,9 +901,9 @@ struct Buffered
 
 	PyResult<PyObject *> writable() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("writable").unwrap())
+			->raw->get_method(PyString::create("writable").unwrap())
 			.and_then([](PyObject *writable) -> PyResult<PyObject *> {
 				return writable->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -916,7 +911,7 @@ struct Buffered
 
 	PyResult<PyObject *> readable() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
 			->get_method(PyString::create("readable").unwrap())
 			.and_then([](PyObject *readable) -> PyResult<PyObject *> {
@@ -926,9 +921,9 @@ struct Buffered
 
 	PyResult<PyObject *> fileno() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("fileno").unwrap())
+			->raw->get_method(PyString::create("fileno").unwrap())
 			.and_then([](PyObject *fileno) -> PyResult<PyObject *> {
 				return fileno->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
 			});
@@ -936,11 +931,11 @@ struct Buffered
 
 	PyResult<PyObject *> isatty() const
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 		return static_cast<const T *>(this)
-			->get_method(PyString::create("isatty").unwrap())
+			->raw->get_method(PyString::create("isatty").unwrap())
 			.and_then([](PyObject *isatty) -> PyResult<PyObject *> {
-				return isatty->call(PyTuple::create().unwrap(), PyDict::create().unwrap());
+				return isatty->call(nullptr, nullptr);
 			});
 	}
 
@@ -971,7 +966,7 @@ struct Buffered
 
 	PyResult<PyObject *> read(int64_t n)
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 
 		if (n < -1) { return Err(value_error("read length must be non-negative or -1")); }
 
@@ -988,7 +983,7 @@ struct Buffered
 
 	PyResult<PyObject *> read1(int64_t n)
 	{
-		if (auto err = check_initialized(); err.is_err()) return Err(err.unwrap_err());
+		if (auto err = this->check_initialized(); err.is_err()) return Err(err.unwrap_err());
 
 		if (n < 0) {
 			// TODO: determine actual buffer size
@@ -1028,7 +1023,8 @@ class BufferedReader
 		this->readable_ = true;
 		this->writable_ = false;
 		this->fast_closed_checks = false;
-		this->ok = true;
+		// the object only becomes usable once __init__ provides a raw stream
+		this->ok = raw != nullptr;
 	}
 
 	BufferedReader(PyType *type) : BufferedReader(type, nullptr, 0) {}
@@ -1358,11 +1354,13 @@ class BufferedWriter
 	BufferedWriter(PyType *type, PyObject *raw, int buffer_size) : BufferedIOBase(type)
 	{
 		this->raw = raw;
-		(void)buffer_size;
+		if (buffer_size > 0) { m_buffer_size = static_cast<size_t>(buffer_size); }
 		this->readable_ = false;
 		this->writable_ = true;
 		this->fast_closed_checks = false;
-		this->ok = true;
+		// the object only becomes usable once __init__ provides a raw stream
+		this->ok = raw != nullptr;
+		this->buffer = std::make_unique<std::stringbuf>();
 	}
 
 	BufferedWriter(PyType *type) : BufferedWriter(type, nullptr, 0) {}
@@ -1396,7 +1394,7 @@ class BufferedWriter
 	static PyResult<BufferedWriter *> create(PyObject *raw, int buffer_size)
 	{
 		auto &heap = VirtualMachine::the().heap();
-		if (auto *obj = heap.allocate<BufferedWriter>(s_io_buffered_reader, raw, buffer_size)) {
+		if (auto *obj = heap.allocate<BufferedWriter>(s_io_buffered_writer, raw, buffer_size)) {
 			return Ok(obj);
 		}
 		return Err(memory_error(sizeof(BufferedWriter)));
@@ -1409,21 +1407,24 @@ class BufferedWriter
 
 	PyResult<int32_t> __init__(PyTuple *args, PyDict *kwargs)
 	{
-		ASSERT(!kwargs || kwargs->map().empty());
-		if (!args || args->elements().empty()) {
-			return Err(type_error("missing required argument 'raw'"));
-		}
-		if (args->elements().size() > 1) { TODO(); }
-		return PyObject::from(args->elements()[0])
-			.and_then([this](PyObject *raw) -> PyResult<int32_t> {
-				this->raw = raw;
-				this->readable_ = false;
-				this->writable_ = true;
-				this->fast_closed_checks = false;
-				this->ok = true;
-				this->buffer = std::make_unique<std::stringbuf>();
-				return Ok(0);
-			});
+		auto parse_result = PyArgsParser<PyObject *, int64_t>::unpack_tuple(args,
+			kwargs,
+			"BufferedWriter",
+			std::integral_constant<size_t, 1>{},
+			std::integral_constant<size_t, 2>{},
+			static_cast<int64_t>(s_default_buffer_size));
+		if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
+		auto [raw, buffer_size] = parse_result.unwrap();
+		if (buffer_size <= 0) { return Err(value_error("buffer size must be strictly positive")); }
+		this->raw = raw;
+		this->readable_ = false;
+		this->writable_ = true;
+		this->fast_closed_checks = false;
+		this->ok = true;
+		this->buffer = std::make_unique<std::stringbuf>();
+		m_buffer_size = static_cast<size_t>(buffer_size);
+		m_buffered_bytes = 0;
+		return Ok(0);
 	}
 
 	PyResult<PyObject *> __repr__() const
@@ -1452,8 +1453,7 @@ class BufferedWriter
 		return raw->get_method(PyString::create("write").unwrap())
 			.and_then([memobj](PyObject *write) {
 				return write->call(PyTuple::create(memobj.unwrap()).unwrap(), nullptr);
-			})
-			.and_then([](auto) { return Ok(py_none()); });
+			});
 	}
 
 	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
@@ -1472,41 +1472,72 @@ class BufferedWriter
 				"write() argument must be contiguous buffer, not {}", arg->type()->name()));
 		}
 
-		// implementation
+		if (auto err = check_initialized(); err.is_err()) { return Err(err.unwrap_err()); }
+
 		if (Buffered<BufferedWriter>::is_closed()) {
 			return Err(value_error("write to closed file"));
 		}
 
-		auto written =
-			this->buffer->sputn(static_cast<char *>(buffer.buf->get_buffer()), buffer.len);
-		if (written == buffer.len) {
-			// fast path: everything was written - we are done
-			return PyInteger::create(written);
+		const char *start = static_cast<char *>(buffer.buf->get_buffer());
+		const auto len = static_cast<size_t>(buffer.len);
+
+		// fast path: the data fits in the buffer's free space, so it is only buffered and does
+		// not reach the raw stream
+		if (m_buffered_bytes + len <= m_buffer_size) {
+			const auto written = this->buffer->sputn(start, len);
+			ASSERT(static_cast<size_t>(written) == len);
+			m_buffered_bytes += len;
+			return PyInteger::create(len);
 		}
 
-		// flush our internal buffer to raw
+		// everything below re-enters Python (flush() and raw_write() both end up calling
+		// raw.write()), which can run arbitrary code that reallocates the source object's
+		// storage - e.g. a raw whose write() resizes the very bytearray being written. Take a
+		// snapshot now so `start` cannot dangle mid-write.
+		const std::vector<char> payload{ start, start + len };
+
+		// the data does not fit: drain our buffer to raw first
 		if (auto r = flush(); r.is_err()) { return r; }
 
-		// TODO: this currently writes to internal buffer and then immediately makes a copy in
-		// write_raw. This is because streambuf doesn't tell us how much capacity it has left, so we
-		// just give it as much as we can each time
-		ssize_t remaining = buffer.len;
-		char *start = static_cast<char *>(buffer.buf->get_buffer());
-		// TODO: use a buffer that actually tells us how much we can write to it, rather than
-		// hardcode 4096
-		while (remaining > 4096) {
-			// flush our internal buffer to raw
-			auto r = raw_write(start + written, remaining);
+		// write oversized data directly to raw, bypassing the buffer
+		size_t written = 0;
+		size_t remaining = len;
+		while (remaining > m_buffer_size) {
+			auto r = raw_write(payload.data() + written, remaining);
 			if (r.is_err()) { return r; }
-			ASSERT(as<PyInteger>(r.unwrap()));
-			const auto count = as<PyInteger>(r.unwrap())->as_size_t();
-			written += count;
-			remaining -= count;
+			if (r.unwrap() == py_none()) {
+				// TODO: raise BlockingIOError
+				// a non-blocking raw stream accepted no data
+				return Err(os_error("write could not complete without blocking"));
+			}
+			if (!as<PyInteger>(r.unwrap())) {
+				return Err(type_error(
+					"'{}' object cannot be interpreted as an integer", r.unwrap()->type()->name()));
+			}
+			const auto &count = as<PyInteger>(r.unwrap())->as_big_int();
+			if (count < 0 || count > remaining) {
+				return Err(
+					os_error("raw write() returned invalid length {} (should have been "
+							 "between 0 and {})",
+						count.get_str(),
+						remaining));
+			}
+			if (count == 0) {
+				// TODO: retry with a zero-byte raw write until a signal interrupts
+				// it. We have no signal check in this loop yet
+				return Err(os_error("write could not complete without blocking"));
+			}
+			written += count.get_ui();
+			remaining -= count.get_ui();
 		}
 
-		// put the rest in our buffer. Assumes that we can write 4096 bytes
-		const auto count = this->buffer->sputn(start + written, remaining);
-		ASSERT(remaining - count == 0);
+		// buffer the tail, which is now guaranteed to fit
+		if (remaining > 0) {
+			const auto count = this->buffer->sputn(payload.data() + written, remaining);
+			ASSERT(static_cast<size_t>(count) == remaining);
+			m_buffered_bytes += remaining;
+			written += remaining;
+		}
 
 		return PyInteger::create(written);
 	}
@@ -1521,6 +1552,7 @@ class BufferedWriter
 				klass<BufferedWriter>(module, "BufferedWriter", s_io_buffered_io_base)
 					.def("write", &BufferedWriter::write)
 					.def("flush", &BufferedWriter::flush)
+					.def("isatty", &Buffered<BufferedWriter>::isatty)
 					.finalize();
 		}
 		module->add_symbol(PyString::create("BufferedWriter").unwrap(), s_io_buffered_writer);
@@ -1536,6 +1568,10 @@ class BufferedWriter
 		PyObject::visit_graph(visitor);
 		visit_graph_buffered(visitor);
 	}
+
+  private:
+	size_t m_buffer_size{ s_default_buffer_size };
+	size_t m_buffered_bytes{ 0 };
 };
 
 template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
@@ -1546,6 +1582,7 @@ template<> PyResult<PyObject *> Buffered<BufferedWriter>::flush_and_rewind()
 
 PyResult<PyObject *> BufferedWriter::flush()
 {
+	if (auto err = check_initialized(); err.is_err()) { return Err(err.unwrap_err()); }
 	if (!writable_) { return Ok(py_none()); }
 	std::array<char, BUFSIZ> to_write;
 
@@ -1566,6 +1603,7 @@ PyResult<PyObject *> BufferedWriter::flush()
 			return r;
 		}
 	}
+	m_buffered_bytes = 0;
 	return Ok(py_none());
 }
 
@@ -2293,6 +2331,11 @@ class FileIO : public RawIOBase
 		return PyInteger::create(0);
 	}
 
+	PyResult<PyObject *> isatty() const
+	{
+		return Ok(::isatty(m_file_descriptor) == 1 ? py_true() : py_false());
+	}
+
 	static PyType *register_type(PyModule *module)
 	{
 		if (!s_io_fileio) {
@@ -2302,6 +2345,7 @@ class FileIO : public RawIOBase
 							  .def("close", &FileIO::close)
 							  .def("flush", &FileIO::flush)
 							  .def("readinto", &FileIO::readinto)
+							  .def("isatty", &FileIO::isatty)
 							  .finalize();
 		}
 		module->add_symbol(PyString::create("FileIO").unwrap(), s_io_fileio);
@@ -2591,8 +2635,12 @@ class IncrementalNewlineDecoder : public PyBaseObject
 	}
 };
 
-class StringIO : public TextIOBase
+class StringIO
+	: public TextIOBase
+	, public IOChecks<StringIO>
 {
+	friend class IOChecks<StringIO>;
+
 	friend ::Heap;
 
 	std::stringstream m_stringstream;
@@ -2675,23 +2723,17 @@ class StringIO : public TextIOBase
 
 	PyResult<PyObject *> readable() const
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([](auto) { return Ok(py_true()); });
+		return check_usable().and_then([](auto) { return Ok(py_true()); });
 	}
 
 	PyResult<PyObject *> writable() const
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([](auto) { return Ok(py_true()); });
+		return check_usable().and_then([](auto) { return Ok(py_true()); });
 	}
 
 	PyResult<PyObject *> seekable() const
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([](auto) { return Ok(py_true()); });
+		return check_usable().and_then([](auto) { return Ok(py_true()); });
 	}
 
 	PyResult<PyObject *> closed() const
@@ -2702,16 +2744,12 @@ class StringIO : public TextIOBase
 
 	PyResult<PyObject *> line_buffering() const
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([](auto) { return Ok(py_false()); });
+		return check_usable().and_then([](auto) { return Ok(py_false()); });
 	}
 
 	PyResult<PyObject *> newlines() const
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([](auto) { return Ok(py_none()); });
+		return check_usable().and_then([](auto) { return Ok(py_none()); });
 	}
 
 	PyResult<PyObject *> close()
@@ -2723,19 +2761,15 @@ class StringIO : public TextIOBase
 
 	PyResult<PyObject *> tell()
 	{
-		return check_initialized()
-			.and_then([this](auto) { return check_closed(); })
-			.and_then([this](auto) { return PyInteger::create(m_stringstream.tellg()); });
+		return check_usable().and_then(
+			[this](auto) { return PyInteger::create(m_stringstream.tellg()); });
 	}
 
 	PyResult<PyObject *> read(PyTuple *args, PyDict *kwargs)
 	{
 		ASSERT(!kwargs || kwargs->size() == 0);
 
-		if (auto result = check_initialized().or_else([this](auto) { return check_closed(); });
-			result.is_err()) {
-			return result;
-		}
+		if (auto result = check_usable(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		auto size_ = [args, this]() -> PyResult<size_t> {
 			const auto initial_pos = m_stringstream.tellg();
@@ -2771,10 +2805,7 @@ class StringIO : public TextIOBase
 	{
 		ASSERT(!kwargs || kwargs->size() == 0);
 
-		if (auto result = check_initialized().or_else([this](auto) { return check_closed(); });
-			result.is_err()) {
-			return result;
-		}
+		if (auto result = check_usable(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		auto limit_ = [args, this]() -> PyResult<size_t> {
 			const auto initial_pos = m_stringstream.tellg();
@@ -2818,7 +2849,7 @@ class StringIO : public TextIOBase
 
 	PyResult<PyObject *> write(PyTuple *args, PyDict *kwargs)
 	{
-		if (auto result = check_initialized(); result.is_err()) { return result; }
+		if (auto result = check_initialized(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
 			kwargs,
@@ -2830,7 +2861,7 @@ class StringIO : public TextIOBase
 
 		auto [obj] = parse_result.unwrap();
 
-		if (auto result = check_closed(); result.is_err()) { return result; }
+		if (auto result = check_closed(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		const auto size = obj->size();
 		m_stringstream << obj->value();
@@ -2843,7 +2874,7 @@ class StringIO : public TextIOBase
 	{
 		ASSERT(!kwargs || kwargs->size() == 0);
 
-		if (auto result = check_initialized(); result.is_err()) { return result; }
+		if (auto result = check_initialized(); result.is_err()) { return Err(result.unwrap_err()); }
 
 		auto parse_result = PyArgsParser<PyInteger *, PyInteger *>::unpack_tuple(args,
 			kwargs,
@@ -2924,23 +2955,22 @@ class StringIO : public TextIOBase
 		return Ok(0);
 	}
 
-	PyResult<PyObject *> check_initialized() const
-	{
-		if (!m_ok) { return Err(value_error("I/O operation on uninitialized object")); }
-		return Ok(py_true());
-	}
+	bool is_initialized() const { return m_ok; }
 
-	PyResult<PyObject *> check_closed() const
+	PyResult<std::monostate> check_closed() const
 	{
 		if (m_closed) { return Err(value_error("I/O operation on closed file")); }
-		return Ok(py_true());
+		return Ok(std::monostate{});
 	}
 };
 
 
-class TextIOWrapper : public TextIOBase
+class TextIOWrapper
+	: public TextIOBase
+	, public IOChecks<TextIOWrapper>
 {
 	friend ::Heap;
+	friend class IOChecks<TextIOWrapper>;
 
 	PyObject *m_buffer{ nullptr };
 	std::string m_errors;
@@ -2951,8 +2981,7 @@ class TextIOWrapper : public TextIOBase
 
 	std::optional<Bytes> m_buffer_bytes;
 	size_t m_position{ 0 };
-	std::optional<Bytes> m_pending_bytes;// bytes to be written
-	size_t m_pending_bytes_count{ 0 };
+	Bytes m_pending_bytes;
 
 	size_t m_chunk_size{ 8192 };
 
@@ -3222,18 +3251,17 @@ class TextIOWrapper : public TextIOBase
 		return Ok(result);
 	}
 
-	PyResult<size_t> writeflush()
+	PyResult<std::monostate> writeflush()
 	{
-		if (!m_pending_bytes.has_value()) { return Ok(0); }
+		if (m_pending_bytes.b.empty()) { return Ok(std::monostate{}); }
 		auto written =
 			m_buffer->get_method(PyString::create("write").unwrap())
 				.and_then([this](PyObject *write) {
-					return write->call(PyTuple::create(m_pending_bytes.value()).unwrap(), nullptr);
+					return write->call(PyTuple::create(m_pending_bytes).unwrap(), nullptr);
 				});
 		if (written.is_err()) { return Err(written.unwrap_err()); }
 		m_pending_bytes = {};
-		m_pending_bytes_count = 0;
-		return Ok(0);
+		return Ok(std::monostate{});
 	}
 
 
@@ -3244,18 +3272,33 @@ class TextIOWrapper : public TextIOBase
 		auto *text = PyObject::from(args->elements()[0]).unwrap();
 		ASSERT(as<PyString>(text));
 		const auto text_len = as<PyString>(text)->size();
-		// TODO: Should use encoder
-		m_pending_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
-		m_pending_bytes_count = m_pending_bytes->b.size();
-		auto result = writeflush();
-		while (result.is_ok()) {
-			ASSERT(m_pending_bytes_count >= result.unwrap());
-			m_pending_bytes_count -= result.unwrap();
-			if (m_pending_bytes_count == 0) { break; }
-			result = writeflush();
-		}
-		if (result.is_err()) { return Err(result.unwrap_err()); }
 
+		// TODO: Should use encoder
+		auto new_bytes = Bytes::from_unescaped_string(as<PyString>(text)->to_string());
+		m_pending_bytes.b.insert(m_pending_bytes.b.end(), new_bytes.b.begin(), new_bytes.b.end());
+
+		const auto should_flush = [this]() -> bool {
+			if (!m_line_buffering) { return false; }
+			if (std::ranges::find(m_pending_bytes.b, std::byte{ '\n' })
+				!= m_pending_bytes.b.end()) {
+				return true;
+			}
+			return std::ranges::find(m_pending_bytes.b, std::byte{ '\r' })
+				   != m_pending_bytes.b.end();
+		}();
+
+		if (m_pending_bytes.b.size() >= m_chunk_size || should_flush || m_write_through) {
+			auto result = writeflush();
+			if (result.is_err()) { return Err(result.unwrap_err()); }
+		}
+
+		if (should_flush) {
+			if (auto r = m_buffer->get_method(PyString::create("flush").unwrap())
+					.and_then([](PyObject *f) { return f->call(nullptr, nullptr); });
+				r.is_err()) {
+				return Err(r.unwrap_err());
+			}
+		}
 		return PyInteger::create(text_len);
 	}
 
@@ -3264,6 +3307,14 @@ class TextIOWrapper : public TextIOBase
 		if (auto result = writeflush(); result.is_err()) { return Err(result.unwrap_err()); }
 		return m_buffer->get_method(PyString::create("flush").unwrap())
 			.and_then([](PyObject *flush_fn) { return flush_fn->call(nullptr, nullptr); });
+	}
+
+	PyResult<PyObject *> isatty()
+	{
+		if (auto err = check_initialized(); err.is_err()) { return Err(err.unwrap_err()); }
+		return m_buffer->get_method(PyString::create("isatty").unwrap()).and_then([](auto *isatty) {
+			return isatty->call(nullptr, nullptr);
+		});
 	}
 
 	PyType *static_type() const override { return s_io_textiowrapper; }
@@ -3276,6 +3327,7 @@ class TextIOWrapper : public TextIOBase
 									 .def("readlines", &TextIOWrapper::readlines)
 									 .def("write", &TextIOWrapper::write)
 									 .def("flush", &TextIOWrapper::flush)
+									 .def("isatty", &TextIOWrapper::isatty)
 									 .finalize();
 		}
 		module->add_symbol(PyString::create("TextIOWrapper").unwrap(), s_io_textiowrapper);
@@ -3305,11 +3357,12 @@ class TextIOWrapper : public TextIOBase
 
 		m_line_buffering = line_buffering;
 		m_write_through = write_through;
-		m_newline = newline.value_or("'\n");
-		m_pending_bytes_count = 0;
+		m_newline = newline.value_or("\n");
 
 		return Ok(1);
 	}
+
+	bool is_initialized() const { return m_buffer != nullptr; }
 };
 
 PyResult<PyObject *> open(PyObject *file, const std::string &mode)
@@ -3434,9 +3487,8 @@ PyModule *io_module()
 				return open(arg0, "rb");
 			}));
 
-	// C++ standard streams currently do not provide an API to get default buffer size, and C's
-	// BUFSIZE doesn't have to be respected
-	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(), Number{ 0 });
+	s_io_module->add_symbol(PyString::create("DEFAULT_BUFFER_SIZE").unwrap(),
+		Number{ static_cast<int64_t>(s_default_buffer_size) });
 
 	// >> type("UnsupportedOperation", (_io.OSError, ValueError), {})
 	auto unsupported_operation_type = types::type()->call(

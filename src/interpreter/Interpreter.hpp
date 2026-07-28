@@ -6,6 +6,7 @@
 
 #include <string>
 #include <string_view>
+#include <variant>
 
 class BytecodeProgram;
 
@@ -34,6 +35,7 @@ class Interpreter
 	py::PyDict *m_codec_search_path_cache{ nullptr };
 	std::string m_entry_script;
 	std::vector<std::string> m_argv;
+	std::vector<std::tuple<py::PyObject *, py::PyTuple *>> m_callbacks;
 
   public:
 	struct Config
@@ -89,6 +91,8 @@ class Interpreter
 	void setup(std::shared_ptr<BytecodeProgram> &&program);
 	void setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program);
 
+	py::PyResult<std::monostate> finalise();
+
 	const std::string &entry_script() const { return m_entry_script; }
 	const std::vector<std::string> &argv() const { return m_argv; }
 
@@ -106,6 +110,10 @@ class Interpreter
 		py::PyObject *self,
 		py::PyTuple *args,
 		py::PyDict *kwargs);
+
+
+	void register_callback(py::PyObject *callback, py::PyTuple *args);
+	void unregister_callback(py::PyObject *callback);
 
 	void visit_graph(::Cell::Visitor &);
 
