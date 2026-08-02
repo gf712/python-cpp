@@ -15,12 +15,18 @@ This is an experimental Python 3.9-compatible interpreter implementation in C++.
 - GMP (GNU Multiple Precision library)
 - ICU (International Components for Unicode)
 
-Install LLVM/MLIR on Ubuntu:
+Install LLVM/MLIR on Ubuntu. LLVM 23 has branched, so it has its own apt suite;
+`llvm.sh` still maps 23 to the unversioned suite (LLVM 24 snapshots), so add the
+release repository directly:
 ```bash
-wget https://apt.llvm.org/llvm.sh
-chmod +x llvm.sh
-sudo ./llvm.sh 23 all
-sudo apt install libmlir-23-dev mlir-23-tools
+CODENAME=$(lsb_release -cs)
+sudo mkdir -p /etc/apt/keyrings
+wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+  | sudo tee /etc/apt/keyrings/apt.llvm.org.asc > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] https://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-23 main" \
+  | sudo tee /etc/apt/sources.list.d/llvm-23.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y clang-23 lld-23 llvm-23-dev libmlir-23-dev mlir-23-tools
 ```
 
 ### Build Commands

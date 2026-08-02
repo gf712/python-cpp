@@ -20,10 +20,19 @@ jobs:
 
     - name: Install LLVM
       run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 23
-        sudo apt install libmlir-23-dev mlir-23-tools
+        # LLVM 23 has branched, so it lives in its own apt suite now. Upstream
+        # llvm.sh still maps 23 to the unversioned suite, which serves LLVM 24
+        # snapshots, so add the release repository directly instead.
+        CODENAME=$(lsb_release -cs)
+        sudo mkdir -p /etc/apt/keyrings
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+          | sudo tee /etc/apt/keyrings/apt.llvm.org.asc > /dev/null
+        echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] https://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-23 main" \
+          | sudo tee /etc/apt/sources.list.d/llvm-23.list > /dev/null
+        sudo apt-get update
+        # The snapshot packaging pulled in llvm-23-dev via libmlir-23-dev; the
+        # release packaging does not, and MLIRConfig.cmake needs LLVMConfig.cmake.
+        sudo apt-get install -y clang-23 lld-23 llvm-23-dev libmlir-23-dev mlir-23-tools
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
