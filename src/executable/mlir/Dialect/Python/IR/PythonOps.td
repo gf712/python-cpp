@@ -585,7 +585,8 @@ def ImportAllOp : Python_Op<"import_all"> {
     let arguments = (ins Python_PyObjectType:$module);
 }
 
-def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments]> {
+def ClassDefinitionOp : Python_Op<"class", [AttrSizedOperandSegments,
+                                            IsolatedFromAbove]> {
     let summary = "Class definition";
 
     // captures is a list of free-variable names — no tensor semantics,

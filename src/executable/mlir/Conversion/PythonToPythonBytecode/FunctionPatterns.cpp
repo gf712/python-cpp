@@ -126,6 +126,23 @@ namespace {
 		}
 	};
 
+	// Collects the py.class_return ops that terminate `body` itself, skipping
+	// nested func.func / py.class subtrees.
+	std::vector<mlir::py::ClassReturnOp> collect_own_class_returns(mlir::Region &body)
+	{
+		std::vector<mlir::py::ClassReturnOp> returns;
+		body.walk<WalkOrder::PreOrder>([&returns](mlir::Operation *child_op) {
+			if (mlir::isa<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(child_op)) {
+				return WalkResult::skip();
+			}
+			if (auto cr = mlir::dyn_cast<mlir::py::ClassReturnOp>(child_op)) {
+				returns.push_back(cr);
+			}
+			return WalkResult::advance();
+		});
+		return returns;
+	}
+
 	struct ClassDefinitionOpLowering : public mlir::OpRewritePattern<mlir::py::ClassDefinitionOp>
 	{
 		using OpRewritePattern<mlir::py::ClassDefinitionOp>::OpRewritePattern;
@@ -146,6 +163,8 @@ namespace {
 
 			class_fn_definition->setAttr("is_class", rewriter.getBoolAttr(true));
 
+			auto class_returns = collect_own_class_returns(op.getBody());
+
 			if (auto cellvars = op->getAttrOfType<mlir::ArrayAttr>("cellvars")) {
 				auto cell_names = cellvars.getValue();
 				if (std::find_if(cell_names.begin(),
@@ -155,18 +174,8 @@ namespace {
 						})
 					!= cell_names.end()) {
 
-					mlir::py::ClassReturnOp return_op;
-					op.getBody().walk<WalkOrder::PreOrder>([&return_op](mlir::Operation *child_op) {
-						if (mlir::isa<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(child_op)) {
-							return WalkResult::skip();
-						}
-						if (auto cr = mlir::dyn_cast<mlir::py::ClassReturnOp>(child_op)) {
-							return_op = cr;
-							return WalkResult::interrupt();
-						}
-						return WalkResult::advance();
-					});
-					ASSERT(return_op);
+					ASSERT(!class_returns.empty());
+					auto return_op = class_returns.front();
 					ASSERT(return_op->getParentOp() == op.getOperation());
 					ASSERT(return_op.getValue().getDefiningOp());
 					rewriter.setInsertionPoint(return_op.getValue().getDefiningOp());
@@ -181,14 +190,14 @@ namespace {
 			attr.insert(attr.end(), op->getAttrs().begin(), op->getAttrs().end());
 			class_fn_definition->setAttrs(attr);
 
-			// Convert all py.class_return ops in the class body to
-			// func.return so that the body, once inlined into the
-			// synthesised func.func, has a valid terminator.
-			op.getBody().walk([&rewriter](mlir::py::ClassReturnOp cr) {
+			// Convert this class's own py.class_return ops to func.return so
+			// that the body, once inlined into the synthesised func.func, has
+			// a valid terminator. Nested classes are left alone.
+			for (auto cr : class_returns) {
 				rewriter.setInsertionPoint(cr);
 				rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(
 					cr, mlir::ValueRange{ cr.getValue() });
-			});
+			}
 
 			auto *end = class_fn_definition.addEntryBlock();
 			rewriter.setInsertionPointToStart(end);
