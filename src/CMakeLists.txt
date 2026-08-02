@@ -302,7 +302,10 @@ target_link_libraries(python-cpp
 )
 
 # LLVM backend
-find_package(LLVM CONFIG 23)
+# No version is requested here for the same reason as in executable/mlir: LLVM's
+# config-version file wants an exact major.minor match. The MLIR subdirectory has
+# already validated the major version by this point.
+find_package(LLVM CONFIG)
 if(ENABLE_LLVM_BACKEND AND NOT LLVM_FOUND)
   message(FATAL_ERROR "Could not find LLVM in the local environment")
 elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
