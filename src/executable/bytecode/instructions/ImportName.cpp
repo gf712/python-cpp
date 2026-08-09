@@ -22,6 +22,8 @@ PyResult<Value> ImportName::execute(VirtualMachine &vm, Interpreter &interpreter
 	const auto &from_list = vm.reg(m_from_list);
 	const auto &level = vm.reg(m_level);
 
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+
 	auto *builtins = interpreter.execution_frame()->builtins();
 	auto import_str = PyString::create("__import__");
 	if (import_str.is_err()) return import_str;
