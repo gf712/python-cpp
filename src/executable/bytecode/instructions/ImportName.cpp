@@ -22,8 +22,6 @@ PyResult<Value> ImportName::execute(VirtualMachine &vm, Interpreter &interpreter
 	const auto &from_list = vm.reg(m_from_list);
 	const auto &level = vm.reg(m_level);
 
-	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
-
 	auto *builtins = interpreter.execution_frame()->builtins();
 	auto import_str = PyString::create("__import__");
 	if (import_str.is_err()) return import_str;
@@ -51,7 +49,10 @@ PyResult<Value> ImportName::execute(VirtualMachine &vm, Interpreter &interpreter
 		PyObject::from(level).unwrap());
 	if (args.is_err()) return args;
 
-	auto module = std::get<PyObject *>(import_func)->call(args.unwrap(), nullptr);
+	auto module = [&] {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+		return std::get<PyObject *>(import_func)->call(args.unwrap(), nullptr);
+	}();
 
 	return module.and_then([&](auto *m) {
 		vm.reg(m_destination) = m;

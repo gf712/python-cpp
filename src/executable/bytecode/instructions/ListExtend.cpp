@@ -16,8 +16,13 @@ PyResult<Value> ListExtend::execute(VirtualMachine &vm, Interpreter &) const
 	ASSERT(pylist);
 	ASSERT(as<PyList>(pylist));
 
-	return PyObject::from(value).and_then(
-		[pylist](PyObject *iterable) { return as<PyList>(pylist)->extend(iterable); });
+	return PyObject::from(value).and_then([pylist](PyObject *iterable) {
+		// extend() walks the iterator protocol, which may run Python __iter__ /
+		// __next__ and clobber r0.
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+
+		return as<PyList>(pylist)->extend(iterable);
+	});
 }
 
 std::vector<uint8_t> ListExtend::serialize() const
