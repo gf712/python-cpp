@@ -332,13 +332,9 @@ namespace py {
 				rewriter.setInsertionPointToEnd(initBlock);
 				mlir::cf::BranchOp::create(rewriter, condition_op.getLoc(), &condition_start);
 
-				if (mlir::isa<mlir::BlockArgument>(condition_op.getCond())) {
-					rewriter.setInsertionPointToStart(condition_op.getCond().getParentBlock());
-				} else {
-					rewriter.setInsertionPointAfter(condition_op.getCond().getDefiningOp());
-				}
-				auto should_jump = mlir::py::CastToBoolOp::create(
-					rewriter, condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
+				rewriter.setInsertionPoint(condition_op);
+				auto should_jump = rewriter.create<mlir::py::CastToBoolOp>(
+					condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
 				ASSERT(!op.getBody().empty());
 				mlir::cf::CondBranchOp::create(rewriter,
 					condition_op.getLoc(),
