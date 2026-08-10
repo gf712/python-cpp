@@ -487,7 +487,7 @@ def TryOp : Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface,
                           VariadicRegion<SizedRegion<1>>:$handlers);
 }
 
-def WithOp : Python_Op<"with"> {
+def WithOp : Python_Op<"with", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let arguments = (ins Variadic<Python_PyObjectType>:$items);
 
     let regions = (region AnyRegion:$body);
