@@ -17,6 +17,8 @@
 
 #include "Python/IR/Dialect.cpp.inc"
 
+#include "Python/IR/PythonInterfaces.cpp.inc"
+
 namespace mlir {
 namespace py {
 	namespace {
@@ -262,6 +264,14 @@ namespace py {
 			return mlir::ValueRange{};
 		}
 	}// namespace
+
+	mlir::Region &WhileOp::getLoopBodyRegion() { return getBody(); }
+
+	mlir::Region &WhileOp::getLoopOrelseRegion() { return getOrelse(); }
+
+	mlir::Region &ForLoopOp::getLoopBodyRegion() { return getBody(); }
+
+	mlir::Region &ForLoopOp::getLoopOrelseRegion() { return getOrelse(); }
 
 	// Based on CIR loop interface implementation
 	void WhileOp::getSuccessorRegions(mlir::RegionBranchPoint point,

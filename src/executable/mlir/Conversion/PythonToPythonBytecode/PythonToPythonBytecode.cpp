@@ -52,6 +52,21 @@ namespace py {
 		// PythonToPythonBytecodePass, and the dedicated single-pattern
 		// passes that wrap the structural ones.
 
+		// The ops whose regions py.br_yield terminates, and which a structural
+		// pattern flattens into the enclosing CFG. A walk looking for the yields
+		// that belong to *one* such op must stop at any other one, because the
+		// nested op's own pattern owns everything inside it.
+		//
+		// This is BranchYieldOp's ParentOneOf list (PythonOps.td) — the sixth
+		// region-bearing python op, py.class, is excluded because its region
+		// becomes a separate function rather than being flattened in place.
+		bool is_flattened_region_op(mlir::Operation *op)
+		{
+			static_assert(mlir::py::BranchYieldOp::hasTrait<
+				mlir::OpTrait::HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
+			return mlir::isa<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>(op);
+		}
+
 		// Shared walker used by both ForLoopOpLowering and WhileOpLowering
 		// to lower py.br_yield ops nested inside a loop body to cf.br ops
 		// that target the right block (continue→condition / step, break→
@@ -73,20 +88,14 @@ namespace py {
 			std::function<WalkResult(mlir::Operation *)> callback =
 				[&rewriter, continue_target, break_target, skip_op, &callback](
 					mlir::Operation *operation) {
-					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
-						return WalkResult::skip();
-					}
-					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
+					if (auto loop = mlir::dyn_cast<mlir::py::PyLoopOpInterface>(operation)) {
+						auto &orelse = loop.getLoopOrelseRegion();
+						if (orelse.empty()) { return WalkResult::skip(); }
+						orelse.walk<WalkOrder::PreOrder>(callback);
 						return WalkResult::skip();
 					}
 					auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation);
 					if (!yield_op) { return WalkResult::advance(); }
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
 					// Kindless yields under try/with/try-handler don't
 					// participate in the loop's continue/break flow.
 					if (!yield_op.getKind().has_value()
@@ -351,15 +360,7 @@ namespace py {
 			{
 				if (region.empty()) { return; }
 				region.walk<WalkOrder::PreOrder>([callback](mlir::Operation *childOp) {
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
-					if (mlir::isa<mlir::py::TryOp>(childOp)
-						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
-						|| mlir::isa<mlir::py::WhileOp>(childOp)
-						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
-						return WalkResult::skip();
-					}
+					if (is_flattened_region_op(childOp)) { return WalkResult::skip(); }
 					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)) {
 						// Both normal-completion (kindless) and loop-control
 						// (break/continue) yields are surfaced; the callback
@@ -712,59 +713,52 @@ namespace py {
 					}
 				};
 
-				op.getBody().walk<WalkOrder::PreOrder>([&rewriter,
-														   exit_block,
-														   cleanup_block,
-														   endBlock,
-														   &emit_normal_exit](
-														   mlir::Operation *childOp) {
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
-					if (mlir::isa<mlir::py::TryOp>(childOp)
-						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
-						|| mlir::isa<mlir::py::WhileOp>(childOp)
-						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
-						return WalkResult::skip();
-					}
-					if (auto op = mlir::dyn_cast<mlir::py::RaiseOp>(childOp)) {
-						rewriter.setInsertionPoint(op);
-						if (op.getCause()) {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
-								op, op.getException(), op.getCause(), BlockRange{ cleanup_block });
-						} else if (op.getException()) {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
-								op, op.getException(), nullptr, BlockRange{ cleanup_block });
-						} else {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
-								op, BlockRange{ cleanup_block });
+				op.getBody().walk<WalkOrder::PreOrder>(
+					[&rewriter, exit_block, cleanup_block, endBlock, &emit_normal_exit](
+						mlir::Operation *childOp) {
+						if (is_flattened_region_op(childOp)) { return WalkResult::skip(); }
+						if (auto op = mlir::dyn_cast<mlir::py::RaiseOp>(childOp)) {
+							rewriter.setInsertionPoint(op);
+							if (op.getCause()) {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(op,
+									op.getException(),
+									op.getCause(),
+									BlockRange{ cleanup_block });
+							} else if (op.getException()) {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
+									op, op.getException(), nullptr, BlockRange{ cleanup_block });
+							} else {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
+									op, BlockRange{ cleanup_block });
+							}
+						} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+							y && !y.getKind().has_value()) {
+							auto *current = y->getBlock();
+							auto *next = rewriter.splitBlock(current, y->getIterator());
+							rewriter.setInsertionPointToEnd(current);
+							rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(
+								y->getLoc());
+							rewriter.create<mlir::cf::BranchOp>(y->getLoc(), exit_block);
+							rewriter.eraseBlock(next);
+						} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+							y && y.getKind().has_value()) {
+							// break/continue out of the with body: leave the
+							// exception handler, run __exit__, then hand the marker
+							// to the enclosing loop on a dedicated exit path.
+							auto *current = y->getBlock();
+							auto *next = rewriter.splitBlock(current, y->getIterator());
+							auto *lc_block = rewriter.createBlock(endBlock);
+							rewriter.setInsertionPointToEnd(current);
+							rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(
+								y->getLoc());
+							rewriter.create<mlir::cf::BranchOp>(y->getLoc(), lc_block);
+							rewriter.setInsertionPointToStart(lc_block);
+							emit_normal_exit();
+							rewriter.create<mlir::py::BranchYieldOp>(y->getLoc(), y.getKindAttr());
+							rewriter.eraseBlock(next);
 						}
-					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
-						y && !y.getKind().has_value()) {
-						auto *current = y->getBlock();
-						auto *next = rewriter.splitBlock(current, y->getIterator());
-						rewriter.setInsertionPointToEnd(current);
-						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
-						mlir::cf::BranchOp::create(rewriter, y->getLoc(), exit_block);
-						rewriter.eraseBlock(next);
-					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
-						y && y.getKind().has_value()) {
-						// break/continue out of the with body: leave the
-						// exception handler, run __exit__, then hand the marker
-						// to the enclosing loop on a dedicated exit path.
-						auto *current = y->getBlock();
-						auto *next = rewriter.splitBlock(current, y->getIterator());
-						auto *lc_block = rewriter.createBlock(endBlock);
-						rewriter.setInsertionPointToEnd(current);
-						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
-						mlir::cf::BranchOp::create(rewriter, y->getLoc(), lc_block);
-						rewriter.setInsertionPointToStart(lc_block);
-						emit_normal_exit();
-						mlir::py::BranchYieldOp::create(rewriter, y->getLoc(), y.getKindAttr());
-						rewriter.eraseBlock(next);
-					}
-					return WalkResult::advance();
-				});
+						return WalkResult::advance();
+					});
 
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
