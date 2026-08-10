@@ -77,8 +77,11 @@ std::shared_ptr<Program> compile(std::shared_ptr<ast::Module> node,
 	pm.addPass(::mlir::py::createConvertWithPass());
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
-	pm.addPass(::mlir::py::createConvertForLoopPass());
-	pm.addPass(::mlir::py::createConvertWhileLoopPass());
+	// One pass for both loop kinds: a `break`/`continue` in a nested loop's orelse
+	// binds to the enclosing loop, and the patterns defer to each other so the
+	// nested loop is flattened first. Split across two passes, a `for` holding a
+	// `while ... else: continue` would defer on a pattern that had not run yet.
+	pm.addPass(::mlir::py::createConvertLoopsPass());
 	pm.addPass(::mlir::createCanonicalizerPass());
 	pm.addPass(::mlir::createCSEPass());
 	pm.addPass(::mlir::py::createPythonToPythonBytecodePass());
