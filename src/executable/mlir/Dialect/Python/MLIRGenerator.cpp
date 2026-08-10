@@ -1169,7 +1169,7 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 				m_context.builder(), node->name(), m_context.filename(), node->source_location())),
 			node->source_location());
 
-		for (const auto &el : node->body()) { el->codegen(this); }
+		codegen_statements(node->body());
 
 		mlir::cf::BranchOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->body().back()->source_location()),
@@ -1492,7 +1492,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 	mlir::py::BranchYieldOp::create(m_context.builder(), m_context.builder().getUnknownLoc());
 
 	m_context.builder().setInsertionPointToStart(&body_start);
-	for (const auto &el : node->body()) { el->codegen(this); }
+	codegen_statements(node->body());
 	if (m_context.builder().getInsertionBlock()->empty()
 		|| !m_context.builder()
 			.getInsertionBlock()
@@ -1503,7 +1503,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 
 	if (!node->orelse().empty()) {
 		m_context.builder().setInsertionPointToStart(orelse_block);
-		for (const auto &el : node->orelse()) { el->codegen(this); }
+		codegen_statements(node->orelse());
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			mlir::py::BranchYieldOp::create(m_context.builder(),
@@ -1589,7 +1589,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 		orelse_block);
 
 	m_context.builder().setInsertionPointToStart(if_block);
-	for (const auto &el : node->body()) { el->codegen(this); }
+	codegen_statements(node->body());
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 		mlir::cf::BranchOp::create(m_context.builder(),
@@ -1598,7 +1598,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 	}
 	if (!node->orelse().empty()) {
 		m_context.builder().setInsertionPointToStart(orelse_block);
-		for (const auto &el : node->orelse()) { el->codegen(this); }
+		codegen_statements(node->orelse());
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			mlir::cf::BranchOp::create(m_context.builder(),
@@ -1806,6 +1806,20 @@ ast::Value *MLIRGenerator::visit(const ast::ListComp *node)
 		node->source_location());
 }
 
+bool MLIRGenerator::current_block_is_terminated() const
+{
+	auto *block = m_context.builder().getBlock();
+	return block && !block->empty() && block->back().hasTrait<mlir::OpTrait::IsTerminator>();
+}
+
+void MLIRGenerator::codegen_statements(const std::vector<ast::ASTNode *> &statements)
+{
+	for (const auto &statement : statements) {
+		statement->codegen(this);
+		if (current_block_is_terminated()) { break; }
+	}
+}
+
 ast::Value *MLIRGenerator::visit(const ast::Module *m)
 {
 	m_context.module()->setLoc(loc(m_context.builder(), m->filename(), SourceLocation{ 0, 0 }));
@@ -1833,7 +1847,7 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 	auto *entry_block = module_fn.addEntryBlock();
 	auto *exit_block = module_fn.addBlock();
 	m_context.builder().setInsertionPointToEnd(entry_block);
-	for (const auto &node : m->body()) { node->codegen(this); }
+	codegen_statements(m->body());
 
 	// If a program does not end with a terminator instruction, jump to the exit_block
 	if (m_context.builder().getBlock()->empty()
@@ -2553,7 +2567,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 		captures = collect_function_captures(mangled_name);
 
 		builder.setInsertionPointToStart(&f.front());
-		for (const auto &el : body) { el->codegen(this); }
+		codegen_statements(body);
 
 		if (builder.getBlock()->empty()
 			|| !builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
@@ -2644,9 +2658,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			final_block);
 		m_context.builder().setInsertionPointToEnd(final_block);
-		if (!node->finalbody().empty()) {
-			for (auto el : node->finalbody()) { el->codegen(this); }
-		}
+		if (!node->finalbody().empty()) { codegen_statements(node->finalbody()); }
 		if (!m_context.builder().getBlock()->empty()
 			&& m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			m_context.builder().createBlock(current->getParent());
@@ -2654,7 +2666,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 	});
 
 	m_context.builder().setInsertionPointToStart(&try_op.getBody().emplaceBlock());
-	for (const auto &el : node->body()) { el->codegen(this); }
+	codegen_statements(node->body());
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 		mlir::py::BranchYieldOp::create(m_context.builder(),
@@ -2699,7 +2711,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 					handler->source_location());
 			}
 			ClearExceptionBeforeReturn clear_exception_before_return{ scope() };
-			for (auto el : handler->body()) { el->codegen(this); }
+			codegen_statements(handler->body());
 			if (m_context.builder().getBlock()->empty()
 				|| !m_context.builder()
 					.getBlock()
@@ -2713,7 +2725,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 
 	if (!node->orelse().empty()) {
 		m_context.builder().setInsertionPointToStart(&try_op.getOrelse().front());
-		for (auto el : node->orelse()) { el->codegen(this); }
+		codegen_statements(node->orelse());
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			mlir::py::BranchYieldOp::create(m_context.builder(),
@@ -2726,7 +2738,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 
 	if (!node->finalbody().empty()) {
 		m_context.builder().setInsertionPointToStart(&try_op.getFinally().front());
-		for (auto el : node->finalbody()) { el->codegen(this); }
+		codegen_statements(node->finalbody());
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			mlir::py::BranchYieldOp::create(m_context.builder(),
@@ -2819,7 +2831,7 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 	mlir::py::ConditionOp::create(m_context.builder(), test.getLoc(), test);
 
 	m_context.builder().setInsertionPointToStart(body_start_block);
-	for (const auto &el : node->body()) { el->codegen(this); }
+	codegen_statements(node->body());
 
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
@@ -2829,7 +2841,7 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 
 	if (!node->orelse().empty()) {
 		m_context.builder().setInsertionPointToStart(orelse_block);
-		for (const auto &el : node->orelse()) { el->codegen(this); }
+		codegen_statements(node->orelse());
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 			mlir::py::BranchYieldOp::create(m_context.builder(),
@@ -2895,7 +2907,7 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 	auto &body_start = with.getBody().emplaceBlock();
 	m_context.builder().setInsertionPointToStart(&body_start);
 
-	for (const auto &el : node->body()) { el->codegen(this); }
+	codegen_statements(node->body());
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
 		mlir::py::BranchYieldOp::create(m_context.builder(),

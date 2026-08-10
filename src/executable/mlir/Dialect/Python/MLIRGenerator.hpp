@@ -121,6 +121,14 @@ class MLIRGenerator : ast::CodeGenerator
 
 	template<typename... Args> MLIRValue *new_value(Args &&...args);
 
+	// Emits a statement list — a body, orelse, finalbody or handler body — stopping
+	// once a statement has terminated the current block.
+	void codegen_statements(const std::vector<ast::ASTNode *> &statements);
+
+	// True when the block being built already ends in a terminator, i.e. nothing
+	// further may be appended to it.
+	bool current_block_is_terminated() const;
+
 	void store_name(std::string_view name, MLIRValue *value, const SourceLocation &location);
 	MLIRValue *load_name(std::string_view name, const SourceLocation &location);
 	void delete_name(std::string_view name, const SourceLocation &location);
