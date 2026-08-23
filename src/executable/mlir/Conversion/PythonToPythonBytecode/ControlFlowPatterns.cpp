@@ -97,8 +97,8 @@ namespace {
 					auto insertion_point = rewriter.getInsertionPoint();
 					auto *return_block = rewriter.createBlock(&op.getRegion());
 					auto value =
-						rewriter.create<mlir::py::ConstantOp>(op.getLoc(), rewriter.getNoneType());
-					rewriter.create<mlir::func::ReturnOp>(op.getLoc(), mlir::ValueRange{ value });
+						mlir::py::ConstantOp::create(rewriter, op.getLoc(), rewriter.getNoneType());
+					mlir::func::ReturnOp::create(rewriter, op.getLoc(), mlir::ValueRange{ value });
 					rewriter.setInsertionPoint(insertion_point->getBlock(), insertion_point);
 					return return_block;
 				})
@@ -136,9 +136,10 @@ namespace {
 		mlir::LogicalResult matchAndRewrite(mlir::py::YieldFromOp op,
 			mlir::PatternRewriter &rewriter) const final
 		{
-			auto iterator = rewriter.create<mlir::emitpybytecode::YieldFromIter>(
-				op.getLoc(), op.getIterable().getType(), op.getIterable());
-			auto value = rewriter.create<mlir::py::ConstantOp>(op.getLoc(), rewriter.getNoneType());
+			auto iterator = mlir::emitpybytecode::YieldFromIter::create(
+				rewriter, op.getLoc(), op.getIterable().getType(), op.getIterable());
+			auto value =
+				mlir::py::ConstantOp::create(rewriter, op.getLoc(), rewriter.getNoneType());
 
 			rewriter.replaceOpWithNewOp<mlir::emitpybytecode::YieldFrom>(
 				op, iterator.getType(), iterator, value);

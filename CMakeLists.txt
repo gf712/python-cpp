@@ -77,10 +77,26 @@ target_compile_options(project_warnings
   INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-sign-conversion;-Wno-shadow;-Wno-implicit-fallthrough;-Wno-old-style-cast;-Wno-deprecated-copy;-Wno-missing-field-initializers;-Wno-null-dereference;-Wno-maybe-uninitialized;-Wno-stringop-overflow>
 )
 
+target_compile_options(project_options
+  # -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base
+  # pointer reliably. The garbage collector scans the C++ stack conservatively
+  # for roots (see MarkSweepGC::collect_roots), so every target whose frames can
+  # be live across an allocation needs it.
+  INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>
+)
+
+# Every first-party target links against project_options and project_warnings
+# through this helper so they are all compiled the same way.
+include(PythonCppFlags)
+
+# check_cxx_source_compiles links the snippet, so it needs a main(); and
+# std::uint64_t needs <cstdint> rather than coming along with <bit>.
 check_cxx_source_compiles(
 	"#include <bit>
+  #include <cstdint>
   constexpr double f64v = 19880124.0;
-  constexpr auto u64v = std::bit_cast<std::uint64_t>(f64v);"
+  constexpr auto u64v = std::bit_cast<std::uint64_t>(f64v);
+  int main() { return u64v == 0; }"
 	STL_SUPPORTS_BIT_CAST)
 
 find_library(MATH_LIBRARY m)

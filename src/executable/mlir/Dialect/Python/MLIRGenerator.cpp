@@ -38,8 +38,9 @@ namespace {
 
 mlir::Location loc(mlir::OpBuilder &builder, std::string_view filename, const SourceLocation &loc)
 {
-	return mlir::FileLineColLoc::get(
-		builder.getStringAttr(filename), loc.start.row, loc.start.column);
+	return mlir::FileLineColLoc::get(builder.getStringAttr(filename),
+		static_cast<unsigned>(loc.start.row),
+		static_cast<unsigned>(loc.start.column));
 }
 
 void add_name(mlir::OpBuilder &builder, mlir::StringRef name, mlir::Operation *fn)
@@ -133,15 +134,15 @@ mlir::py::ConstantOp load_const(mlir::OpBuilder &builder,
 				builder.getIntegerType(1, false), llvm::APInt::getZero(1));
 		} else {
 			const size_t bits = mpz_sizeinbase(integer.get_mpz_t(), 2);
-			return builder.getIntegerAttr(
-				builder.getIntegerType(bits, integer.get_mpz_t()->_mp_size < 0),
-				llvm::APInt(bits,
+			return builder.getIntegerAttr(builder.getIntegerType(static_cast<unsigned>(bits),
+											  integer.get_mpz_t()->_mp_size < 0),
+				llvm::APInt(static_cast<unsigned>(bits),
 					llvm::ArrayRef<uint64_t>(
 						integer.get_mpz_t()->_mp_d, std::abs(integer.get_mpz_t()->_mp_size))));
 		}
 	}();
 
-	auto op = builder.create<mlir::py::ConstantOp>(loc(builder, filename, source_location), value);
+	auto op = mlir::py::ConstantOp::create(builder, loc(builder, filename, source_location), value);
 	return op;
 }
 
@@ -150,8 +151,8 @@ mlir::py::ConstantOp load_const(mlir::OpBuilder &builder,
 	std::string_view filename,
 	SourceLocation source_location)
 {
-	return builder.create<mlir::py::ConstantOp>(
-		loc(builder, filename, source_location), builder.getStringAttr(str));
+	return mlir::py::ConstantOp::create(
+		builder, loc(builder, filename, source_location), builder.getStringAttr(str));
 }
 
 /// Find the first parent operation of the given type, or nullptr if there is
@@ -268,13 +269,13 @@ template<typename... Args> MLIRGenerator::MLIRValue *MLIRGenerator::new_value(Ar
 }
 
 
-ast::Value *MLIRGenerator::visit(const ast::Argument *node)
+ast::Value *MLIRGenerator::visit(const ast::Argument *)
 {
 	TODO();
 	return nullptr;
 }
 
-ast::Value *MLIRGenerator::visit(const ast::Arguments *node)
+ast::Value *MLIRGenerator::visit(const ast::Arguments *)
 {
 	TODO();
 	return nullptr;
@@ -285,7 +286,7 @@ ast::Value *MLIRGenerator::visit(const ast::Attribute *node)
 	auto self = static_cast<MLIRValue *>(node->value()->codegen(this))->value;
 	switch (node->context()) {
 	case ast::ContextType::LOAD: {
-		return new_value(m_context.builder().create<mlir::py::LoadAttributeOp>(
+		return new_value(mlir::py::LoadAttributeOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			self,
@@ -295,7 +296,7 @@ ast::Value *MLIRGenerator::visit(const ast::Attribute *node)
 		TODO();
 	} break;
 	case ast::ContextType::DELETE: {
-		m_context.builder().create<mlir::py::DeleteAttributeOp>(
+		mlir::py::DeleteAttributeOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			self,
 			m_context.builder().getStringAttr(node->attr()));
@@ -330,24 +331,32 @@ void MLIRGenerator::store_name(std::string_view name,
 
 	switch (visibility) {
 	case VariablesResolver::Visibility::NAME: {
-		m_context.builder().create<mlir::py::StoreNameOp>(
-			loc(m_context.builder(), m_context.filename(), location), name, value->value);
+		mlir::py::StoreNameOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), location),
+			name,
+			value->value);
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
-		m_context.builder().create<mlir::py::StoreFastOp>(
-			loc(m_context.builder(), m_context.filename(), location), name, value->value);
+		mlir::py::StoreFastOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), location),
+			name,
+			value->value);
 	} break;
 	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
 	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		if (&m_scope.front() == &scope()) {
-			m_context.builder().create<mlir::py::StoreNameOp>(
-				loc(m_context.builder(), m_context.filename(), location), name, value->value);
+			mlir::py::StoreNameOp::create(m_context.builder(),
+				loc(m_context.builder(), m_context.filename(), location),
+				name,
+				value->value);
 		} else {
 			auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 				m_context.builder().getInsertionBlock()->getParent());
 			add_name(m_context.builder(), name, current_fn);
-			m_context.builder().create<mlir::py::StoreGlobalOp>(
-				loc(m_context.builder(), m_context.filename(), location), name, value->value);
+			mlir::py::StoreGlobalOp::create(m_context.builder(),
+				loc(m_context.builder(), m_context.filename(), location),
+				name,
+				value->value);
 		}
 	} break;
 	case VariablesResolver::Visibility::CELL: {
@@ -357,8 +366,10 @@ void MLIRGenerator::store_name(std::string_view name,
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
-		m_context.builder().create<mlir::py::StoreDerefOp>(
-			loc(m_context.builder(), m_context.filename(), location), name, value->value);
+		mlir::py::StoreDerefOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), location),
+			name,
+			value->value);
 	} break;
 	case VariablesResolver::Visibility::FREE: {
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
@@ -367,12 +378,16 @@ void MLIRGenerator::store_name(std::string_view name,
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
-		m_context.builder().create<mlir::py::StoreDerefOp>(
-			loc(m_context.builder(), m_context.filename(), location), name, value->value);
+		mlir::py::StoreDerefOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), location),
+			name,
+			value->value);
 	} break;
 	case VariablesResolver::Visibility::HIDDEN: {
-		m_context.builder().create<mlir::py::StoreNameOp>(
-			loc(m_context.builder(), m_context.filename(), location), name, value->value);
+		mlir::py::StoreNameOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), location),
+			name,
+			value->value);
 	} break;
 	}
 }
@@ -397,13 +412,13 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 
 	switch (visibility) {
 	case VariablesResolver::Visibility::NAME: {
-		return new_value(m_context.builder().create<mlir::py::LoadNameOp>(
+		return new_value(mlir::py::LoadNameOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
 	}
 	case VariablesResolver::Visibility::LOCAL: {
-		return new_value(m_context.builder().create<mlir::py::LoadFastOp>(
+		return new_value(mlir::py::LoadFastOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
@@ -411,7 +426,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 	case VariablesResolver::Visibility::EXPLICIT_GLOBAL:
 	case VariablesResolver::Visibility::IMPLICIT_GLOBAL: {
 		if (&m_scope.front() == &scope()) {
-			return new_value(m_context.builder().create<mlir::py::LoadNameOp>(
+			return new_value(mlir::py::LoadNameOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), location),
 				m_context->pyobject_type(),
 				name));
@@ -419,7 +434,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 		auto parent = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
 		add_name(m_context.builder(), name, parent);
-		return new_value(m_context.builder().create<mlir::py::LoadGlobalOp>(
+		return new_value(mlir::py::LoadGlobalOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
@@ -431,7 +446,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
-		return new_value(m_context.builder().create<mlir::py::LoadDerefOp>(
+		return new_value(mlir::py::LoadDerefOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
@@ -443,13 +458,13 @@ MLIRGenerator::MLIRValue *MLIRGenerator::load_name(std::string_view name,
 		ASSERT(std::find_if(arr.begin(), arr.end(), [name](mlir::Attribute attr) {
 			return mlir::cast<mlir::StringAttr>(attr).getValue() == mlir::StringRef{ name };
 		}) != arr.end());
-		return new_value(m_context.builder().create<mlir::py::LoadDerefOp>(
+		return new_value(mlir::py::LoadDerefOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
 	} break;
 	case VariablesResolver::Visibility::HIDDEN: {
-		return new_value(m_context.builder().create<mlir::py::LoadNameOp>(
+		return new_value(mlir::py::LoadNameOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), location),
 			m_context->pyobject_type(),
 			name));
@@ -484,35 +499,37 @@ void MLIRGenerator::delete_name(std::string_view name, const SourceLocation &loc
 			m_context.builder().getInsertionBlock()->getParent());
 		add_name(m_context.builder(), name, current_fn);
 		if (&m_scope.front() == &scope()) {
-			m_context.builder().create<mlir::py::DeleteNameOp>(
-				loc(m_context.builder(), m_context.filename(), location), name);
+			mlir::py::DeleteNameOp::create(m_context.builder(),
+				loc(m_context.builder(), m_context.filename(), location),
+				name);
 		} else {
-			m_context.builder().create<mlir::py::DeleteGlobalOp>(
-				loc(m_context.builder(), m_context.filename(), location), name);
+			mlir::py::DeleteGlobalOp::create(m_context.builder(),
+				loc(m_context.builder(), m_context.filename(), location),
+				name);
 		}
 	} break;
 	case VariablesResolver::Visibility::NAME: {
 		auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
 		add_name(m_context.builder(), name, current_fn);
-		m_context.builder().create<mlir::py::DeleteNameOp>(
-			loc(m_context.builder(), m_context.filename(), location), name);
+		mlir::py::DeleteNameOp::create(
+			m_context.builder(), loc(m_context.builder(), m_context.filename(), location), name);
 	} break;
 	case VariablesResolver::Visibility::LOCAL: {
-		m_context.builder().create<mlir::py::DeleteFastOp>(
-			loc(m_context.builder(), m_context.filename(), location), name);
+		mlir::py::DeleteFastOp::create(
+			m_context.builder(), loc(m_context.builder(), m_context.filename(), location), name);
 	} break;
 	case VariablesResolver::Visibility::CELL:
 	case VariablesResolver::Visibility::FREE: {
-		m_context.builder().create<mlir::py::DeleteDerefOp>(
-			loc(m_context.builder(), m_context.filename(), location), name);
+		mlir::py::DeleteDerefOp::create(
+			m_context.builder(), loc(m_context.builder(), m_context.filename(), location), name);
 	} break;
 	case VariablesResolver::Visibility::HIDDEN: {
 		auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 			m_context.builder().getInsertionBlock()->getParent());
 		add_name(m_context.builder(), name, current_fn);
-		m_context.builder().create<mlir::py::DeleteNameOp>(
-			loc(m_context.builder(), m_context.filename(), location), name);
+		mlir::py::DeleteNameOp::create(
+			m_context.builder(), loc(m_context.builder(), m_context.filename(), location), name);
 	} break;
 	}
 }
@@ -526,7 +543,7 @@ void MLIRGenerator::assign(const ast::ASTNode *target,
 	} else if (auto subscript = as<ast::Subscript>(target)) {
 		auto value = static_cast<const MLIRValue &>(*subscript->value()->codegen(this)).value;
 		auto index = build_slice(subscript->slice(), subscript->source_location())->value;
-		m_context.builder().create<mlir::py::StoreSubscriptOp>(
+		mlir::py::StoreSubscriptOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), source_location),
 			value,
 			index,
@@ -542,7 +559,7 @@ void MLIRGenerator::assign(const ast::ASTNode *target,
 				std::vector<mlir::Type> unpacked_types(
 					tuple->elements().size() - 1, m_context->pyobject_type());
 				mlir::Type rest{ m_context->pyobject_type() };
-				auto unpack_sequence = m_context.builder().create<mlir::py::UnpackExpandOp>(
+				auto unpack_sequence = mlir::py::UnpackExpandOp::create(m_context.builder(),
 					loc(m_context.builder(), m_context.filename(), source_location),
 					unpacked_types,
 					rest,
@@ -561,7 +578,7 @@ void MLIRGenerator::assign(const ast::ASTNode *target,
 			std::vector<mlir::Value> unpacked_values;
 			std::vector<mlir::Type> unpacked_types(
 				tuple->elements().size(), m_context->pyobject_type());
-			auto unpack_sequence = m_context.builder().create<mlir::py::UnpackSequenceOp>(
+			auto unpack_sequence = mlir::py::UnpackSequenceOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), source_location),
 				unpacked_types,
 				src->value);
@@ -573,8 +590,11 @@ void MLIRGenerator::assign(const ast::ASTNode *target,
 	} else if (auto attr = as<ast::Attribute>(target)) {
 		auto obj = static_cast<const MLIRValue &>(*attr->value()->codegen(this)).value;
 		const auto &name = attr->attr();
-		m_context.builder().create<mlir::py::StoreAttributeOp>(
-			loc(m_context.builder(), m_context.filename(), source_location), obj, name, src->value);
+		mlir::py::StoreAttributeOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), source_location),
+			obj,
+			name,
+			src->value);
 	} else {
 		ASSERT(false && "Invalid assignment in AST");
 	}
@@ -592,7 +612,7 @@ ast::Value *MLIRGenerator::visit(const ast::Assign *node)
 ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 {
 	auto test = static_cast<const MLIRValue &>(*node->test()->codegen(this)).value;
-	auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+	auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		m_context.builder().getI1Type(),
 		test);
@@ -602,7 +622,7 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 	auto continuation = m_context.builder().createBlock(parent);
 
 	m_context.builder().setInsertionPointToEnd(cond.getOperation()->getBlock());
-	m_context.builder().create<mlir::cf::CondBranchOp>(
+	mlir::cf::CondBranchOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		cond,
 		continuation,
@@ -617,13 +637,13 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 		const auto assert_location =
 			static_cast<int64_t>((static_cast<uint64_t>(assert_start.row) << 32)
 								 | (static_cast<uint64_t>(assert_start.column) & 0xFFFFFFFFull));
-		auto assertion_error_fn = m_context.builder().create<mlir::py::LoadAssertionError>(
+		auto assertion_error_fn = mlir::py::LoadAssertionError::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			m_context.builder().getI64IntegerAttr(assert_location));
 		if (node->msg()) {
 			auto msg = static_cast<const MLIRValue &>(*node->msg()->codegen(this)).value;
-			return m_context.builder().create<mlir::py::FunctionCallOp>(
+			return mlir::py::FunctionCallOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				assertion_error_fn,
@@ -635,7 +655,7 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 				false,
 				false);
 		} else {
-			return m_context.builder().create<mlir::py::FunctionCallOp>(
+			return mlir::py::FunctionCallOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				assertion_error_fn,
@@ -649,8 +669,9 @@ ast::Value *MLIRGenerator::visit(const ast::Assert *node)
 		}
 	}();
 
-	m_context.builder().create<mlir::py::RaiseOp>(
-		loc(m_context.builder(), m_context.filename(), node->source_location()), assertion_error);
+	mlir::py::RaiseOp::create(m_context.builder(),
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		assertion_error);
 
 	m_context.builder().setInsertionPointToEnd(continuation);
 
@@ -675,11 +696,11 @@ ast::Value *MLIRGenerator::visit(const ast::AsyncFunctionDefinition *node)
 ast::Value *MLIRGenerator::visit(const ast::Await *node)
 {
 	auto iterable = static_cast<const MLIRValue &>(*node->value()->codegen(this)).value;
-	auto iterator = m_context.builder().create<mlir::py::GetAwaitableOp>(
+	auto iterator = mlir::py::GetAwaitableOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->value()->source_location()),
 		m_context->pyobject_type(),
 		iterable);
-	return new_value(m_context.builder().create<mlir::py::YieldFromOp>(
+	return new_value(mlir::py::YieldFromOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		iterator));
@@ -697,7 +718,7 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 		} else if (auto attribute_target = as<ast::Attribute>(node->target())) {
 			target_value =
 				static_cast<MLIRValue &>(*attribute_target->value()->codegen(this)).value;
-			return new_value(m_context.builder().create<mlir::py::LoadAttributeOp>(
+			return new_value(mlir::py::LoadAttributeOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				*target_value,
@@ -707,7 +728,7 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 				static_cast<MLIRValue &>(*subscript_target->value()->codegen(this)).value;
 			target_slice =
 				build_slice(subscript_target->slice(), subscript_target->source_location())->value;
-			return new_value(m_context.builder().create<mlir::py::BinarySubscriptOp>(
+			return new_value(mlir::py::BinarySubscriptOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				*target_value,
@@ -720,10 +741,10 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 	}();
 	auto value = node->value()->codegen(this);
 
-	auto result = [&]() {
+	[[maybe_unused]] auto result = [&]() {
 		auto make_binop = [this, &node](
 							  ast::Value *value, ast::Value *target, mlir::py::ArithOpKind kind) {
-			return new_value(m_context.builder().create<mlir::py::InplaceOp>(
+			return new_value(mlir::py::InplaceOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				static_cast<MLIRValue *>(value)->value,
@@ -781,7 +802,7 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 	} else if (auto attribute_target = as<ast::Attribute>(node->target())) {
 		ASSERT(target_value.has_value());
 		const auto &name = attribute_target->attr();
-		m_context.builder().create<mlir::py::StoreAttributeOp>(
+		mlir::py::StoreAttributeOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->target()->source_location()),
 			*target_value,
 			name,
@@ -789,7 +810,7 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 	} else if (as<ast::Subscript>(node->target())) {
 		ASSERT(target_value.has_value());
 		ASSERT(target_slice.has_value());
-		m_context.builder().create<mlir::py::StoreSubscriptOp>(
+		mlir::py::StoreSubscriptOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->target()->source_location()),
 			*target_value,
 			*target_slice,
@@ -806,10 +827,11 @@ ast::Value *MLIRGenerator::visit(const ast::Break *node)
 	auto *old_b = m_context.builder().getBlock();
 	auto *b = m_context.builder().createBlock(old_b->getParent());
 	m_context.builder().setInsertionPointToEnd(old_b);
-	m_context.builder().create<mlir::cf::BranchOp>(
-		loc(m_context.builder(), m_context.filename(), node->source_location()), b);
+	mlir::cf::BranchOp::create(m_context.builder(),
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		b);
 	m_context.builder().setInsertionPointToStart(b);
-	m_context.builder().create<mlir::py::BranchYieldOp>(
+	mlir::py::BranchYieldOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		mlir::py::LoopOpKindAttr::get(&m_context.ctx(), mlir::py::LoopOpKind::break_));
 	return nullptr;
@@ -822,7 +844,8 @@ ast::Value *MLIRGenerator::visit(const ast::BinaryExpr *node)
 	auto location = loc(m_context.builder(), m_context.filename(), node->source_location());
 
 	auto build_binary = [&](mlir::py::ArithOpKind kind) {
-		return new_value(m_context.builder().create<mlir::py::BinaryOp>(location,
+		return new_value(mlir::py::BinaryOp::create(m_context.builder(),
+			location,
 			m_context->pyobject_type(),
 			mlir::py::ArithOpKindAttr::get(&m_context.ctx(), kind),
 			lhs,
@@ -877,19 +900,19 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 		while (std::next(it) != end) {
 			auto *result_block = m_context.builder().createBlock(continuation);
 			m_context.builder().setInsertionPointToEnd(current);
-			m_context.builder().create<mlir::cf::BranchOp>(
+			mlir::cf::BranchOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				result_block);
 			m_context.builder().setInsertionPointToStart(result_block);
 			auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
-			auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+			auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				m_context.builder().getI1Type(),
 				result);
 			auto *this_block = m_context.builder().getInsertionBlock();
 			auto *next = m_context.builder().createBlock(continuation);
 			m_context.builder().setInsertionPointToEnd(this_block);
-			m_context.builder().create<mlir::cf::CondBranchOp>(
+			mlir::cf::CondBranchOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				cond,
 				next,
@@ -901,7 +924,7 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 			m_context.builder().setInsertionPointToEnd(current);
 		}
 		auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
-		m_context.builder().create<mlir::cf::BranchOp>(
+		mlir::cf::BranchOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 			continuation,
 			mlir::ValueRange{ result });
@@ -913,19 +936,19 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 		while (std::next(it) != end) {
 			auto *result_block = m_context.builder().createBlock(continuation);
 			m_context.builder().setInsertionPointToEnd(current);
-			m_context.builder().create<mlir::cf::BranchOp>(
+			mlir::cf::BranchOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				result_block);
 			m_context.builder().setInsertionPointToStart(result_block);
 			auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
-			auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+			auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				m_context.builder().getI1Type(),
 				result);
 			auto *this_block = m_context.builder().getInsertionBlock();
 			auto *next = m_context.builder().createBlock(continuation);
 			m_context.builder().setInsertionPointToEnd(this_block);
-			m_context.builder().create<mlir::cf::CondBranchOp>(
+			mlir::cf::CondBranchOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 				cond,
 				continuation,
@@ -937,7 +960,7 @@ ast::Value *MLIRGenerator::visit(const ast::BoolOp *node)
 			m_context.builder().setInsertionPointToEnd(current);
 		}
 		auto result = static_cast<MLIRValue *>((*it)->codegen(this))->value;
-		m_context.builder().create<mlir::cf::BranchOp>(
+		mlir::cf::BranchOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), (*it)->source_location()),
 			continuation,
 			mlir::ValueRange{ result });
@@ -954,7 +977,7 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 		if (auto method = as<ast::Attribute>(node->function())) {
 			auto self = static_cast<MLIRValue *>(method->value()->codegen(this))->value;
 			auto method_name = method->attr();
-			return m_context.builder().create<mlir::py::LoadMethodOp>(
+			return mlir::py::LoadMethodOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				self,
@@ -991,9 +1014,8 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 				arg_requires_expansion.push_back(is_args_expansion(arg));
 				args.push_back(arg_value);
 			}
-			arg_values.push_back(static_cast<MLIRValue *>(
-				build_tuple(args, arg_requires_expansion, node->source_location()))
-					->value);
+			arg_values.push_back(
+				build_tuple(args, arg_requires_expansion, node->source_location())->value);
 		}
 		if (!node->keywords().empty()) { requires_kwargs_expansion = true; }
 		{
@@ -1004,7 +1026,7 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 			values.reserve(node->keywords().size());
 			kwarg_requires_expansion.reserve(node->keywords().size());
 
-			auto none = new_value(m_context.builder().create<mlir::py::ConstantOp>(
+			auto none = new_value(mlir::py::ConstantOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context.builder().getNoneType()));
 			for (const auto &kwarg : node->keywords()) {
@@ -1014,14 +1036,13 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 					keys.push_back(none);
 				} else {
 					auto name = *kwarg->arg();
-					keys.push_back(new_value(m_context.builder().create<mlir::py::ConstantOp>(
+					keys.push_back(new_value(mlir::py::ConstantOp::create(m_context.builder(),
 						loc(m_context.builder(), m_context.filename(), kwarg->source_location()),
 						m_context.builder().getStringAttr(name))));
 				}
 			}
-			keyword_values.push_back(static_cast<MLIRValue *>(
-				build_dict(keys, values, kwarg_requires_expansion, node->source_location()))
-					->value);
+			keyword_values.push_back(
+				build_dict(keys, values, kwarg_requires_expansion, node->source_location())->value);
 		}
 	} else {
 		arg_values.reserve(node->args().size());
@@ -1041,7 +1062,7 @@ ast::Value *MLIRGenerator::visit(const ast::Call *node)
 		}
 	}
 
-	auto function_call = m_context.builder().create<mlir::py::FunctionCallOp>(
+	auto function_call = mlir::py::FunctionCallOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		callee,
@@ -1091,7 +1112,7 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 		kwargs.push_back(static_cast<MLIRValue *>(keyword->codegen(this))->value);
 	}
 
-	auto output = m_context.builder().create<mlir::py::ClassDefinitionOp>(
+	auto output = mlir::py::ClassDefinitionOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		node->name(),
@@ -1150,7 +1171,7 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 
 		for (const auto &el : node->body()) { el->codegen(this); }
 
-		m_context.builder().create<mlir::cf::BranchOp>(
+		mlir::cf::BranchOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->body().back()->source_location()),
 			return_block);
 
@@ -1158,13 +1179,14 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 		if (class_scope->requires_class_ref) {
 			auto *__class__ = load_name("__class__", node->source_location());
 			store_name("__classcell__", __class__, node->source_location());
-			m_context.builder().create<mlir::py::ClassReturnOp>(
-				m_context.builder().getUnknownLoc(), __class__->value);
+			mlir::py::ClassReturnOp::create(
+				m_context.builder(), m_context.builder().getUnknownLoc(), __class__->value);
 		} else {
-			auto result = m_context.builder().create<mlir::py::ConstantOp>(
-				m_context.builder().getUnknownLoc(), m_context.builder().getNoneType());
-			m_context.builder().create<mlir::py::ClassReturnOp>(
-				m_context.builder().getUnknownLoc(), result);
+			auto result = mlir::py::ConstantOp::create(m_context.builder(),
+				m_context.builder().getUnknownLoc(),
+				m_context.builder().getNoneType());
+			mlir::py::ClassReturnOp::create(
+				m_context.builder(), m_context.builder().getUnknownLoc(), result);
 		}
 	}
 
@@ -1180,7 +1202,8 @@ ast::Value *MLIRGenerator::visit(const ast::ClassDefinition *node)
 	if (!decorator_functions.empty()) {
 		mlir::Value arg = load_name(node->name(), node->source_location())->value;
 		for (const auto &decorator_function : decorator_functions | std::ranges::views::reverse) {
-			arg = m_context.builder().create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),
+			arg = mlir::py::FunctionCallOp::create(m_context.builder(),
+				decorator_function.getLoc(),
 				m_context->pyobject_type(),
 				decorator_function,
 				mlir::ValueRange{ arg },
@@ -1202,10 +1225,11 @@ ast::Value *MLIRGenerator::visit(const ast::Continue *node)
 	auto *old_b = m_context.builder().getBlock();
 	auto *b = m_context.builder().createBlock(old_b->getParent());
 	m_context.builder().setInsertionPointToEnd(old_b);
-	m_context.builder().create<mlir::cf::BranchOp>(
-		loc(m_context.builder(), m_context.filename(), node->source_location()), b);
+	mlir::cf::BranchOp::create(m_context.builder(),
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		b);
 	m_context.builder().setInsertionPointToStart(b);
-	m_context.builder().create<mlir::py::BranchYieldOp>(
+	mlir::py::BranchYieldOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		mlir::py::LoopOpKindAttr::get(&m_context.ctx(), mlir::py::LoopOpKind::continue_));
 	return nullptr;
@@ -1224,7 +1248,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 
 		switch (op) {
 		case ast::Compare::OpType::Eq: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::eq),
@@ -1232,7 +1256,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::NotEq: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::ne),
@@ -1240,7 +1264,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Lt: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::lt),
@@ -1248,7 +1272,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::LtE: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::le),
@@ -1256,7 +1280,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Gt: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::gt),
@@ -1264,7 +1288,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::GtE: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::ge),
@@ -1272,7 +1296,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::Is: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::is),
@@ -1280,7 +1304,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::IsNot: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::isnot),
@@ -1288,7 +1312,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::In: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::in),
@@ -1296,7 +1320,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 				rhs);
 		} break;
 		case ast::Compare::OpType::NotIn: {
-			result = m_context.builder().create<mlir::py::CompareOp>(
+			result = mlir::py::CompareOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				mlir::py::CmpPredicateAttr::get(&m_context.ctx(), mlir::py::CmpPredicate::notin),
@@ -1311,7 +1335,7 @@ ast::Value *MLIRGenerator::visit(const ast::Compare *node)
 	return new_value(*result);
 }
 
-ast::Value *MLIRGenerator::visit(const ast::Comprehension *node)
+ast::Value *MLIRGenerator::visit(const ast::Comprehension *)
 {
 	ASSERT_NOT_REACHED();
 	return nullptr;
@@ -1326,7 +1350,7 @@ ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 				return std::visit(overloaded{
 									  [this, node](double value) {
 										  mlir::py::ConstantOp op =
-											  m_context.builder().create<mlir::py::ConstantOp>(
+											  mlir::py::ConstantOp::create(m_context.builder(),
 												  loc(m_context.builder(),
 													  m_context.filename(),
 													  node->source_location()),
@@ -1346,7 +1370,7 @@ ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 				return std::visit(
 					overloaded{
 						[this, node](bool value) {
-							auto op = m_context.builder().create<mlir::py::ConstantOp>(
+							auto op = mlir::py::ConstantOp::create(m_context.builder(),
 								loc(m_context.builder(),
 									m_context.filename(),
 									node->source_location()),
@@ -1354,7 +1378,7 @@ ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 							return new_value(op);
 						},
 						[this, node](py::NoneType) {
-							auto op = m_context.builder().create<mlir::py::ConstantOp>(
+							auto op = mlir::py::ConstantOp::create(m_context.builder(),
 								loc(m_context.builder(),
 									m_context.filename(),
 									node->source_location()),
@@ -1369,12 +1393,13 @@ ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 					m_context.builder(), s.s, m_context.filename(), node->source_location()));
 			},
 			[this, node](const py::Bytes &b) -> ast::Value * {
-				mlir::py::ConstantOp op = m_context.builder().create<mlir::py::ConstantOp>(
-					loc(m_context.builder(), m_context.filename(), node->source_location()), b.b);
+				mlir::py::ConstantOp op = mlir::py::ConstantOp::create(m_context.builder(),
+					loc(m_context.builder(), m_context.filename(), node->source_location()),
+					b.b);
 				return new_value(op);
 			},
 			[this, node](py::Ellipsis) -> ast::Value * {
-				mlir::py::ConstantOp op = m_context.builder().create<mlir::py::ConstantOp>(
+				mlir::py::ConstantOp op = mlir::py::ConstantOp::create(m_context.builder(),
 					loc(m_context.builder(), m_context.filename(), node->source_location()),
 					mlir::py::EllipsisAttr::get(&m_context.ctx()));
 				return new_value(op);
@@ -1399,7 +1424,7 @@ ast::Value *MLIRGenerator::visit(const ast::Dict *node)
 	std::vector<MLIRValue *> values;
 	std::vector<bool> requires_expansion;
 
-	auto none = new_value(m_context.builder().create<mlir::py::ConstantOp>(
+	auto none = new_value(mlir::py::ConstantOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context.builder().getNoneType()));
 
@@ -1425,7 +1450,7 @@ ast::Value *MLIRGenerator::visit(const ast::DictComp *node)
 		[this, node](MLIRValue *container) {
 			auto key = static_cast<MLIRValue *>(node->key()->codegen(this))->value;
 			auto value = static_cast<MLIRValue *>(node->value()->codegen(this))->value;
-			m_context.builder().create<mlir::py::DictAddOp>(
+			mlir::py::DictAddOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->key()->source_location()),
 				container->value,
 				key,
@@ -1435,13 +1460,13 @@ ast::Value *MLIRGenerator::visit(const ast::DictComp *node)
 		node->source_location());
 }
 
-ast::Value *MLIRGenerator::visit(const ast::ExceptHandler *node)
+ast::Value *MLIRGenerator::visit(const ast::ExceptHandler *)
 {
 	TODO();
 	return nullptr;
 }
 
-ast::Value *MLIRGenerator::visit(const ast::Expression *node)
+ast::Value *MLIRGenerator::visit(const ast::Expression *)
 {
 	TODO();
 	return nullptr;
@@ -1449,11 +1474,10 @@ ast::Value *MLIRGenerator::visit(const ast::Expression *node)
 
 ast::Value *MLIRGenerator::visit(const ast::For *node)
 {
-	auto *parent = m_context.builder().getBlock()->getParent();
-
 	auto iterable = static_cast<MLIRValue *>(node->iter()->codegen(this))->value;
-	auto for_loop = m_context.builder().create<mlir::py::ForLoopOp>(
-		loc(m_context.builder(), m_context.filename(), node->source_location()), iterable);
+	auto for_loop = mlir::py::ForLoopOp::create(m_context.builder(),
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		iterable);
 	auto &body_start = for_loop.getBody().emplaceBlock();
 
 	auto &orelse = for_loop.getOrelse();
@@ -1465,7 +1489,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
 
 	assign(node->target(), iterator, node->target()->source_location());
-	m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
+	mlir::py::BranchYieldOp::create(m_context.builder(), m_context.builder().getUnknownLoc());
 
 	m_context.builder().setInsertionPointToStart(&body_start);
 	for (const auto &el : node->body()) { el->codegen(this); }
@@ -1474,7 +1498,7 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 			.getInsertionBlock()
 			->back()
 			.hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
+		mlir::py::BranchYieldOp::create(m_context.builder(), m_context.builder().getUnknownLoc());
 	}
 
 	if (!node->orelse().empty()) {
@@ -1482,8 +1506,10 @@ ast::Value *MLIRGenerator::visit(const ast::For *node)
 		for (const auto &el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::BranchYieldOp>(loc(
-				m_context.builder(), m_context.filename(), node->body().back()->source_location()));
+			mlir::py::BranchYieldOp::create(m_context.builder(),
+				loc(m_context.builder(),
+					m_context.filename(),
+					node->body().back()->source_location()));
 		}
 	}
 
@@ -1497,7 +1523,7 @@ ast::Value *MLIRGenerator::visit(const ast::FormattedValue *node)
 	if (node->format_spec()) { TODO(); }
 	auto *value = static_cast<MLIRValue *>(node->value()->codegen(this));
 	ASSERT(value);
-	return new_value(m_context.builder().create<mlir::py::FormatValueOp>(
+	return new_value(mlir::py::FormatValueOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		value->value,
@@ -1527,7 +1553,7 @@ ast::Value *MLIRGenerator::visit(const ast::GeneratorExp *node)
 		[this, node]() { return nullptr; },
 		[this, node](MLIRValue *) {
 			auto result = static_cast<MLIRValue *>(node->elt()->codegen(this))->value;
-			m_context.builder().create<mlir::py::YieldOp>(
+			mlir::py::YieldOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->elt()->source_location()),
 				m_context->pyobject_type(),
 				result);
@@ -1545,7 +1571,7 @@ ast::Value *MLIRGenerator::visit(const ast::Global *)
 ast::Value *MLIRGenerator::visit(const ast::If *node)
 {
 	auto test = static_cast<MLIRValue *>(node->test()->codegen(this))->value;
-	auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+	auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		m_context.builder().getI1Type(),
 		test);
@@ -1556,7 +1582,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 	auto continuation = m_context.builder().createBlock(parent);
 
 	m_context.builder().setInsertionPointToEnd(cond.getOperation()->getBlock());
-	m_context.builder().create<mlir::cf::CondBranchOp>(
+	mlir::cf::CondBranchOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		cond,
 		if_block,
@@ -1566,7 +1592,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::cf::BranchOp>(
+		mlir::cf::BranchOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->body().back()->source_location()),
 			continuation);
 	}
@@ -1575,7 +1601,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 		for (const auto &el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::cf::BranchOp>(
+			mlir::cf::BranchOp::create(m_context.builder(),
 				loc(m_context.builder(),
 					m_context.filename(),
 					node->orelse().back()->source_location()),
@@ -1594,7 +1620,7 @@ ast::Value *MLIRGenerator::visit(const ast::If *node)
 ast::Value *MLIRGenerator::visit(const ast::IfExpr *node)
 {
 	auto test = static_cast<MLIRValue *>(node->test()->codegen(this))->value;
-	auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+	auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		m_context.builder().getI1Type(),
 		test);
@@ -1607,7 +1633,7 @@ ast::Value *MLIRGenerator::visit(const ast::IfExpr *node)
 		loc(m_context.builder(), m_context.filename(), node->source_location()));
 
 	m_context.builder().setInsertionPointToEnd(cond.getOperation()->getBlock());
-	m_context.builder().create<mlir::cf::CondBranchOp>(
+	mlir::cf::CondBranchOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->test()->source_location()),
 		cond,
 		if_block,
@@ -1615,14 +1641,14 @@ ast::Value *MLIRGenerator::visit(const ast::IfExpr *node)
 
 	m_context.builder().setInsertionPointToStart(if_block);
 	auto true_case = static_cast<MLIRValue *>(node->body()->codegen(this))->value;
-	m_context.builder().create<mlir::cf::BranchOp>(
+	mlir::cf::BranchOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->body()->source_location()),
 		continuation,
 		mlir::ValueRange{ true_case });
 
 	m_context.builder().setInsertionPointToStart(orelse_block);
 	auto false_case = static_cast<MLIRValue *>(node->orelse()->codegen(this))->value;
-	m_context.builder().create<mlir::cf::BranchOp>(
+	mlir::cf::BranchOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->orelse()->source_location()),
 		continuation,
 		mlir::ValueRange{ false_case });
@@ -1639,7 +1665,7 @@ ast::Value *MLIRGenerator::visit(const ast::Import *node)
 		auto from_list = m_context.builder().getStrArrayAttr({});
 		const uint32_t level = 0;
 
-		auto module = new_value(m_context.builder().create<mlir::py::ImportOp>(
+		auto module = new_value(mlir::py::ImportOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			n.name,
@@ -1668,19 +1694,20 @@ ast::Value *MLIRGenerator::visit(const ast::ImportFrom *node)
 
 	auto from_list = m_context.builder().getStrArrayAttr(names);
 
-	auto module = m_context.builder().create<mlir::py::ImportOp>(
+	auto module = mlir::py::ImportOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		node->module(),
 		from_list,
-		node->level());
+		static_cast<uint32_t>(node->level()));
 
 	for (const auto &n : node->names()) {
 		if (n.name == "*") {
-			m_context.builder().create<mlir::py::ImportAllOp>(
-				loc(m_context.builder(), m_context.filename(), node->source_location()), module);
+			mlir::py::ImportAllOp::create(m_context.builder(),
+				loc(m_context.builder(), m_context.filename(), node->source_location()),
+				module);
 		} else {
-			auto imported_object = m_context.builder().create<mlir::py::ImportFromOp>(
+			auto imported_object = mlir::py::ImportFromOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				module,
@@ -1722,7 +1749,7 @@ ast::Value *MLIRGenerator::visit(const ast::JoinedStr *node)
 		strings.push_back(load_const(
 			m_context.builder(), current_string.s, m_context.filename(), node->source_location()));
 	}
-	return new_value(m_context.builder().create<mlir::py::BuildStringOp>(
+	return new_value(mlir::py::BuildStringOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		strings));
@@ -1770,7 +1797,7 @@ ast::Value *MLIRGenerator::visit(const ast::ListComp *node)
 		[this, node]() { return build_list({}, node->source_location()); },
 		[this, node](MLIRValue *container) {
 			auto result = static_cast<MLIRValue *>(node->elt()->codegen(this))->value;
-			m_context.builder().create<mlir::py::ListAppendOp>(
+			mlir::py::ListAppendOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->elt()->source_location()),
 				container->value,
 				result);
@@ -1785,10 +1812,10 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 	const auto filename = fs::path(m->filename()).stem();
 	[[maybe_unused]] auto module_scope = create_nested_scope(filename, filename);
 	m_context.builder().setInsertionPointToEnd(m_context.module().getBody());
-	auto module_fn =
-		m_context.builder().create<mlir::func::FuncOp>(m_context.builder().getUnknownLoc(),
-			"__hidden_init__",
-			m_context.builder().getFunctionType({}, { m_context->pyobject_type() }));
+	auto module_fn = mlir::func::FuncOp::create(m_context.builder(),
+		m_context.builder().getUnknownLoc(),
+		"__hidden_init__",
+		m_context.builder().getFunctionType({}, { m_context->pyobject_type() }));
 	// Public visibility: the module entry's side effects (storing names
 	// into the module dict, etc.) escape this MLIR module because the
 	// bytecode runtime invokes it and importers observe the resulting
@@ -1811,15 +1838,16 @@ ast::Value *MLIRGenerator::visit(const ast::Module *m)
 	// If a program does not end with a terminator instruction, jump to the exit_block
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::cf::BranchOp>(
-			m_context.builder().getUnknownLoc(), exit_block);
+		mlir::cf::BranchOp::create(
+			m_context.builder(), m_context.builder().getUnknownLoc(), exit_block);
 	}
 
 	m_context.builder().setInsertionPointToEnd(exit_block);
-	auto result = m_context.builder().create<mlir::py::ConstantOp>(
-		m_context.builder().getUnknownLoc(), m_context.builder().getNoneType());
-	m_context.builder().create<mlir::func::ReturnOp>(
-		m_context.builder().getUnknownLoc(), mlir::ValueRange{ result });
+	auto result = mlir::py::ConstantOp::create(m_context.builder(),
+		m_context.builder().getUnknownLoc(),
+		m_context.builder().getNoneType());
+	mlir::func::ReturnOp::create(
+		m_context.builder(), m_context.builder().getUnknownLoc(), mlir::ValueRange{ result });
 	return nullptr;
 }
 
@@ -1844,7 +1872,7 @@ ast::Value *MLIRGenerator::visit(const ast::Name *node)
 	ASSERT(node->ids().size() == 1);
 	const auto name = node->ids()[0];
 	if (node->context_type() == ast::ContextType::LOAD) {
-		// return new_value(m_context.builder().create<mlir::py::LoadNameOp>(
+		// return new_value(mlir::py::LoadNameOp::create(m_context.builder(),
 		// 	loc(m_context.builder(), m_context.filename(), node->source_location()),
 		// 	m_context->pyobject_type(),// TODO: propagate type information
 		// 	name));
@@ -1866,16 +1894,17 @@ ast::Value *MLIRGenerator::visit(const ast::Raise *node)
 	if (node->cause()) {
 		auto exception = static_cast<const MLIRValue &>(*node->exception()->codegen(this)).value;
 		auto cause = static_cast<const MLIRValue &>(*node->cause()->codegen(this)).value;
-		m_context.builder().create<mlir::py::RaiseOp>(
+		mlir::py::RaiseOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			exception,
 			cause);
 	} else if (node->exception()) {
 		auto exception = static_cast<const MLIRValue &>(*node->exception()->codegen(this)).value;
-		m_context.builder().create<mlir::py::RaiseOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()), exception);
+		mlir::py::RaiseOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), node->source_location()),
+			exception);
 	} else {
-		m_context.builder().create<mlir::py::RaiseOp>(
+		mlir::py::RaiseOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	}
 
@@ -1889,8 +1918,9 @@ ast::Value *MLIRGenerator::visit(const ast::Return *node)
 		if (node->value()) {
 			return static_cast<const MLIRValue &>(*node->value()->codegen(this)).value;
 		}
-		return m_context.builder().create<mlir::py::ConstantOp>(
-			m_context.builder().getUnknownLoc(), m_context.builder().getNoneType());
+		return mlir::py::ConstantOp::create(m_context.builder(),
+			m_context.builder().getUnknownLoc(),
+			m_context.builder().getNoneType());
 	}();
 
 	return_value(new_value(value), node->source_location());
@@ -1931,7 +1961,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 	arg_attrs.push_back(
 		m_context.builder().getNamedAttr("llvm.name", m_context.builder().getStringAttr(".0")));
 	args_attrs.push_back(m_context.builder().getDictionaryAttr(arg_attrs));
-	auto f = m_context.builder().create<mlir::func::FuncOp>(
+	auto f = mlir::func::FuncOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), source_location),
 		mangled_name,
 		func_type,
@@ -1966,10 +1996,10 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 		}
 
 		auto next_generator = [this](mlir::Value iterable, const ast::Comprehension *generator) {
-			auto for_loop = m_context.builder().create<mlir::py::ForLoopOp>(
+			auto for_loop = mlir::py::ForLoopOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), generator->source_location()),
 				iterable);
-			m_context.builder().create<mlir::py::BranchYieldOp>(
+			mlir::py::BranchYieldOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), generator->source_location()));
 			// iterator
 			{
@@ -1977,8 +2007,8 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 				auto iterator = new_value(for_loop.getStep().addArgument(
 					m_context->pyobject_type(), m_context.builder().getUnknownLoc()));
 				assign(generator->target(), iterator, generator->target()->source_location());
-				m_context.builder().create<mlir::py::BranchYieldOp>(
-					m_context.builder().getUnknownLoc());
+				mlir::py::BranchYieldOp::create(
+					m_context.builder(), m_context.builder().getUnknownLoc());
 			}
 			// loop body
 			{
@@ -1998,12 +2028,12 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 						next = m_context.builder().createBlock(&body_continue);
 
 						m_context.builder().setInsertionPointToStart(current);
-						auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+						auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 							loc(m_context.builder(), m_context.filename(), el->source_location()),
 							m_context.builder().getI1Type(),
 							static_cast<MLIRValue *>(el->codegen(this))->value);
 
-						m_context.builder().create<mlir::cf::CondBranchOp>(
+						mlir::cf::CondBranchOp::create(m_context.builder(),
 							loc(m_context.builder(), m_context.filename(), el->source_location()),
 							cond,
 							next,
@@ -2013,18 +2043,18 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 					}
 					{
 						const auto &el = generator->ifs().back();
-						auto cond = m_context.builder().create<mlir::py::CastToBoolOp>(
+						auto cond = mlir::py::CastToBoolOp::create(m_context.builder(),
 							loc(m_context.builder(), m_context.filename(), el->source_location()),
 							m_context.builder().getI1Type(),
 							static_cast<MLIRValue *>(el->codegen(this))->value);
-						m_context.builder().create<mlir::cf::CondBranchOp>(
+						mlir::cf::CondBranchOp::create(m_context.builder(),
 							loc(m_context.builder(), m_context.filename(), el->source_location()),
 							cond,
 							&body_end,
 							&body_continue);
 					}
 					m_context.builder().setInsertionPointToStart(&body_continue);
-					m_context.builder().create<mlir::py::BranchYieldOp>(
+					mlir::py::BranchYieldOp::create(m_context.builder(),
 						loc(m_context.builder(),
 							m_context.filename(),
 							generator->source_location()),
@@ -2039,7 +2069,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 
 		m_context.builder().setInsertionPointToStart(entry_block);
 		auto *container = container_factory();
-		auto iterable = m_context.builder().create<mlir::py::LoadFastOp>(
+		auto iterable = mlir::py::LoadFastOp::create(m_context.builder(),
 			loc(m_context.builder(),
 				m_context.filename(),
 				first_generator->iter()->source_location()),
@@ -2052,7 +2082,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 			next_generator(iter, generator);
 		}
 		container_update(container);
-		m_context.builder().create<mlir::py::BranchYieldOp>(m_context.builder().getUnknownLoc());
+		mlir::py::BranchYieldOp::create(m_context.builder(), m_context.builder().getUnknownLoc());
 
 		m_context.builder().setInsertionPointToEnd(entry_block);
 		m_context.builder().getBlock()->back().erase();
@@ -2060,7 +2090,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 			return_value(container, first_generator->target()->source_location());
 		} else {
 			f->setAttr("is_generator", m_context.builder().getBoolAttr(true));
-			auto none = m_context.builder().create<mlir::py::ConstantOp>(
+			auto none = mlir::py::ConstantOp::create(m_context.builder(),
 				loc(m_context.builder(),
 					m_context.filename(),
 					first_generator->target()->source_location()),
@@ -2074,7 +2104,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 	std::vector<mlir::StringRef> captures_ref;
 	captures_ref.reserve(captures.size());
 	for (const auto &el : captures) { captures_ref.push_back(el); }
-	auto fn_obj = m_context.builder().create<mlir::py::MakeFunctionOp>(
+	auto fn_obj = mlir::py::MakeFunctionOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), source_location),
 		m_context->pyobject_type(),
 		mangled_name,
@@ -2084,7 +2114,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_comprehension(
 
 	auto iterable = static_cast<MLIRValue *>(generators.front()->iter()->codegen(this))->value;
 
-	return new_value(m_context.builder().create<mlir::py::FunctionCallOp>(
+	return new_value(mlir::py::FunctionCallOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), source_location),
 		m_context->pyobject_type(),
 		fn_obj,
@@ -2103,7 +2133,7 @@ ast::Value *MLIRGenerator::visit(const ast::SetComp *node)
 		[this, node]() { return build_set({}, node->source_location()); },
 		[this, node](MLIRValue *container) {
 			auto result = static_cast<MLIRValue *>(node->elt()->codegen(this))->value;
-			m_context.builder().create<mlir::py::SetAddOp>(
+			mlir::py::SetAddOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->elt()->source_location()),
 				container->value,
 				result);
@@ -2135,17 +2165,17 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_slice(
 				// pass nullptr when missing and save a register.
 				auto lower = slice.lower
 								 ? static_cast<MLIRValue &>(*slice.lower->codegen(this)).value
-								 : m_context.builder().create<mlir::py::ConstantOp>(
+								 : mlir::py::ConstantOp::create(m_context.builder(),
 									   loc(m_context.builder(), m_context.filename(), location),
 									   m_context.builder().getNoneType());
 				auto upper = slice.upper
 								 ? static_cast<MLIRValue &>(*slice.upper->codegen(this)).value
-								 : m_context.builder().create<mlir::py::ConstantOp>(
+								 : mlir::py::ConstantOp::create(m_context.builder(),
 									   loc(m_context.builder(), m_context.filename(), location),
 									   m_context.builder().getNoneType());
 				auto step = slice.step ? static_cast<MLIRValue &>(*slice.step->codegen(this)).value
 									   : mlir::Value{};
-				return new_value(m_context.builder().create<mlir::py::BuildSliceOp>(
+				return new_value(mlir::py::BuildSliceOp::create(m_context.builder(),
 					loc(m_context.builder(), m_context.filename(), location),
 					m_context->pyobject_type(),
 					lower,
@@ -2194,7 +2224,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_list(
 		std::back_inserter(requires_expansion_),
 		[](bool el) -> int8_t { return el; });
 
-	return new_value(m_context.builder().create<mlir::py::BuildListOp>(
+	return new_value(mlir::py::BuildListOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), location),
 		m_context->pyobject_type(),
 		elements,
@@ -2235,7 +2265,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_dict(
 		std::back_inserter(requires_expansion_),
 		[](bool el) -> int8_t { return el; });
 
-	return new_value(m_context.builder().create<mlir::py::BuildDictOp>(
+	return new_value(mlir::py::BuildDictOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), location),
 		m_context->pyobject_type(),
 		ks,
@@ -2269,7 +2299,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_tuple(
 		std::back_inserter(requires_expansion_),
 		[](bool el) -> int8_t { return el; });
 
-	return new_value(m_context.builder().create<mlir::py::BuildTupleOp>(
+	return new_value(mlir::py::BuildTupleOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), location),
 		m_context->pyobject_type(),
 		elements,
@@ -2301,7 +2331,7 @@ codegen::MLIRGenerator::MLIRValue *MLIRGenerator::build_set(std::vector<MLIRValu
 		std::back_inserter(requires_expansion_),
 		[](bool el) -> int8_t { return el; });
 
-	return new_value(m_context.builder().create<mlir::py::BuildSetOp>(
+	return new_value(mlir::py::BuildSetOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), location),
 		m_context->pyobject_type(),
 		std::move(elements),
@@ -2312,13 +2342,13 @@ void MLIRGenerator::return_value(MLIRValue *value, const SourceLocation &source_
 {
 	for (auto clear_exception : scope().clear_exception_before_return) {
 		if (clear_exception) {
-			m_context.builder().create<mlir::py::ClearExceptionStateOp>(
+			mlir::py::ClearExceptionStateOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), source_location));
 		}
 	}
 
 	if (!scope().finally_blocks.empty()) {
-		// m_context.builder().create<mlir::cf::BranchOp>(
+		// mlir::cf::BranchOp::create(m_context.builder(),
 		// 	loc(m_context.builder(), m_context.filename(), node->source_location()),
 		// scope().finally_blocks.top());
 		const auto finally_blocks = scope().finally_blocks;
@@ -2331,7 +2361,7 @@ void MLIRGenerator::return_value(MLIRValue *value, const SourceLocation &source_
 		scope().finally_blocks = std::move(finally_blocks);
 	}
 
-	m_context.builder().create<mlir::py::ReturnOp>(
+	mlir::py::ReturnOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), source_location),
 		mlir::ValueRange{ value->value });
 }
@@ -2345,7 +2375,6 @@ MLIRGenerator::RAIIScope MLIRGenerator::setup_function(mlir::func::FuncOp &f,
 	const auto &name_visibility_it = m_variable_visibility.find(mangled_name);
 	ASSERT(name_visibility_it != m_variable_visibility.end());
 	const auto &symbol_map = name_visibility_it->second->symbol_map;
-	const bool is_generator = name_visibility_it->second->is_generator;
 
 	for (const auto &symbol : symbol_map.symbols) {
 		const auto &varname = symbol.name;
@@ -2427,7 +2456,8 @@ void apply_decorators_for_make_function(MLIRGenerator &gen,
 	mlir::Value arg = gen.load_name(function_name, source_location)->value;
 	for (auto *decorator : decorator_functions | std::ranges::views::reverse) {
 		mlir::Value decorator_function = decorator->value;
-		arg = builder.create<mlir::py::FunctionCallOp>(decorator_function.getLoc(),
+		arg = mlir::py::FunctionCallOp::create(builder,
+			decorator_function.getLoc(),
 			gen.m_context->pyobject_type(),
 			decorator_function,
 			mlir::ValueRange{ arg },
@@ -2507,7 +2537,8 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 	}
 
 	builder.setInsertionPointToEnd(&m_context.module().getBodyRegion().getBlocks().back());
-	auto f = builder.create<mlir::func::FuncOp>(loc(builder, m_context.filename(), source_location),
+	auto f = mlir::func::FuncOp::create(builder,
+		loc(builder, m_context.filename(), source_location),
 		mangled_name,
 		func_type,
 		mlir::ArrayRef<mlir::NamedAttribute>{},
@@ -2526,8 +2557,8 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 
 		if (builder.getBlock()->empty()
 			|| !builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			auto none = builder.create<mlir::py::ConstantOp>(
-				builder.getUnknownLoc(), builder.getNoneType());
+			auto none = mlir::py::ConstantOp::create(
+				builder, builder.getUnknownLoc(), builder.getNoneType());
 			return_value(new_value(none), source_location);
 		}
 	}
@@ -2542,7 +2573,7 @@ MLIRGenerator::MLIRValue *MLIRGenerator::make_function(const std::string &functi
 	std::vector<mlir::Value> kw_defaults_values;
 	kw_defaults_values.reserve(kw_defaults.size());
 	for (auto *v : kw_defaults) { kw_defaults_values.push_back(v->value); }
-	auto fn_obj = new_value(builder.create<mlir::py::MakeFunctionOp>(
+	auto fn_obj = new_value(mlir::py::MakeFunctionOp::create(builder,
 		loc(builder, m_context.filename(), source_location),
 		m_context->pyobject_type(),
 		mangled_name,
@@ -2565,12 +2596,14 @@ ast::Value *MLIRGenerator::visit(const ast::Subscript *node)
 
 	switch (node->context()) {
 	case ast::ContextType::DELETE: {
-		m_context.builder().create<mlir::py::DeleteSubscriptOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()), value, index);
+		mlir::py::DeleteSubscriptOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), node->source_location()),
+			value,
+			index);
 		return nullptr;
 	} break;
 	case ast::ContextType::LOAD: {
-		return new_value(m_context.builder().create<mlir::py::BinarySubscriptOp>(
+		return new_value(mlir::py::BinarySubscriptOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			value,
@@ -2588,12 +2621,9 @@ ast::Value *MLIRGenerator::visit(const ast::Subscript *node)
 
 ast::Value *MLIRGenerator::visit(const ast::Try *node)
 {
-	auto *current = m_context.builder().getBlock();
-	auto *parent = current->getParent();
-
-	auto try_op = m_context.builder().create<mlir::py::TryOp>(
+	auto try_op = mlir::py::TryOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
-		node->handlers().size());
+		static_cast<unsigned>(node->handlers().size()));
 
 	if (!try_op.getHandlers().empty()) {
 		scope().unhappy_path.push(&try_op.getHandlers().front().front());
@@ -2604,14 +2634,15 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 
 	scope().finally_blocks.emplace_back([this, node](bool first) {
 		(void)first;
-		// if (!first) { m_context.builder().create<mlir::py::LeaveExceptionHandling>(); }
+		// if (!first) mler().<mlir::py::LeaveExceptionHandling>()::create m_context.builder(),}
 		// auto current_fn = getParentOfType<mlir::func::FuncOp, mlir::py::ClassDefinitionOp>(
 		// 	m_context.builder().getInsertionBlock()->getParent());
 		auto *current = m_context.builder().getInsertionBlock();
 		auto *final_block = m_context.builder().createBlock(current->getParent());
 		m_context.builder().setInsertionPointToEnd(current);
-		m_context.builder().create<mlir::cf::BranchOp>(
-			loc(m_context.builder(), m_context.filename(), node->source_location()), final_block);
+		mlir::cf::BranchOp::create(m_context.builder(),
+			loc(m_context.builder(), m_context.filename(), node->source_location()),
+			final_block);
 		m_context.builder().setInsertionPointToEnd(final_block);
 		if (!node->finalbody().empty()) {
 			for (auto el : node->finalbody()) { el->codegen(this); }
@@ -2626,7 +2657,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::BranchYieldOp>(
+		mlir::py::BranchYieldOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	}
 
@@ -2638,19 +2669,18 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		});
 
 	for (auto p : llvm::enumerate(llvm::zip(try_op.getHandlers(), node->handlers()))) {
-		const auto &idx = p.index();
 		auto [handler_region, handler] = p.value();
 
 		ASSERT(!handler_region.getBlocks().empty());
 
 		m_context.builder().setInsertionPointToStart(&handler_region.front());
-		auto handler_op = m_context.builder().create<mlir::py::TryHandlerOp>(
+		auto handler_op = mlir::py::TryHandlerOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), handler->source_location()));
 
 		if (handler->type()) {
-			auto *exception_check_block = m_context.builder().createBlock(&handler_op.getCond());
+			m_context.builder().createBlock(&handler_op.getCond());
 			auto exception_type = handler->type()->codegen(this);
-			m_context.builder().create<mlir::py::ConditionOp>(
+			mlir::py::ConditionOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), handler->source_location()),
 				static_cast<MLIRValue *>(exception_type)->value);
 		}
@@ -2661,7 +2691,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 			// *instance* (not the type). Bind it at the start of the matched
 			// handler body via py.load_exception.
 			if (!handler->name().empty()) {
-				auto exception_instance = m_context.builder().create<mlir::py::LoadException>(
+				auto exception_instance = mlir::py::LoadException::create(m_context.builder(),
 					loc(m_context.builder(), m_context.filename(), handler->source_location()),
 					m_context->pyobject_type());
 				store_name(handler->name(),
@@ -2675,7 +2705,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 					.getBlock()
 					->back()
 					.hasTrait<mlir::OpTrait::IsTerminator>()) {
-				m_context.builder().create<mlir::py::BranchYieldOp>(
+				mlir::py::BranchYieldOp::create(m_context.builder(),
 					loc(m_context.builder(), m_context.filename(), node->source_location()));
 			}
 		}
@@ -2686,7 +2716,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		for (auto el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::BranchYieldOp>(
+			mlir::py::BranchYieldOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()));
 		}
 	}
@@ -2699,7 +2729,7 @@ ast::Value *MLIRGenerator::visit(const ast::Try *node)
 		for (auto el : node->finalbody()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::BranchYieldOp>(
+			mlir::py::BranchYieldOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()));
 		}
 	}
@@ -2741,25 +2771,25 @@ ast::Value *MLIRGenerator::visit(const ast::UnaryExpr *node)
 	auto src = static_cast<const MLIRValue &>(*node->operand()->codegen(this)).value;
 	switch (node->op_type()) {
 	case ast::UnaryOpType::ADD: {
-		return new_value(m_context.builder().create<mlir::py::PositiveOp>(
+		return new_value(mlir::py::PositiveOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			src));
 	} break;
 	case ast::UnaryOpType::SUB: {
-		return new_value(m_context.builder().create<mlir::py::NegativeOp>(
+		return new_value(mlir::py::NegativeOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			src));
 	} break;
 	case ast::UnaryOpType::INVERT: {
-		return new_value(m_context.builder().create<mlir::py::InvertOp>(
+		return new_value(mlir::py::InvertOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			src));
 	} break;
 	case ast::UnaryOpType::NOT: {
-		return new_value(m_context.builder().create<mlir::py::NotOp>(
+		return new_value(mlir::py::NotOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()),
 			m_context->pyobject_type(),
 			src));
@@ -2771,9 +2801,8 @@ ast::Value *MLIRGenerator::visit(const ast::UnaryExpr *node)
 ast::Value *MLIRGenerator::visit(const ast::While *node)
 {
 	auto *current_block = m_context.builder().getInsertionBlock();
-	auto *parent = current_block->getParent();
 
-	auto while_op = m_context.builder().create<mlir::py::WhileOp>(
+	auto while_op = mlir::py::WhileOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()));
 
 	auto &condition = while_op.getCondition();
@@ -2787,14 +2816,14 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 
 	m_context.builder().setInsertionPointToStart(condition_block);
 	auto test = static_cast<MLIRValue *>(node->test()->codegen(this))->value;
-	m_context.builder().create<mlir::py::ConditionOp>(test.getLoc(), test);
+	mlir::py::ConditionOp::create(m_context.builder(), test.getLoc(), test);
 
 	m_context.builder().setInsertionPointToStart(body_start_block);
 	for (const auto &el : node->body()) { el->codegen(this); }
 
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::BranchYieldOp>(
+		mlir::py::BranchYieldOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->body().back()->source_location()));
 	}
 
@@ -2803,8 +2832,10 @@ ast::Value *MLIRGenerator::visit(const ast::While *node)
 		for (const auto &el : node->orelse()) { el->codegen(this); }
 		if (m_context.builder().getBlock()->empty()
 			|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-			m_context.builder().create<mlir::py::BranchYieldOp>(loc(
-				m_context.builder(), m_context.filename(), node->body().back()->source_location()));
+			mlir::py::BranchYieldOp::create(m_context.builder(),
+				loc(m_context.builder(),
+					m_context.filename(),
+					node->body().back()->source_location()));
 		}
 	}
 
@@ -2823,27 +2854,27 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 	}
 
 	auto *current_block = m_context.builder().getBlock();
-	auto *parent = current_block->getParent();
 
-	auto with = m_context.builder().create<mlir::py::WithOp>(
-		loc(m_context.builder(), m_context.filename(), node->source_location()), with_item_results);
+	auto with = mlir::py::WithOp::create(m_context.builder(),
+		loc(m_context.builder(), m_context.filename(), node->source_location()),
+		with_item_results);
 
 	auto with_exit_factory = [this, node, &with_item_results](bool first) {
 		ASSERT(node->items().size() == 1);
 
-		for (size_t i = 0; const auto &item : with_item_results) {
+		for (const auto &item : with_item_results) {
 			if (!first) {
-				// m_context.builder().create<mlir::py::LeaveExceptionHandling>(item.getLoc());
+				// mlir::py::LeaveExceptionHandling::create(m_context.builder(),item.getLoc());
 			}
 
-			auto exit = m_context.builder().create<mlir::py::LoadMethodOp>(
-				item.getLoc(), m_context->pyobject_type(), item, "__exit__");
+			auto exit = mlir::py::LoadMethodOp::create(
+				m_context.builder(), item.getLoc(), m_context->pyobject_type(), item, "__exit__");
 
-			auto none = m_context.builder().create<mlir::py::ConstantOp>(
+			auto none = mlir::py::ConstantOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context.builder().getNoneType());
 
-			m_context.builder().create<mlir::py::FunctionCallOp>(
+			mlir::py::FunctionCallOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context->pyobject_type(),
 				exit,
@@ -2856,7 +2887,7 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 				false);
 		}
 
-		m_context.builder().create<mlir::py::ClearExceptionStateOp>(
+		mlir::py::ClearExceptionStateOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	};
 	scope().finally_blocks.push_back(with_exit_factory);
@@ -2867,7 +2898,7 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 	for (const auto &el : node->body()) { el->codegen(this); }
 	if (m_context.builder().getBlock()->empty()
 		|| !m_context.builder().getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
-		m_context.builder().create<mlir::py::BranchYieldOp>(
+		mlir::py::BranchYieldOp::create(m_context.builder(),
 			loc(m_context.builder(), m_context.filename(), node->source_location()));
 	}
 	scope().finally_blocks.pop_back();
@@ -2880,12 +2911,12 @@ ast::Value *MLIRGenerator::visit(const ast::With *node)
 ast::Value *MLIRGenerator::visit(const ast::WithItem *node)
 {
 	auto expr = static_cast<MLIRValue *>(node->context_expr()->codegen(this))->value;
-	auto method = m_context.builder().create<mlir::py::LoadMethodOp>(
+	auto method = mlir::py::LoadMethodOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		expr,
 		"__enter__");
-	auto item_result = m_context.builder().create<mlir::py::FunctionCallOp>(
+	auto item_result = mlir::py::FunctionCallOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		method,
@@ -2909,12 +2940,12 @@ ast::Value *MLIRGenerator::visit(const ast::Yield *node)
 		if (node->value()) {
 			return static_cast<MLIRValue *>(node->value()->codegen(this))->value;
 		} else {
-			return m_context.builder().create<mlir::py::ConstantOp>(
+			return mlir::py::ConstantOp::create(m_context.builder(),
 				loc(m_context.builder(), m_context.filename(), node->source_location()),
 				m_context.builder().getNoneType());
 		}
 	}();
-	return new_value(m_context.builder().create<mlir::py::YieldOp>(
+	return new_value(mlir::py::YieldOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		value));
@@ -2923,7 +2954,7 @@ ast::Value *MLIRGenerator::visit(const ast::Yield *node)
 ast::Value *MLIRGenerator::visit(const ast::YieldFrom *node)
 {
 	auto value = static_cast<MLIRValue *>(node->value()->codegen(this))->value;
-	return new_value(m_context.builder().create<mlir::py::YieldFromOp>(
+	return new_value(mlir::py::YieldFromOp::create(m_context.builder(),
 		loc(m_context.builder(), m_context.filename(), node->source_location()),
 		m_context->pyobject_type(),
 		value));

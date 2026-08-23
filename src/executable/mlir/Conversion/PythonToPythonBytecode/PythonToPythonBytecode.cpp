@@ -144,12 +144,13 @@ namespace py {
 			mlir::py::BranchYieldOp yield_op)
 		{
 			if (finally_exits.empty()) {
-				rewriter.create<mlir::py::BranchYieldOp>(yield_op.getLoc(), yield_op.getKindAttr());
+				mlir::py::BranchYieldOp::create(
+					rewriter, yield_op.getLoc(), yield_op.getKindAttr());
 				return;
 			}
 			auto it = finally_exits.find(static_cast<int>(*yield_op.getKind()));
 			ASSERT(it != finally_exits.end());
-			rewriter.create<mlir::cf::BranchOp>(yield_op.getLoc(), it->second);
+			mlir::cf::BranchOp::create(rewriter, yield_op.getLoc(), it->second);
 		}
 
 		// For each break/continue kind that escapes the try through its finally,
@@ -205,17 +206,18 @@ namespace py {
 
 				auto iterable = op.getIterable();
 				rewriter.setInsertionPointToEnd(initBlock);
-				auto iterator = rewriter.create<mlir::emitpybytecode::GetIter>(
-					op.getStep().getLoc(), iterable.getType(), iterable);
+				auto iterator = mlir::emitpybytecode::GetIter::create(
+					rewriter, op.getStep().getLoc(), iterable.getType(), iterable);
 
 				// advance iterator
 				auto iterator_next_block = rewriter.createBlock(endBlock);
 				rewriter.setInsertionPointToEnd(initBlock);
-				rewriter.create<mlir::cf::BranchOp>(op.getStep().getLoc(), iterator_next_block);
+				mlir::cf::BranchOp::create(rewriter, op.getStep().getLoc(), iterator_next_block);
 
 				rewriter.setInsertionPointToStart(iterator_next_block);
 
-				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
+				mlir::emitpybytecode::ForIter::create(rewriter,
+					op.getStep().getLoc(),
 					iterator,
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
@@ -230,7 +232,8 @@ namespace py {
 					iterator_exit_block->getTerminator(), &op.getBody().front());
 
 				auto *for_iter_block = rewriter.createBlock(&op.getBody());
-				rewriter.create<mlir::emitpybytecode::ForIter>(op.getStep().getLoc(),
+				mlir::emitpybytecode::ForIter::create(rewriter,
+					op.getStep().getLoc(),
 					iterator,
 					&op.getStep().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
@@ -296,17 +299,18 @@ namespace py {
 				ASSERT(condition_op);
 
 				rewriter.setInsertionPointToEnd(initBlock);
-				rewriter.create<mlir::cf::BranchOp>(condition_op.getLoc(), &condition_start);
+				mlir::cf::BranchOp::create(rewriter, condition_op.getLoc(), &condition_start);
 
 				if (mlir::isa<mlir::BlockArgument>(condition_op.getCond())) {
 					rewriter.setInsertionPointToStart(condition_op.getCond().getParentBlock());
 				} else {
 					rewriter.setInsertionPointAfter(condition_op.getCond().getDefiningOp());
 				}
-				auto should_jump = rewriter.create<mlir::py::CastToBoolOp>(
-					condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
+				auto should_jump = mlir::py::CastToBoolOp::create(
+					rewriter, condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
 				ASSERT(!op.getBody().empty());
-				rewriter.create<mlir::cf::CondBranchOp>(condition_op.getLoc(),
+				mlir::cf::CondBranchOp::create(rewriter,
+					condition_op.getLoc(),
 					should_jump,
 					&op.getBody().front(),
 					op.getOrelse().empty() ? endBlock : &op.getOrelse().front());
@@ -412,8 +416,8 @@ namespace py {
 						auto *current = childOp->getBlock();
 						auto *next = rewriter.splitBlock(current, childOp->getIterator());
 						rewriter.setInsertionPointToEnd(current);
-						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(
-							childOp->getLoc());
+						mlir::emitpybytecode::LeaveExceptionHandle::create(
+							rewriter, childOp->getLoc());
 						if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
 							y.getKind().has_value()) {
 							// break/continue out of the try body: pop the
@@ -425,16 +429,16 @@ namespace py {
 						}
 						if (op.getHandlers().empty()) {
 							ASSERT(!op.getFinally().empty());
-							rewriter.create<mlir::cf::BranchOp>(
-								childOp->getLoc(), &op.getFinally().front());
+							mlir::cf::BranchOp::create(
+								rewriter, childOp->getLoc(), &op.getFinally().front());
 						} else if (!op.getOrelse().empty()) {
-							rewriter.create<mlir::cf::BranchOp>(
-								childOp->getLoc(), &op.getOrelse().front());
+							mlir::cf::BranchOp::create(
+								rewriter, childOp->getLoc(), &op.getOrelse().front());
 						} else if (!op.getFinally().empty()) {
-							rewriter.create<mlir::cf::BranchOp>(
-								childOp->getLoc(), &op.getFinally().front());
+							mlir::cf::BranchOp::create(
+								rewriter, childOp->getLoc(), &op.getFinally().front());
 						} else {
-							rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
+							mlir::cf::BranchOp::create(rewriter, childOp->getLoc(), endBlock);
 						}
 						rewriter.eraseBlock(next);
 					});
@@ -464,11 +468,11 @@ namespace py {
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
 								if (kind_attr) {
-									rewriter.create<mlir::py::BranchYieldOp>(
-										childOp->getLoc(), kind_attr);
+									mlir::py::BranchYieldOp::create(
+										rewriter, childOp->getLoc(), kind_attr);
 								} else {
-									rewriter.create<mlir::cf::BranchOp>(
-										childOp->getLoc(), endBlock);
+									mlir::cf::BranchOp::create(
+										rewriter, childOp->getLoc(), endBlock);
 								}
 								rewriter.eraseBlock(next);
 							}
@@ -484,13 +488,13 @@ namespace py {
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
 								if (kind_attr) {
-									rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
-										childOp->getLoc());
-									rewriter.create<mlir::py::BranchYieldOp>(
-										childOp->getLoc(), kind_attr);
+									mlir::emitpybytecode::ClearExceptionState::create(
+										rewriter, childOp->getLoc());
+									mlir::py::BranchYieldOp::create(
+										rewriter, childOp->getLoc(), kind_attr);
 								} else {
-									rewriter.create<mlir::emitpybytecode::ReRaiseOp>(
-										childOp->getLoc(), endBlock);
+									mlir::emitpybytecode::ReRaiseOp::create(
+										rewriter, childOp->getLoc(), endBlock);
 								}
 								rewriter.eraseBlock(next);
 							}
@@ -504,14 +508,17 @@ namespace py {
 					auto handler_scope =
 						mlir::cast<mlir::py::TryHandlerOp>(handler.front().getTerminator());
 					ASSERT(handler_scope);
-					rewriter.create<mlir::emitpybytecode::SetupExceptionHandle>(op.getLoc(),
+					mlir::emitpybytecode::SetupExceptionHandle::create(rewriter,
+						op.getLoc(),
 						body_start,
 						handler_scope.getCond().empty() ? &handler_scope.getHandler().front()
 														: &handler_scope.getCond().front());
 				} else {
 					ASSERT(finally_mapping.has_value());
-					rewriter.create<mlir::emitpybytecode::SetupExceptionHandle>(
-						op.getLoc(), body_start, finally_mapping->lookup(&op.getFinally().front()));
+					mlir::emitpybytecode::SetupExceptionHandle::create(rewriter,
+						op.getLoc(),
+						body_start,
+						finally_mapping->lookup(&op.getFinally().front()));
 				}
 
 				if (!op.getHandlers().empty()) {
@@ -550,8 +557,8 @@ namespace py {
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
-								rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
-									op.getLoc());
+								mlir::emitpybytecode::ClearExceptionState::create(
+									rewriter, op.getLoc());
 								if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
 									y.getKind().has_value()) {
 									// break/continue out of an except handler:
@@ -562,11 +569,11 @@ namespace py {
 									return;
 								}
 								if (!op.getFinally().empty()) {
-									rewriter.create<mlir::cf::BranchOp>(
-										childOp->getLoc(), &op.getFinally().front());
+									mlir::cf::BranchOp::create(
+										rewriter, childOp->getLoc(), &op.getFinally().front());
 								} else {
-									rewriter.create<mlir::cf::BranchOp>(
-										childOp->getLoc(), endBlock);
+									mlir::cf::BranchOp::create(
+										rewriter, childOp->getLoc(), endBlock);
 								}
 								rewriter.eraseBlock(next);
 							});
@@ -585,7 +592,7 @@ namespace py {
 							ASSERT(cond);
 
 							auto *reraise_block = rewriter.createBlock(&handler_scope.getCond());
-							rewriter.create<mlir::py::RaiseOp>(cond.getLoc());
+							mlir::py::RaiseOp::create(rewriter, cond.getLoc());
 
 							rewriter.setInsertionPoint(cond);
 							rewriter.replaceOpWithNewOp<mlir::py::CondBranchSubclassOp>(cond,
@@ -605,8 +612,8 @@ namespace py {
 								auto *current = childOp->getBlock();
 								auto *next = rewriter.splitBlock(current, childOp->getIterator());
 								rewriter.setInsertionPointToEnd(current);
-								rewriter.create<mlir::emitpybytecode::ClearExceptionState>(
-									op.getLoc());
+								mlir::emitpybytecode::ClearExceptionState::create(
+									rewriter, op.getLoc());
 								if (auto y = mlir::cast<mlir::py::BranchYieldOp>(childOp);
 									y.getKind().has_value()) {
 									// break/continue out of an except handler:
@@ -617,11 +624,11 @@ namespace py {
 									return;
 								}
 								if (!op.getFinally().empty()) {
-									rewriter.create<mlir::cf::BranchOp>(
-										childOp->getLoc(), &op.getFinally().front());
+									mlir::cf::BranchOp::create(
+										rewriter, childOp->getLoc(), &op.getFinally().front());
 								} else {
-									rewriter.create<mlir::cf::BranchOp>(
-										childOp->getLoc(), endBlock);
+									mlir::cf::BranchOp::create(
+										rewriter, childOp->getLoc(), endBlock);
 								}
 								rewriter.eraseBlock(next);
 							});
@@ -644,10 +651,10 @@ namespace py {
 							return;
 						}
 						if (!op.getFinally().empty()) {
-							rewriter.create<mlir::cf::BranchOp>(
-								childOp->getLoc(), &op.getFinally().front());
+							mlir::cf::BranchOp::create(
+								rewriter, childOp->getLoc(), &op.getFinally().front());
 						} else {
-							rewriter.create<mlir::cf::BranchOp>(childOp->getLoc(), endBlock);
+							mlir::cf::BranchOp::create(rewriter, childOp->getLoc(), endBlock);
 						}
 						rewriter.eraseBlock(next);
 					});
@@ -682,13 +689,15 @@ namespace py {
 				// and the break/continue path (both leave without an exception).
 				auto emit_normal_exit = [&rewriter, &op]() {
 					for (const auto &item : op.getItems()) {
-						auto exit = rewriter.create<mlir::py::LoadMethodOp>(item.getLoc(),
+						auto exit = mlir::py::LoadMethodOp::create(rewriter,
+							item.getLoc(),
 							mlir::py::PyObjectType::get(rewriter.getContext()),
 							item,
 							"__exit__");
-						auto none = rewriter.create<mlir::py::ConstantOp>(
-							item.getLoc(), rewriter.getNoneType());
-						rewriter.create<mlir::py::FunctionCallOp>(item.getLoc(),
+						auto none = mlir::py::ConstantOp::create(
+							rewriter, item.getLoc(), rewriter.getNoneType());
+						mlir::py::FunctionCallOp::create(rewriter,
+							item.getLoc(),
 							mlir::py::PyObjectType::get(rewriter.getContext()),
 							exit,
 							std::vector<mlir::Value>{ none, none, none },
@@ -699,7 +708,7 @@ namespace py {
 							std::vector<mlir::Value>{},
 							false,
 							false);
-						rewriter.create<mlir::py::ClearExceptionStateOp>(item.getLoc());
+						mlir::py::ClearExceptionStateOp::create(rewriter, item.getLoc());
 					}
 				};
 
@@ -735,8 +744,8 @@ namespace py {
 						auto *current = y->getBlock();
 						auto *next = rewriter.splitBlock(current, y->getIterator());
 						rewriter.setInsertionPointToEnd(current);
-						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(y->getLoc());
-						rewriter.create<mlir::cf::BranchOp>(y->getLoc(), exit_block);
+						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
+						mlir::cf::BranchOp::create(rewriter, y->getLoc(), exit_block);
 						rewriter.eraseBlock(next);
 					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
 						y && y.getKind().has_value()) {
@@ -747,11 +756,11 @@ namespace py {
 						auto *next = rewriter.splitBlock(current, y->getIterator());
 						auto *lc_block = rewriter.createBlock(endBlock);
 						rewriter.setInsertionPointToEnd(current);
-						rewriter.create<mlir::emitpybytecode::LeaveExceptionHandle>(y->getLoc());
-						rewriter.create<mlir::cf::BranchOp>(y->getLoc(), lc_block);
+						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
+						mlir::cf::BranchOp::create(rewriter, y->getLoc(), lc_block);
 						rewriter.setInsertionPointToStart(lc_block);
 						emit_normal_exit();
-						rewriter.create<mlir::py::BranchYieldOp>(y->getLoc(), y.getKindAttr());
+						mlir::py::BranchYieldOp::create(rewriter, y->getLoc(), y.getKindAttr());
 						rewriter.eraseBlock(next);
 					}
 					return WalkResult::advance();
@@ -770,38 +779,41 @@ namespace py {
 					   && "WithOp lowering does not yet support multiple context managers");
 				rewriter.setInsertionPointToStart(cleanup_block);
 				for (const auto &item : op.getItems()) {
-					auto exit = rewriter.create<mlir::py::LoadMethodOp>(item.getLoc(),
+					auto exit = mlir::py::LoadMethodOp::create(rewriter,
+						item.getLoc(),
 						mlir::py::PyObjectType::get(rewriter.getContext()),
 						item,
 						"__exit__");
 
-					auto except_result = rewriter.create<mlir::py::WithExceptStartOp>(
-						item.getLoc(), mlir::py::PyObjectType::get(rewriter.getContext()), exit);
+					auto except_result = mlir::py::WithExceptStartOp::create(rewriter,
+						item.getLoc(),
+						mlir::py::PyObjectType::get(rewriter.getContext()),
+						exit);
 
 					auto *reraise_block = rewriter.createBlock(endBlock);
 					auto *continue_block = rewriter.createBlock(endBlock);
 					rewriter.setInsertionPointAfter(except_result);
 
-					auto cond = rewriter.create<mlir::py::CastToBoolOp>(
-						except_result.getLoc(), rewriter.getI1Type(), except_result);
-					rewriter.create<mlir::cf::CondBranchOp>(
-						cond.getLoc(), cond, continue_block, reraise_block);
+					auto cond = mlir::py::CastToBoolOp::create(
+						rewriter, except_result.getLoc(), rewriter.getI1Type(), except_result);
+					mlir::cf::CondBranchOp::create(
+						rewriter, cond.getLoc(), cond, continue_block, reraise_block);
 
 					rewriter.setInsertionPointToStart(reraise_block);
-					rewriter.create<mlir::emitpybytecode::ReRaiseOp>(item.getLoc(), endBlock);
+					mlir::emitpybytecode::ReRaiseOp::create(rewriter, item.getLoc(), endBlock);
 
 					rewriter.setInsertionPointToStart(continue_block);
-					rewriter.create<mlir::emitpybytecode::ClearExceptionState>(item.getLoc());
-					rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
+					mlir::emitpybytecode::ClearExceptionState::create(rewriter, item.getLoc());
+					mlir::cf::BranchOp::create(rewriter, op.getLoc(), endBlock);
 				}
 
 				rewriter.setInsertionPointToStart(exit_block);
 				emit_normal_exit();
-				rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
+				mlir::cf::BranchOp::create(rewriter, op.getLoc(), endBlock);
 
 				rewriter.setInsertionPointToEnd(initBlock);
-				rewriter.create<mlir::emitpybytecode::SetupWith>(
-					op.getLoc(), body_start, cleanup_block);
+				mlir::emitpybytecode::SetupWith::create(
+					rewriter, op.getLoc(), body_start, cleanup_block);
 
 				rewriter.eraseOp(op);
 
@@ -913,8 +925,8 @@ namespace py {
 				if (!parent) { return mlir::failure(); }
 				auto pyobject_ty = mlir::py::PyObjectType::get(rewriter.getContext());
 				rewriter.setInsertionPoint(op);
-				auto none = rewriter.create<mlir::emitpybytecode::ConstantOp>(
-					op.getLoc(), pyobject_ty, rewriter.getUnitAttr());
+				auto none = mlir::emitpybytecode::ConstantOp::create(
+					rewriter, op.getLoc(), pyobject_ty, rewriter.getUnitAttr());
 				rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, mlir::ValueRange{ none });
 
 				// Restore the function signature if RemoveDeadValues stripped

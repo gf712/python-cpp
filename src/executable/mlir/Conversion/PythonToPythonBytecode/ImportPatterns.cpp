@@ -25,16 +25,18 @@ namespace {
 			mlir::PatternRewriter &rewriter) const final
 		{
 			auto name = op.getName();
-			auto level = rewriter.create<mlir::emitpybytecode::ConstantOp>(
-				op.getLoc(), op.getModule().getType(), rewriter.getUI32IntegerAttr(op.getLevel()));
+			auto level = mlir::emitpybytecode::ConstantOp::create(rewriter,
+				op.getLoc(),
+				op.getModule().getType(),
+				rewriter.getUI32IntegerAttr(op.getLevel()));
 			std::vector<mlir::Value> els;
 			for (auto attr : op.getFromList()) {
 				auto from = mlir::cast<mlir::StringAttr>(attr);
-				els.push_back(rewriter.create<mlir::emitpybytecode::ConstantOp>(
-					op.getLoc(), op.getModule().getType(), from));
+				els.push_back(mlir::emitpybytecode::ConstantOp::create(
+					rewriter, op.getLoc(), op.getModule().getType(), from));
 			}
-			auto from_list = rewriter.create<mlir::emitpybytecode::BuildTuple>(
-				op.getLoc(), op.getModule().getType(), els);
+			auto from_list = mlir::emitpybytecode::BuildTuple::create(
+				rewriter, op.getLoc(), op.getModule().getType(), els);
 			rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ImportName>(
 				op, op.getModule().getType(), name, level, from_list);
 

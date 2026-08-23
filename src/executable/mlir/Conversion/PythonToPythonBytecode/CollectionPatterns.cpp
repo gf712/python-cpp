@@ -36,13 +36,13 @@ namespace {
 					llvm::zip(op.getKeys(), op.getValues(), op.getRequiresExpansion())) {
 					if (to_expand) {
 						if (!result.has_value()) {
-							result = rewriter.create<mlir::emitpybytecode::BuildDict>(
-								op.getLoc(), op.getOutput().getType(), keys, values);
+							result = mlir::emitpybytecode::BuildDict::create(
+								rewriter, op.getLoc(), op.getOutput().getType(), keys, values);
 							keys.clear();
 							values.clear();
 						}
-						rewriter.create<mlir::emitpybytecode::DictUpdate>(
-							op.getLoc(), *result, value);
+						mlir::emitpybytecode::DictUpdate::create(
+							rewriter, op.getLoc(), *result, value);
 					} else {
 						if (!result.has_value()) {
 							keys.push_back(key);
@@ -50,8 +50,8 @@ namespace {
 						} else {
 							ASSERT(keys.empty());
 							ASSERT(values.empty());
-							rewriter.create<mlir::emitpybytecode::DictAdd>(
-								op.getLoc(), *result, key, value);
+							mlir::emitpybytecode::DictAdd::create(
+								rewriter, op.getLoc(), *result, key, value);
 						}
 					}
 				}
@@ -89,12 +89,12 @@ namespace {
 		llvm::ArrayRef<bool> requires_expansion)
 	{
 		auto list =
-			rewriter.create<mlir::emitpybytecode::BuildList>(loc, list_type, mlir::ValueRange{});
+			mlir::emitpybytecode::BuildList::create(rewriter, loc, list_type, mlir::ValueRange{});
 		for (auto [el, expand] : llvm::zip(elements, requires_expansion)) {
 			if (expand) {
-				rewriter.create<mlir::emitpybytecode::ListExtend>(loc, list, el);
+				mlir::emitpybytecode::ListExtend::create(rewriter, loc, list, el);
 			} else {
-				rewriter.create<mlir::emitpybytecode::ListAppend>(loc, list, el);
+				mlir::emitpybytecode::ListAppend::create(rewriter, loc, list, el);
 			}
 		}
 		return list;
@@ -181,23 +181,23 @@ namespace {
 				for (auto [el, expand] : llvm::zip(op.getElements(), requires_expansion)) {
 					if (expand) {
 						if (!set.has_value()) {
-							set = rewriter.create<mlir::emitpybytecode::BuildSet>(
-								op->getLoc(), op.getOutput().getType(), elements);
+							set = mlir::emitpybytecode::BuildSet::create(
+								rewriter, op->getLoc(), op.getOutput().getType(), elements);
 						} else {
 							for (auto el : elements) {
-								rewriter.create<mlir::emitpybytecode::SetAdd>(
-									op.getLoc(), *set, el);
+								mlir::emitpybytecode::SetAdd::create(
+									rewriter, op.getLoc(), *set, el);
 							}
 						}
 						elements.clear();
-						rewriter.create<mlir::emitpybytecode::SetUpdate>(op.getLoc(), *set, el);
+						mlir::emitpybytecode::SetUpdate::create(rewriter, op.getLoc(), *set, el);
 					} else {
 						elements.push_back(el);
 					}
 				}
 				ASSERT(set.has_value());
 				for (auto el : elements) {
-					rewriter.create<mlir::emitpybytecode::SetAdd>(op.getLoc(), *set, el);
+					mlir::emitpybytecode::SetAdd::create(rewriter, op.getLoc(), *set, el);
 				}
 				rewriter.replaceOp(op, *set);
 			} else {

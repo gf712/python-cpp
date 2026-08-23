@@ -1,5 +1,6 @@
 add_executable(integration-tests_ program.cpp ../src/testing/main.cpp)
-target_link_libraries(integration-tests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings tsl::ordered_map)
+target_link_libraries(integration-tests_ PRIVATE python-cpp gtest gtest_main cxxopts tsl::ordered_map)
+python_cpp_link_project_options(integration-tests_)
 # gtest_discover_tests(integration-tests_)
 
 add_test(

@@ -269,8 +269,6 @@ add_executable(unittests_ ${UNITTEST_SOURCES})
 target_link_libraries(python-cpp
   PUBLIC spdlog m
   PRIVATE
-    project_options
-    project_warnings
     ICU::uc
     ICU::data
     ${GMPXX_LIBRARIES}
@@ -283,11 +281,7 @@ target_include_directories(python-cpp
   PRIVATE ${GMP_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_compile_options(
-  python-cpp
-  PRIVATE
-  # -fno-omit-frame-pointer is needed, otherwise we cannot access the stack base pointer reliably
-  -fno-omit-frame-pointer)
+python_cpp_link_project_options(python-cpp)
 
 if(STL_SUPPORTS_BIT_CAST)
   target_compile_definitions(python-cpp PUBLIC "STL_SUPPORTS_BIT_CAST")
@@ -312,14 +306,6 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
   message(STATUS "Configuring LLVM backend")
   add_library(python-cpp-llvm ${LLVM_BACKEND_FILES})
 
-  target_compile_options(
-    python-cpp-llvm
-    PRIVATE -Wall
-            -Wextra
-            -Werror
-            -Wno-unused-parameter
-            -fno-omit-frame-pointer)
-
   add_library(llvm-interface INTERFACE)
   target_include_directories(llvm-interface INTERFACE . )
   # include llvm include directories as system paths to silence compiler warnings
@@ -337,7 +323,8 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
     orcjit
     x86asmparser
     x86codegen)
-  target_link_libraries(llvm-interface INTERFACE ${llvm_libs} project_options project_warnings)
+  target_link_libraries(llvm-interface INTERFACE ${llvm_libs})
+  python_cpp_link_project_options(llvm-interface)
   # TODO: not all versions of llvm are ready for C++20, figure out when to use this
   set_property(TARGET python-cpp-llvm PROPERTY CXX_STANDARD 17)
 
@@ -355,12 +342,14 @@ elseif(ENABLE_LLVM_BACKEND AND LLVM_FOUND)
   target_link_libraries(unittests_ PRIVATE python-cpp-llvm)
 endif()
 
-target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts project_options project_warnings tsl::ordered_map)
+target_link_libraries(unittests_ PRIVATE python-cpp gtest gtest_main cxxopts tsl::ordered_map)
 gtest_discover_tests(unittests_)
 
 add_executable(python repl/repl.cpp)
-target_link_libraries(python PRIVATE linenoise cxxopts python-cpp project_options project_warnings stdc++)
+target_link_libraries(python PRIVATE linenoise cxxopts python-cpp stdc++)
 
 add_executable(freeze utilities/freeze.cpp)
-target_link_libraries(freeze PRIVATE python-cpp cxxopts project_options project_warnings)
+target_link_libraries(freeze PRIVATE python-cpp cxxopts)
 target_include_directories(freeze SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})
+
+python_cpp_link_project_options(unittests_ python freeze)

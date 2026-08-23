@@ -29,6 +29,8 @@ target_include_directories(TargetPythonBytecode
                            ${CMAKE_BINARY_DIR}/src/executable/mlir/Dialect
 )
 
+python_cpp_link_project_options(TargetPythonBytecode)
+
 #                             ${CMAKE_SOURCE_DIR}/src
 #                             ${CMAKE_SOURCE_DIR}/src/executable/mlir/include/mlir/Dialect
 #                             ${CMAKE_BINARY_DIR}/src/executable/mlir/include/mlir/Dialect

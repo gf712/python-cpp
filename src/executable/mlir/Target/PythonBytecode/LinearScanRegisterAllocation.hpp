@@ -220,15 +220,15 @@ class LinearScanRegisterAllocation
 		auto *def_op = victim_value.getDefiningOp();
 		ASSERT(def_op);
 		builder.setInsertionPointAfter(def_op);
-		builder.create<mlir::emitpybytecode::StoreFastOp>(
-			def_op->getLoc(), name_attr, victim_value);
+		mlir::emitpybytecode::StoreFastOp::create(
+			builder, def_op->getLoc(), name_attr, victim_value);
 
 		// Before each original use: LOAD_FAST to reload the spilled value
 		for (auto *use : uses) {
 			auto *user_op = use->getOwner();
 			builder.setInsertionPoint(user_op);
-			auto reload = builder.create<mlir::emitpybytecode::LoadFastOp>(
-				user_op->getLoc(), victim_value.getType(), name_attr);
+			auto reload = mlir::emitpybytecode::LoadFastOp::create(
+				builder, user_op->getLoc(), victim_value.getType(), name_attr);
 			use->set(reload.getOutput());
 		}
 	}
@@ -254,14 +254,14 @@ class LinearScanRegisterAllocation
 
 		// Insert STORE_FAST at the very start of the block
 		builder.setInsertionPoint(bb, bb->begin());
-		builder.create<mlir::emitpybytecode::StoreFastOp>(loc, name_attr, arg);
+		mlir::emitpybytecode::StoreFastOp::create(builder, loc, name_attr, arg);
 
 		// Before each original use: LOAD_FAST to reload the value
 		for (auto *use : uses) {
 			auto *user_op = use->getOwner();
 			builder.setInsertionPoint(user_op);
-			auto reload = builder.create<mlir::emitpybytecode::LoadFastOp>(
-				user_op->getLoc(), arg.getType(), name_attr);
+			auto reload = mlir::emitpybytecode::LoadFastOp::create(
+				builder, user_op->getLoc(), arg.getType(), name_attr);
 			use->set(reload.getOutput());
 		}
 	}
@@ -358,7 +358,7 @@ class LinearScanRegisterAllocation
 			ASSERT(std::holds_alternative<ForwardedOutput>(to_spill->value));
 			auto [op_ptr, idx] = std::get<ForwardedOutput>(to_spill->value);
 			auto for_iter = mlir::cast<mlir::emitpybytecode::ForIter>(op_ptr);
-			auto body_arg = for_iter.getBody()->getArgument(idx);
+			auto body_arg = for_iter.getBody()->getArgument(static_cast<unsigned>(idx));
 			do_spill_block_argument(body_arg, name_attr, builder);
 		}
 
@@ -377,8 +377,8 @@ class LinearScanRegisterAllocation
 	 */
 	void preallocate_r0_clobbering_operations(
 		std::span<LiveIntervalAnalysis::LiveInterval> unhandled,
-		const LiveIntervalAnalysis &live_interval_analysis,
-		LiveIntervalSet &inactive)
+		const LiveIntervalAnalysis &,
+		LiveIntervalSet &)
 	{
 		auto logger = get_regalloc_logger();
 
@@ -642,10 +642,10 @@ class LinearScanRegisterAllocation
 
 			// Insert: push r{cur_reg}, move r{scratch}, r{cur_reg}, pop r{cur_reg}
 			builder.setInsertionPoint(current_value.getDefiningOp());
-			builder.create<mlir::emitpybytecode::Push>(loc, cur_reg);
+			mlir::emitpybytecode::Push::create(builder, loc, cur_reg);
 			builder.setInsertionPointAfter(current_value.getDefiningOp());
-			builder.create<mlir::emitpybytecode::Move>(loc, *scratch_reg, cur_reg);
-			builder.create<mlir::emitpybytecode::Pop>(loc, cur_reg);
+			mlir::emitpybytecode::Move::create(builder, loc, *scratch_reg, cur_reg);
+			mlir::emitpybytecode::Pop::create(builder, loc, cur_reg);
 
 			value2mem_map.insert_or_assign(cur.value, Reg{ .idx = *scratch_reg });
 
@@ -672,10 +672,10 @@ class LinearScanRegisterAllocation
 
 			// Save cur_reg before FOR_ITER, move loop variable to scratch, restore cur_reg
 			builder.setInsertionPoint(for_iter_op);
-			builder.create<mlir::emitpybytecode::Push>(loc, cur_reg);
+			mlir::emitpybytecode::Push::create(builder, loc, cur_reg);
 			builder.setInsertionPoint(body_block, body_block->begin());
-			builder.create<mlir::emitpybytecode::Move>(loc, *scratch_reg, cur_reg);
-			builder.create<mlir::emitpybytecode::Pop>(loc, cur_reg);
+			mlir::emitpybytecode::Move::create(builder, loc, *scratch_reg, cur_reg);
+			mlir::emitpybytecode::Pop::create(builder, loc, cur_reg);
 
 			value2mem_map.insert_or_assign(cur.value, Reg{ .idx = *scratch_reg });
 			free.set(*scratch_reg, false);

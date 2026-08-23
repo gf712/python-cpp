@@ -68,12 +68,15 @@ namespace emitpybytecode {
 				auto keys = op.getKeys();
 				auto values = op.getValues();
 				rewriter.setInsertionPointAfterValue(keys.front());
-				auto result = rewriter.create<BuildDict>(
-					op->getLoc(), op.getOutput().getType(), mlir::ValueRange{}, mlir::ValueRange{});
+				auto result = BuildDict::create(rewriter,
+					op->getLoc(),
+					op.getOutput().getType(),
+					mlir::ValueRange{},
+					mlir::ValueRange{});
 
 				for (auto [key, value] : llvm::zip(keys, values)) {
 					rewriter.setInsertionPointAfterValue(value);
-					rewriter.create<DictAdd>(op.getLoc(), result, key, value);
+					DictAdd::create(rewriter, op.getLoc(), result, key, value);
 				}
 				rewriter.replaceOp(op, result);
 				return mlir::success();
@@ -112,10 +115,10 @@ namespace emitpybytecode {
 				}
 				auto loc = op.getLoc();
 				auto output_type = op.getOutput().getType();
-				auto list = rewriter.create<BuildList>(loc, output_type, mlir::ValueRange{});
-				auto tuple = rewriter.create<ConstantOp>(
-					loc, output_type, mlir::ArrayAttr::get(getContext(), elements));
-				rewriter.create<ListExtend>(loc, list, tuple);
+				auto list = BuildList::create(rewriter, loc, output_type, mlir::ValueRange{});
+				auto tuple = ConstantOp::create(
+					rewriter, loc, output_type, mlir::ArrayAttr::get(getContext(), elements));
+				ListExtend::create(rewriter, loc, list, tuple);
 				rewriter.replaceOp(op, list);
 				return mlir::success();
 			}

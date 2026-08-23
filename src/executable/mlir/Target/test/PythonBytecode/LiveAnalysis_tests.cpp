@@ -145,7 +145,6 @@ TEST_F(LiveAnalysisTest, LiveAnalysis)
 
 	// Test 4: Verify that block_arg_18 appears in alive_at_timestep
 	bool found_block_arg = false;
-	bool found_block_arg_inputs = false;
 	for (const auto &timestep : live_analysis.alive_at_timestep) {
 		for (const auto &val : timestep) {
 			if (std::holds_alternative<mlir::Value>(val)) {

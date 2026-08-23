@@ -299,7 +299,7 @@ struct PythonBytecodeEmitter
 					return ::py::NameConstant{ ::py::NoneType{} };
 				});
 		return value;
-	};
+	}
 
 	Register get_register(const mlir::Value &value) const
 	{
@@ -308,7 +308,7 @@ struct PythonBytecodeEmitter
 		const auto reg = std::get<LinearScanRegisterAllocation::Reg>(mem).idx;
 		ASSERT(reg <= std::numeric_limits<Register>::max());
 
-		return reg;
+		return static_cast<Register>(reg);
 	}
 
 	Register get_register(mlir::Operation *producing_operation,
@@ -320,7 +320,7 @@ struct PythonBytecodeEmitter
 		const auto reg = std::get<LinearScanRegisterAllocation::Reg>(mem).idx;
 		ASSERT(reg <= std::numeric_limits<Register>::max());
 
-		return reg;
+		return static_cast<Register>(reg);
 	}
 
 	Register get_name_idx(StringRef name) const
@@ -335,7 +335,7 @@ struct PythonBytecodeEmitter
 		ASSERT(it != names_array.end());
 		const auto idx = std::distance(names_array.begin(), it);
 		ASSERT(idx <= std::numeric_limits<Register>::max());
-		return idx;
+		return static_cast<Register>(idx);
 	}
 
 	Register get_local_idx(StringRef name) const
@@ -352,7 +352,7 @@ struct PythonBytecodeEmitter
 				return std::find(cellvars.begin(), cellvars.end(), varname) == cellvars.end();
 			});
 		ASSERT(idx <= std::numeric_limits<Register>::max());
-		return idx;
+		return static_cast<Register>(idx);
 	}
 
 	void enter_function_op(mlir::func::FuncOp op)
@@ -1035,7 +1035,7 @@ LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::RaiseVa
 	return success();
 }
 
-template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::ReRaiseOp &op)
+template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybytecode::ReRaiseOp &)
 {
 	emit<ReRaise>();
 	return success();
@@ -1185,7 +1185,9 @@ LogicalResult PythonBytecodeEmitter::emitOperation(
 	for (auto [keyword, value] :
 		llvm::zip(op.getKeywords().getValues<mlir::StringRef>(), op.getKwargs())) {
 		kwarg_registers.push_back(get_register(value));
-		keywords_registers.push_back(add_name(keyword));
+		const auto name_idx = add_name(keyword);
+		ASSERT(name_idx <= std::numeric_limits<Register>::max());
+		keywords_registers.push_back(static_cast<Register>(name_idx));
 	}
 
 	emit<FunctionCallWithKeywords>(get_register(op.getCallee()),
@@ -1258,7 +1260,7 @@ template<> LogicalResult PythonBytecodeEmitter::emitOperation(mlir::emitpybyteco
 {
 	const auto src = op.getSrc();
 	ASSERT(src <= std::numeric_limits<Register>::max());
-	push(src);
+	push(static_cast<Register>(src));
 	return success();
 }
 

@@ -20,15 +20,16 @@ add_mlir_library(PythonMLIRDialect
                  MLIRTransformUtils
                 )
 
+# The MLIR headers come from the subtree-wide include_directories(SYSTEM ...)
+# set up in src/executable/mlir/CMakeLists.txt.
 target_include_directories(PythonMLIRDialect PUBLIC
                             ${PROJECT_SOURCE_DIR}/src
-                            ${MLIR_INCLUDE_DIRS}
                             ${PROJECT_SOURCE_DIR}/src/executable/mlir/Dialect
                             ${CMAKE_BINARY_DIR}/src/executable/mlir/Dialect)
 target_link_libraries(PythonMLIRDialect
                       PRIVATE
-                        project_options
                         ${GMPXX_LIBRARIES}
                         ${GMP_LIBRARIES}
                       PUBLIC
                         spdlog)
+python_cpp_link_project_options(PythonMLIRDialect)

@@ -28,3 +28,4 @@ target_include_directories(PythonToPythonBytecode PUBLIC
 )
 
 target_link_libraries(PythonToPythonBytecode PRIVATE spdlog)
+python_cpp_link_project_options(PythonToPythonBytecode)
