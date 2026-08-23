@@ -8,4 +8,5 @@ add_executable(python_bytecode_tests
 target_link_libraries(python_bytecode_tests PRIVATE
     TargetPythonBytecode
     gtest_main)
+python_cpp_link_project_options(python_bytecode_tests)
 gtest_discover_tests(python_bytecode_tests)

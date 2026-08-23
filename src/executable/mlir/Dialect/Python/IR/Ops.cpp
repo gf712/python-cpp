@@ -169,7 +169,7 @@ namespace py {
 		if (getRequiresArgsExpansion() || getRequiresKwargsExpansion()) { return mlir::success(); }
 		const auto keywords_size = getKeywords().size();
 		const auto kwargs_size = getKwargs().size();
-		if (keywords_size != kwargs_size) {
+		if (static_cast<size_t>(keywords_size) != kwargs_size) {
 			return emitOpError() << "has " << keywords_size << " keyword name(s) but "
 								 << kwargs_size << " kwargs value(s)";
 		}
@@ -196,7 +196,7 @@ namespace py {
 		// parallel rule always applies.
 		const auto keywords_size = getKeywords().size();
 		const auto kwargs_size = getKwargs().size();
-		if (keywords_size != kwargs_size) {
+		if (static_cast<size_t>(keywords_size) != kwargs_size) {
 			return emitOpError() << "has " << keywords_size << " keyword name(s) but "
 								 << kwargs_size << " kwargs value(s)";
 		}
@@ -373,7 +373,7 @@ namespace py {
 		}
 	}
 
-	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> operands,
+	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute>,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
 		static_assert(BranchYieldOp::hasTrait<
@@ -477,6 +477,7 @@ namespace py {
 							  llvm_unreachable("BranchYieldOp has unexpected parent op kind");
 						  });
 
+		(void)result;
 		assert(result.succeeded());
 	}
 

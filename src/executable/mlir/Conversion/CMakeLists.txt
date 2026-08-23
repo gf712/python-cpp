@@ -16,3 +16,5 @@ add_mlir_library(PythonConversionPasses
     LINK_LIBS PUBLIC
     ${PYTHON_CONVERSION_LIBS}
 )
+
+python_cpp_link_project_options(PythonConversionPasses)

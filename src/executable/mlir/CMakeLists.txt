@@ -27,6 +27,23 @@ include(AddLLVM)
 set(PYTHON_MLIR_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src/executable/mlir)
 set(PYTHON_MLIR_BINARY_DIR ${PROJECT_BINARY_DIR}/src/executable/mlir)
 
+# The LLVM/MLIR helpers used below (add_mlir_library and friends) compile their
+# sources in a separate `obj.<name>` object library and forward the target's
+# INCLUDE_DIRECTORIES to it as plain include paths, which drops the SYSTEM
+# marking. Marking the third-party headers as system directories for the whole
+# subtree survives that, and keeps our warning set (-Werror included) from
+# firing inside LLVM, MLIR and spdlog headers.
+#
+# ${PYTHON_MLIR_BINARY_DIR} holds nothing but TableGen output (Ops.h.inc,
+# Passes.h.inc, ...), which is machine-generated and not ours to clean up, so it
+# is treated the same way.
+include_directories(SYSTEM
+                    ${LLVM_INCLUDE_DIRS}
+                    ${MLIR_INCLUDE_DIRS}
+                    ${spdlog_SOURCE_DIR}/include
+                    ${PYTHON_MLIR_BINARY_DIR}
+                    ${PYTHON_MLIR_BINARY_DIR}/Dialect)
+
 add_subdirectory(Conversion)
 add_subdirectory(Dialect)
 add_subdirectory(Target)
@@ -35,3 +52,4 @@ add_subdirectory(test)
 
 add_library(python-mlir compile.cpp)
 target_link_libraries(python-mlir PRIVATE PythonMLIRDialect TargetPythonBytecode PythonConversionPasses)
+python_cpp_link_project_options(python-mlir)

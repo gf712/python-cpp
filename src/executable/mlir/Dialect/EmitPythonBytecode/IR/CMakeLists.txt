@@ -17,6 +17,6 @@ add_mlir_library(EmitPythonBytecodeDialect
 )
 
 target_include_directories(EmitPythonBytecodeDialect PRIVATE
-                            ${MLIR_INCLUDE_DIRS}
                             ${CMAKE_SOURCE_DIR}/src/executable/mlir/Dialect
                             ${CMAKE_BINARY_DIR}/src/executable/mlir/Dialect)
+python_cpp_link_project_options(EmitPythonBytecodeDialect)

@@ -26,3 +26,5 @@ target_include_directories(python-mlir-opt PRIVATE
     ${PYTHON_MLIR_SOURCE_DIR}
     ${PYTHON_MLIR_BINARY_DIR}
 )
+
+python_cpp_link_project_options(python-mlir-opt)

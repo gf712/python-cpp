@@ -77,7 +77,8 @@ namespace {
 			ASSERT(function_definition);
 			ASSERT(mlir::isa<mlir::func::FuncOp>(*function_definition));
 
-			auto sym_name = rewriter.create<mlir::emitpybytecode::ConstantOp>(op.getLoc(),
+			auto sym_name = mlir::emitpybytecode::ConstantOp::create(rewriter,
+				op.getLoc(),
 				mlir::py::PyObjectType::get(rewriter.getContext()),
 				rewriter.getStringAttr(op.getFunctionName()));
 
@@ -86,11 +87,11 @@ namespace {
 				std::vector<mlir::Value> captures_vec;
 				for (auto attr : op.getCaptures()) {
 					auto name = mlir::cast<mlir::StringAttr>(attr).getValue();
-					captures_vec.push_back(rewriter.create<mlir::emitpybytecode::LoadClosureOp>(
-						op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
+					captures_vec.push_back(mlir::emitpybytecode::LoadClosureOp::create(
+						rewriter, op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
 				}
-				return rewriter.create<mlir::emitpybytecode::BuildTuple>(
-					op.getLoc(), mlir::py::PyObjectType::get(getContext()), captures_vec);
+				return mlir::emitpybytecode::BuildTuple::create(
+					rewriter, op.getLoc(), mlir::py::PyObjectType::get(getContext()), captures_vec);
 			}();
 			rewriter.replaceOpWithNewOp<mlir::emitpybytecode::MakeFunction>(op,
 				mlir::py::PyObjectType::get(rewriter.getContext()),
@@ -117,7 +118,7 @@ namespace {
 
 		void populate_arguments(mlir::func::FuncOp &op, mlir::OpBuilder &builder) const
 		{
-			for (size_t i = 0; i < op.getNumArguments(); ++i) {
+			for (unsigned i = 0; i < op.getNumArguments(); ++i) {
 				auto arg_name = op.getArgAttr(i, "llvm.name");
 				ASSERT(arg_name);
 				detail::add_identifier_to(
@@ -155,7 +156,8 @@ namespace {
 
 			auto func_type = rewriter.getFunctionType(mlir::TypeRange{},
 				mlir::TypeRange{ mlir::py::PyObjectType::get(rewriter.getContext()) });
-			auto class_fn_definition = rewriter.create<mlir::func::FuncOp>(op.getLoc(),
+			auto class_fn_definition = mlir::func::FuncOp::create(rewriter,
+				op.getLoc(),
 				op.getMangledName(),
 				func_type,
 				mlir::ArrayRef<mlir::NamedAttribute>{},
@@ -205,7 +207,8 @@ namespace {
 			rewriter.eraseBlock(end);
 
 			rewriter.setInsertionPoint(op);
-			auto class_name = rewriter.create<mlir::emitpybytecode::ConstantOp>(op.getLoc(),
+			auto class_name = mlir::emitpybytecode::ConstantOp::create(rewriter,
+				op.getLoc(),
 				mlir::py::PyObjectType::get(rewriter.getContext()),
 				rewriter.getStringAttr(op.getMangledName()));
 
@@ -214,22 +217,23 @@ namespace {
 				std::vector<mlir::Value> captures_vec;
 				for (auto attr : op.getCaptures()) {
 					auto name = mlir::cast<mlir::StringAttr>(attr).getValue();
-					captures_vec.push_back(rewriter.create<mlir::emitpybytecode::LoadClosureOp>(
-						op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
+					captures_vec.push_back(mlir::emitpybytecode::LoadClosureOp::create(
+						rewriter, op.getLoc(), mlir::py::PyObjectType::get(getContext()), name));
 				}
-				return rewriter.create<mlir::emitpybytecode::BuildTuple>(
-					op.getLoc(), mlir::py::PyObjectType::get(getContext()), captures_vec);
+				return mlir::emitpybytecode::BuildTuple::create(
+					rewriter, op.getLoc(), mlir::py::PyObjectType::get(getContext()), captures_vec);
 			}();
 
-			auto class_fn = rewriter.create<mlir::emitpybytecode::MakeFunction>(op.getLoc(),
+			auto class_fn = mlir::emitpybytecode::MakeFunction::create(rewriter,
+				op.getLoc(),
 				mlir::py::PyObjectType::get(rewriter.getContext()),
 				class_name,
 				mlir::ValueRange{},
 				mlir::ValueRange{},
 				captures_tuple);
 
-			auto class_builder = rewriter.create<mlir::emitpybytecode::LoadBuildClass>(
-				op.getLoc(), mlir::py::PyObjectType::get(rewriter.getContext()));
+			auto class_builder = mlir::emitpybytecode::LoadBuildClass::create(
+				rewriter, op.getLoc(), mlir::py::PyObjectType::get(rewriter.getContext()));
 			std::vector<mlir::Value> args{ class_fn, class_name };
 			args.insert(args.end(), op.getBases().begin(), op.getBases().end());
 			rewriter.replaceOpWithNewOp<py::FunctionCallOp>(op,
