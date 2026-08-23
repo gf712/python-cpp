@@ -6,10 +6,12 @@ on:
 
 env:
   CMAKE_PRESET: release
+  CC: gcc-16
+  CXX: g++-16
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v7
@@ -17,6 +19,16 @@ jobs:
     - uses: actions/setup-python@v7.0.0
 
     - uses: pre-commit/action@v3.0.1
+
+    - name: Install GCC 16
+      run: |
+        # We require C++26, which currently is best supported in gcc-16.
+        # By default, Ubuntu 24.04 only supports up to gcc-13,
+        # but ubuntu-toolchain-r/test carries experimental trunk snapshots.
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+        sudo apt-get update
+        sudo apt-get install -y gcc-16 g++-16
+        g++-16 --version
 
     - name: Install LLVM
       run: |
@@ -30,9 +42,7 @@ jobs:
         echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] https://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-23 main" \
           | sudo tee /etc/apt/sources.list.d/llvm-23.list > /dev/null
         sudo apt-get update
-        # The snapshot packaging pulled in llvm-23-dev via libmlir-23-dev; the
-        # release packaging does not, and MLIRConfig.cmake needs LLVMConfig.cmake.
-        sudo apt-get install -y clang-23 lld-23 llvm-23-dev libmlir-23-dev mlir-23-tools
+        sudo apt-get install -y llvm-23-dev libmlir-23-dev mlir-23-tools
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
