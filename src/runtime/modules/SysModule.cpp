@@ -40,7 +40,7 @@ PyResult<PyList *> create_sys_paths(Interpreter &interpreter)
 	const auto &entry_script = interpreter.entry_script();
 	auto entry_parent = PyString::create(std::filesystem::path(entry_script).parent_path());
 	if (entry_parent.is_err()) return Err(entry_parent.unwrap_err());
-	auto path_list = PyList::create({
+	auto path_list = PyList::create(std::vector<Value>{
 		entry_parent.unwrap(),
 		PyString::create(kPythonLibPath.data()).unwrap(),
 	});

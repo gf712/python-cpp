@@ -17,6 +17,7 @@
 #include <string_view>
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 

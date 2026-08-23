@@ -79,10 +79,20 @@
 
 using namespace py;
 
+// GCC 16 inlines the std::variant copy-assignment behind py::Value and then
+// attributes the std::vector destructor's operator delete to the stack slot
+// holding the variant. Nothing is freed here; the diagnostic is a false positive.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
 Instruction::RAIIStoreNonCallInstructionData::RAIIStoreNonCallInstructionData()
 {
 	reg0 = VirtualMachine::the().reg(0);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 Instruction::RAIIStoreNonCallInstructionData::~RAIIStoreNonCallInstructionData()
 {

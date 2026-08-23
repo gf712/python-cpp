@@ -80,7 +80,17 @@ bool PyCell::empty() const
 
 PyResult<PyObject *> PyCell::__repr__() const { return PyString::create(to_string()); }
 
+// GCC 16 inlines the std::variant copy-assignment behind py::Value and then
+// attributes the std::vector destructor's operator delete to the stack slot
+// holding the variant. Nothing is freed here; the diagnostic is a false positive.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
 void PyCell::set_cell(const Value &new_value) { m_content = new_value; }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace {
 	std::once_flag cell_flag;
