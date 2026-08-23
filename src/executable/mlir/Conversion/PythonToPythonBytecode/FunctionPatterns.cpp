@@ -185,10 +185,10 @@ namespace {
 
 					if (mlir::isa<mlir::py::ConstantOp>(defining_op)) {
 						rewriter.setInsertionPoint(return_op);
-						auto class_cell =
-							rewriter.create<mlir::emitpybytecode::LoadClosureOp>(return_op.getLoc(),
-								mlir::py::PyObjectType::get(getContext()),
-								mlir::StringRef{ "__class__" });
+						auto class_cell = mlir::emitpybytecode::LoadClosureOp::create(rewriter,
+							return_op.getLoc(),
+							mlir::py::PyObjectType::get(getContext()),
+							mlir::StringRef{ "__class__" });
 						rewriter.modifyOpInPlace(
 							return_op, [&] { return_op.getValueMutable().assign(class_cell); });
 					} else {

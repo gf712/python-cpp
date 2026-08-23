@@ -406,7 +406,7 @@ namespace py {
 		return region_or_block_arguments(getOperation(), successor);
 	}
 
-	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> operands,
+	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> /*operands*/,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
 		static_assert(BranchYieldOp::hasTrait<
