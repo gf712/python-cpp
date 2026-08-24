@@ -1,4 +1,5 @@
 include "Python/IR/PythonAttributes.td"
+include "Python/IR/PythonInterfaces.td"
 include "Python/IR/PythonTypes.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -443,7 +444,8 @@ def UnpackExpandOp : Python_Op<"unpack_ex"> {
                         Python_PyObjectType:$rest);
 }
 
-def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
+def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
+                                       DeclareOpInterfaceMethods<PyLoopOpInterface>]> {
     let summary = "For loop representation";
 
     let arguments = (ins Python_PyObjectType:$iterable);
@@ -457,7 +459,8 @@ def ForLoopOp : Python_Op<"for_loop", [DeclareOpInterfaceMethods<RegionBranchOpI
                           AnyRegion:$orelse);
 }
 
-def WhileOp : Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
+def WhileOp : Python_Op<"while", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
+                                  DeclareOpInterfaceMethods<PyLoopOpInterface>]> {
     let summary = "While loop representation";
 
     let regions = (region AnyRegion:$condition, AnyRegion:$body, AnyRegion:$orelse);
@@ -484,7 +487,7 @@ def TryOp : Python_Op<"try", [DeclareOpInterfaceMethods<RegionBranchOpInterface,
                           VariadicRegion<SizedRegion<1>>:$handlers);
 }
 
-def WithOp : Python_Op<"with"> {
+def WithOp : Python_Op<"with", [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>]> {
     let arguments = (ins Variadic<Python_PyObjectType>:$items);
 
     let regions = (region AnyRegion:$body);

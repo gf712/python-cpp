@@ -9,10 +9,17 @@ class Pass;
 namespace py {
 	std::unique_ptr<Pass> createPythonToPythonBytecodePass();
 
-	// Dedicated passes for the four region-bearing control-flow ops.
-	// Each runs only its own lowering pattern and is meant to slot into
-	// the pipeline ahead of the monolithic conversion pass, so that
-	// canonicalize / CSE can be interleaved between them. Plan step 18.
+	// Dedicated passes for the region-bearing control-flow ops. Each runs only its
+	// own lowering pattern(s) and is meant to slot into the pipeline ahead of the
+	// monolithic conversion pass, so that canonicalize / CSE can be interleaved
+	// between them. Plan step 18.
+	//
+	// Both loops share one pass: their patterns defer to each other so that a
+	// nested loop is flattened before the enclosing one retargets the break /
+	// continue in its orelse, and that handshake needs both patterns in the same
+	// greedy run. createConvertForLoopPass/createConvertWhileLoopPass remain for
+	// python-mlir-opt, which drives a single lowering at a time.
+	std::unique_ptr<Pass> createConvertLoopsPass();
 	std::unique_ptr<Pass> createConvertForLoopPass();
 	std::unique_ptr<Pass> createConvertWhileLoopPass();
 	std::unique_ptr<Pass> createConvertTryPass();

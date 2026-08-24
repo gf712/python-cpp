@@ -15,6 +15,10 @@ PyResult<Value> SetUpdate::execute(VirtualMachine &vm, Interpreter &) const
 	auto *pyset = std::get<PyObject *>(set);
 	ASSERT(pyset);
 	ASSERT(as<PySet>(pyset));
+	// update() walks the iterator protocol and hashes each element, either of
+	// which may run Python and clobber r0.
+	[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+
 	auto iterable_obj = PyObject::from(iterable);
 	if (iterable_obj.is_err()) { return Err(iterable_obj.unwrap_err()); }
 

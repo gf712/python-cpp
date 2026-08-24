@@ -6,16 +6,23 @@ using namespace py;
 
 PyResult<Value> BuildSet::execute(VirtualMachine &vm, Interpreter &) const
 {
-	PySet::SetType elements;
-	elements.reserve(m_size);
-	if (m_size > 0) {
-		auto *start = vm.sp() - m_size;
-		while (start != vm.sp()) {
-			elements.insert(*start);
-			start = std::next(start);
+	// Hashing the elements may run a Python __hash__/__eq__ and clobber r0.
+	auto set_ = [&] {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+
+		PySet::SetType elements;
+		elements.reserve(m_size);
+		if (m_size > 0) {
+			auto *start = vm.sp() - m_size;
+			while (start != vm.sp()) {
+				elements.insert(*start);
+				start = std::next(start);
+			}
 		}
-	}
-	return PySet::create(elements).and_then([&vm, this](PySet *set) {
+		return PySet::create(elements);
+	}();
+
+	return set_.and_then([&vm, this](PySet *set) {
 		vm.reg(m_dst) = set;
 		return Ok(set);
 	});

@@ -17,6 +17,8 @@
 
 #include "Python/IR/Dialect.cpp.inc"
 
+#include "Python/IR/PythonInterfaces.cpp.inc"
+
 namespace mlir {
 namespace py {
 	namespace {
@@ -263,6 +265,14 @@ namespace py {
 		}
 	}// namespace
 
+	mlir::Region &WhileOp::getLoopBodyRegion() { return getBody(); }
+
+	mlir::Region &WhileOp::getLoopOrelseRegion() { return getOrelse(); }
+
+	mlir::Region &ForLoopOp::getLoopBodyRegion() { return getBody(); }
+
+	mlir::Region &ForLoopOp::getLoopOrelseRegion() { return getOrelse(); }
+
 	// Based on CIR loop interface implementation
 	void WhileOp::getSuccessorRegions(mlir::RegionBranchPoint point,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
@@ -373,7 +383,30 @@ namespace py {
 		}
 	}
 
-	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute>,
+	// py.with has a single region and no loop back-edge: enter the body, then exit
+	// to the parent. The matching terminator edge (body -> parent) was already
+	// modelled by BranchYieldOp's WithOp case below; this is the op side of the
+	// same contract, which py.with was the only flattened-region op not to declare.
+	void WithOp::getSuccessorRegions(mlir::RegionBranchPoint point,
+		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
+	{
+		if (point.isParent()) {
+			regions.emplace_back(&getBody());
+		} else if (predecessor_region(point) == &getBody()) {
+			// Same exit-to-parent convention as TryOp: emplace the containing
+			// region rather than RegionSuccessor::parent().
+			regions.emplace_back(getOperation()->getParentRegion());
+		} else {
+			llvm_unreachable("unexpected branch origin");
+		}
+	}
+
+	mlir::ValueRange WithOp::getSuccessorInputs(mlir::RegionSuccessor successor)
+	{
+		return region_or_block_arguments(getOperation(), successor);
+	}
+
+	void BranchYieldOp::getSuccessorRegions(llvm::ArrayRef<mlir::Attribute> /*operands*/,
 		llvm::SmallVectorImpl<mlir::RegionSuccessor> &regions)
 	{
 		static_assert(BranchYieldOp::hasTrait<

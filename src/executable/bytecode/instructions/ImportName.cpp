@@ -49,7 +49,10 @@ PyResult<Value> ImportName::execute(VirtualMachine &vm, Interpreter &interpreter
 		PyObject::from(level).unwrap());
 	if (args.is_err()) return args;
 
-	auto module = std::get<PyObject *>(import_func)->call(args.unwrap(), nullptr);
+	auto module = [&] {
+		[[maybe_unused]] RAIIStoreNonCallInstructionData non_call_instruction_data;
+		return std::get<PyObject *>(import_func)->call(args.unwrap(), nullptr);
+	}();
 
 	return module.and_then([&](auto *m) {
 		vm.reg(m_destination) = m;

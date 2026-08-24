@@ -41,59 +41,91 @@ namespace mlir {
 namespace py {
 
 	namespace {
-		// All non-region-bearing patterns now live in per-family files:
-		// {Arith, AttributeSubscript, Collection, ControlFlow, Function,
-		// Import, LoadStore}Patterns.cpp, registered via the
-		// populate*Patterns() entry points below.
-		// The shared DirectReplaceLowering / DirectReplaceRegisterName
-		// helpers and add_identifier* utilities moved to LoweringHelpers.hpp.
-		// What remains in this file are the four region-bearing structural
-		// patterns (ForLoop / While / Try / With), the
-		// PythonToPythonBytecodePass, and the dedicated single-pattern
-		// passes that wrap the structural ones.
-
-		// Shared walker used by both ForLoopOpLowering and WhileOpLowering
-		// to lower py.br_yield ops nested inside a loop body to cf.br ops
-		// that target the right block (continue→condition / step, break→
-		// end). Nested loops are walked into their orelse regions only;
-		// the loop body itself is skipped because the nested loop will be
-		// lowered by its own pattern.
+		// The ops whose regions py.br_yield terminates, and which a structural
+		// pattern flattens into the enclosing CFG. A walk looking for the yields
+		// that belong to *one* such op must stop at any other one, because the
+		// nested op's own pattern owns everything inside it.
 		//
-		// `skip_op` allows a caller to short-circuit on yield ops whose
-		// enclosing loop matches a specific predicate — ForLoopOpLowering
-		// uses this to ignore yields that bind to the *outer* for-loop's
-		// orelse (which shouldn't be lowered as part of the inner loop
-		// pass).
+		// This is BranchYieldOp's ParentOneOf list (PythonOps.td) — the sixth
+		// region-bearing python op, py.class, is excluded because its region
+		// becomes a separate function rather than being flattened in place.
+		bool is_flattened_region_op(mlir::Operation *op)
+		{
+			static_assert(mlir::py::BranchYieldOp::hasTrait<
+				mlir::OpTrait::HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
+			return mlir::isa<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>(op);
+		}
+
+		// True when `yield_op`, a loop-control (break/continue) yield, binds to the
+		// loop whose body region is `body`.
+		//
+		// Python binds break/continue to the innermost loop whose *body* lexically
+		// contains it. An else clause is not part of its own loop's body, so a yield
+		// sitting there keeps searching outwards — and transitively so: an else nested
+		// inside another else is still lexically part of whatever body encloses the
+		// pair. Regions that are neither body nor orelse (a try body, a with body) are
+		// likewise transparent, which is what makes `break` inside a `try` bind to the
+		// loop around it.
+		bool binds_to_loop(mlir::Region &body, mlir::py::BranchYieldOp yield_op)
+		{
+			for (mlir::Region *region = yield_op->getParentRegion(); region != nullptr;
+				region = region->getParentRegion()) {
+				if (region == &body) { return true; }
+				auto loop =
+					mlir::dyn_cast_if_present<mlir::py::PyLoopOpInterface>(region->getParentOp());
+				// A loop body (or a for's step) stops the search: the yield is that
+				// loop's, and its own pattern claims it.
+				if (loop && !loop.isLoopOrelse(region)) { return false; }
+			}
+			return false;
+		}
+
+		// True when a break/continue that binds to the loop whose body is `body` is
+		// somewhere replace_loop_branch_yields cannot reach yet — inside a nested
+		// region that has not been flattened into ours. Branching it to our target
+		// block now would be a cross-region block reference, which is invalid IR.
+		//
+		// The caller defers (fails the match) until the nested op lowers and inlines
+		// the yield into our region, the same innermost-first trick TryOpLowering uses
+		// for nested trys. Terminates because the innermost such op has nothing nested
+		// to wait on.
+		bool has_pending_nested_orelse_control(mlir::Region &body)
+		{
+			if (body.empty()) { return false; }
+			bool pending = false;
+			body.walk<WalkOrder::PreOrder>([&pending, &body](mlir::Operation *op) {
+				// Mirror replace_loop_branch_yields: what it walks through it rewrites
+				// in place, so only what it skips over can be pending.
+				if (!is_flattened_region_op(op)) { return WalkResult::advance(); }
+				op->walk([&pending, &body](mlir::py::BranchYieldOp yield_op) {
+					if (!yield_op.getKind().has_value()) { return WalkResult::advance(); }
+					if (!binds_to_loop(body, yield_op)) { return WalkResult::advance(); }
+					pending = true;
+					return WalkResult::interrupt();
+				});
+				return pending ? WalkResult::interrupt() : WalkResult::skip();
+			});
+			return pending;
+		}
+
+		// Shared walker used by both ForLoopOpLowering and WhileOpLowering to lower
+		// the py.br_yield ops in a loop body to cf.br ops targeting the right block
+		// (continue→condition / step, break→end).
+		//
+		// It stops at every nested flattened-region op: those own their own yields,
+		// and a break/continue in a nested loop's orelse only becomes ours once that
+		// loop has been flattened into our region (see
+		// has_pending_nested_orelse_control, which is what makes that ordering hold).
 		void replace_loop_branch_yields(mlir::PatternRewriter &rewriter,
 			mlir::Region &region,
 			mlir::Block *continue_target,
-			mlir::Block *break_target,
-			llvm::function_ref<bool(mlir::py::BranchYieldOp)> skip_op)
+			mlir::Block *break_target)
 		{
-			std::function<WalkResult(mlir::Operation *)> callback =
-				[&rewriter, continue_target, break_target, skip_op, &callback](
-					mlir::Operation *operation) {
-					if (auto loop = mlir::dyn_cast<mlir::py::ForLoopOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
-						return WalkResult::skip();
-					}
-					if (auto loop = mlir::dyn_cast<mlir::py::WhileOp>(operation)) {
-						if (loop.getOrelse().empty()) { return WalkResult::skip(); }
-						loop.getOrelse().walk<WalkOrder::PreOrder>(callback);
-						return WalkResult::skip();
-					}
+			region.walk<WalkOrder::PreOrder>(
+				[&rewriter, continue_target, break_target](mlir::Operation *operation) {
+					if (is_flattened_region_op(operation)) { return WalkResult::skip(); }
 					auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation);
 					if (!yield_op) { return WalkResult::advance(); }
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
-					// Kindless yields under try/with/try-handler don't
-					// participate in the loop's continue/break flow.
-					if (!yield_op.getKind().has_value()
-						&& mlir::isa<TryOp, WithOp, TryHandlerOp>(yield_op->getParentOp())) {
-						return WalkResult::advance();
-					}
-					if (skip_op && skip_op(yield_op)) { return WalkResult::advance(); }
 					rewriter.setInsertionPoint(yield_op);
 					if (!yield_op.getKind().has_value()
 						|| yield_op.getKind().value() == py::LoopOpKind::continue_) {
@@ -102,8 +134,29 @@ namespace py {
 						rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, break_target);
 					}
 					return WalkResult::advance();
-				};
-			region.walk<WalkOrder::PreOrder>(callback);
+				});
+		}
+
+		// Rewrites a loop orelse region's normal-completion (kindless) py.br_yield ops
+		// into branches to the loop's exit block.
+		//
+		// Only the kindless ones. A `break`/`continue` written in an orelse binds to
+		// the loop *enclosing* this one, so those are left in place: once this region
+		// is inlined they sit directly in the enclosing loop's body, where its own
+		// replace_loop_branch_yields claims them.
+		void replace_orelse_completion_yields(mlir::PatternRewriter &rewriter,
+			mlir::Region &region,
+			mlir::Block *exit_target)
+		{
+			if (region.empty()) { return; }
+			region.walk<WalkOrder::PreOrder>([&rewriter, exit_target](mlir::Operation *operation) {
+				if (is_flattened_region_op(operation)) { return WalkResult::skip(); }
+				auto yield_op = mlir::dyn_cast<mlir::py::BranchYieldOp>(operation);
+				if (!yield_op || yield_op.getKind().has_value()) { return WalkResult::advance(); }
+				rewriter.setInsertionPoint(yield_op);
+				rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield_op, exit_target);
+				return WalkResult::advance();
+			});
 		}
 
 		// Collects the loop-control (break/continue) kinds that appear directly
@@ -199,6 +252,11 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::py::ForLoopOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
+				// Lower innermost-first: a break/continue in a nested loop's orelse
+				// binds to us, but only becomes rewritable once that loop has been
+				// flattened into our region.
+				if (has_pending_nested_orelse_control(op.getBody())) { return failure(); }
+
 				auto *initBlock = rewriter.getInsertionBlock();
 				auto initPos = rewriter.getInsertionPoint();
 
@@ -242,15 +300,7 @@ namespace py {
 				rewriter.inlineRegionBefore(
 					op.getStep(), *op->getParentRegion(), endBlock->getIterator());
 
-				// Skip yields whose enclosing for-loop sits inside an
-				// outer for-loop's orelse — those belong to the outer
-				// pattern's rewrite, not this one.
-				auto skip_orelse_yields = [](mlir::py::BranchYieldOp y) {
-					auto forloop_op = y->getParentOfType<mlir::py::ForLoopOp>();
-					return forloop_op && &forloop_op.getOrelse() == y->getParentRegion();
-				};
-				replace_loop_branch_yields(
-					rewriter, op.getBody(), for_iter_block, endBlock, skip_orelse_yields);
+				replace_loop_branch_yields(rewriter, op.getBody(), for_iter_block, endBlock);
 
 				ASSERT(!op.getBody().empty());
 				auto *body_exit_block = &op.getBody().back();
@@ -258,15 +308,7 @@ namespace py {
 				rewriter.inlineRegionBefore(
 					op.getBody(), *op->getParentRegion(), endBlock->getIterator());
 
-				if (!op.getOrelse().empty()) {
-					auto *orelse_exit_block = &op.getOrelse().back();
-					ASSERT(orelse_exit_block->getTerminator());
-					if (mlir::isa<mlir::py::BranchYieldOp>(orelse_exit_block->getTerminator())) {
-						rewriter.setInsertionPointToEnd(orelse_exit_block);
-						rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-							orelse_exit_block->getTerminator(), endBlock);
-					}
-				}
+				replace_orelse_completion_yields(rewriter, op.getOrelse(), endBlock);
 				rewriter.inlineRegionBefore(
 					op.getOrelse(), *op->getParentRegion(), endBlock->getIterator());
 
@@ -284,6 +326,10 @@ namespace py {
 			mlir::LogicalResult matchAndRewrite(mlir::py::WhileOp op,
 				mlir::PatternRewriter &rewriter) const final
 			{
+				// See ForLoopOpLowering: innermost-first, so a nested loop's orelse
+				// break/continue is in our region before we try to retarget it.
+				if (has_pending_nested_orelse_control(op.getBody())) { return failure(); }
+
 				auto *initBlock = rewriter.getInsertionBlock();
 				auto initPos = rewriter.getInsertionPoint();
 
@@ -301,11 +347,7 @@ namespace py {
 				rewriter.setInsertionPointToEnd(initBlock);
 				mlir::cf::BranchOp::create(rewriter, condition_op.getLoc(), &condition_start);
 
-				if (mlir::isa<mlir::BlockArgument>(condition_op.getCond())) {
-					rewriter.setInsertionPointToStart(condition_op.getCond().getParentBlock());
-				} else {
-					rewriter.setInsertionPointAfter(condition_op.getCond().getDefiningOp());
-				}
+				rewriter.setInsertionPoint(condition_op);
 				auto should_jump = mlir::py::CastToBoolOp::create(
 					rewriter, condition_op.getLoc(), rewriter.getI1Type(), condition_op.getCond());
 				ASSERT(!op.getBody().empty());
@@ -317,23 +359,13 @@ namespace py {
 				rewriter.eraseOp(condition_op);
 				rewriter.inlineRegionBefore(condition, endBlock);
 
-				replace_loop_branch_yields(rewriter,
-					op.getBody(),
-					&condition_start,
-					endBlock,
-					/*skip_op=*/{});
+				replace_loop_branch_yields(rewriter, op.getBody(), &condition_start, endBlock);
 
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
-				// if (!op.getOrelse().empty()) {
-				// 	auto *orelse_exit_block = &op.getOrelse().back();
-				// 	ASSERT(orelse_exit_block->getTerminator());
-				// 	if (mlir::isa<mlir::py::BranchYieldOp>(orelse_exit_block->getTerminator())) {
-				// 		rewriter.setInsertionPointToEnd(orelse_exit_block);
-				// 		rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(
-				// 			orelse_exit_block->getTerminator(), endBlock);
-				// 	}
-				// }
+				// Without this the orelse's completion yield survives region inlining
+				// with no py.while parent left to satisfy its HasParent trait.
+				replace_orelse_completion_yields(rewriter, op.getOrelse(), endBlock);
 				rewriter.inlineRegionBefore(op.getOrelse(), endBlock);
 
 				rewriter.eraseOp(op);
@@ -351,15 +383,7 @@ namespace py {
 			{
 				if (region.empty()) { return; }
 				region.walk<WalkOrder::PreOrder>([callback](mlir::Operation *childOp) {
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
-					if (mlir::isa<mlir::py::TryOp>(childOp)
-						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
-						|| mlir::isa<mlir::py::WhileOp>(childOp)
-						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
-						return WalkResult::skip();
-					}
+					if (is_flattened_region_op(childOp)) { return WalkResult::skip(); }
 					if (mlir::isa<mlir::py::BranchYieldOp>(childOp)) {
 						// Both normal-completion (kindless) and loop-control
 						// (break/continue) yields are surfaced; the callback
@@ -712,59 +736,52 @@ namespace py {
 					}
 				};
 
-				op.getBody().walk<WalkOrder::PreOrder>([&rewriter,
-														   exit_block,
-														   cleanup_block,
-														   endBlock,
-														   &emit_normal_exit](
-														   mlir::Operation *childOp) {
-					static_assert(mlir::py::BranchYieldOp::hasTrait<mlir::OpTrait::
-							HasParent<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>::Impl>());
-					if (mlir::isa<mlir::py::TryOp>(childOp)
-						|| mlir::isa<mlir::py::ForLoopOp>(childOp)
-						|| mlir::isa<mlir::py::WhileOp>(childOp)
-						|| mlir::isa<mlir::py::WithOp>(childOp)
-						|| mlir::isa<mlir::py::TryHandlerOp>(childOp)) {
-						return WalkResult::skip();
-					}
-					if (auto op = mlir::dyn_cast<mlir::py::RaiseOp>(childOp)) {
-						rewriter.setInsertionPoint(op);
-						if (op.getCause()) {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
-								op, op.getException(), op.getCause(), BlockRange{ cleanup_block });
-						} else if (op.getException()) {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
-								op, op.getException(), nullptr, BlockRange{ cleanup_block });
-						} else {
-							rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
-								op, BlockRange{ cleanup_block });
+				op.getBody().walk<WalkOrder::PreOrder>(
+					[&rewriter, exit_block, cleanup_block, endBlock, &emit_normal_exit](
+						mlir::Operation *childOp) {
+						if (is_flattened_region_op(childOp)) { return WalkResult::skip(); }
+						if (auto op = mlir::dyn_cast<mlir::py::RaiseOp>(childOp)) {
+							rewriter.setInsertionPoint(op);
+							if (op.getCause()) {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(op,
+									op.getException(),
+									op.getCause(),
+									BlockRange{ cleanup_block });
+							} else if (op.getException()) {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::RaiseVarargs>(
+									op, op.getException(), nullptr, BlockRange{ cleanup_block });
+							} else {
+								rewriter.replaceOpWithNewOp<mlir::emitpybytecode::ReRaiseOp>(
+									op, BlockRange{ cleanup_block });
+							}
+						} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+							y && !y.getKind().has_value()) {
+							auto *current = y->getBlock();
+							auto *next = rewriter.splitBlock(current, y->getIterator());
+							rewriter.setInsertionPointToEnd(current);
+							mlir::emitpybytecode::LeaveExceptionHandle::create(
+								rewriter, y->getLoc());
+							mlir::cf::BranchOp::create(rewriter, y->getLoc(), exit_block);
+							rewriter.eraseBlock(next);
+						} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
+							y && y.getKind().has_value()) {
+							// break/continue out of the with body: leave the
+							// exception handler, run __exit__, then hand the marker
+							// to the enclosing loop on a dedicated exit path.
+							auto *current = y->getBlock();
+							auto *next = rewriter.splitBlock(current, y->getIterator());
+							auto *lc_block = rewriter.createBlock(endBlock);
+							rewriter.setInsertionPointToEnd(current);
+							mlir::emitpybytecode::LeaveExceptionHandle::create(
+								rewriter, y->getLoc());
+							mlir::cf::BranchOp::create(rewriter, y->getLoc(), lc_block);
+							rewriter.setInsertionPointToStart(lc_block);
+							emit_normal_exit();
+							mlir::py::BranchYieldOp::create(rewriter, y->getLoc(), y.getKindAttr());
+							rewriter.eraseBlock(next);
 						}
-					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
-						y && !y.getKind().has_value()) {
-						auto *current = y->getBlock();
-						auto *next = rewriter.splitBlock(current, y->getIterator());
-						rewriter.setInsertionPointToEnd(current);
-						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
-						mlir::cf::BranchOp::create(rewriter, y->getLoc(), exit_block);
-						rewriter.eraseBlock(next);
-					} else if (auto y = mlir::dyn_cast<mlir::py::BranchYieldOp>(childOp);
-						y && y.getKind().has_value()) {
-						// break/continue out of the with body: leave the
-						// exception handler, run __exit__, then hand the marker
-						// to the enclosing loop on a dedicated exit path.
-						auto *current = y->getBlock();
-						auto *next = rewriter.splitBlock(current, y->getIterator());
-						auto *lc_block = rewriter.createBlock(endBlock);
-						rewriter.setInsertionPointToEnd(current);
-						mlir::emitpybytecode::LeaveExceptionHandle::create(rewriter, y->getLoc());
-						mlir::cf::BranchOp::create(rewriter, y->getLoc(), lc_block);
-						rewriter.setInsertionPointToStart(lc_block);
-						emit_normal_exit();
-						mlir::py::BranchYieldOp::create(rewriter, y->getLoc(), y.getKindAttr());
-						rewriter.eraseBlock(next);
-					}
-					return WalkResult::advance();
-				});
+						return WalkResult::advance();
+					});
 
 				rewriter.inlineRegionBefore(op.getBody(), endBlock);
 
@@ -843,8 +860,8 @@ namespace py {
 		// (Python source dialect + EmitPythonBytecode target dialect); the
 		// patterns also create cf::BranchOp / func::FuncOp internally, but
 		// those dialects are already loaded by the time the pipeline runs.
-		template<typename Derived, typename Pattern, const char *Argument>
-		struct SinglePatternConversionPass : public PassWrapper<Derived, OperationPass<ModuleOp>>
+		template<typename Derived, const char *Argument, typename... Patterns>
+		struct PatternConversionPass : public PassWrapper<Derived, OperationPass<ModuleOp>>
 		{
 			void getDependentDialects(DialectRegistry &registry) const override
 			{
@@ -856,7 +873,7 @@ namespace py {
 			void runOnOperation() final
 			{
 				mlir::RewritePatternSet patterns(&this->getContext());
-				patterns.template add<Pattern>(&this->getContext());
+				patterns.template add<Patterns...>(&this->getContext());
 
 				GreedyRewriteConfig config;
 				config.setStrictness(GreedyRewriteStrictness::AnyOp);
@@ -868,10 +885,33 @@ namespace py {
 			}
 		};
 
+		template<typename Derived, typename Pattern, const char *Argument>
+		using SinglePatternConversionPass = PatternConversionPass<Derived, Argument, Pattern>;
+
+		inline constexpr char kConvertLoopsArg[] = "convert-py-loops";
 		inline constexpr char kConvertForLoopArg[] = "convert-py-forloop";
 		inline constexpr char kConvertWhileLoopArg[] = "convert-py-while";
 		inline constexpr char kConvertTryArg[] = "convert-py-try";
 		inline constexpr char kConvertWithArg[] = "convert-py-with";
+
+		// Both loop patterns must share one greedy driver. A break/continue in a
+		// nested loop's orelse binds to the enclosing loop and can only be retargeted
+		// after the nested loop is flattened, which the patterns arrange by deferring
+		// (see has_pending_nested_orelse_control). Deferral can only resolve if the
+		// pattern being waited on is available in the same run: with `for` and `while`
+		// in separate passes, a `for` containing a `while ... else: continue` would
+		// wait for a pattern that does not run until the next pass, and never lower.
+		//
+		// The single-pattern passes below stay registered for python-mlir-opt, where
+		// running one lowering in isolation is what the Conversion lit tests want.
+		struct ConvertLoopsPass
+			: public PatternConversionPass<ConvertLoopsPass,
+				  kConvertLoopsArg,
+				  ForLoopOpLowering,
+				  WhileOpLowering>
+		{
+			MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertLoopsPass)
+		};
 
 		struct ConvertForLoopPass
 			: public SinglePatternConversionPass<ConvertForLoopPass,
@@ -1017,6 +1057,8 @@ namespace py {
 	{
 		return std::make_unique<ConvertWhileLoopPass>();
 	}
+
+	std::unique_ptr<Pass> createConvertLoopsPass() { return std::make_unique<ConvertLoopsPass>(); }
 
 	std::unique_ptr<Pass> createConvertTryPass() { return std::make_unique<ConvertTryPass>(); }
 

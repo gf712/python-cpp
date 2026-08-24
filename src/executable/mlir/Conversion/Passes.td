@@ -6,6 +6,11 @@ def ConvertPythonToPythonBytecode : Pass<"convert-python-to-pythonbytecode"> {
   let constructor = "mlir::py::createPythonToPythonBytecodePass()";
 }
 
+def ConvertPyLoops : Pass<"convert-py-loops"> {
+  let summary = "Lower py.for_loop and py.while together to emitpybytecode control flow";
+  let constructor = "mlir::py::createConvertLoopsPass()";
+}
+
 def ConvertPyForLoop : Pass<"convert-py-forloop"> {
   let summary = "Lower py.for_loop to emitpybytecode control flow";
   let constructor = "mlir::py::createConvertForLoopPass()";

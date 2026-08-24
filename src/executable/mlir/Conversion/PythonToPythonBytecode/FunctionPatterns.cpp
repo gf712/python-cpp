@@ -176,15 +176,28 @@ namespace {
 						})
 					!= cell_names.end()) {
 
-					ASSERT(!class_returns.empty());
+					ASSERT(class_returns.size() == 1);
 					auto return_op = class_returns.front();
 					ASSERT(return_op->getParentOp() == op.getOperation());
-					ASSERT(return_op.getValue().getDefiningOp());
-					rewriter.setInsertionPoint(return_op.getValue().getDefiningOp());
-					rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadClosureOp>(
-						return_op.getValue().getDefiningOp(),
-						mlir::py::PyObjectType::get(getContext()),
-						mlir::StringRef{ "__class__" });
+
+					auto *defining_op = return_op.getValue().getDefiningOp();
+					ASSERT(defining_op);
+
+					if (mlir::isa<mlir::py::ConstantOp>(defining_op)) {
+						rewriter.setInsertionPoint(return_op);
+						auto class_cell = mlir::emitpybytecode::LoadClosureOp::create(rewriter,
+							return_op.getLoc(),
+							mlir::py::PyObjectType::get(getContext()),
+							mlir::StringRef{ "__class__" });
+						rewriter.modifyOpInPlace(
+							return_op, [&] { return_op.getValueMutable().assign(class_cell); });
+					} else {
+						rewriter.setInsertionPoint(defining_op);
+						rewriter.replaceOpWithNewOp<mlir::emitpybytecode::LoadClosureOp>(
+							defining_op,
+							mlir::py::PyObjectType::get(getContext()),
+							mlir::StringRef{ "__class__" });
+					}
 				}
 			}
 

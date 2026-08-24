@@ -15,5 +15,7 @@
 
 #include "Python/IR/PythonOpsEnums.h.inc"
 
+#include "Python/IR/PythonInterfaces.h.inc"
+
 #define GET_OP_CLASSES
 #include "Python/IR/Ops.h.inc"

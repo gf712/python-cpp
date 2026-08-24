@@ -513,7 +513,7 @@ PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
 	auto *fromlist = arg3.unwrap();
 
 	auto arg4 = [args]() -> PyResult<PyObject *> {
-		if (args->size() > 1) {
+		if (args->size() > 4) {
 			auto arg4 = args->operator[](4);
 			if (arg4.is_err()) return arg4;
 			auto *level = arg4.unwrap();
