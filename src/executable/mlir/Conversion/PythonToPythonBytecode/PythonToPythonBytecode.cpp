@@ -56,39 +56,54 @@ namespace py {
 			return mlir::isa<TryOp, ForLoopOp, WithOp, WhileOp, TryHandlerOp>(op);
 		}
 
-		// True when `yield_op` is a loop-control (break/continue) yield that binds to
-		// the loop *enclosing* `loop` rather than to `loop` itself — i.e. it sits in
-		// `loop`'s orelse, which is not part of the loop body.
-		bool binds_to_enclosing_loop(mlir::py::PyLoopOpInterface loop,
-			mlir::py::BranchYieldOp yield_op)
+		// True when `yield_op`, a loop-control (break/continue) yield, binds to the
+		// loop whose body region is `body`.
+		//
+		// Python binds break/continue to the innermost loop whose *body* lexically
+		// contains it. An else clause is not part of its own loop's body, so a yield
+		// sitting there keeps searching outwards — and transitively so: an else nested
+		// inside another else is still lexically part of whatever body encloses the
+		// pair. Regions that are neither body nor orelse (a try body, a with body) are
+		// likewise transparent, which is what makes `break` inside a `try` bind to the
+		// loop around it.
+		bool binds_to_loop(mlir::Region &body, mlir::py::BranchYieldOp yield_op)
 		{
-			return yield_op.getKind().has_value() && loop.isLoopOrelse(yield_op->getParentRegion());
+			for (mlir::Region *region = yield_op->getParentRegion(); region != nullptr;
+				region = region->getParentRegion()) {
+				if (region == &body) { return true; }
+				auto loop =
+					mlir::dyn_cast_if_present<mlir::py::PyLoopOpInterface>(region->getParentOp());
+				// A loop body (or a for's step) stops the search: the yield is that
+				// loop's, and its own pattern claims it.
+				if (loop && !loop.isLoopOrelse(region)) { return false; }
+			}
+			return false;
 		}
 
-		// True when some loop nested in `region` still holds a break/continue that
-		// binds to the loop being lowered — i.e. one sitting in that nested loop's
-		// orelse. Such a yield cannot be rewritten yet: it lives in a region that has
-		// not been flattened, so branching it to our target block would be a
-		// cross-region block reference, which is invalid IR.
+		// True when a break/continue that binds to the loop whose body is `body` is
+		// somewhere replace_loop_branch_yields cannot reach yet — inside a nested
+		// region that has not been flattened into ours. Branching it to our target
+		// block now would be a cross-region block reference, which is invalid IR.
 		//
-		// The caller defers (fails the match) until the nested loop lowers and inlines
+		// The caller defers (fails the match) until the nested op lowers and inlines
 		// the yield into our region, the same innermost-first trick TryOpLowering uses
-		// for nested trys. Terminates because the innermost such loop has nothing
-		// nested to wait on.
-		bool has_pending_nested_orelse_control(mlir::Region &region)
+		// for nested trys. Terminates because the innermost such op has nothing nested
+		// to wait on.
+		bool has_pending_nested_orelse_control(mlir::Region &body)
 		{
-			if (region.empty()) { return false; }
+			if (body.empty()) { return false; }
 			bool pending = false;
-			region.walk<WalkOrder::PreOrder>([&pending](mlir::Operation *op) {
-				auto loop = mlir::dyn_cast<mlir::py::PyLoopOpInterface>(op);
-				if (!loop) { return WalkResult::advance(); }
-				loop.getLoopOrelseRegion().walk<WalkOrder::PreOrder>(
-					[&pending, loop](mlir::py::BranchYieldOp yield_op) {
-						if (binds_to_enclosing_loop(loop, yield_op)) { pending = true; }
-					});
-				// Only this loop's own orelse matters here; anything deeper is the
-				// nested loop's problem and it defers on it in turn.
-				return WalkResult::skip();
+			body.walk<WalkOrder::PreOrder>([&pending, &body](mlir::Operation *op) {
+				// Mirror replace_loop_branch_yields: what it walks through it rewrites
+				// in place, so only what it skips over can be pending.
+				if (!is_flattened_region_op(op)) { return WalkResult::advance(); }
+				op->walk([&pending, &body](mlir::py::BranchYieldOp yield_op) {
+					if (!yield_op.getKind().has_value()) { return WalkResult::advance(); }
+					if (!binds_to_loop(body, yield_op)) { return WalkResult::advance(); }
+					pending = true;
+					return WalkResult::interrupt();
+				});
+				return pending ? WalkResult::interrupt() : WalkResult::skip();
 			});
 			return pending;
 		}
