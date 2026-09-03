@@ -609,6 +609,24 @@ TEST(Lexer, IgnoreCommentsAndNL)
 	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
 }
 
+TEST(Lexer, IgnoreCommentsAndNLLateInTheProgram)
+{
+	constexpr std::size_t line_count = 200;
+	std::string program;
+	std::vector<Token::TokenType> expected_tokens;
+	for (std::size_t i = 0; i < line_count; ++i) {
+		program += std::format("# leading comment {}\n", i);
+		program += "\n";
+		program += std::format("a{} = {} # trailing comment\n", i, i);
+		expected_tokens.push_back(Token::TokenType::NAME);
+		expected_tokens.push_back(Token::TokenType::EQUAL);
+		expected_tokens.push_back(Token::TokenType::NUMBER);
+		expected_tokens.push_back(Token::TokenType::NEWLINE);
+	}
+	expected_tokens.push_back(Token::TokenType::ENDMARKER);
+	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
+}
+
 TEST(Lexer, Ellipsis)
 {
 	constexpr std::string_view program = "...\n";

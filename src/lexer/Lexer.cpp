@@ -78,17 +78,23 @@ bool Lexer::read_more_tokens()
 {
 	const std::size_t token_size = m_tokens_to_emit.size();
 	while (token_size >= m_tokens_to_emit.size()) {
+		const std::size_t already_filtered = m_tokens_to_emit.size();
 		bool read_tokens = read_more_tokens_loop();
 		if (read_tokens) {
-			std::erase_if(m_tokens_to_emit, [this](Token &token) {
-				if (m_ignore_comments && token.token_type() == Token::TokenType::COMMENT) {
-					return true;
-				}
-				if (m_ignore_nl_token && token.token_type() == Token::TokenType::NL) {
-					return true;
-				}
-				return false;
-			});
+			const auto first = m_tokens_to_emit.begin() + already_filtered;
+			m_tokens_to_emit.erase(
+				std::remove_if(first,
+					m_tokens_to_emit.end(),
+					[this](const Token &token) {
+						if (m_ignore_comments && token.token_type() == Token::TokenType::COMMENT) {
+							return true;
+						}
+						if (m_ignore_nl_token && token.token_type() == Token::TokenType::NL) {
+							return true;
+						}
+						return false;
+					}),
+				m_tokens_to_emit.end());
 		} else {
 			return false;
 		}
