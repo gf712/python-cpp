@@ -1,12 +1,14 @@
-#include "LoadDeref.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/NameError.hpp"
-#include "runtime/PyCell.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyObject.hpp"
-#include "vm/VM.hpp"
-#include <variant>
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

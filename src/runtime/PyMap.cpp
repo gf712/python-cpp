@@ -1,7 +1,11 @@
-#include "PyMap.hpp"
-#include "PyList.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -13,7 +17,7 @@ PyMap::PyMap(PyType *type, PyObject *func, PyTuple *iters)
 
 std::string PyMap::to_string() const
 {
-	return fmt::format("<map object at {}>", static_cast<const void *>(this));
+	return std::format("<map object at {}>", static_cast<const void *>(this));
 }
 
 

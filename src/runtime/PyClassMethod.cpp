@@ -1,14 +1,12 @@
-#include "PyClassMethod.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyDict.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "RuntimeError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -50,7 +48,7 @@ PyClassMethod::PyClassMethod(PyType *type) : PyBaseObject(type) {}
 
 std::string PyClassMethod::to_string() const
 {
-	return fmt::format("<classmethod object at {}>", static_cast<const void *>(this));
+	return std::format("<classmethod object at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyClassMethod *> PyClassMethod::create()

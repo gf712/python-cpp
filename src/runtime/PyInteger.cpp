@@ -1,20 +1,14 @@
-#include "PyInteger.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBytes.hpp"
-#include "PyFloat.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "runtime/PyByteArray.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
-
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
 #include <gmpxx.h>
 
-#include <ranges>
+module py.runtime;
+import py.types;
+import std;
+
 
 namespace py {
 

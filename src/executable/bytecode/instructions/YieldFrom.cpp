@@ -1,14 +1,14 @@
-#include "YieldFrom.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/BaseException.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyGenerator.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/StopIteration.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

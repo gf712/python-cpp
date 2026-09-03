@@ -1,9 +1,14 @@
-#include "DeleteAttr.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 
@@ -11,14 +16,17 @@ PyResult<Value> DeleteAttr::execute(VirtualMachine &vm, Interpreter &intepreter)
 {
 	auto this_value = vm.reg(m_self);
 	const auto &attr_name_ = intepreter.execution_frame()->names(m_attr_name);
-	spdlog::debug("This object: {}",
-		std::visit(
-			[](const auto &val) {
-				auto obj = PyObject::from(val);
-				ASSERT(obj.is_ok());
-				return obj.unwrap()->to_string();
-			},
-			this_value));
+	if (::detail::log_debug_enabled()) {
+		::detail::log_debug(std::format("This object: {}",
+			std::visit(
+				[](const auto &val) {
+					auto obj = PyObject::from(val);
+					ASSERT(obj.is_ok());
+					return obj.unwrap()->to_string();
+				},
+				this_value))
+				.c_str());
+	}
 	if (auto *this_obj = std::get_if<PyObject *>(&this_value)) {
 		auto attr_name = PyString::create(attr_name_);
 		if (attr_name.is_err()) { return Err(attr_name.unwrap_err()); }

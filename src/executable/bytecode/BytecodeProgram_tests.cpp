@@ -1,11 +1,13 @@
-#include "BytecodeProgram.hpp"
-#include "codegen/BytecodeGenerator.hpp"
+#include "core.hpp"
 #include "executable/common.hpp"
-#include "lexer/Lexer.hpp"
-#include "parser/Parser.hpp"
-#include "vm/VM.hpp"
-
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.runtime;
+import py.codegen;
+import py.ast;
+
+// After the import: these name module-owned types.
 
 namespace {
 std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)

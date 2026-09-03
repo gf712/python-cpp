@@ -3,8 +3,7 @@
 #include "gtest/gtest.h"
 
 #include <cstdio>
-#include <filesystem>
-#include <fstream>
+import std;
 
 namespace {
 std::filesystem::path write_temp(std::string_view name, std::string_view contents)

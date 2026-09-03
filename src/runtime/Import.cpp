@@ -1,24 +1,20 @@
-#include "Import.hpp"
-#include "ImportError.hpp"
-#include "PyBool.hpp"
-#include "PyCode.hpp"
-#include "PyDict.hpp"
-#include "PyFrame.hpp"
-#include "PyModule.hpp"
-#include "PyNone.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
+module;
+#include "core.hpp"
+
+// <vector> must precede the frozen headers: they define std::vector<uint8_t>
+// objects at namespace scope. clang-format's include sorting will happily
+// reorder these and break the build.
+// clang-format off
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include "frozen/importlib.h"
 #include "frozen/importlib_external.h"
-#include "interpreter/Interpreter.hpp"
-#include "modules/config.hpp"
-#include "runtime/KeyError.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/Value.hpp"
-#include "vm/VM.hpp"
+// clang-format on
+
+module py.runtime;
+import std;
 
 namespace py {
 
@@ -114,7 +110,7 @@ namespace {
 
 		if (name->to_string().empty()) { return PyString::create(base); }
 
-		auto abs_name_str = fmt::format("{}.{}", base->to_string(), name->to_string());
+		auto abs_name_str = std::format("{}.{}", base->to_string(), name->to_string());
 		auto abs_name = PyString::create(abs_name_str);
 
 		return abs_name;
@@ -336,7 +332,7 @@ PyResult<PyModule *> import_frozen_module(PyString *name)
 
 	if (result.is_err()) {
 		remove_module(name);
-		spdlog::error("{}", result.unwrap_err()->to_string());
+		::detail::log_error(std::format("{}", result.unwrap_err()->to_string()).c_str());
 		TODO();
 		return Err(import_error("TODO"));
 	}

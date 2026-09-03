@@ -1,5 +1,14 @@
-#include "GetAwaitable.hpp"
-#include "runtime/PyObject.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

@@ -1,21 +1,13 @@
-#include "PyModule.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyDict.hpp"
-#include "PyList.hpp"
-#include "PyString.hpp"
-#include "ValueError.hpp"
-#include "executable/Program.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "modules/Modules.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/AttributeError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include <filesystem>
+module py.runtime;
+import py.types;
+import py.codegen;
+
 
 namespace py {
 
@@ -46,7 +38,7 @@ PyResult<PyObject *> PyModule::__repr__() const
 			return obj->call(PyTuple::create(const_cast<PyModule *>(this)).unwrap(), nullptr);
 		});
 	} else {
-		return PyString::create(fmt::format("<module {}>", m_module_name->value()));
+		return PyString::create(std::format("<module {}>", m_module_name->value()));
 	}
 }
 
@@ -165,7 +157,7 @@ void PyModule::visit_graph(Visitor &visitor)
 
 std::string PyModule::to_string() const
 {
-	return fmt::format("<module '{}'>", m_module_name->to_string());
+	return std::format("<module '{}'>", m_module_name->to_string());
 }
 
 PyResult<PyModule *> PyModule::create(PyDict *symbol_table, PyString *module_name, PyObject *doc)

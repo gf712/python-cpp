@@ -1,12 +1,11 @@
 #pragma once
 
-#include "runtime/PyObject.hpp"
-
 namespace py {
 
 class PyCallableProxyType : public PyBaseObject
 {
 	friend class ::Heap;
+	friend class py::detail::Allocator;
 	mutable PyObject *m_object{ nullptr };
 	PyObject *m_callback{ nullptr };
 

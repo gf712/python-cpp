@@ -1,9 +1,5 @@
-#include "LLVMProgram.hpp"
-#include "LLVMPyUtils.hpp"
-#include "executable/Function.hpp"
-#include "executable/Mangler.hpp"
-#include "executable/llvm/LLVMGenerator.hpp"
-#include "runtime/Value.hpp"
+#include "core.hpp"
+
 
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
@@ -13,6 +9,14 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+
+import py.runtime;
+
+// After the import: these name module-owned types.
+#include "LLVMProgram.hpp"
+#include "LLVMPyUtils.hpp"
+#include "executable/llvm/LLVMGenerator.hpp"
+
 
 namespace py {
 class PyTuple;

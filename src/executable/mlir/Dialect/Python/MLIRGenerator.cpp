@@ -1,36 +1,34 @@
-#include "Python/MLIRGenerator.hpp"
-#include "Python/IR/Dialect.hpp"
-#include "Python/IR/PythonOps.hpp"
-
-#include "ast/AST.hpp"
-#include "executable/Mangler.hpp"
-#include "executable/Program.hpp"
+module;
+#include "core.hpp"
 #include "executable/mlir/Conversion/Passes.hpp"
 #include "executable/mlir/Conversion/PythonToPythonBytecode/PythonToPythonBytecode.hpp"
-#include "executable/mlir/Target/PythonBytecode/PythonBytecodeEmitter.hpp"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "runtime/Value.hpp"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "utilities.hpp"
+#include <gmpxx.h>
+
+#include "Python/IR/Dialect.hpp"
+#include "Python/IR/PythonOps.hpp"
 #include "llvm/ADT/SmallVector.h"
 
-#include <algorithm>
-#include <filesystem>
-#include <memory>
-#include <ranges>
-#include <variant>
+module py.runtime;
+import py.ast;
+import py.codegen;
+import std;
+
+#include "Python/MLIRGenerator.hpp"
+#include "executable/mlir/Target/PythonBytecode/PythonBytecodeEmitter.hpp"
+
 
 namespace fs = std::filesystem;
 
@@ -734,7 +732,7 @@ ast::Value *MLIRGenerator::visit(const ast::AugAssign *node)
 				*target_value,
 				*target_slice));
 		} else {
-			std::cerr << fmt::format("Invalid node type ({}) for augmented assignment",
+			std::cerr << std::format("Invalid node type ({}) for augmented assignment",
 				ast::node_type_to_string(node->node_type()));
 			ASSERT_NOT_REACHED();
 		}
@@ -1343,7 +1341,9 @@ ast::Value *MLIRGenerator::visit(const ast::Comprehension *)
 
 ast::Value *MLIRGenerator::visit(const ast::Constant *node)
 {
-	const auto &value = *node->value();
+	// The AST stores an ast::Literal now; the visitor below is written against
+	// py::Value alternatives, so convert once here.
+	const auto value = to_runtime_value(node->value());
 	return std::visit(
 		overloaded{
 			[this, node](const py::Number &number) -> ast::Value * {
@@ -1729,8 +1729,8 @@ ast::Value *MLIRGenerator::visit(const ast::JoinedStr *node)
 	std::vector<mlir::Value> strings;
 	for (const auto &value : node->values()) {
 		if (auto c = as<ast::Constant>(value);
-			c && std::holds_alternative<py::String>(*c->value())) {
-			current_string.s += std::get<py::String>(*as<ast::Constant>(value)->value()).s;
+			c && std::holds_alternative<std::string>(c->value())) {
+			current_string.s += std::get<std::string>(as<ast::Constant>(value)->value());
 		} else {
 			if (!current_string.s.empty()) {
 				strings.push_back(load_const(m_context.builder(),
@@ -2991,5 +2991,29 @@ std::string MLIRGenerator::mangle_namespace(const std::deque<MLIRGenerator::Scop
 			return acc + '.' + s.name;
 		});
 }
+
+
+Context::ContextImpl *Context::operator->() { return m_impl.get(); }
+
+MLIRGenerator::ClearExceptionBeforeReturn::ClearExceptionBeforeReturn(Scope &scope) : scope(scope)
+{
+	scope.clear_exception_before_return.push_back(true);
+}
+
+MLIRGenerator::ClearExceptionBeforeReturn::~ClearExceptionBeforeReturn()
+{
+	ASSERT(!scope.clear_exception_before_return.empty());
+	scope.clear_exception_before_return.pop_back();
+}
+
+MLIRGenerator::RAIIScope::~RAIIScope()
+{
+	ASSERT(!this_->m_scope.empty());
+	this_->m_scope.pop_back();
+}
+
+MLIRGenerator::Scope &MLIRGenerator::scope() { return m_scope.back(); }
+
+const MLIRGenerator::Scope &MLIRGenerator::scope() const { return m_scope.back(); }
 
 }// namespace codegen

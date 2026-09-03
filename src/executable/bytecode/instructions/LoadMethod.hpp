@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class LoadMethod final : public Instruction
 {
 	Register m_destination;
@@ -17,7 +14,7 @@ class LoadMethod final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format(
+		return std::format(
 			"LOAD_METHOD     r{:<3} r{:<3} ({})", m_destination, m_value_source, m_method_name);
 	}
 

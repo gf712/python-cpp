@@ -1,10 +1,11 @@
-#include "MakeFunction.hpp"
-#include "executable/Mangler.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyTuple.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
 
 
 using namespace py;

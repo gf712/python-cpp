@@ -1,15 +1,12 @@
+module;
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.memory;
+import std;
+
+// After the import: these name module-owned types.
 #include "Match.hpp"
-#include "memory/Heap.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyMappingProxy.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include "utilities.hpp"
-#include "vm/VM.hpp"
 
 using namespace py;
 using namespace py::sre;

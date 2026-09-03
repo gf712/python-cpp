@@ -1,19 +1,17 @@
-#include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyNumber.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
+#include "core.hpp"
+#include "executable/common.hpp"
 
 #include "gtest/gtest.h"
+#include <gmpxx.h>
+#include <spdlog/spdlog.h>
+
+#include <cmath>
+
+import py.ast;
+import py.types;
+import py.lexer;
+import py.runtime;
+import std;
 
 using namespace py;
 

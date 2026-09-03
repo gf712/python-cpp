@@ -1,17 +1,14 @@
-#include "BaseException.hpp"
-#include "MemoryError.hpp"
-#include "PyBool.hpp"
-#include "PyCode.hpp"
-#include "PyFrame.hpp"
-#include "PyNone.hpp"
-#include "PyString.hpp"
-#include "PyTraceback.hpp"
-#include "PyTuple.hpp"
-#include "PyType.hpp"
-#include "SourceManager.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+// SourceManager names no py:: types, so it belongs in the global module
+// fragment like any other ordinary header.
+#include "runtime/SourceManager.hpp"
+
+module py.runtime;
+import std;
+import py.types;
 
 namespace py {
 
@@ -60,7 +57,7 @@ PyResult<PyObject *> BaseException::__new__(const PyType *type, PyTuple *args, P
 	}
 }
 
-PyResult<int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
+PyResult<std::int32_t> BaseException::__init__(PyTuple *args, PyDict *kwargs)
 {
 	// takes no keyword arguments
 	ASSERT(!kwargs || kwargs->map().empty());
@@ -114,7 +111,7 @@ std::string BaseException::format_traceback() const
 	auto *tb = m_traceback;
 	while (tb) {
 		const auto &filename = tb->m_tb_frame->code()->m_filename;
-		out << fmt::format("  File \"{}\", line {}, in {}\n",
+		out << std::format("  File \"{}\", line {}, in {}\n",
 			filename,
 			tb->m_tb_lineno,
 			tb->m_tb_frame->code()->name());
@@ -133,7 +130,7 @@ PyResult<PyObject *> BaseException::__repr__() const
 	if (m_args && m_args->size() == 1) {
 		auto r = repr_value(m_args->elements()[0]);
 		if (r.is_err()) { return r; }
-		args_part = fmt::format("({})", r.unwrap()->to_string());
+		args_part = std::format("({})", r.unwrap()->to_string());
 	} else if (m_args) {
 		auto r = m_args->repr();
 		if (r.is_err()) { return r; }
@@ -141,7 +138,7 @@ PyResult<PyObject *> BaseException::__repr__() const
 	} else {
 		args_part = "()";
 	}
-	return PyString::create(fmt::format("{}{}", type()->name(), args_part));
+	return PyString::create(std::format("{}{}", type()->name(), args_part));
 }
 
 PyResult<PyObject *> BaseException::__str__() const { return PyString::create(to_string()); }

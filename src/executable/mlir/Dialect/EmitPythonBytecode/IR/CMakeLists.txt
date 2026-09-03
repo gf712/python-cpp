@@ -20,3 +20,7 @@ target_include_directories(EmitPythonBytecodeDialect PRIVATE
                             ${CMAKE_SOURCE_DIR}/src/executable/mlir/Dialect
                             ${CMAKE_BINARY_DIR}/src/executable/mlir/Dialect)
 python_cpp_link_project_options(EmitPythonBytecodeDialect)
+
+# See the note in Conversion/PythonToPythonBytecode/CMakeLists.txt: the obj.<name>
+# twin does not inherit TableGen ordering.
+add_dependencies(obj.EmitPythonBytecodeDialect MLIRPythonOpsIncGen MLIREmitPythonBytecodeIncGen PythonConversionPassIncGen)

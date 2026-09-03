@@ -1,21 +1,16 @@
-#include "Deque.hpp"
-#include "runtime/IndexError.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include "utilities.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 
-#include <algorithm>
-#include <cstdint>
-#include <deque>
-#include <sstream>
-#include <unordered_set>
-#include <variant>
+#include <gmpxx.h>
+
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
+
+// After the import: these name module-owned types.
+#include "Deque.hpp"
 
 using namespace py;
 using namespace py::collections;

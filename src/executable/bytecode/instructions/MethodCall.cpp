@@ -1,16 +1,16 @@
-#include "MethodCall.hpp"
-#include "FunctionCall.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include "spdlog/spdlog.h"
+#include <cstddef>
+#include <cstdint>
 
-#include "runtime/AttributeError.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyMethodDescriptor.hpp"
-#include "runtime/PySlotWrapper.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
 
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
+
 
 using namespace py;
 

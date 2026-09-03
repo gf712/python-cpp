@@ -1,21 +1,8 @@
-#include "Modules.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/LookupError.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
-
-#include <algorithm>
+module;
 #include <cctype>
+
+module py.runtime;
+import py.types;
 
 
 namespace py {
@@ -26,8 +13,8 @@ namespace detail {
 			auto result = PyArgsParser<PyString *>::unpack_tuple(args,
 				kwargs,
 				"lookup_errors",
-				std::integral_constant<size_t, 1>{},
-				std::integral_constant<size_t, 1>{});
+				std::integral_constant<std::size_t, 1>{},
+				std::integral_constant<std::size_t, 1>{});
 
 			if (result.is_err()) { return Err(result.unwrap_err()); }
 			auto [error] = result.unwrap();
@@ -46,8 +33,8 @@ namespace detail {
 			auto parse_result = PyArgsParser<PyString *>::unpack_tuple(args,
 				kwargs,
 				"lookup",
-				std::integral_constant<size_t, 1>{},
-				std::integral_constant<size_t, 1>{});
+				std::integral_constant<std::size_t, 1>{},
+				std::integral_constant<std::size_t, 1>{});
 
 			if (parse_result.is_err()) { return Err(parse_result.unwrap_err()); }
 			auto [encoding] = parse_result.unwrap();

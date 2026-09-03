@@ -1,14 +1,15 @@
-#include "WithExceptStart.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
 
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
 #include "executable/bytecode/serialization/serialize.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/BaseException.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "runtime/PyType.hpp"
-#include "vm/VM.hpp"
+
 
 using namespace py;
 

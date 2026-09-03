@@ -1,17 +1,8 @@
-#include "GeneratorInterface.hpp"
-#include "PyAsyncGenerator.hpp"
-#include "PyCode.hpp"
-#include "PyCoroutine.hpp"
-#include "PyFrame.hpp"
-#include "PyGenerator.hpp"
-#include "PyNone.hpp"
-#include "PyTraceback.hpp"
-#include "PyType.hpp"
-#include "RuntimeError.hpp"
-#include "StopIteration.hpp"
-#include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import :detail;
 
 namespace py {
 
@@ -29,10 +20,12 @@ GeneratorInterface<T>::GeneratorInterface(TypePrototype &type,
 	  m_is_running(is_running), m_code(code), m_name(name), m_qualname(qualname)
 {}
 
+template<typename T> GeneratorInterface<T>::~GeneratorInterface() = default;
+
 template<typename T> std::string GeneratorInterface<T>::to_string() const
 {
 	// FIXME: use qualname
-	return fmt::format("<{} object {} at {}>",
+	return std::format("<{} object {} at {}>",
 		T::GeneratorTypeName,
 		m_name->value(),
 		static_cast<const void *>(this));
@@ -78,12 +71,14 @@ template<typename T> PyResult<PyObject *> GeneratorInterface<T>::send(PyObject *
 	m_last_sent_value = nullptr;
 
 	if (m_invalid_return && result.is_ok()) {
-		spdlog::debug("generator returned value {}", result.unwrap()->to_string());
+		::detail::log_debug(
+			std::format("generator returned value {}", result.unwrap()->to_string()).c_str());
 	} else if (!m_invalid_return && result.is_err()
 			   && result.unwrap_err()->type()->issubclass(stop_iteration()->type())) {
 		result = Err(runtime_error("generator raised StopIteration"));
 	} else if (result.is_ok()) {
-		spdlog::debug("generator yielded {}", result.unwrap()->to_string());
+		::detail::log_debug(
+			std::format("generator yielded {}", result.unwrap()->to_string()).c_str());
 	}
 
 	if (result.is_err()) { m_frame = nullptr; }

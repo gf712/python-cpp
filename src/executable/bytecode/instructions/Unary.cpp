@@ -1,9 +1,15 @@
-#include "Unary.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/TypeError.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <gmpxx.h>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

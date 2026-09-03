@@ -9,6 +9,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 
+// After the third-party headers: these name module-owned types.
+import py.runtime;
+
 namespace mlir::py {
 namespace {
 

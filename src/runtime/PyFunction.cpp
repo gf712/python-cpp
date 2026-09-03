@@ -1,18 +1,10 @@
-#include "PyFunction.hpp"
-#include "PyBoundMethod.hpp"
-#include "PyCode.hpp"
-#include "PyDict.hpp"
-#include "PyNone.hpp"
-#include "PyString.hpp"
-#include "executable/Program.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyObject.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
 
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
+import py.types;
 
-#include <variant>
 
 namespace py {
 
@@ -85,7 +77,7 @@ PyResult<PyObject *> PyFunction::__repr__() const
 {
 	return PyString::create(m_qualname).and_then([this](PyString *qualname) {
 		return PyString::create(
-			fmt::format("<function {} at {}>", qualname->value(), static_cast<const void *>(this)));
+			std::format("<function {} at {}>", qualname->value(), static_cast<const void *>(this)));
 	});
 }
 
@@ -116,7 +108,7 @@ PyResult<PyObject *> PyFunction::__call__(PyTuple *args, PyDict *kwargs)
 
 std::string PyFunction::to_string() const
 {
-	return fmt::format("<function {} at {}>", m_name->value(), (void *)this);
+	return std::format("<function {} at {}>", m_name->value(), (void *)this);
 }
 
 namespace {
@@ -169,12 +161,12 @@ PyNativeFunction::PyNativeFunction(std::string &&name, FunctionType &&function)
 std::string PyNativeFunction::to_string() const
 {
 	if (is_method()) {
-		return fmt::format("<built-in method {} of {} object at {}>",
+		return std::format("<built-in method {} of {} object at {}>",
 			m_name,
 			m_self->type()->name(),
 			(void *)this);
 	} else {
-		return fmt::format("<built-in function {} at {}>", m_name, (void *)this);
+		return std::format("<built-in function {} at {}>", m_name, (void *)this);
 	}
 }
 

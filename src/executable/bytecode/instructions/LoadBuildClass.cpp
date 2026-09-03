@@ -1,11 +1,14 @@
-#include "LoadBuildClass.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyString.hpp"
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

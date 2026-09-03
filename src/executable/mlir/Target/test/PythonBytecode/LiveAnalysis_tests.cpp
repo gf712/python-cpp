@@ -1,5 +1,6 @@
 #include "Target/PythonBytecode/LiveAnalysis.hpp"
 #include "Target/PythonBytecode/RegisterAllocationLogger.hpp"
+#include "core.hpp"
 
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "Dialect/Python/IR/Dialect.hpp"
@@ -9,13 +10,15 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
-#include "utilities.hpp"
 
 #include "gtest/gtest.h"
 #include <mlir/IR/Block.h>
 #include <mlir/IR/ValueRange.h>
 #include <mlir/IR/Visitors.h>
 #include <spdlog/spdlog.h>
+
+// After the third-party headers: these name module-owned types.
+import py.runtime;
 
 using namespace codegen;
 

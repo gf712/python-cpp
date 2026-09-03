@@ -1,11 +1,9 @@
-#include "PyIterator.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include <limits>
+module;
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
 
 
 using namespace py;

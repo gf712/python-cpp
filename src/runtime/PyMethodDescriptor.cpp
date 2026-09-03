@@ -1,11 +1,11 @@
-#include "PyMethodDescriptor.hpp"
-#include "PyFunction.hpp"
-#include "PyString.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -55,7 +55,7 @@ void PyMethodDescriptor::visit_graph(Visitor &visitor)
 
 std::string PyMethodDescriptor::to_string() const
 {
-	return fmt::format(
+	return std::format(
 		"<method '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
 }
 

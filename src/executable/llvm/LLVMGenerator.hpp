@@ -1,7 +1,5 @@
-#include "ast/AST.hpp"
-#include "ast/optimizers/ConstantFolding.hpp"
+#include "ast/ASTNodeTypes.hpp"
 
-#include "executable/Function.hpp"
 
 namespace llvm {
 class Function;
@@ -19,6 +17,10 @@ class LLVMGenerator : public ast::CodeGenerator
 	std::unique_ptr<Context> m_ctx;
 
 	LLVMGenerator();
+
+	// Out of line: m_ctx is a unique_ptr to an incomplete Context, so the
+	// deleter must instantiate where Context is defined, not at each use.
+	~LLVMGenerator();
 
   public:
 	static std::shared_ptr<Program> compile(std::shared_ptr<ast::ASTNode> node,
@@ -50,7 +52,7 @@ class LLVMFunction : public ::Function
 
 	const llvm::Function &impl() const { return m_function; }
 
-	std::vector<uint8_t> serialize() const override { TODO(); }
+	std::vector<std::uint8_t> serialize() const override { TODO(); }
 
 	py::PyResult<py::Value> call(VirtualMachine &, Interpreter &) const override;
 	py::PyResult<py::Value> call_without_setup(VirtualMachine &, Interpreter &) const override;

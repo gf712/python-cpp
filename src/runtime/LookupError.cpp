@@ -1,9 +1,26 @@
-#include "LookupError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+LookupError *LookupError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<LookupError>(args);
+}
+
+BaseException *make_lookup_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return LookupError::create(args_tuple.unwrap());
+}
 
 LookupError::LookupError(PyType *type) : Exception(type->underlying_type(), nullptr) {}
 

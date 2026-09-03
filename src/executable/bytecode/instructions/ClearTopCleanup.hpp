@@ -1,12 +1,10 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class ClearTopCleanup final : public Instruction
 {
   public:
 	ClearTopCleanup() = default;
-	std::string to_string() const final { return fmt::format("CLEAR_TOP_CLEANUP"); }
+	std::string to_string() const final { return std::format("CLEAR_TOP_CLEANUP"); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 

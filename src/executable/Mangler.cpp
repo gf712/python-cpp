@@ -1,8 +1,9 @@
-#include "Mangler.hpp"
+module;
+#include "core.hpp"
 
-#include "ast/AST.hpp"
-
-#include <string_view>
+module py.runtime;
+import std;
+import py.ast;
 
 class DefaultMangler : public Mangler
 {
@@ -11,7 +12,7 @@ class DefaultMangler : public Mangler
 		const std::string &function_name,
 		const SourceLocation &source_location) const override
 	{
-		return fmt::format("{}.{}.{}:{}",
+		return std::format("{}.{}.{}:{}",
 			module,
 			function_name,
 			source_location.start.row,
@@ -22,7 +23,7 @@ class DefaultMangler : public Mangler
 		const std::string &class_name,
 		const SourceLocation &source_location) const override
 	{
-		return fmt::format("{}.__class__{}__.{}:{}",
+		return std::format("{}.__class__{}__.{}:{}",
 			module,
 			class_name,
 			source_location.start.row,

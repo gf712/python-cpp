@@ -1,6 +1,6 @@
-#include "PyNumber.hpp"
-
 #include "gtest/gtest.h"
+
+import py.runtime;
 
 using namespace py;
 using namespace py::concepts;

@@ -1,20 +1,17 @@
-#include "Pattern.hpp"
-#include "Match.hpp"
-#include "memory/Heap.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyMappingProxy.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include "utilities.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+#include <cstddef>
 #include <cstdint>
-#include <limits>
+
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
+
+#include "Match.hpp"
+#include "Pattern.hpp"
 
 using namespace py;
 using namespace py::sre;

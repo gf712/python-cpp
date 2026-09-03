@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class BinaryOperation : public Instruction
 {
   public:
@@ -34,8 +32,11 @@ class BinaryOperation : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format(
-			"BINARY_OP       r{:<3} r{:<3} r{:<3} ({})", m_destination, m_lhs, m_rhs, m_operation);
+		return std::format("BINARY_OP       r{:<3} r{:<3} r{:<3} ({})",
+			m_destination,
+			m_lhs,
+			m_rhs,
+			static_cast<int>(m_operation));
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

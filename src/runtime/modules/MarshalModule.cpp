@@ -1,5 +1,7 @@
-#include "Modules.hpp"
-#include "runtime/PyDict.hpp"
+module;
+
+module py.runtime;
+
 
 namespace py {
 PyModule *marshal_module()

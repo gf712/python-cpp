@@ -1,9 +1,18 @@
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+#include <gmpxx.h>
+
+#include <cstddef>
+
+module py.runtime;
+import py.memory;
+import std;
+
+// After the import: these name module-owned types.
 #include "Repeat.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/types/api.hpp"
+
 
 namespace py {
 namespace {

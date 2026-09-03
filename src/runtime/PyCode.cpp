@@ -1,22 +1,16 @@
-#include "PyCode.hpp"
-#include "MemoryError.hpp"
-#include "PyAsyncGenerator.hpp"
-#include "PyCell.hpp"
-#include "PyCoroutine.hpp"
-#include "PyFrame.hpp"
-#include "PyFunction.hpp"
-#include "PyGenerator.hpp"
-#include "PyList.hpp"
-#include "PyTuple.hpp"
-#include "executable/Function.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/instructions/Instructions.hpp"
+module;
+#include "core.hpp"
+#include "executable/CodeFlags.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 #include "executable/bytecode/serialization/deserialize.hpp"
 #include "executable/bytecode/serialization/serialize.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include <cstdint>
+
 
 namespace py {
 
@@ -116,7 +110,7 @@ PyCode::~PyCode() {}
 
 std::string PyCode::to_string() const
 {
-	return fmt::format("<code object {} at {}, file \"{}\", line {}>",
+	return std::format("<code object {} at {}, file \"{}\", line {}>",
 		m_name,
 		static_cast<const void *>(this),
 		m_filename,

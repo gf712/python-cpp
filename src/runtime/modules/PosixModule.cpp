@@ -1,23 +1,13 @@
-#include "Modules.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyBytes.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/api.hpp"
-
-#include <cstddef>
-#include <filesystem>
-#include <string_view>
-
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cerrno>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+module py.runtime;
+
 
 namespace fs = std::filesystem;
 
@@ -28,6 +18,9 @@ namespace {
 
 	class PyStatResult : public PyBaseObject
 	{
+		friend class ::Heap;
+		friend class py::detail::Allocator;
+
 		friend class ::Heap;
 
 	  public:
@@ -87,7 +80,7 @@ namespace {
 
 		std::string to_string() const final
 		{
-			return fmt::format(
+			return std::format(
 				"os.stat_result(st_mode={}, st_ino={}, std_dev={}, st_nlink={}, st_uid={} "
 				"st_gid={}, st_size={}. st_atime={}, st_mtime={}, st_ctime={})",
 				m_st_mode,
@@ -136,7 +129,7 @@ namespace {
 
 	PyResult<PyObject *> convertenviron()
 	{
-		size_t i = 0;
+		std::size_t i = 0;
 		PyDict::MapType environ_dict;
 		while (environ[i]) {
 			auto env_pair = std::string_view{ environ[i++] };
@@ -190,8 +183,8 @@ PyModule *posix_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"posix.stat",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *path_obj = std::get<0>(result.unwrap());
 				if (!as<PyString>(path_obj)) {
@@ -213,8 +206,8 @@ PyModule *posix_module()
 				auto parsed = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"posix.listdir",
-					std::integral_constant<size_t, 0>{},
-					std::integral_constant<size_t, 1>{},
+					std::integral_constant<std::size_t, 0>{},
+					std::integral_constant<std::size_t, 1>{},
 					nullptr);
 				if (parsed.is_err()) return Err(parsed.unwrap_err());
 				auto *path_obj = std::get<0>(parsed.unwrap());
@@ -262,8 +255,8 @@ PyModule *posix_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"posix.fspath",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *path_obj = std::get<0>(result.unwrap());
 				if (!as<PyString>(path_obj) && !as<PyBytes>(path_obj)) {

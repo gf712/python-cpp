@@ -1,18 +1,20 @@
+module;
+#include "memory/allocate.hpp"
+
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
+
+// After the import: these name module-owned types.
 #include "DefaultDict.hpp"
-#include "runtime/KeyError.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include <variant>
 
-using namespace py;
-using namespace py::collections;
-
+namespace py::collections {
 namespace {
-PyType *s_collections_defaultdict = nullptr;
+	PyType *s_collections_defaultdict = nullptr;
 }
 
 DefaultDict::DefaultDict(PyType *type) : PyDict(type) {}
@@ -62,3 +64,4 @@ PyType *DefaultDict::register_type(PyModule *module)
 	}
 	return s_collections_defaultdict;
 }
+}// namespace py::collections

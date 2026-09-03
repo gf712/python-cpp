@@ -1,10 +1,9 @@
-#include "runtime/PyObject.hpp"
-
 namespace py {
 namespace itertools {
 	class ISlice : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyObject *m_iterator{ nullptr };
 		BigIntType m_start{ 0 };

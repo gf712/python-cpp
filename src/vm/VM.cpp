@@ -1,19 +1,12 @@
-#include "VM.hpp"
-#include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "executable/bytecode/instructions/Instructions.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "interpreter/InterpreterSession.hpp"
-#include "runtime/BaseException.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "utilities.hpp"
+module;
+
+#include "core.hpp"
+
 #include <cstddef>
-#include <iterator>
 #include <spdlog/spdlog.h>
+
+module py.runtime;
+import std;
 
 using namespace py;
 
@@ -184,21 +177,21 @@ void VirtualMachine::dump() const
 		std::visit(overloaded{ [](const auto &stack_value) {
 								  std::ostringstream os;
 								  os << stack_value;
-								  std::cout << fmt::format("@{}:  {}\n",
+								  std::cout << std::format("@{}:  {}\n",
 									  static_cast<const void *>(&stack_value),
 									  os.str());
 							  },
 					   [](const PyObject *&obj) {
 						   if (obj) {
-							   //    std::cout << fmt::format("[{}]  {} ({})\n",
+							   //    std::cout << std::format("[{}]  {} ({})\n",
 							   // 	   i++,
 							   // 	   static_cast<const void *>(obj),
 							   // 	   obj->to_string());
-							   std::cout << fmt::format("@{}:  {}\n",
+							   std::cout << std::format("@{}:  {}\n",
 								   static_cast<const void *>(&obj),
 								   static_cast<const void *>(obj));
 						   } else {
-							   std::cout << fmt::format(
+							   std::cout << std::format(
 								   "@{}:  (Empty)\n", static_cast<const void *>(&obj));
 						   }
 					   } },
@@ -211,14 +204,14 @@ void VirtualMachine::dump() const
 			overloaded{ [&i](const auto &register_value) {
 						   std::ostringstream os;
 						   os << register_value;
-						   std::cout << fmt::format("[{}]  {}\n", i, os.str());
+						   std::cout << std::format("[{}]  {}\n", i, os.str());
 					   },
 				[&i](PyObject *obj) {
 					if (obj) {
-						std::cout << fmt::format(
+						std::cout << std::format(
 							"[{}]  {} ({})\n", i, static_cast<const void *>(obj), obj->to_string());
 					} else {
-						std::cout << fmt::format("[{}]  (Empty)\n", i);
+						std::cout << std::format("[{}]  (Empty)\n", i);
 					}
 				} },
 			register_);

@@ -1,36 +1,13 @@
-#include "PyType.hpp"
-#include "AttributeError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyBoundMethod.hpp"
-#include "PyBuiltInMethod.hpp"
-#include "PyCell.hpp"
-#include "PyClassMethodDescriptor.hpp"
-#include "PyDict.hpp"
-#include "PyFrame.hpp"
-#include "PyFunction.hpp"
-#include "PyGetSetDescriptor.hpp"
-#include "PyInteger.hpp"
-#include "PyList.hpp"
-#include "PyMappingProxy.hpp"
-#include "PyMemberDescriptor.hpp"
-#include "PyMethodDescriptor.hpp"
-#include "PyNone.hpp"
-#include "PySlotWrapper.hpp"
-#include "PyStaticMethod.hpp"
-#include "PyString.hpp"
-#include "StopIteration.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyTuple.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include <algorithm>
-#include <string_view>
-#include <unordered_set>
+module py.runtime;
+import py.types;
+import std;
+
 
 namespace py {
 template<> PyType *as(PyObject *obj)
@@ -571,7 +548,8 @@ PyResult<std::monostate> PyType::initialize(const std::string &name,
 									   PyObject *self) -> PyResult<PyObject *> {
 					const auto object_offset =
 						self->type()->underlying_type().basicsize + additional_offset;
-					auto *obj = *bit_cast<PyObject **>(bit_cast<uint8_t *>(self) + object_offset);
+					auto *obj =
+						*std::bit_cast<PyObject **>(std::bit_cast<uint8_t *>(self) + object_offset);
 					if (!obj) { return Err(attribute_error(name)); }
 					return Ok(obj);
 				},
@@ -579,9 +557,9 @@ PyResult<std::monostate> PyType::initialize(const std::string &name,
 									 PyObject *self, PyObject *value) -> PyResult<std::monostate> {
 					const auto offset =
 						self->type()->underlying_type().basicsize + additional_offset;
-					uint8_t *self_address = bit_cast<uint8_t *>(self);
+					uint8_t *self_address = std::bit_cast<uint8_t *>(self);
 					uint8_t *slot_address = self_address + offset;
-					*bit_cast<PyObject **>(slot_address) = value;
+					*std::bit_cast<PyObject **>(slot_address) = value;
 					return Ok(std::monostate{});
 				},
 			});
@@ -1539,7 +1517,8 @@ PyResult<PyType *> PyType::build_type(const PyType *metatype,
 				return Err(r.unwrap_err());
 			}
 
-			spdlog::trace("Created type@{} #{}", (void *)type, type->name());
+			::detail::log_trace(
+				std::format("Created type@{} #{}", (void *)type, type->name()).c_str());
 
 			return Ok(type);
 		});
@@ -1600,7 +1579,7 @@ PyResult<PyObject *> PyType::__call__(PyTuple *args, PyDict *kwargs) const
 
 std::string PyType::to_string() const
 {
-	return fmt::format("<class '{}'>", underlying_type().__name__);
+	return std::format("<class '{}'>", underlying_type().__name__);
 }
 
 PyResult<PyObject *> PyType::__repr__() const { return PyString::create(to_string()); }

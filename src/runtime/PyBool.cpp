@@ -1,9 +1,12 @@
-#include "PyBool.hpp"
-#include "PyArgParser.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <gmpxx.h>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 

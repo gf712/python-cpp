@@ -1,21 +1,17 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-#include <optional>
-
 class JumpIfTrue final : public Instruction
 {
 	Register m_test_register;
 	std::shared_ptr<Label> m_label;
-	std::optional<int32_t> m_offset;
+	std::optional<std::int32_t> m_offset;
 
   public:
 	JumpIfTrue(Register test_register, std::shared_ptr<Label> label)
 		: m_test_register(test_register), m_label(std::move(label))
 	{}
 
-	JumpIfTrue(Register test_register, int32_t offset)
+	JumpIfTrue(Register test_register, std::int32_t offset)
 		: m_test_register(test_register), m_offset(offset)
 	{}
 
@@ -23,14 +19,14 @@ class JumpIfTrue final : public Instruction
 	{
 		const std::string position =
 			m_offset.has_value() ? std::to_string(*m_offset) : "offset not evaluated";
-		return fmt::format("JUMP_IF_TRUE    r{} position: {}", m_test_register, position);
+		return std::format("JUMP_IF_TRUE    r{} position: {}", m_test_register, position);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(size_t) final;
+	void relocate(std::size_t) final;
 
-	std::vector<uint8_t> serialize() const final;
+	std::vector<std::uint8_t> serialize() const final;
 
-	uint8_t id() const final { return JUMP_IF_TRUE; }
+	std::uint8_t id() const final { return JUMP_IF_TRUE; }
 };

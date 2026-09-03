@@ -1,11 +1,8 @@
-#include "ConstantFolding.hpp"
-#include "ast/AST.hpp"
-#include "executable/Program.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/Value.hpp"
-#include "utilities.hpp"
-
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.ast;
+import py.runtime;
 
 using namespace ast;
 using namespace py;

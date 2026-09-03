@@ -1,29 +1,13 @@
-#include "PyMemoryView.hpp"
-#include "runtime/NotImplementedError.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyBytes.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFloat.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/forward.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "utilities.hpp"
-#include <algorithm>
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
 #include <cstddef>
 #include <cstdint>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <string_view>
+#include <sys/types.h>
+
+module py.runtime;
+import py.types;
 
 namespace py {
 
@@ -102,60 +86,60 @@ namespace {
 		case 'c': {
 			Bytes b;
 			b.b.reserve(1);
-			b.b.push_back(static_cast<std::byte>(*bit_cast<char *>(ptr)));
+			b.b.push_back(static_cast<std::byte>(*std::bit_cast<char *>(ptr)));
 			return PyBytes::create(std::move(b));
 		} break;
 		case 'b': {
-			return PyInteger::create(*bit_cast<char *>(ptr));
+			return PyInteger::create(*std::bit_cast<char *>(ptr));
 		} break;
 		case 'B': {
-			return PyInteger::create(*bit_cast<unsigned char *>(ptr));
+			return PyInteger::create(*std::bit_cast<unsigned char *>(ptr));
 		} break;
 		case 'h': {
-			return PyInteger::create(*bit_cast<short *>(ptr));
+			return PyInteger::create(*std::bit_cast<short *>(ptr));
 		} break;
 		case 'H': {
-			return PyInteger::create(*bit_cast<unsigned short *>(ptr));
+			return PyInteger::create(*std::bit_cast<unsigned short *>(ptr));
 		} break;
 		case 'i': {
-			return PyInteger::create(*bit_cast<int32_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<int32_t *>(ptr));
 		} break;
 		case 'I': {
-			return PyInteger::create(*bit_cast<uint32_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<uint32_t *>(ptr));
 		} break;
 		case 'l': {
-			return PyInteger::create(*bit_cast<int32_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<int32_t *>(ptr));
 		} break;
 		case 'L': {
-			return PyInteger::create(*bit_cast<uint32_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<uint32_t *>(ptr));
 		} break;
 		case 'q': {
-			return PyInteger::create(*bit_cast<int64_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<int64_t *>(ptr));
 		} break;
 		case 'Q': {
-			return PyInteger::create(*bit_cast<uint64_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<uint64_t *>(ptr));
 		} break;
 		case 'n': {
-			return PyInteger::create(*bit_cast<ssize_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<ssize_t *>(ptr));
 		} break;
 		case 'N': {
-			return PyInteger::create(*bit_cast<size_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<size_t *>(ptr));
 		} break;
 		case 'f': {
-			return PyFloat::create(static_cast<double>(*bit_cast<float *>(ptr)));
+			return PyFloat::create(static_cast<double>(*std::bit_cast<float *>(ptr)));
 		} break;
 		case 'd': {
-			return PyFloat::create(*bit_cast<double *>(ptr));
+			return PyFloat::create(*std::bit_cast<double *>(ptr));
 		} break;
 		case '?': {
-			if (*bit_cast<bool *>(ptr)) {
+			if (*std::bit_cast<bool *>(ptr)) {
 				return Ok(py_true());
 			} else {
 				return Ok(py_false());
 			}
 		} break;
 		case 'P': {
-			return PyInteger::create(*bit_cast<size_t *>(ptr));
+			return PyInteger::create(*std::bit_cast<size_t *>(ptr));
 		} break;
 		}
 
@@ -410,7 +394,7 @@ void PyMemoryView::visit_graph(Visitor &visitor)
 
 std::string PyMemoryView::to_string() const
 {
-	return fmt::format("<memory at {}>", static_cast<const void *>(this));
+	return std::format("<memory at {}>", static_cast<const void *>(this));
 }
 
 }// namespace py

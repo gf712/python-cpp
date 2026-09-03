@@ -1,10 +1,16 @@
-#include "Parser.hpp"
-#include "runtime/SyntaxError.hpp"
-#include "runtime/Value.hpp"
+module;
+#include "core.hpp"
+#include "spdlog/spdlog.h"
 
 #include <gmpxx.h>
 
-#include <sstream>
+
+module py.runtime;
+import std;
+import py.ast;
+import py.lexer;
+
+// After the import: these name module-owned types.
 
 using namespace py;
 using namespace ast;
@@ -37,7 +43,7 @@ using namespace parser;
 size_t Parser::CacheHash::operator()(const Parser::CacheKey &cache) const
 {
 	size_t seed = cache.rule.hash_code();
-	seed ^= bit_cast<size_t>(cache.token.start().pointer_to_program) + 0x9e3779b9 + (seed << 6)
+	seed ^= std::bit_cast<size_t>(cache.token.start().pointer_to_program) + 0x9e3779b9 + (seed << 6)
 			+ (seed >> 2);
 	seed ^= static_cast<size_t>(cache.token.token_type()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 	return seed;
@@ -1551,7 +1557,7 @@ struct StarTargetsPattern : PatternV2<StarTargetsPattern>
 
 Constant *parse_bytes(Parser &p, Token string)
 {
-	Bytes byte_collection;
+	ast::Bytes byte_collection;
 	auto *start = string.start().pointer_to_program;
 	const auto *end = string.end().pointer_to_program;
 
@@ -1569,8 +1575,10 @@ Constant *parse_bytes(Parser &p, Token string)
 			return std::string{ start + 1, end - 1 };
 		}
 	}();
+	// py::Bytes::from_unescaped_string does the unescaping; the AST stores the
+	// raw bytes (ast::Bytes) so it stays independent of the runtime's types.
 	return p.arena().create<Constant>(
-		Bytes::from_unescaped_string(value), SourceLocation{ string.start(), string.end() });
+		py::Bytes::from_unescaped_string(value).b, SourceLocation{ string.start(), string.end() });
 }
 
 template<> struct traits<struct FStringReplacementFieldPattern>
@@ -1745,7 +1753,7 @@ struct FStringMiddlePattern : PatternV2<FStringMiddlePattern>
 					str.push_back(middle_str[i]);
 				}
 			}
-			return p.arena().create<Constant>(String::from_unescaped_string(std::move(str)),
+			return p.arena().create<Constant>(py::String::from_unescaped_string(std::move(str)).s,
 				SourceLocation{ middle.token.start(), middle.token.end() });
 		}
 
@@ -1863,10 +1871,11 @@ struct StringPattern : PatternV2<StringPattern>
 			}
 
 			if (is_raw_string) {
-				return p.arena().create<Constant>(String(std::string{ value }),
-					SourceLocation{ str.token.start(), str.token.end() });
+				return p.arena().create<Constant>(
+					std::string{ value }, SourceLocation{ str.token.start(), str.token.end() });
 			}
-			return p.arena().create<Constant>(String::from_unescaped_string(std::string{ value }),
+			return p.arena().create<Constant>(
+				py::String::from_unescaped_string(std::string{ value }).s,
 				SourceLocation{ str.token.start(), str.token.end() });
 		}
 		return {};
@@ -1909,17 +1918,18 @@ struct StringsPattern : PatternV2<StringsPattern>
 				string_nodes.end(),
 				[](const auto &el) -> bool { return static_cast<bool>(as<Constant>(el)); });
 			if (all_constant) {
-				if (std::holds_alternative<Bytes>(*as<Constant>(string_nodes.front())->value())) {
-					Bytes bytes;
+				if (std::holds_alternative<ast::Bytes>(
+						as<Constant>(string_nodes.front())->value())) {
+					ast::Bytes bytes;
 					for (const auto &el : string_nodes) {
 						ASSERT(as<Constant>(el));
 						auto c = as<Constant>(el);
-						if (!std::holds_alternative<Bytes>(*c->value())) {
+						if (!std::holds_alternative<ast::Bytes>(c->value())) {
 							std::cerr << "SyntaxError: cannot mix bytes and nonbytes literals\n";
 							std::abort();
 						}
-						const auto &byte = std::get<Bytes>(*c->value());
-						bytes.b.insert(bytes.b.end(), byte.b.begin(), byte.b.end());
+						const auto &byte = std::get<ast::Bytes>(c->value());
+						bytes.insert(bytes.end(), byte.begin(), byte.end());
 					}
 					return p.arena().create<Constant>(bytes, sl);
 				} else {
@@ -1929,8 +1939,8 @@ struct StringsPattern : PatternV2<StringsPattern>
 						[](std::string acc, const auto &el) {
 							ASSERT(as<Constant>(el));
 							auto c = as<Constant>(el);
-							ASSERT(std::holds_alternative<String>(*c->value()));
-							return acc + std::get<String>(*c->value()).s;
+							ASSERT(std::holds_alternative<std::string>(c->value()));
+							return acc + std::get<std::string>(c->value());
 						});
 					return p.arena().create<Constant>(std::move(str), sl);
 				}
@@ -2535,7 +2545,7 @@ struct AtomPattern : PatternV2<AtomPattern>
 				return p.arena().create<Constant>(
 					false, SourceLocation{ token.token.start(), token.token.end() });
 			} else if (name == "None") {
-				return p.arena().create<Constant>(py::NameConstant{ py::NoneType{} },
+				return p.arena().create<Constant>(ast::Literal{ std::monostate{} },
 					SourceLocation{ token.token.start(), token.token.end() });
 			} else {
 				return p.arena().create<Name>(name,
@@ -2590,8 +2600,8 @@ struct AtomPattern : PatternV2<AtomPattern>
 		using pattern11 = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::ELLIPSIS>>;
 		if (auto result = pattern11::match(p)) {
 			auto [token] = *result;
-			return p.arena().create<Constant>(
-				Ellipsis{}, SourceLocation{ token.token.start(), token.token.end() });
+			return p.arena().create<Constant>(ast::Literal{ ast::EllipsisType{} },
+				SourceLocation{ token.token.start(), token.token.end() });
 		}
 
 		return {};
@@ -4704,7 +4714,7 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 		if (auto result = pattern1::match(p)) {
 			DEBUG_LOG("'yield' 'from' expression");
 			auto [yield_token, from_token, expression] = *result;
-			return p.arena().create<YieldFrom>(expression,
+			return p.arena().create<ast::YieldFrom>(expression,
 				SourceLocation{ yield_token.start(), expression->source_location().end });
 		}
 
@@ -4721,7 +4731,7 @@ struct YieldExpressionPattern : PatternV2<YieldExpressionPattern>
 			}
 			const auto end = p.lexer().peek_token(p.token_position() - 1);
 			auto value = p.arena().create<Constant>(
-				NameConstant{ NoneType{} }, SourceLocation{ end->start(), end->end() });
+				ast::Literal{ std::monostate{} }, SourceLocation{ end->start(), end->end() });
 			return p.arena().create<Yield>(
 				value, SourceLocation{ yield_token.start(), value->source_location().end });
 		}
@@ -5187,7 +5197,7 @@ struct ImportFromTargetsPattern : PatternV2<ImportFromTargetsPattern>
 
 template<> struct traits<struct ImportFromPattern>
 {
-	using result_type = ImportFrom *;
+	using result_type = ast::ImportFrom *;
 };
 
 struct ImportFromPattern : PatternV2<ImportFromPattern>
@@ -5245,7 +5255,7 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 
-			return p.arena().create<ImportFrom>(module,
+			return p.arena().create<ast::ImportFrom>(module,
 				std::move(aliases),
 				level,
 				SourceLocation{ from_token.start(),
@@ -5290,7 +5300,7 @@ struct ImportFromPattern : PatternV2<ImportFromPattern>
 					}
 				});
 
-			return p.arena().create<ImportFrom>(module,
+			return p.arena().create<ast::ImportFrom>(module,
 				std::move(aliases),
 				level,
 				SourceLocation{ from_token.start(),

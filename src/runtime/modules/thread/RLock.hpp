@@ -1,14 +1,4 @@
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/api.hpp"
-#include "vm/VM.hpp"
+
 
 namespace py {
 
@@ -19,6 +9,7 @@ namespace {
 class RLock : public PyBaseObject
 {
 	friend class ::Heap;
+	friend class py::detail::Allocator;
 
 	std::recursive_timed_mutex m_mutex;
 	bool m_locked{ false };

@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class DictUpdate final : public Instruction
 {
 	Register m_dst;
@@ -13,7 +10,7 @@ class DictUpdate final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("DICT_UPDATE     r{:<3} r{:<3}", m_dst, m_src);
+		return std::format("DICT_UPDATE     r{:<3} r{:<3}", m_dst, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;

@@ -1,10 +1,12 @@
-#include "VariablesResolver.hpp"
-
-#include "lexer/Lexer.hpp"
-#include "parser/Parser.hpp"
-
+#include "core.hpp"
 #include "gtest/gtest.h"
 
+import py.lexer;
+import py.runtime;
+import py.codegen;
+import py.ast;
+
+// After the import: these name module-owned types.
 
 namespace {
 VariablesResolver::VisibilityMap generate_resolver(std::string_view program)

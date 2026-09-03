@@ -1,5 +1,7 @@
-#include "Lexer.hpp"
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.ast;
 
 namespace {
 std::vector<Token>
@@ -21,7 +23,7 @@ void assert_generates_tokens_without_nl_token(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);
@@ -35,7 +37,7 @@ void assert_generates_tokens_without_comment_tokens(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);
@@ -49,7 +51,7 @@ void assert_generates_tokens(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);

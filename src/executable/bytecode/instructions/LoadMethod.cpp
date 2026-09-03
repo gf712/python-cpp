@@ -1,13 +1,14 @@
-#include "LoadMethod.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/AttributeError.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

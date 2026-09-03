@@ -1,36 +1,12 @@
-#include "PyList.hpp"
-#include "IndexError.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyDict.hpp"
-#include "PyFunction.hpp"
-#include "PyGenericAlias.hpp"
-#include "PyInteger.hpp"
-#include "PyNone.hpp"
-#include "PyNumber.hpp"
-#include "PySlice.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "StopIteration.hpp"
-#include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
-
-#include <algorithm>
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <limits>
-#include <numeric>
-#include <ranges>
-#include <unordered_set>
-#include <variant>
+#include <gmpxx.h>
 
+module py.runtime;
+import py.types;
 
 namespace py {
 
@@ -704,7 +680,7 @@ PyListIterator::PyListIterator(const PyList &pylist)
 
 std::string PyListIterator::to_string() const
 {
-	return fmt::format("<list_iterator at {}>", static_cast<const void *>(this));
+	return std::format("<list_iterator at {}>", static_cast<const void *>(this));
 }
 
 void PyListIterator::visit_graph(Visitor &visitor)

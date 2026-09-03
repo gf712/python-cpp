@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class StoreFast final : public Instruction
 {
 	Register m_stack_index;
@@ -12,7 +10,7 @@ class StoreFast final : public Instruction
 	~StoreFast() override {}
 	std::string to_string() const final
 	{
-		return fmt::format("STORE_FAST       {} r{:<3}", m_stack_index, m_src);
+		return std::format("STORE_FAST       {} r{:<3}", m_stack_index, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &) const final;

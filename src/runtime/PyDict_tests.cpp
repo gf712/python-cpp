@@ -1,8 +1,6 @@
-#include "PyDict.hpp"
-#include "PyNone.hpp"
-#include "PyString.hpp"
-
 #include <gtest/gtest.h>
+
+import py.runtime;
 
 using namespace py;
 

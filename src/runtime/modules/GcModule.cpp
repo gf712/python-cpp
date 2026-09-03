@@ -1,12 +1,8 @@
-#include "Modules.hpp"
-#include "memory/GarbageCollector.hpp"
-#include "memory/Heap.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+
 
 namespace py {
 

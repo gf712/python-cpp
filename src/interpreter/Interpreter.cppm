@@ -1,0 +1,144 @@
+module;
+#include "memory/allocate.hpp"
+
+#include "core.hpp"
+
+#include <cstddef>
+
+export module py.runtime:interpreter;
+import :baseexception;
+import :dict;
+import :frame;
+import :function;
+import :list;
+import :object;
+import :string;
+import :tuple;
+import :value;
+import :vm;
+import std;
+
+namespace py {
+class PyModule;
+}
+
+class BytecodeProgram;
+
+struct ScopedStack
+{
+	std::unique_ptr<StackFrame> top_frame;
+	~ScopedStack();
+
+	std::unique_ptr<StackFrame> release();
+};
+
+export class Interpreter
+	: NonCopyable
+	, NonMoveable
+{
+  private:
+	py::PyFrame *m_current_frame{ nullptr };
+	py::PyFrame *m_global_frame{ nullptr };
+	py::PyDict *m_modules{ nullptr };
+	py::PyModule *m_module{ nullptr };
+	py::PyModule *m_builtins{ nullptr };
+	py::PyModule *m_importlib{ nullptr };
+	py::PyObject *m_import_func{ nullptr };
+	py::PyDict *m_codec_error_registry{ nullptr };
+	py::PyList *m_codec_search_path{ nullptr };
+	py::PyDict *m_codec_search_path_cache{ nullptr };
+	std::string m_entry_script;
+	std::vector<std::string> m_argv;
+	std::vector<std::tuple<py::PyObject *, py::PyTuple *>> m_callbacks;
+
+  public:
+	struct Config
+	{
+		bool requires_importlib;
+	};
+
+  public:
+	Interpreter();
+
+	void raise_exception(py::BaseException *exception);
+
+	py::PyFrame *execution_frame() const { return m_current_frame; }
+	py::PyFrame *global_execution_frame() const { return m_global_frame; }
+
+	void set_execution_frame(py::PyFrame *frame) { m_current_frame = frame; }
+
+	[[nodiscard]] py::PyResult<std::monostate> store_object(const std::string &name,
+		const py::Value &value);
+
+	py::PyResult<py::Value> get_object(const std::string &name);
+
+	template<typename PyObjectType, typename... Args>
+	py::PyObject *allocate_object(const std::string &name, Args &&...args)
+	{
+		auto &heap = VirtualMachine::the().heap();
+		if (auto obj = heap.allocate<PyObjectType>(std::forward<Args>(args)...)) {
+			store_object(name, obj);
+			return obj;
+		} else {
+			return nullptr;
+		}
+	}
+
+	py::PyModule *get_imported_module(py::PyString *) const;
+
+	py::PyDict *modules() const { return m_modules; }
+
+	py::PyModule *importlib() const { return m_importlib; }
+
+	py::PyObject *importfunc() const { return m_import_func; }
+
+	py::PyModule *builtins() const { return m_builtins; }
+
+	py::PyModule *module() const { return m_module; }
+
+	py::PyDict *codec_error_registry() { return m_codec_error_registry; }
+
+	py::PyList *codec_search_path() { return m_codec_search_path; }
+
+	py::PyDict *codec_search_path_cache() { return m_codec_search_path_cache; }
+
+	void setup(std::shared_ptr<BytecodeProgram> &&program);
+	void setup_main_interpreter(std::shared_ptr<BytecodeProgram> &&program);
+
+	py::PyResult<std::monostate> finalise();
+
+	const std::string &entry_script() const { return m_entry_script; }
+	const std::vector<std::string> &argv() const { return m_argv; }
+
+	ScopedStack setup_call_stack(const std::unique_ptr<Function> &, py::PyFrame *function_frame);
+	py::PyResult<py::PyObject *> call(const std::unique_ptr<Function> &,
+		py::PyFrame *function_frame);
+
+	py::PyResult<py::PyObject *>
+		call(const std::unique_ptr<Function> &, py::PyFrame *function_frame, StackFrame &frame);
+
+	py::PyResult<py::PyObject *>
+		call(py::PyNativeFunction *native_func, py::PyTuple *args, py::PyDict *kwargs);
+
+	py::PyResult<py::PyObject *> call(py::PyNativeFunction *native_func,
+		py::PyObject *self,
+		py::PyTuple *args,
+		py::PyDict *kwargs);
+
+	void register_callback(py::PyObject *callback, py::PyTuple *args);
+	void unregister_callback(py::PyObject *callback);
+
+	void visit_graph(::Cell::Visitor &);
+
+  private:
+	void internal_setup(const std::string &name,
+		std::string entry_script,
+		std::vector<std::string> argv,
+		std::size_t local_registers,
+		const py::PyTuple *consts,
+		const std::vector<std::string> &names,
+		Config &&,
+		std::shared_ptr<Program> &&);
+};
+
+export void initialize_types();

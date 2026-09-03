@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class BuildString final : public Instruction
 {
 	Register m_dst;
@@ -12,7 +10,7 @@ class BuildString final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("BUILD_STRING    r{:<3} ({})", m_dst, m_size);
+		return std::format("BUILD_STRING    r{:<3} ({})", m_dst, m_size);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;

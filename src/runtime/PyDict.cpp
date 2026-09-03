@@ -1,21 +1,11 @@
-#include "PyDict.hpp"
-#include "KeyError.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyNone.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "StopIteration.hpp"
-#include "ValueError.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
 
-#include <unordered_set>
-#include <variant>
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -804,7 +794,7 @@ void PyDictItemsIterator::visit_graph(Visitor &visitor)
 
 std::string PyDictItemsIterator::to_string() const
 {
-	return fmt::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
+	return std::format("<dict_itemiterator at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyDictItemsIterator::__repr__() const { return PyString::create(to_string()); }
@@ -901,7 +891,7 @@ void PyDictKeyIterator::visit_graph(Visitor &visitor)
 
 std::string PyDictKeyIterator::to_string() const
 {
-	return fmt::format("<dict_keyiterator at {}>", static_cast<const void *>(this));
+	return std::format("<dict_keyiterator at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyDictKeyIterator::__repr__() const { return PyString::create(to_string()); }
@@ -997,7 +987,7 @@ void PyDictValueIterator::visit_graph(Visitor &visitor)
 
 std::string PyDictValueIterator::to_string() const
 {
-	return fmt::format("<dict_valueiterator at {}>", static_cast<const void *>(this));
+	return std::format("<dict_valueiterator at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyDictValueIterator::__repr__() const { return PyString::create(to_string()); }

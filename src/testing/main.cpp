@@ -1,9 +1,8 @@
-#include "interpreter/Interpreter.hpp"
-#include "vm/VM.hpp"
-
 #include "gtest/gtest.h"
-
 #include <cxxopts.hpp>
+#include <spdlog/spdlog.h>
+
+import py.runtime;
 
 #if defined(__SANITIZE_ADDRESS__)
 #define PYTHON_ASAN_ENABLED
@@ -32,7 +31,7 @@ class PythonVMEnvironment : public ::testing::Environment
 	void SetUp() override
 	{
 		auto &vm = VirtualMachine::the();
-		vm.heap().set_start_stack_pointer(bit_cast<uintptr_t *>(m_argv));
+		vm.heap().set_start_stack_pointer(std::bit_cast<uintptr_t *>(m_argv));
 		initialize_types();
 	}
 

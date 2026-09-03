@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class YieldValue final : public Instruction
 {
 	Register m_source;
@@ -10,7 +7,7 @@ class YieldValue final : public Instruction
   public:
 	YieldValue(Register source) : m_source(source) {}
 	~YieldValue() override {}
-	std::string to_string() const final { return fmt::format("YIELD_VALUE     r{:<3}", m_source); }
+	std::string to_string() const final { return std::format("YIELD_VALUE     r{:<3}", m_source); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 	void relocate(size_t) final {}

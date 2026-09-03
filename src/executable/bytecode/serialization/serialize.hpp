@@ -1,11 +1,5 @@
 #pragma once
 
-#include "runtime/PyTuple.hpp"
-#include "utilities.hpp"
-
-#include <cstdint>
-#include <string>
-#include <vector>
 
 namespace py {
 
@@ -39,7 +33,7 @@ enum class ValueType {
 
 template<typename T> inline void serialize(const T &value, std::vector<uint8_t> &result)
 {
-	auto *data = bit_cast<const uint8_t *>(&value);
+	auto *data = std::bit_cast<const uint8_t *>(&value);
 	result.insert(result.end(), data, data + sizeof(T));
 }
 
@@ -52,7 +46,7 @@ template<> inline void serialize<bool>(const bool &value, std::vector<uint8_t> &
 
 template<> inline void serialize<std::byte>(const std::byte &value, std::vector<uint8_t> &result)
 {
-	result.push_back(::bit_cast<uint8_t>(value));
+	result.push_back(std::bit_cast<uint8_t>(value));
 }
 
 template<>

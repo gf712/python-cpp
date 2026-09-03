@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class Pop final : public Instruction
 {
 	bool m_discard{ true };
@@ -16,7 +14,7 @@ class Pop final : public Instruction
 		if (m_discard) {
 			return "POP";
 		} else {
-			return fmt::format("POP             r{}", m_dst);
+			return std::format("POP             r{}", m_dst);
 		}
 	}
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

@@ -1,19 +1,13 @@
-#include "PyRange.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyDict.hpp"
-#include "PyInteger.hpp"
-#include "PyString.hpp"
-#include "StopIteration.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/IndexError.hpp"
-#include "runtime/PySlice.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <gmpxx.h>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -89,9 +83,9 @@ PyRange::PyRange(PyInteger *start, PyInteger *stop, PyInteger *step)
 std::string PyRange::to_string() const
 {
 	if (m_step == 1) {
-		return fmt::format("range({}, {})", m_start, m_stop);
+		return std::format("range({}, {})", m_start, m_stop);
 	} else {
-		return fmt::format("range({}, {}, {})", m_start, m_stop, m_step);
+		return std::format("range({}, {}, {})", m_start, m_stop, m_step);
 	}
 }
 
@@ -189,7 +183,7 @@ PyRangeIterator::PyRangeIterator(const PyRange &pyrange)
 
 std::string PyRangeIterator::to_string() const
 {
-	return fmt::format("<range_iterator at {}>", static_cast<const void *>(this));
+	return std::format("<range_iterator at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyRangeIterator::__repr__() const { return PyString::create(to_string()); }

@@ -1,8 +1,15 @@
-#include "../Modules.hpp"
+module;
+#include "memory/allocate.hpp"
+
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
 #include "DefaultDict.hpp"
 #include "Deque.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyType.hpp"
+
 
 namespace py {
 

@@ -1,12 +1,10 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class ClearExceptionState final : public Instruction
 {
   public:
 	ClearExceptionState() = default;
-	std::string to_string() const final { return fmt::format("CLEAR_EXC"); }
+	std::string to_string() const final { return std::format("CLEAR_EXC"); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;
 

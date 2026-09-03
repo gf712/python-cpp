@@ -1,7 +1,14 @@
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.memory;
+import std;
+
+// After the import: these name module-owned types.
 #include "Chain.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/types/api.hpp"
 
 namespace py {
 namespace {

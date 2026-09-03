@@ -1,4 +1,3 @@
-#include "Instructions.hpp"
 
 
 class LoadException final : public Instruction
@@ -10,7 +9,7 @@ class LoadException final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("LOAD_EXCEPTION  r{}", m_destination);
+		return std::format("LOAD_EXCEPTION  r{}", m_destination);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

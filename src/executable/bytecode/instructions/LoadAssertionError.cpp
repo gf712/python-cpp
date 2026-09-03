@@ -1,7 +1,15 @@
-#include "LoadAssertionError.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+
+// Names Instruction, so it follows the import.
+import py.types;
+import std;
+
 
 using namespace py;
 

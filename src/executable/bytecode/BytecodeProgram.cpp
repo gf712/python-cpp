@@ -1,15 +1,15 @@
-#include "BytecodeProgram.hpp"
-#include "Bytecode.hpp"
-#include "executable/Function.hpp"
-#include "executable/Mangler.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "runtime/PyTuple.hpp"
+module;
+#include "core.hpp"
 
-#include <memory>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+
+module py.runtime;
+import py.ast;
+import py.codegen;
+import std;
+
 
 using namespace py;
 
@@ -227,16 +227,18 @@ std::shared_ptr<BytecodeProgram> BytecodeProgram::deserialize(const std::vector<
 	auto deserialized_result = PyCode::deserialize(span, program);
 	ASSERT(deserialized_result.first.is_ok());
 	program->m_main_function = deserialized_result.first.unwrap();
-	spdlog::debug(
-		"Deserialized main function:\n{}\n\n", program->m_main_function->function()->to_string());
+	::detail::log_debug(std::format(
+		"Deserialized main function:\n{}\n\n", program->m_main_function->function()->to_string())
+			.c_str());
 
 	while (!span.empty()) {
 		deserialized_result = PyCode::deserialize(span, program);
 		ASSERT(deserialized_result.first.is_ok());
 		program->m_functions.push_back(deserialized_result.first.unwrap());
-		spdlog::debug("Deserialized function {}:\n{}\n\n",
+		::detail::log_debug(std::format("Deserialized function {}:\n{}\n\n",
 			program->m_functions.back()->function()->function_name(),
-			program->m_functions.back()->function()->to_string());
+			program->m_functions.back()->function()->to_string())
+				.c_str());
 	}
 
 	return program;

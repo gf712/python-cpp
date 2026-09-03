@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-#include <optional>
 
 class ToBool final : public Instruction
 {
@@ -14,7 +11,7 @@ class ToBool final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("TO_BOOL         r{:<3} r{:<3}", m_dst, m_src);
+		return std::format("TO_BOOL         r{:<3} r{:<3}", m_dst, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

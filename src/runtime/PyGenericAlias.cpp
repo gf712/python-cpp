@@ -1,11 +1,11 @@
-#include "PyGenericAlias.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "RuntimeError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -52,7 +52,7 @@ PyResult<PyGenericAlias *> PyGenericAlias::create(PyObject *origin, PyObject *ar
 
 std::string PyGenericAlias::to_string() const
 {
-	return fmt::format("<generic_alias object at {}>", static_cast<const void *>(this));
+	return std::format("<generic_alias object at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyGenericAlias::__repr__() const
@@ -69,7 +69,7 @@ PyResult<PyObject *> PyGenericAlias::__repr__() const
 		if (++i != m_args->elements().size()) { os << ", "; }
 	}
 	ASSERT(as<PyType>(m_origin));
-	return PyString::create(fmt::format("{}[{}]", as<PyType>(m_origin)->name(), os.str()));
+	return PyString::create(std::format("{}[{}]", as<PyType>(m_origin)->name(), os.str()));
 }
 
 namespace {

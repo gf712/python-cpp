@@ -33,3 +33,6 @@ target_link_libraries(PythonMLIRDialect
                       PUBLIC
                         spdlog)
 python_cpp_link_project_options(PythonMLIRDialect)
+# See the note in Conversion/PythonToPythonBytecode/CMakeLists.txt: the obj.<name>
+# twin does not inherit TableGen ordering.
+add_dependencies(obj.PythonMLIRDialect MLIRPythonOpsIncGen MLIREmitPythonBytecodeIncGen PythonConversionPassIncGen)

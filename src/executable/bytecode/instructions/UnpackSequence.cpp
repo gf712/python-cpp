@@ -1,16 +1,15 @@
-#include "UnpackSequence.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyNumber.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/ValueError.hpp"
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
 
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
+
 
 using namespace py;
 

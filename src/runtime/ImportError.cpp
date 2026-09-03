@@ -1,9 +1,27 @@
-#include "ImportError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+ImportError *ImportError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<ImportError>(args);
+}
+
+BaseException *make_import_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return ImportError::create(args_tuple.unwrap());
+}
 
 ImportError::ImportError(PyType *type) : ImportError(type->underlying_type(), nullptr) {}
 

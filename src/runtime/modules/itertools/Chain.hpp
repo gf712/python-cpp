@@ -1,10 +1,9 @@
-#include "runtime/PyObject.hpp"
-
 namespace py {
 namespace itertools {
 	class Chain : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyObject *m_iterable_objects_iterator{ nullptr };
 		PyObject *m_current_iterator{ nullptr };

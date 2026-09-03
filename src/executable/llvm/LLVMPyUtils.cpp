@@ -1,11 +1,10 @@
+#include "core.hpp"
+
+
+import py.runtime;
+
+// After the import: these name module-owned types.
 #include "LLVMPyUtils.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyLLVMFunction.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
 
 using namespace py;
 
@@ -44,7 +43,7 @@ PyObject *create_llvm_function(const std::string &name,
 
 int64_t from_args_i64(uint8_t *args, int64_t idx)
 {
-	return from_args<int64_t>(bit_cast<PyTuple *>(args), idx);
+	return from_args<int64_t>(std::bit_cast<PyTuple *>(args), idx);
 }
 
-uint8_t *from_i64(int64_t value) { return bit_cast<uint8_t *>(from<int64_t>(value)); }
+uint8_t *from_i64(int64_t value) { return std::bit_cast<uint8_t *>(from<int64_t>(value)); }

@@ -1,11 +1,15 @@
-#include "LLVMGenerator.hpp"
-#include "LLVMProgram.hpp"
-
+#include "core.hpp"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
+
+import py.runtime;
+
+// After the import: these name module-owned types.
+#include "LLVMGenerator.hpp"
+#include "LLVMProgram.hpp"
 
 using namespace llvm;
 using namespace codegen;
@@ -82,6 +86,8 @@ struct LLVMGenerator::Context
 };
 
 LLVMGenerator::LLVMGenerator() : m_ctx(std::make_unique<Context>("test")) {}
+
+LLVMGenerator::~LLVMGenerator() = default;
 
 std::shared_ptr<Program> LLVMGenerator::compile(std::shared_ptr<ast::ASTNode> node,
 	std::vector<std::string> argv,

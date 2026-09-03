@@ -1,33 +1,20 @@
-#include "Value.hpp"
-#include "PyBool.hpp"
-#include "PyBytes.hpp"
-#include "PyEllipsis.hpp"
-#include "PyFloat.hpp"
-#include "PyInteger.hpp"
-#include "PyNone.hpp"
-#include "PyNumber.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "vm/VM.hpp"
-
-#include <cstdlib>
-#include <iostream>
-#include <locale>
-#include <ranges>
-
+module;
+#include "core.hpp"
+#include <cstdint>
+#include <gmpxx.h>
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/urename.h>
 #include <unicode/utypes.h>
 
+module py.runtime;
+
+
 using namespace py;
 
 std::string Number::to_string() const
 {
-	return std::visit([](const auto &value) { return fmt::format("{}", value); }, value);
+	return std::visit([](const auto &value) { return std::format("{}", value); }, value);
 }
 
 Number Number::exp(const Number &rhs) const
@@ -534,7 +521,8 @@ Bytes Bytes::from_unescaped_string(const std::string &str)
 				const auto c = static_cast<unsigned char>((digit1 << 4) + digit2);
 				bytes.push_back(std::byte{ c });
 			}
-			auto &f = std::use_facet<std::ctype<char>>(std::locale());
+			const std::locale loc;
+			const auto &f = std::use_facet<std::ctype<char>>(loc);
 			/* skip \x */
 			if (it < end && f.is(std::ctype<char>::xdigit, *it)) {
 				it++;// and a hexdigit

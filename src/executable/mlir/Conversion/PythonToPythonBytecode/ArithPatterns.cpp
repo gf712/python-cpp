@@ -1,14 +1,15 @@
-#include "Conversion/PythonToPythonBytecode/LoweringHelpers.hpp"
 #include "Conversion/PythonToPythonBytecode/PatternPopulators.hpp"
-
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "Dialect/Python/IR/PythonOps.hpp"
-
-#include "executable/bytecode/instructions/BinaryOperation.hpp"
-#include "executable/bytecode/instructions/Unary.hpp"
-#include "utilities.hpp"
-
+#include "core.hpp"
 #include "mlir/IR/PatternMatch.h"
+
+import py.runtime;
+
+// After the import: these name ast:: / py:: types.
+#include "Conversion/PythonToPythonBytecode/LoweringHelpers.hpp"
+
+// After the import: these name module-owned types.
 
 namespace mlir::py {
 namespace {

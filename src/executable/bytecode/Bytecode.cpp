@@ -1,23 +1,27 @@
-#include "Bytecode.hpp"
-#include "ast/AST.hpp"
-#include "executable/FunctionBlock.hpp"
-#include "instructions/Instructions.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/BaseException.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyTraceback.hpp"
+module;
+#include <cstddef>
+#include <cstdint>
+
+#include "core.hpp"
+
+module py.runtime;
+import py.ast;
+import std;
+
+// After the module declaration and its imports: these name module-owned types.
 #include "serialization/deserialize.hpp"
 #include "serialization/serialize.hpp"
 
-#include <algorithm>
-#include <optional>
+// Out of line so that ~unique_ptr<Instruction> instantiates here, where
+// Instructions.hpp is included, rather than in the module interface.
+Bytecode::~Bytecode() = default;
+
 
 using namespace py;
 
-Bytecode::Bytecode(size_t register_count,
-	size_t locals_count,
-	size_t stack_size,
+Bytecode::Bytecode(std::size_t register_count,
+	std::size_t locals_count,
+	std::size_t stack_size,
 	std::string function_name,
 	InstructionVector instructions,
 	std::vector<InstructionSourceLocation> instruction_locations,
@@ -32,14 +36,14 @@ Bytecode::Bytecode(size_t register_count,
 	  m_instruction_locations(std::move(instruction_locations))
 {}
 
-std::optional<InstructionSourceLocation> Bytecode::location_for(size_t instruction_index) const
+std::optional<InstructionSourceLocation> Bytecode::location_for(std::size_t instruction_index) const
 {
 	if (m_instruction_locations.empty()) { return std::nullopt; }
 	// Find the last entry whose instruction_index is <= the query.
 	const auto it = std::upper_bound(m_instruction_locations.begin(),
 		m_instruction_locations.end(),
 		instruction_index,
-		[](size_t idx, const InstructionSourceLocation &entry) {
+		[](std::size_t idx, const InstructionSourceLocation &entry) {
 			return idx < entry.instruction_index;
 		});
 	if (it == m_instruction_locations.begin()) { return std::nullopt; }
@@ -50,23 +54,23 @@ std::string Bytecode::to_string() const
 {
 	std::ostringstream os;
 	for (const auto &ins : m_instructions) {
-		os << fmt::format("    {} {}", (void *)ins.get(), ins->to_string()) << '\n';
+		os << std::format("    {} {}", (void *)ins.get(), ins->to_string()) << '\n';
 	}
 
 	return os.str();
 }
 
-std::vector<uint8_t> Bytecode::serialize() const
+std::vector<std::uint8_t> Bytecode::serialize() const
 {
-	std::vector<uint8_t> result;
+	std::vector<std::uint8_t> result;
 
 	py::serialize(m_register_count, result);
 	py::serialize(m_locals_count, result);
 	py::serialize(m_stack_size, result);
 	py::serialize(m_function_name, result);
-	py::serialize(static_cast<uint8_t>(m_backend), result);
+	py::serialize(static_cast<std::uint8_t>(m_backend), result);
 
-	const size_t instruction_count = m_instructions.size();
+	const std::size_t instruction_count = m_instructions.size();
 	py::serialize(instruction_count, result);
 
 	for (const auto &ins : m_instructions) {
@@ -77,20 +81,21 @@ std::vector<uint8_t> Bytecode::serialize() const
 	return result;
 }
 
-std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const uint8_t> &buffer,
+std::unique_ptr<Bytecode> Bytecode::deserialize(std::span<const std::uint8_t> &buffer,
 	std::shared_ptr<Program> program)
 {
-	const auto register_count = py::deserialize<size_t>(buffer);
-	const auto locals_count = py::deserialize<size_t>(buffer);
-	const auto stack_size = py::deserialize<size_t>(buffer);
+	const auto register_count = py::deserialize<std::size_t>(buffer);
+	const auto locals_count = py::deserialize<std::size_t>(buffer);
+	const auto stack_size = py::deserialize<std::size_t>(buffer);
 	const auto function_name = py::deserialize<std::string>(buffer);
-	const auto backend = static_cast<FunctionExecutionBackend>(py::deserialize<uint8_t>(buffer));
+	const auto backend =
+		static_cast<FunctionExecutionBackend>(py::deserialize<std::uint8_t>(buffer));
 	(void)backend;
 
 	InstructionVector instructions;
-	const auto instruction_count = py::deserialize<size_t>(buffer);
+	const auto instruction_count = py::deserialize<std::size_t>(buffer);
 
-	for (size_t i = 0; i < instruction_count; ++i) {
+	for (std::size_t i = 0; i < instruction_count; ++i) {
 		auto instruction = ::deserialize(buffer);
 		if (!instruction) {
 			for (const auto &ins : instructions) { std::cout << ins->to_string() << '\n'; }
@@ -154,8 +159,9 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		ASSERT((*vm.instruction_pointer()).get());
 		const auto &current_ip = vm.instruction_pointer();
 		const auto &instruction = *current_ip;
-		// spdlog::debug("{} {}", (void *)instruction.get(), instruction->to_string());
-		// std::cout << std::format("{} {}", (void *)instruction.get(), instruction->to_string())
+		// ::detail::log_debug(std::format("{} {}", (void *)instruction.get(),
+		// instruction->to_string()).c_str()); std::cout << std::format("{} {}", (void
+		// *)instruction.get(), instruction->to_string())
 		// 		  << std::endl;
 		auto result = instruction->execute(vm, vm.interpreter());
 		// we left the current stack frame in the previous instruction
@@ -166,8 +172,8 @@ py::PyResult<py::Value> Bytecode::eval_loop(VirtualMachine &vm, Interpreter &int
 		// vm.dump();
 		if (result.is_err()) {
 			auto *exception = result.unwrap_err();
-			const size_t tb_lasti = std::distance(initial_ip, current_ip);
-			const size_t tb_lineno =
+			const std::size_t tb_lasti = std::distance(initial_ip, current_ip);
+			const std::size_t tb_lineno =
 				location_for(tb_lasti).value_or(InstructionSourceLocation{ 0, 0, 0 }).line;
 			PyTraceback *tb_next = exception->traceback();
 			auto traceback =

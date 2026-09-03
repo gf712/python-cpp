@@ -1,26 +1,18 @@
-#include "runtime/BaseException.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNamespace.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/api.hpp"
-
-#include "config.hpp"
-#include "interpreter/Interpreter.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 #include "runtime/modules/paths.hpp"
-#include "vm/VM.hpp"
 
-#include <bit>
-#include <filesystem>
-#include <format>
+#include <cstddef>
+#include <cstdint>
+
+// py::sys_module is declared in Modules.cppm, attached to py.runtime, so its
+// definition has to be attached to py.runtime too - hence an implementation
+// unit rather than an ordinary TU that imports the module.
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
 
 using namespace py;
 
@@ -91,6 +83,7 @@ static PyType *s_sys_version = nullptr;
 class Flags : public PyBaseObject
 {
 	friend class ::Heap;
+	friend class py::detail::Allocator;
 
   public:
 	uint8_t m_debug;
@@ -173,7 +166,7 @@ class Flags : public PyBaseObject
 
 	std::string to_string() const final
 	{
-		return fmt::format(
+		return std::format(
 			"sys.flags(debug={}, inspect={}, interactive={}, optimize={}, dont_write_bytecode={}, "
 			"no_user_site={}, no_site={}, ignore_environment={}, verbose={}, bytes_warning={}, "
 			"quiet={}, hash_randomization={}, isolated={}, dev_mode={}, utf8_mode={})",
@@ -231,6 +224,7 @@ class Flags : public PyBaseObject
 class Version : public PyTuple
 {
 	friend class ::Heap;
+	friend class py::detail::Allocator;
 
   public:
 	PyInteger *m_major{ nullptr };
@@ -274,7 +268,7 @@ class Version : public PyTuple
 
 	std::string to_string() const final
 	{
-		return fmt::format(
+		return std::format(
 			"sys.version_info(major={}, minor={}, micro={}, releaselevel={}, serial={})",
 			m_major ? m_major->as_i64() : 0,
 			m_minor ? m_minor->as_i64() : 0,
@@ -335,7 +329,7 @@ PyModule *sys_module(Interpreter &interpreter)
 {
 	auto &heap = VirtualMachine::the().heap();
 
-	if (s_sys_module && heap.slab().has_address(bit_cast<uint8_t *>(s_sys_module))) {
+	if (s_sys_module && heap.slab().has_address(std::bit_cast<uint8_t *>(s_sys_module))) {
 		return s_sys_module;
 	}
 

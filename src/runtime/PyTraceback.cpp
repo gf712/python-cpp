@@ -1,10 +1,13 @@
-#include "PyTraceback.hpp"
-#include "MemoryError.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyInteger.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
+
+import :traceback;
 
 namespace py {
 
@@ -12,7 +15,7 @@ PyTraceback::PyTraceback(PyType *type) : PyBaseObject(type) {}
 
 std::string PyTraceback::to_string() const
 {
-	return fmt::format("<traceback object at {}>", static_cast<const void *>(this));
+	return std::format("<traceback object at {}>", static_cast<const void *>(this));
 }
 
 void PyTraceback::visit_graph(Visitor &visitor)

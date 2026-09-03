@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class UnpackSequence final : public Instruction
 {
 	std::vector<Register> m_destination;
@@ -14,7 +11,7 @@ class UnpackSequence final : public Instruction
 	{}
 	std::string to_string() const final
 	{
-		return fmt::format("UNPACK_SEQUENCE {} r{:<3}", m_destination.size(), m_source);
+		return std::format("UNPACK_SEQUENCE {} r{:<3}", m_destination.size(), m_source);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

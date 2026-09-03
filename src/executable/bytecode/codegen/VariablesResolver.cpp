@@ -1,7 +1,10 @@
-#include "VariablesResolver.hpp"
-#include "executable/Mangler.hpp"
+module;
+#include "core.hpp"
 
-#include <filesystem>
+module py.codegen;
+import py.ast;
+import std;
+
 
 namespace fs = std::filesystem;
 
@@ -391,7 +394,7 @@ Value *VariablesResolver::visit(const Delete *node)
 Value *VariablesResolver::visit(const Dict *node)
 {
 	ASSERT(node->keys().size() == node->values().size());
-	for (size_t i = 0; i < node->keys().size(); ++i) {
+	for (std::size_t i = 0; i < node->keys().size(); ++i) {
 		if (const auto &key = node->keys()[i]) { key->codegen(this); }
 		const auto &value = node->values()[i];
 		ASSERT(value);
@@ -537,12 +540,14 @@ Value *VariablesResolver::visit(const Global *node)
 			if (it->get().visibility == Visibility::NAME
 				|| it->get().visibility == Visibility::LOCAL) {
 				// TODO: raise SyntaxError
-				spdlog::error(
-					"SyntaxError: name '{}' is assigned to before global declaration", name);
+				::detail::log_error(std::format(
+					"SyntaxError: name '{}' is assigned to before global declaration", name)
+						.c_str());
 				std::abort();
 			} else if (captured_by_closure(it->get().visibility)) {
 				// TODO: raise SyntaxError
-				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+				::detail::log_error(
+					std::format("SyntaxError: name '{}' is nonlocal and global", name).c_str());
 				std::abort();
 			}
 		}
@@ -561,17 +566,20 @@ Value *VariablesResolver::visit(const NonLocal *node)
 		if (auto it = visibility.get_visible_symbol(name); it.has_value()) {
 			if (it->get().visibility == Visibility::EXPLICIT_GLOBAL) {
 				// TODO: raise SyntaxError
-				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+				::detail::log_error(
+					std::format("SyntaxError: name '{}' is nonlocal and global", name).c_str());
 				std::abort();
 			} else if (it->get().visibility == Visibility::NAME
 					   || it->get().visibility == Visibility::LOCAL) {
 				// TODO: raise SyntaxError
-				spdlog::error(
-					"SyntaxError: name '{}' is assigned to before nonlocal declaration", name);
+				::detail::log_error(std::format(
+					"SyntaxError: name '{}' is assigned to before nonlocal declaration", name)
+						.c_str());
 				std::abort();
 			} else if (captured_by_closure(it->get().visibility)) {
 				// TODO: raise SyntaxError
-				spdlog::error("SyntaxError: name '{}' is nonlocal and global", name);
+				::detail::log_error(
+					std::format("SyntaxError: name '{}' is nonlocal and global", name).c_str());
 				std::abort();
 			}
 		}
@@ -614,7 +622,7 @@ Value *VariablesResolver::visit(const Import *node)
 	return nullptr;
 }
 
-Value *VariablesResolver::visit(const ImportFrom *node)
+Value *VariablesResolver::visit(const ast::ImportFrom *node)
 {
 	for (const auto &name : node->names()) {
 		if (!name.asname.empty()) {
@@ -741,7 +749,7 @@ Value *VariablesResolver::visit(const Yield *node)
 	return nullptr;
 }
 
-Value *VariablesResolver::visit(const YieldFrom *node)
+Value *VariablesResolver::visit(const ast::YieldFrom *node)
 {
 	ASSERT(m_current_scope->get().type == Scope::Type::FUNCTION
 		   || m_current_scope->get().type == Scope::Type::CLOSURE);

@@ -1,7 +1,10 @@
-#include "PyReversed.hpp"
-#include "PyArgParser.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 PyReversed::PyReversed(PyType *type) : PyBaseObject(type) {}

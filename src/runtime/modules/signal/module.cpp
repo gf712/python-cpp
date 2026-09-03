@@ -1,18 +1,9 @@
-#include "../Modules.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-
+module;
+#include "core.hpp"
 #include <csignal>
-#include <cstdint>
-#include <limits>
-#include <variant>
+
+module py.runtime;
+
 
 namespace py {
 
@@ -59,11 +50,11 @@ static PyDict *handlers = nullptr;
 
 PyResult<PyObject *> signal(PyTuple *args, PyDict *kwargs)
 {
-	auto result = PyArgsParser<int64_t, PyObject *>::unpack_tuple(args,
+	auto result = PyArgsParser<std::int64_t, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"signal",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
@@ -100,11 +91,11 @@ PyResult<PyObject *> signal(PyTuple *args, PyDict *kwargs)
 
 PyResult<PyObject *> getsignal(PyTuple *args, PyDict *kwargs)
 {
-	auto result = PyArgsParser<int64_t>::unpack_tuple(args,
+	auto result = PyArgsParser<std::int64_t>::unpack_tuple(args,
 		kwargs,
 		"getsignal",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 

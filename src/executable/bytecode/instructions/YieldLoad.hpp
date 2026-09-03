@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class YieldLoad final : public Instruction
 {
 	Register m_dst;
@@ -10,7 +7,7 @@ class YieldLoad final : public Instruction
   public:
 	YieldLoad(Register dst) : m_dst(dst) {}
 
-	std::string to_string() const final { return fmt::format("YIELD_LOAD      r{:<3}", m_dst); }
+	std::string to_string() const final { return std::format("YIELD_LOAD      r{:<3}", m_dst); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 	void relocate(size_t) final {}

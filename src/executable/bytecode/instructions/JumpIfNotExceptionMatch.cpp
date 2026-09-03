@@ -1,14 +1,17 @@
-#include "JumpIfNotExceptionMatch.hpp"
+module;
+#include "core.hpp"
 #include "executable/Label.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
+#include <cstddef>
+#include <cstdint>
 
+module py.runtime;
+import py.types;
+import std;
+
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
+#include "executable/Label.hpp"
+
 
 using namespace py;
 
