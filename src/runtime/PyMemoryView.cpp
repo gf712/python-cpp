@@ -396,9 +396,14 @@ PyType *PyMemoryView::static_type() const { return types::memoryview(); }
 void PyMemoryView::visit_graph(Visitor &visitor)
 {
 	PyObject::visit_graph(visitor);
-	if (m_view.obj && !m_view.readonly) { visitor.visit(*m_view.obj); }
-	if (m_managed_buffer && m_managed_buffer->m_main_view.obj
-		&& !m_managed_buffer->m_main_view.readonly) {
+	// A view must root its backing object whether or not it is readonly: readonly
+	// governs writing *through* the view, not whether the view holds a reference.
+	// Because a memoryview over immutable bytes is always readonly, skipping those
+	// left BufferedWriter::raw_write's PyBytes unrooted - it was collected during
+	// the allocations that follow, and the raw stream then copied recycled memory.
+	// Reproduces with --gc-frequency 1.
+	if (m_view.obj) { visitor.visit(*m_view.obj); }
+	if (m_managed_buffer && m_managed_buffer->m_main_view.obj) {
 		visitor.visit(*m_managed_buffer->m_main_view.obj);
 	}
 }
