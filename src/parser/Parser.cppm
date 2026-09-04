@@ -14,22 +14,6 @@ class Parser
 	std::size_t m_token_position{ 0 };
 
   public:
-	struct CacheKey
-	{
-		const std::type_info &rule;
-		Token token;
-	};
-
-	struct CacheHash
-	{
-		std::size_t operator()(const CacheKey &cache) const;
-	};
-
-	struct CacheEqual
-	{
-		bool operator()(const CacheKey &lhs, const CacheKey &rhs) const;
-	};
-
 	struct CacheValue
 	{
 		// AST nodes are owned by the Module's arena; the cache holds non-owning
@@ -39,7 +23,30 @@ class Parser
 		std::size_t position;
 	};
 
-	std::unordered_map<CacheKey, std::optional<CacheValue>, CacheHash, CacheEqual> m_cache;
+	using MemoSlot = std::optional<CacheValue>;
+
+	MemoSlot *memo_find(std::size_t position, std::uint16_t rule)
+	{
+		if (position >= m_memo_index.size()) { return nullptr; }
+		for (const auto &[id, slot] : m_memo_index[position]) {
+			if (id == rule) { return &m_memo_pool[slot]; }
+		}
+		return nullptr;
+	}
+
+	MemoSlot &memo_insert(std::size_t position, std::uint16_t rule)
+	{
+		if (auto *existing = memo_find(position, rule)) { return *existing; }
+		if (position >= m_memo_index.size()) { m_memo_index.resize(position + 1); }
+		m_memo_pool.emplace_back();
+		m_memo_index[position].emplace_back(
+			rule, static_cast<std::uint32_t>(m_memo_pool.size() - 1));
+		return m_memo_pool.back();
+	}
+
+  private:
+	std::deque<MemoSlot> m_memo_pool;
+	std::vector<std::vector<std::pair<std::uint16_t, std::uint32_t>>> m_memo_index;
 
   public:
 	Parser(Lexer &l) : m_module(std::make_shared<ast::Module>(l.filename())), m_lexer(l)

@@ -38,42 +38,13 @@ using namespace parser;
 		return {};                                                                          \
 	} while (0)
 
-[[maybe_unused]] static int hits = 0;
-
-size_t Parser::CacheHash::operator()(const Parser::CacheKey &cache) const
+static std::uint16_t next_memo_rule_id()
 {
-	size_t seed = cache.rule.hash_code();
-	seed ^= std::bit_cast<size_t>(cache.token.start().pointer_to_program) + 0x9e3779b9 + (seed << 6)
-			+ (seed >> 2);
-	seed ^= static_cast<size_t>(cache.token.token_type()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	return seed;
+	static std::uint16_t next = 0;
+	return next++;
 }
 
-bool Parser::CacheEqual::operator()(const Parser::CacheKey &lhs, const Parser::CacheKey &rhs) const
-{
-	if ((lhs.token.start().pointer_to_program != rhs.token.start().pointer_to_program)
-		|| (lhs.token.token_type() != rhs.token.token_type())) {
-		return false;
-	}
-	return lhs.rule == rhs.rule;
-}
-
-// template<typename Derived> struct Pattern
-// {
-// 	virtual ~Pattern() = default;
-
-// 	static bool matches(Parser &p)
-// 	{
-// 		const auto start_stack_size = p.stack().size();
-// 		const auto start_position = p.token_position();
-// 		const bool is_match = Derived::matches_impl(p);
-// 		if (!is_match) {
-// 			while (p.stack().size() > start_stack_size) { p.pop_back(); }
-// 			p.token_position() = start_position;
-// 		}
-// 		return is_match;
-// 	}
-// };
+template<typename Rule> inline const std::uint16_t memo_rule_id = next_memo_rule_id();
 
 template<typename T> struct traits;
 
@@ -129,19 +100,19 @@ template<typename Derived> struct PatternV2
 	{
 		const auto start_position = p.token_position();
 		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
-			const auto token = p.lexer().peek_token(start_position);
-			ASSERT(token.has_value());
-			Parser::CacheKey line{ typeid(Derived), *token };
-			Parser::CacheValue value{ false, start_position };
-			p.m_cache[line] = value;
+			// Seed the left-recursion sentinel: if the rule re-enters itself at this same
+			// position the lookup below flips the bool, and grow_lr takes over.
+			p.memo_insert(start_position, memo_rule_id<Derived>) =
+				Parser::CacheValue{ false, start_position };
 		}
 		const std::optional<ResultType> result = Derived::matches_impl(p);
 		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
-			const auto token = p.lexer().peek_token(start_position);
 			if (result.has_value()) {
-				Parser::CacheKey line{ typeid(Derived), *token };
-				auto &value = p.m_cache.at(line);
-				ASSERT(value.has_value());
+				// Safe to hold across grow_lr: memo entries live in a deque.
+				auto *slot = p.memo_find(start_position, memo_rule_id<Derived>);
+				ASSERT(slot);
+				ASSERT(slot->has_value());
+				auto &value = *slot;
 				if (std::holds_alternative<bool>(value->value) && std::get<bool>(value->value)) {
 					return grow_lr(p, start_position, *value);
 				} else {
@@ -215,22 +186,18 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 
 		const auto t = p.lexer().peek_token(original_token_position);
 		if (!t.has_value()) { return {}; }
-		std::optional<Parser::CacheKey> line;
 		if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 						  ::detail::ValueTypesTuple>{}) {
-			line.emplace(Parser::CacheKey{ typeid(CurrentType), *t });
-			if (auto it = p.m_cache.find(*line); it != p.m_cache.end()) {
-				hits++;
-				auto &cache = it->second;
-				if (!cache.has_value()) { return {}; }
-				// auto&& [node, position] = *cache;
-				auto &value = cache->value;
-				const auto &position = cache->position;
-				p.token_position() = position;
+			if (auto *slot = p.memo_find(original_token_position, memo_rule_id<CurrentType>)) {
+				if (!slot->has_value()) { return {}; }
+				auto &value = (*slot)->value;
+				p.token_position() = (*slot)->position;
 				if (std::holds_alternative<bool>(value)) {
 					std::get<bool>(value) = true;
 					return {};
 				} else {
+					// The reference handed to advance() stays valid while it parses on,
+					// because memo entries live in a deque.
 					auto &v = std::get<Parser::CacheValue::ValueType>(value);
 					ASSERT(std::holds_alternative<typename ResultTypeHead::value_type>(v));
 					return advance(p, std::get<typename ResultTypeHead::value_type>(v));
@@ -241,14 +208,15 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 		if (auto result = CurrentType::matches(p)) {
 			if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 							  ::detail::ValueTypesTuple>{}) {
-				p.m_cache[*line] = Parser::CacheValue{ *result, p.token_position() };
+				p.memo_insert(original_token_position, memo_rule_id<CurrentType>) =
+					Parser::CacheValue{ *result, p.token_position() };
 			}
 			return advance(p, *result);
 		} else {
 			p.token_position() = original_token_position;
 			if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 							  ::detail::ValueTypesTuple>{}) {
-				p.m_cache[*line] = std::nullopt;
+				p.memo_insert(original_token_position, memo_rule_id<CurrentType>) = std::nullopt;
 			}
 			return std::nullopt;
 		}
@@ -7542,7 +7510,6 @@ struct StatementsPattern : PatternV2<StatementsPattern>
 		using pattern1 = PatternMatchV2<StatementPattern>;
 		ResultType statements;
 		while (auto result = pattern1::match(p)) {
-			// p.m_cache.clear();
 			auto [statement] = *result;
 			statements.insert(statements.end(), statement.begin(), statement.end());
 		}
