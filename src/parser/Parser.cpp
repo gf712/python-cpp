@@ -38,42 +38,31 @@ using namespace parser;
 		return {};                                                                          \
 	} while (0)
 
-[[maybe_unused]] static int hits = 0;
-
-size_t Parser::CacheHash::operator()(const Parser::CacheKey &cache) const
+static std::uint16_t next_memo_rule_id()
 {
-	size_t seed = cache.rule.hash_code();
-	seed ^= std::bit_cast<size_t>(cache.token.start().pointer_to_program) + 0x9e3779b9 + (seed << 6)
-			+ (seed >> 2);
-	seed ^= static_cast<size_t>(cache.token.token_type()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	return seed;
+	static std::uint16_t next = 0;
+	return next++;
 }
 
-bool Parser::CacheEqual::operator()(const Parser::CacheKey &lhs, const Parser::CacheKey &rhs) const
+template<typename Rule> inline const std::uint16_t memo_rule_id = next_memo_rule_id();
+
+// Seeding the left-recursion sentinel is only useful for a rule that can re-enter itself at
+// the same position: the seed exists so the re-entry finds it, flips it, and hands control to
+// grow_lr.
+// Keep this in step with the grammar: a rule whose first element can reach the rule itself
+// needs an entry here, or it recurses until the stack runs out. Both current entries are
+// direct self-references, which is also all grow_lr claims to detect.
+template<typename Rule> struct is_left_recursive : std::false_type
 {
-	if ((lhs.token.start().pointer_to_program != rhs.token.start().pointer_to_program)
-		|| (lhs.token.token_type() != rhs.token.token_type())) {
-		return false;
-	}
-	return lhs.rule == rhs.rule;
-}
+};
 
-// template<typename Derived> struct Pattern
-// {
-// 	virtual ~Pattern() = default;
+template<> struct is_left_recursive<struct TPrimaryPattern> : std::true_type
+{
+};
 
-// 	static bool matches(Parser &p)
-// 	{
-// 		const auto start_stack_size = p.stack().size();
-// 		const auto start_position = p.token_position();
-// 		const bool is_match = Derived::matches_impl(p);
-// 		if (!is_match) {
-// 			while (p.stack().size() > start_stack_size) { p.pop_back(); }
-// 			p.token_position() = start_position;
-// 		}
-// 		return is_match;
-// 	}
-// };
+template<> struct is_left_recursive<struct DottedNamePattern> : std::true_type
+{
+};
 
 template<typename T> struct traits;
 
@@ -127,21 +116,27 @@ template<typename Derived> struct PatternV2
   public:
 	static std::optional<ResultType> matches(Parser &p)
 	{
+		// Memoisation itself happens in PatternMatchV2_::match, which stores the result
+		// whether or not a sentinel was seeded; this only governs the left-recursion seed.
+		static constexpr bool seeds_sentinel =
+			::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}
+			&& is_left_recursive<Derived>::value;
+
 		const auto start_position = p.token_position();
-		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
-			const auto token = p.lexer().peek_token(start_position);
-			ASSERT(token.has_value());
-			Parser::CacheKey line{ typeid(Derived), *token };
-			Parser::CacheValue value{ false, start_position };
-			p.m_cache[line] = value;
+		if constexpr (seeds_sentinel) {
+			// Seed the left-recursion sentinel: if the rule re-enters itself at this same
+			// position the lookup below flips the bool, and grow_lr takes over.
+			p.memo_insert(start_position, memo_rule_id<Derived>) =
+				Parser::CacheValue{ false, start_position };
 		}
-		const std::optional<ResultType> result = Derived::matches_impl(p);
-		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
-			const auto token = p.lexer().peek_token(start_position);
+		const auto &result = Derived::matches_impl(p);
+		if constexpr (seeds_sentinel) {
 			if (result.has_value()) {
-				Parser::CacheKey line{ typeid(Derived), *token };
-				auto &value = p.m_cache.at(line);
-				ASSERT(value.has_value());
+				// Safe to hold across grow_lr: memo entries live in a deque.
+				auto *slot = p.memo_find(start_position, memo_rule_id<Derived>);
+				ASSERT(slot);
+				ASSERT(slot->has_value());
+				auto &value = *slot;
 				if (std::holds_alternative<bool>(value->value) && std::get<bool>(value->value)) {
 					return grow_lr(p, start_position, *value);
 				} else {
@@ -215,22 +210,18 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 
 		const auto t = p.lexer().peek_token(original_token_position);
 		if (!t.has_value()) { return {}; }
-		std::optional<Parser::CacheKey> line;
 		if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 						  ::detail::ValueTypesTuple>{}) {
-			line.emplace(Parser::CacheKey{ typeid(CurrentType), *t });
-			if (auto it = p.m_cache.find(*line); it != p.m_cache.end()) {
-				hits++;
-				auto &cache = it->second;
-				if (!cache.has_value()) { return {}; }
-				// auto&& [node, position] = *cache;
-				auto &value = cache->value;
-				const auto &position = cache->position;
-				p.token_position() = position;
+			if (auto *slot = p.memo_find(original_token_position, memo_rule_id<CurrentType>)) {
+				if (!slot->has_value()) { return {}; }
+				auto &value = (*slot)->value;
+				p.token_position() = (*slot)->position;
 				if (std::holds_alternative<bool>(value)) {
 					std::get<bool>(value) = true;
 					return {};
 				} else {
+					// The reference handed to advance() stays valid while it parses on,
+					// because memo entries live in a deque.
 					auto &v = std::get<Parser::CacheValue::ValueType>(value);
 					ASSERT(std::holds_alternative<typename ResultTypeHead::value_type>(v));
 					return advance(p, std::get<typename ResultTypeHead::value_type>(v));
@@ -241,14 +232,15 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 		if (auto result = CurrentType::matches(p)) {
 			if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 							  ::detail::ValueTypesTuple>{}) {
-				p.m_cache[*line] = Parser::CacheValue{ *result, p.token_position() };
+				p.memo_insert(original_token_position, memo_rule_id<CurrentType>) =
+					Parser::CacheValue{ *result, p.token_position() };
 			}
 			return advance(p, *result);
 		} else {
 			p.token_position() = original_token_position;
 			if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 							  ::detail::ValueTypesTuple>{}) {
-				p.m_cache[*line] = std::nullopt;
+				p.memo_insert(original_token_position, memo_rule_id<CurrentType>) = std::nullopt;
 			}
 			return std::nullopt;
 		}
@@ -3000,78 +2992,88 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 	//     | primary '(' [arguments] ')'
 	//     | primary '[' slices ']'
 	//     | atom
+	//
+	// Spelled left-recursively the rule re-parses the whole primary once per postfix
+	// operator and leans on grow_lr to extend the seed. The postfix forms all start at the
+	// position after the primary, so a loop over them does the same work without
+	// re-entering the rule: parse the atom once, then keep appending. The alternatives are
+	// tried in the order above - genexp before the call form, since a genexp also opens
+	// with '('.
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		//  primary '.' NAME
 		DEBUG_LOG("PrimaryPattern");
-		using pattern2 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::DOT>,
-			NAMEPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG(" primary '.' NAME");
-			auto [value, _, name_token] = *result;
-			std::string name{ name_token.token.start().pointer_to_program,
-				name_token.token.end().pointer_to_program };
-			return p.arena().create<Attribute>(value,
-				name,
-				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, name_token.token.end() });
-		}
 
-		//  primary genexp
-		using pattern3 = PatternMatchV2<PrimaryPattern, GenexPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("primary genexp");
-			auto [function, arg] = *result;
-			std::vector<ASTNode *> args{ arg };
-			std::vector<Keyword *> kwargs;
-			return p.arena().create<Call>(function,
-				args,
-				kwargs,
-				SourceLocation{ function->source_location().start, arg->source_location().end });
-		}
+		auto atom = PatternMatchV2<AtomPattern>::match(p);
+		if (!atom.has_value()) { return {}; }
+		ASTNode *value = std::get<0>(*atom);
 
-		// primary '(' [arguments] ')'
-		using pattern4 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::LPAREN>,
-			ZeroOrOnePatternV2<ArgumentsPattern>,
-			SingleTokenPatternV2<Token::TokenType::RPAREN>>;
-		if (auto result = pattern4::match(p)) {
-			DEBUG_LOG("primary '(' [arguments] ')'");
-			std::vector<ASTNode *> args;
-			std::vector<Keyword *> kwargs;
-			auto [function, _, arguments, r] = *result;
-			if (arguments.has_value()) {
-				auto [args_, kwargs_] = *arguments;
-				args = std::move(args_);
-				kwargs = std::move(kwargs_);
+		while (true) {
+			//  primary '.' NAME
+			using dot_name =
+				PatternMatchV2<SingleTokenPatternV2<Token::TokenType::DOT>, NAMEPattern>;
+			if (auto result = dot_name::match(p)) {
+				DEBUG_LOG(" primary '.' NAME");
+				auto [_, name_token] = *result;
+				std::string name{ name_token.token.start().pointer_to_program,
+					name_token.token.end().pointer_to_program };
+				value = p.arena().create<Attribute>(value,
+					name,
+					ContextType::LOAD,
+					SourceLocation{ value->source_location().start, name_token.token.end() });
+				continue;
 			}
-			return p.arena().create<Call>(function,
-				args,
-				kwargs,
-				SourceLocation{ function->source_location().start, r.token.end() });
-		}
 
-		// primary '[' slices ']'
-		using pattern5 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::LSQB>,
-			SlicesPattern,
-			SingleTokenPatternV2<Token::TokenType::RSQB>>;
-		if (auto result = pattern5::match(p)) {
-			DEBUG_LOG("'[' slices ']'");
-			auto [value, l, slices, r] = *result;
-			return p.arena().create<Subscript>(value,
-				slices,
-				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, r.token.end() });
-		}
+			//  primary genexp
+			if (auto result = PatternMatchV2<GenexPattern>::match(p)) {
+				DEBUG_LOG("primary genexp");
+				auto [arg] = *result;
+				std::vector<ASTNode *> args{ arg };
+				std::vector<Keyword *> kwargs;
+				value = p.arena().create<Call>(value,
+					args,
+					kwargs,
+					SourceLocation{ value->source_location().start, arg->source_location().end });
+				continue;
+			}
 
-		using pattern6 = PatternMatchV2<AtomPattern>;
-		if (auto result = pattern6::match(p)) {
-			auto [atom] = *result;
-			return atom;
+			// primary '(' [arguments] ')'
+			using call = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LPAREN>,
+				ZeroOrOnePatternV2<ArgumentsPattern>,
+				SingleTokenPatternV2<Token::TokenType::RPAREN>>;
+			if (auto result = call::match(p)) {
+				DEBUG_LOG("primary '(' [arguments] ')'");
+				std::vector<ASTNode *> args;
+				std::vector<Keyword *> kwargs;
+				auto [_, arguments, r] = *result;
+				if (arguments.has_value()) {
+					auto [args_, kwargs_] = *arguments;
+					args = std::move(args_);
+					kwargs = std::move(kwargs_);
+				}
+				value = p.arena().create<Call>(value,
+					args,
+					kwargs,
+					SourceLocation{ value->source_location().start, r.token.end() });
+				continue;
+			}
+
+			// primary '[' slices ']'
+			using subscript = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LSQB>,
+				SlicesPattern,
+				SingleTokenPatternV2<Token::TokenType::RSQB>>;
+			if (auto result = subscript::match(p)) {
+				DEBUG_LOG("'[' slices ']'");
+				auto [l, slices, r] = *result;
+				value = p.arena().create<Subscript>(value,
+					slices,
+					ContextType::LOAD,
+					SourceLocation{ value->source_location().start, r.token.end() });
+				continue;
+			}
+
+			break;
 		}
-		return {};
+		return value;
 	}
 };
 
@@ -3215,316 +3217,94 @@ struct FactorPattern : PatternV2<FactorPattern>
 	}
 };
 
-template<> struct traits<struct TermPattern>
+// The grammar spells the binary operator precedence levels as a chain of left-recursive
+// rules - bitwise_or -> bitwise_xor -> bitwise_and -> shift_expr -> sum -> term
+// Precedence climbing does one descent to the operand and a token peek per
+// operator, and takes the left recursion. BitwiseOrPattern keeps its name because ComparisonPattern
+// refers to it; nothing outside the chain referred to the five levels below.
+//
+// Precedences are the Python ones, lowest binding first. Every operator here is
+// left-associative; `not` and the comparisons sit above this in ComparisonPattern, and unary
+// +-~ and the right-associative ** below it in FactorPattern, so neither is affected.
+struct BinaryOperatorInfo
 {
-	using result_type = ASTNode *;
+	std::uint8_t precedence;
+	BinaryOpType type;
 };
 
-struct TermPattern : PatternV2<TermPattern>
+static constexpr std::optional<BinaryOperatorInfo> binary_operator(Token::TokenType token)
 {
-	using ResultType = typename traits<TermPattern>::result_type;
-
-	// term:
-	//     | term '*' factor
-	//     | term '/' factor
-	//     | term '//' factor
-	//     | term '%' factor
-	//     | term '@' factor
-	//     | factor
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("TermPattern");
-
-		using pattern1 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::STAR>,
-			FactorPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("term '*' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MULTIPLY,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::SLASH>,
-			FactorPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("term '/' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::SLASH,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern3 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::DOUBLESLASH>,
-			FactorPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("term '//' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::FLOORDIV,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern4 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::PERCENT>,
-			FactorPattern>;
-		if (auto result = pattern4::match(p)) {
-			DEBUG_LOG("term '%' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MODULO,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern5 =
-			PatternMatchV2<TermPattern, SingleTokenPatternV2<Token::TokenType::AT>, FactorPattern>;
-		if (auto result = pattern5::match(p)) {
-			DEBUG_LOG("term '@' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MATMUL,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// factor
-		using pattern6 = PatternMatchV2<FactorPattern>;
-		if (auto result = pattern6::match(p)) {
-			auto [factor] = *result;
-			return factor;
-		}
-
+	switch (token) {
+	case Token::TokenType::VBAR:
+		return BinaryOperatorInfo{ 1, BinaryOpType::OR };
+	case Token::TokenType::CIRCUMFLEX:
+		return BinaryOperatorInfo{ 2, BinaryOpType::XOR };
+	case Token::TokenType::AMPER:
+		return BinaryOperatorInfo{ 3, BinaryOpType::AND };
+	case Token::TokenType::LEFTSHIFT:
+		return BinaryOperatorInfo{ 4, BinaryOpType::LEFTSHIFT };
+	case Token::TokenType::RIGHTSHIFT:
+		return BinaryOperatorInfo{ 4, BinaryOpType::RIGHTSHIFT };
+	case Token::TokenType::PLUS:
+		return BinaryOperatorInfo{ 5, BinaryOpType::PLUS };
+	case Token::TokenType::MINUS:
+		return BinaryOperatorInfo{ 5, BinaryOpType::MINUS };
+	case Token::TokenType::STAR:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MULTIPLY };
+	case Token::TokenType::SLASH:
+		return BinaryOperatorInfo{ 6, BinaryOpType::SLASH };
+	case Token::TokenType::DOUBLESLASH:
+		return BinaryOperatorInfo{ 6, BinaryOpType::FLOORDIV };
+	case Token::TokenType::PERCENT:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MODULO };
+	case Token::TokenType::AT:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MATMUL };
+	default:
 		return {};
 	}
-};
-
-template<> struct traits<struct SumPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct SumPattern : PatternV2<SumPattern>
-{
-	using ResultType = typename traits<SumPattern>::result_type;
-	// left recursive
-	// sum:
-	//     | sum '+' term
-	//     | sum '-' term
-	//     | term
-
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("SumPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// sum '+' term
-		using pattern1 =
-			PatternMatchV2<SumPattern, SingleTokenPatternV2<Token::TokenType::PLUS>, TermPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("sum '+' term");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::PLUS,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// sum '-' term
-		using pattern2 =
-			PatternMatchV2<SumPattern, SingleTokenPatternV2<Token::TokenType::MINUS>, TermPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("sum '-' term");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MINUS,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// term
-		using pattern3 = PatternMatchV2<TermPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("term");
-			auto [term] = *result;
-			return term;
-		}
-
-		return {};
-	}
-};
-
-
-template<> struct traits<struct ShiftExprPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct ShiftExprPattern : PatternV2<ShiftExprPattern>
-{
-	using ResultType = typename traits<ShiftExprPattern>::result_type;
-
-	// shift_expr:
-	//     | shift_expr '<<' sum
-	//     | shift_expr '>>' sum
-	//     | sum
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("ShiftExprPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		using pattern1 = PatternMatchV2<ShiftExprPattern,
-			SingleTokenPatternV2<Token::TokenType::LEFTSHIFT>,
-			SumPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("shift_expr '<<' sum");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::LEFTSHIFT,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<ShiftExprPattern,
-			SingleTokenPatternV2<Token::TokenType::RIGHTSHIFT>,
-			SumPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("shift_expr '>>' sum");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::RIGHTSHIFT,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern3 = PatternMatchV2<SumPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("sum");
-			auto [sum] = *result;
-			return sum;
-		}
-		return {};
-	}
-};
-
-template<> struct traits<struct BitwiseAndPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct BitwiseAndPattern : PatternV2<BitwiseAndPattern>
-{
-	using ResultType = typename traits<BitwiseAndPattern>::result_type;
-	// bitwise_and:
-	//     | bitwise_and '&' shift_expr
-	//     | shift_expr
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("bitwise_and");
-
-		// bitwise_and '&' shift_expr
-		using pattern1 = PatternMatchV2<BitwiseAndPattern,
-			SingleTokenPatternV2<Token::TokenType::AMPER>,
-			ShiftExprPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_and '&' shift_expr");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::AND,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<ShiftExprPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("shift_expr");
-			auto [shift_expr] = *result;
-			return shift_expr;
-		}
-
-		return {};
-	}
-};
-
-template<> struct traits<struct BitwiseXorPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct BitwiseXorPattern : PatternV2<BitwiseXorPattern>
-{
-	using ResultType = typename traits<BitwiseXorPattern>::result_type;
-
-	// bitwise_xor:
-	//     | bitwise_xor '^' bitwise_and
-	//     | bitwise_and
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("BitwiseXorPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// bitwise_xor '^' bitwise_and
-		using pattern1 = PatternMatchV2<BitwiseXorPattern,
-			SingleTokenPatternV2<Token::TokenType::CIRCUMFLEX>,
-			BitwiseAndPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_xor '^' bitwise_and");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::XOR,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// bitwise_and
-		using pattern2 = PatternMatchV2<BitwiseAndPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("bitwise_and");
-			auto [and_op] = *result;
-			return and_op;
-		}
-
-		return {};
-	}
-};
-
+}
 
 struct BitwiseOrPattern : PatternV2<BitwiseOrPattern>
 {
 	using ResultType = typename traits<BitwiseOrPattern>::result_type;
 
-	// bitwise_or:
-	//     | bitwise_or '|' bitwise_xor
-	//     | bitwise_xor
+	// bitwise_or / bitwise_xor / bitwise_and / shift_expr / sum / term
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		DEBUG_LOG("BitwiseOrPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// bitwise_or '|' bitwise_xor
-		using pattern1 = PatternMatchV2<BitwiseOrPattern,
-			SingleTokenPatternV2<Token::TokenType::VBAR>,
-			BitwiseXorPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_or '|' bitwise_xor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::OR,
+		return climb(p, 1);
+	}
+
+  private:
+	static std::optional<ResultType> climb(Parser &p, std::uint8_t min_precedence)
+	{
+		auto operand = PatternMatchV2<FactorPattern>::match(p);
+		if (!operand.has_value()) { return {}; }
+		ASTNode *lhs = std::get<0>(*operand);
+
+		while (true) {
+			const auto token = p.lexer().peek_token(p.token_position());
+			if (!token.has_value()) { break; }
+			const auto op = binary_operator(token->token_type());
+			if (!op.has_value() || op->precedence < min_precedence) { break; }
+
+			// Left associativity: the right operand takes only strictly tighter operators,
+			// so an operator of equal precedence is left for the next turn of this loop.
+			const auto before_operator = p.token_position();
+			p.token_position() += 1;
+			auto rhs = climb(p, static_cast<std::uint8_t>(op->precedence + 1));
+			if (!rhs.has_value()) {
+				// No right operand: the ladder would have failed this alternative and
+				// fallen through to the bare operand, so give the operator back.
+				p.token_position() = before_operator;
+				break;
+			}
+			lhs = p.arena().create<BinaryExpr>(op->type,
 				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
+				*rhs,
+				SourceLocation{ lhs->source_location().start, (*rhs)->source_location().end });
 		}
-
-		// bitwise_xor
-		using pattern2 = PatternMatchV2<BitwiseXorPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("bitwise_xor");
-			auto [bitwise_xor] = *result;
-			return bitwise_xor;
-		}
-
-		return {};
+		return lhs;
 	}
 };
 
@@ -7542,7 +7322,6 @@ struct StatementsPattern : PatternV2<StatementsPattern>
 		using pattern1 = PatternMatchV2<StatementPattern>;
 		ResultType statements;
 		while (auto result = pattern1::match(p)) {
-			// p.m_cache.clear();
 			auto [statement] = *result;
 			statements.insert(statements.end(), statement.begin(), statement.end());
 		}
