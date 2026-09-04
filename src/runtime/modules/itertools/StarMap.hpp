@@ -1,10 +1,9 @@
-#include "runtime/PyObject.hpp"
-
 namespace py {
 namespace itertools {
 	class StarMap : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyObject *m_function{ nullptr };
 		PyObject *m_iterator{ nullptr };

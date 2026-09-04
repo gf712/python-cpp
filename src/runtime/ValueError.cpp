@@ -1,10 +1,21 @@
-#include "ValueError.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+BaseException *make_value_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return ValueError::create(args_tuple.unwrap()).unwrap();
+}
 
 template<> ValueError *as(PyObject *obj)
 {

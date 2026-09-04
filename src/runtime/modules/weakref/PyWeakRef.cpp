@@ -1,10 +1,15 @@
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstdint>
+
+module py.runtime;
+import py.memory;
+import std;
+
+// After the import: these name module-owned types.
 #include "PyWeakRef.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/api.hpp"
-#include "vm/VM.hpp"
+
 
 namespace py {
 
@@ -26,7 +31,7 @@ PyWeakRef::~PyWeakRef()
 	// switched m_object to py_none() or the entry was erased by sweep —
 	// either way, unregister_weakref is a safe no-op.
 	if (m_object && m_object != py_none()) {
-		VirtualMachine::the().heap().unregister_weakref(bit_cast<uint8_t *>(m_object), this);
+		VirtualMachine::the().heap().unregister_weakref(std::bit_cast<uint8_t *>(m_object), this);
 	}
 }
 
@@ -45,10 +50,10 @@ void PyWeakRef::visit_graph(Visitor &visitor)
 
 std::string PyWeakRef::to_string() const
 {
-	return fmt::format("<weakref at {}; {}>",
+	return std::format("<weakref at {}; {}>",
 		static_cast<const void *>(this),
 		is_alive()
-			? fmt::format("to '{}' at {}", m_object->type()->name(), static_cast<void *>(m_object))
+			? std::format("to '{}' at {}", m_object->type()->name(), static_cast<void *>(m_object))
 			: "dead");
 }
 
@@ -100,10 +105,12 @@ PyType *PyWeakRef::register_type(PyModule *module, std::string_view name)
 bool PyWeakRef::is_alive() const
 {
 	if (m_object
-		&& !VirtualMachine::the().heap().has_weakref_object(bit_cast<uint8_t *>(m_object))) {
+		&& !VirtualMachine::the().heap().has_weakref_object(std::bit_cast<uint8_t *>(m_object))) {
 		m_object = py_none();
 	}
 	return m_object != py_none();
 }
+
+PyObject *PyWeakRef::get_object() const { return m_object; }
 
 }// namespace py

@@ -1,10 +1,8 @@
-#include "Modules.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+
 
 namespace py {
 PyModule *warnings_module()

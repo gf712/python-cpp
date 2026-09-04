@@ -1,5 +1,7 @@
-#include "Lexer.hpp"
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.ast;
 
 namespace {
 std::vector<Token>
@@ -21,7 +23,7 @@ void assert_generates_tokens_without_nl_token(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);
@@ -35,7 +37,7 @@ void assert_generates_tokens_without_comment_tokens(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);
@@ -49,7 +51,7 @@ void assert_generates_tokens(std::string_view program,
 	ASSERT_EQ(expected_tokens.size(), tokens.size());
 	for (size_t i = 0; i < expected_tokens.size(); ++i) {
 		ASSERT_EQ(expected_tokens[i], tokens[i].token_type())
-			<< fmt::format("Expected {}, but got {} at position {}",
+			<< std::format("Expected {}, but got {} at position {}",
 				   Token::stringify_token_type(expected_tokens[i]),
 				   Token::stringify_token_type(tokens[i].token_type()),
 				   i);
@@ -604,6 +606,24 @@ TEST(Lexer, IgnoreCommentsAndNL)
 		Token::TokenType::NAME,
 		Token::TokenType::NEWLINE,
 		Token::TokenType::ENDMARKER };
+	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
+}
+
+TEST(Lexer, IgnoreCommentsAndNLLateInTheProgram)
+{
+	constexpr std::size_t line_count = 200;
+	std::string program;
+	std::vector<Token::TokenType> expected_tokens;
+	for (std::size_t i = 0; i < line_count; ++i) {
+		program += std::format("# leading comment {}\n", i);
+		program += "\n";
+		program += std::format("a{} = {} # trailing comment\n", i, i);
+		expected_tokens.push_back(Token::TokenType::NAME);
+		expected_tokens.push_back(Token::TokenType::EQUAL);
+		expected_tokens.push_back(Token::TokenType::NUMBER);
+		expected_tokens.push_back(Token::TokenType::NEWLINE);
+	}
+	expected_tokens.push_back(Token::TokenType::ENDMARKER);
 	assert_generates_tokens_without_comment_tokens(program, expected_tokens);
 }
 

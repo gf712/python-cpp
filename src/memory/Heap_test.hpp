@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Heap.hpp"
-#include "vm/VM.hpp"
-
 #include <gtest/gtest.h>
 
 struct TestHeap : ::testing::Test

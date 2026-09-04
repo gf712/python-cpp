@@ -1,9 +1,10 @@
-#include "PyBuiltInMethod.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -39,7 +40,7 @@ std::string PyBuiltInMethod::to_string() const
 	ASSERT(m_ml);
 	ASSERT(m_self);
 
-	return fmt::format("<built-in method '{}' of '{}' object at {}>",
+	return std::format("<built-in method '{}' of '{}' object at {}>",
 		m_ml->get().name,
 		m_self->type()->name(),
 		static_cast<const void *>(this));

@@ -1,15 +1,12 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class LoadBuildClass final : public Instruction
 {
 	Register m_dst;
 
   public:
 	LoadBuildClass(Register dst) : m_dst(dst) {}
-	std::string to_string() const final { return fmt::format("LOAD_BUILD_CLASS r{}", m_dst); }
+	std::string to_string() const final { return std::format("LOAD_BUILD_CLASS r{}", m_dst); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 	void relocate(size_t) final {}

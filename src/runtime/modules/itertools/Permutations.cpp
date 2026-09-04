@@ -1,15 +1,16 @@
-#include "Permutations.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 
-#include <algorithm>
 #include <cstddef>
-#include <numeric>
+
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
+
+// After the import: these name module-owned types.
+#include "Permutations.hpp"
 
 namespace py {
 namespace {

@@ -1,21 +1,15 @@
-#include "ast/optimizers/ConstantFolding.hpp"
-#include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
-#include "executable/mlir/Conversion/Passes.hpp"
-#include "executable/mlir/Conversion/PythonToPythonBytecode/PythonToPythonBytecode.hpp"
-#include "executable/mlir/Dialect/Python/MLIRGenerator.hpp"
-#include "executable/mlir/Target/PythonBytecode/PythonBytecodeEmitter.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
+#include "core.hpp"
+#include "executable/common.hpp"
+#include <spdlog/spdlog.h>
+
 
 #include <cxxopts.hpp>
 
-#include <filesystem>
-#include <fstream>
+import py.ast;
+import py.lexer;
+import py.runtime;
+import py.codegen;
+import std;
 
 using namespace py;
 

@@ -1,81 +1,14 @@
-#include "Instructions.hpp"
-#include "BinaryOperation.hpp"
-#include "BinarySubscript.hpp"
-#include "BuildDict.hpp"
-#include "BuildList.hpp"
-#include "BuildSet.hpp"
-#include "BuildSlice.hpp"
-#include "BuildString.hpp"
-#include "BuildTuple.hpp"
-#include "ClearExceptionState.hpp"
-#include "ClearTopCleanup.hpp"
-#include "CompareOperation.hpp"
-#include "DeleteName.hpp"
-#include "DeleteSubscript.hpp"
-#include "DictMerge.hpp"
-#include "DictUpdate.hpp"
-#include "ForIter.hpp"
-#include "FormatValue.hpp"
-#include "FunctionCall.hpp"
-#include "FunctionCallEx.hpp"
-#include "FunctionCallWithKeywords.hpp"
-#include "GetIter.hpp"
-#include "GetYieldFromIter.hpp"
-#include "ImportFrom.hpp"
-#include "ImportName.hpp"
-#include "InplaceOp.hpp"
-#include "Jump.hpp"
-#include "JumpForward.hpp"
-#include "JumpIfExceptionMatch.hpp"
-#include "JumpIfFalse.hpp"
-#include "JumpIfFalseOrPop.hpp"
-#include "JumpIfNotExceptionMatch.hpp"
-#include "JumpIfTrue.hpp"
-#include "JumpIfTrueOrPop.hpp"
-#include "LeaveExceptionHandling.hpp"
-#include "ListAppend.hpp"
-#include "ListExtend.hpp"
-#include "ListToTuple.hpp"
-#include "LoadAssertionError.hpp"
-#include "LoadAttr.hpp"
-#include "LoadBuildClass.hpp"
-#include "LoadClosure.hpp"
-#include "LoadConst.hpp"
-#include "LoadDeref.hpp"
-#include "LoadException.hpp"
-#include "LoadFast.hpp"
-#include "LoadGlobal.hpp"
-#include "LoadMethod.hpp"
-#include "LoadName.hpp"
-#include "MakeFunction.hpp"
-#include "MethodCall.hpp"
-#include "Move.hpp"
-#include "Pop.hpp"
-#include "Push.hpp"
-#include "RaiseVarargs.hpp"
-#include "ReRaise.hpp"
-#include "ReturnValue.hpp"
-#include "SetAdd.hpp"
-#include "SetUpdate.hpp"
-#include "SetupExceptionHandling.hpp"
-#include "SetupWith.hpp"
-#include "StoreAttr.hpp"
-#include "StoreDeref.hpp"
-#include "StoreFast.hpp"
-#include "StoreGlobal.hpp"
-#include "StoreName.hpp"
-#include "StoreSubscript.hpp"
-#include "ToBool.hpp"
-#include "Unary.hpp"
-#include "UnpackSequence.hpp"
-#include "WithExceptStart.hpp"
-#include "YieldLoad.hpp"
-#include "YieldValue.hpp"
+module;
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
 
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
 #include "../serialization/deserialize.hpp"
-#include "vm/VM.hpp"
 
-#include <optional>
 
 using namespace py;
 
@@ -510,6 +443,6 @@ std::unique_ptr<Instruction> deserialize(std::span<const uint8_t> &instruction_b
 		return std::make_unique<SetUpdate>(set, iterable);
 	}
 	}
-	spdlog::error("Missing opcode: {}", instruction_code);
+	::detail::log_error(std::format("Missing opcode: {}", instruction_code).c_str());
 	return nullptr;
 }

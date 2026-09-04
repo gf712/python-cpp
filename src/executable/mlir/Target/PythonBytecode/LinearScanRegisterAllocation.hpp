@@ -1,12 +1,13 @@
 #pragma once
 
+#include "core.hpp"
+
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "LiveIntervalAnalysis.hpp"
 #include "RegisterAllocationLogger.hpp"
 #include "RegisterAllocationTypes.hpp"
 
 #include "mlir/IR/Builders.h"
-#include "utilities.hpp"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Format.h"
@@ -19,6 +20,7 @@
 #include <set>
 #include <span>
 #include <variant>
+
 
 namespace codegen {
 
@@ -791,7 +793,7 @@ class LinearScanRegisterAllocation
 		// Print each value's liveness
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
-			std::string value_str = fmt::format("{}", interval.value);
+			std::string value_str = std::format("{}", interval.value);
 			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 
@@ -841,7 +843,7 @@ class LinearScanRegisterAllocation
 		// Print each value's register assignment
 		for (const auto &interval : live_interval_analysis->sorted_live_intervals) {
 			// Print value name (truncate to 55 chars)
-			std::string value_str = fmt::format("{}", interval.value);
+			std::string value_str = std::format("{}", interval.value);
 			if (value_str.length() > 55) { value_str = value_str.substr(0, 52) + "..."; }
 			llvm::outs() << llvm::format("%-55s", value_str.c_str()) << " | ";
 

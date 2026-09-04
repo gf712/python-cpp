@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class FunctionCall final : public Instruction
 {
 	Register m_function_name;
@@ -15,7 +13,7 @@ class FunctionCall final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("CALL            r{:<3} ({})", m_function_name, m_size);
+		return std::format("CALL            r{:<3} ({})", m_function_name, m_size);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

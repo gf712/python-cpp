@@ -1,16 +1,12 @@
 #pragma once
 
-#include "runtime/PyDict.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/Value.hpp"
-#include <cstdint>
 
 namespace py {
 namespace sre {
 	class Pattern : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		size_t m_groups;
 		PyDict *m_groupindex{ nullptr };

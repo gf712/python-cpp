@@ -1,9 +1,17 @@
-#include "StopIteration.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+StopIteration *StopIteration::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<StopIteration>(args);
+}
 
 template<> StopIteration *as(PyObject *obj)
 {

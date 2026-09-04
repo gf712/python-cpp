@@ -1,8 +1,10 @@
-#include "PyCell.hpp"
-#include "MemoryError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -43,7 +45,7 @@ std::string PyCell::to_string() const
 {
 	if (std::holds_alternative<PyObject *>(m_content)) {
 		if (auto *obj = std::get<PyObject *>(m_content)) {
-			return fmt::format("<cell at {}: {} object at {}>",
+			return std::format("<cell at {}: {} object at {}>",
 				(void *)this,
 				obj->type()->to_string(),
 				(void *)obj);
@@ -51,7 +53,7 @@ std::string PyCell::to_string() const
 			return "<cell: empty>";
 		}
 	} else {
-		return fmt::format("<cell at {}: {} object at {}>",
+		return std::format("<cell at {}: {} object at {}>",
 			(void *)this,
 			PyObject::from(m_content).unwrap()->type()->to_string(),
 			(void *)&m_content);

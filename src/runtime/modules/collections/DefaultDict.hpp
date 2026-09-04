@@ -1,14 +1,11 @@
 #pragma once
 
-#include "runtime/PyDict.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-
 namespace py {
 namespace collections {
 	class DefaultDict : public PyDict
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyObject *m_default_factory;
 

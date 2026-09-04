@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class LoadAttr final : public Instruction
 {
 	Register m_destination;
@@ -16,7 +13,7 @@ class LoadAttr final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format(
+		return std::format(
 			"LOAD_ATTR       r{:<3} r{:<3} ({})", m_destination, m_value_source, m_attr_name);
 	}
 

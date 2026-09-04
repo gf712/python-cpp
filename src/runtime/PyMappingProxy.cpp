@@ -1,7 +1,11 @@
-#include "PyMappingProxy.hpp"
-#include "MemoryError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 PyMappingProxy::PyMappingProxy(PyType *type) : PyBaseObject(type) {}
@@ -36,7 +40,7 @@ PyResult<PyObject *> PyMappingProxy::__new__(const PyType *type, PyTuple *args, 
 PyResult<PyObject *> PyMappingProxy::__repr__() const
 {
 	if (auto r = m_mapping->repr(); r.is_ok()) {
-		return PyString::create(fmt::format("mappingproxy({})", r.unwrap()->to_string()));
+		return PyString::create(std::format("mappingproxy({})", r.unwrap()->to_string()));
 	} else {
 		return r;
 	}

@@ -1,9 +1,10 @@
-#include "PyBoundMethod.hpp"
-#include "PyFunction.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -33,7 +34,7 @@ std::string PyBoundMethod::to_string() const
 	if (qualname_str.is_err()) { TODO(); }
 	auto self_qualname = m_self->getattribute(qualname_str.unwrap());
 	if (self_qualname.is_err()) { TODO(); }
-	return fmt::format(
+	return std::format(
 		"<bound method '{}' of '{}'>", m_method->to_string(), self_qualname.unwrap()->to_string());
 }
 

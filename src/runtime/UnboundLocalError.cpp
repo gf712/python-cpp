@@ -1,9 +1,26 @@
-#include "UnboundLocalError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+UnboundLocalError *UnboundLocalError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<UnboundLocalError>(args);
+}
+
+BaseException *make_unbound_local_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return UnboundLocalError::create(args_tuple.unwrap());
+}
 
 UnboundLocalError::UnboundLocalError(PyType *type) : Exception(type) {}
 

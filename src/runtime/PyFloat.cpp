@@ -1,14 +1,12 @@
-#include "PyFloat.hpp"
-#include "MemoryError.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyNumber.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/forward.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <gmpxx.h>
 
-#include <cmath>
+module py.runtime;
+import py.types;
+
 
 namespace py {
 

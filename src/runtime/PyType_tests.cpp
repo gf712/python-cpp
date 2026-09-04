@@ -1,10 +1,7 @@
-#include "PyList.hpp"
-#include "PyTuple.hpp"
-#include "PyType.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
-
 #include "gtest/gtest.h"
+
+import py.runtime;
+import py.types;
 
 using namespace py;
 

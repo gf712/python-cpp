@@ -1,12 +1,11 @@
 #pragma once
 
-#include "runtime/PyObject.hpp"
-
 namespace py {
 
 class PyWeakRef : public PyBaseObject
 {
 	friend class ::Heap;
+	friend class py::detail::Allocator;
 	mutable PyObject *m_object{ nullptr };
 	PyObject *m_callback{ nullptr };
 
@@ -31,7 +30,7 @@ class PyWeakRef : public PyBaseObject
 	static PyType *register_type(PyModule *module, std::string_view name);
 
   public:
-	PyObject *get_object() const { return m_object; }
+	PyObject *get_object() const;
 
   private:
 	bool is_alive() const;

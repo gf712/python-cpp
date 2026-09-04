@@ -1,8 +1,10 @@
-#include "FunctionCall.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyTuple.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "spdlog/spdlog.h"
+
+module py.runtime;
+import std;
+
 
 using namespace py;
 

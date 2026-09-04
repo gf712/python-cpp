@@ -18,3 +18,6 @@ add_mlir_library(PythonConversionPasses
 )
 
 python_cpp_link_project_options(PythonConversionPasses)
+# See the note in Conversion/PythonToPythonBytecode/CMakeLists.txt: the obj.<name>
+# twin does not inherit TableGen ordering.
+add_dependencies(obj.PythonConversionPasses MLIRPythonOpsIncGen MLIREmitPythonBytecodeIncGen PythonConversionPassIncGen)

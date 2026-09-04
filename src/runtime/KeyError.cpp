@@ -1,10 +1,21 @@
-#include "KeyError.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+BaseException *make_key_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return KeyError::create(args_tuple.unwrap()).unwrap();
+}
 
 template<> KeyError *as(PyObject *obj)
 {

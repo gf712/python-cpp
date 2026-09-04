@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class LoadFast final : public Instruction
 {
 	Register m_destination;
@@ -16,7 +14,7 @@ class LoadFast final : public Instruction
 	~LoadFast() override {}
 	std::string to_string() const final
 	{
-		return fmt::format(
+		return std::format(
 			"LOAD_FAST       r{:<3} {} (\"{}\")", m_destination, m_stack_index, m_object_name);
 	}
 

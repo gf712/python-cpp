@@ -1,11 +1,12 @@
-#include "Bytecode.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
-
-#include "lexer/Lexer.hpp"
-#include "parser/Parser.hpp"
-
+#include "core.hpp"
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.runtime;
+import py.codegen;
+import py.ast;
+
+// After the import: these name module-owned types.
 
 namespace {
 Bytecode make_bytecode_with_locations(std::vector<InstructionSourceLocation> locations)

@@ -1,9 +1,26 @@
-#include "DeprecationWarning.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include "runtime/warnings/Warning.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 using namespace py;
+
+// Declared in DeprecationWarning.cppm. In namespace py rather than under the
+// using-directive above, which would define an unrelated function at global scope.
+namespace py {
+BaseException *make_deprecation_warning(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return DeprecationWarning::create(DeprecationWarning::class_type(), args_tuple.unwrap())
+		.unwrap();
+}
+}// namespace py
 
 DeprecationWarning::DeprecationWarning(PyType *type) : Warning(type) {}
 

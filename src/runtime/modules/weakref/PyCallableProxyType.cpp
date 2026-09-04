@@ -1,11 +1,15 @@
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstdint>
+
+module py.runtime;
+import py.memory;
+import std;
+
+// After the import: these name module-owned types.
 #include "PyCallableProxyType.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/api.hpp"
-#include "vm/VM.hpp"
+
 
 namespace py {
 
@@ -22,7 +26,7 @@ PyCallableProxyType::PyCallableProxyType(PyObject *object, PyObject *callback)
 PyCallableProxyType::~PyCallableProxyType()
 {
 	if (m_object && m_object != py_none()) {
-		VirtualMachine::the().heap().unregister_weakref(bit_cast<uint8_t *>(m_object), this);
+		VirtualMachine::the().heap().unregister_weakref(std::bit_cast<uint8_t *>(m_object), this);
 	}
 }
 
@@ -43,9 +47,9 @@ void PyCallableProxyType::visit_graph(Visitor &visitor)
 std::string PyCallableProxyType::to_string() const
 {
 	if (!m_object) {
-		return fmt::format("<weakproxy at {} empty", static_cast<const void *>(this));
+		return std::format("<weakproxy at {} empty", static_cast<const void *>(this));
 	}
-	return fmt::format("<weakproxy at {} to {} at {}>",
+	return std::format("<weakproxy at {} to {} at {}>",
 		static_cast<const void *>(this),
 		m_object->type()->name(),
 		static_cast<const void *>(m_object));
@@ -138,7 +142,7 @@ PyType *PyCallableProxyType::register_type(PyModule *module, std::string_view na
 bool PyCallableProxyType::is_alive() const
 {
 	if (m_object
-		&& !VirtualMachine::the().heap().has_weakref_object(bit_cast<uint8_t *>(m_object))) {
+		&& !VirtualMachine::the().heap().has_weakref_object(std::bit_cast<uint8_t *>(m_object))) {
 		m_object = nullptr;
 	}
 	return m_object != nullptr;

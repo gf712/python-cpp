@@ -1,9 +1,9 @@
-#include "PyCoroutine.hpp"
-#include "MemoryError.hpp"
-#include "PyCode.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 

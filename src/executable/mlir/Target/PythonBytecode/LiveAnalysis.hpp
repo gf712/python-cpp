@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core.hpp"
+
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "RegisterAllocationLogger.hpp"
 #include "RegisterAllocationTypes.hpp"
@@ -10,7 +12,6 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
-#include "utilities.hpp"
 
 #include <algorithm>
 #include <map>
@@ -19,6 +20,7 @@
 #include <span>
 #include <tuple>
 #include <vector>
+
 
 namespace codegen {
 

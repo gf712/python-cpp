@@ -1,12 +1,12 @@
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-#include <cstddef>
+#pragma once
+
 
 namespace py {
 namespace itertools {
 	class Permutations : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyList *m_pool{ nullptr };
 		size_t m_length;

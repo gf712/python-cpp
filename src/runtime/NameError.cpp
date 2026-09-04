@@ -1,11 +1,26 @@
-#include "NameError.hpp"
-#include "MemoryError.hpp"
-#include "PyDict.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+NameError *NameError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<NameError>(args);
+}
+
+BaseException *make_name_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return NameError::create(args_tuple.unwrap());
+}
 
 NameError::NameError(PyType *type) : Exception(type) {}
 

@@ -1,4 +1,3 @@
-#include "Instructions.hpp"
 
 
 class LoadAssertionError final : public Instruction
@@ -10,7 +9,7 @@ class LoadAssertionError final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("LOAD_ASSERTION_ERROR r{}", m_assertion_location);
+		return std::format("LOAD_ASSERTION_ERROR r{}", m_assertion_location);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

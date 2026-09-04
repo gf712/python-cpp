@@ -1,24 +1,14 @@
-#include "PyBytes.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "StopIteration.hpp"
-#include "runtime/IndexError.hpp"
-#include "runtime/PyByteArray.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PySlice.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/utilities.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 
-#include <string_view>
+#include <gmpxx.h>
+
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
 
 namespace py {
 
@@ -43,34 +33,36 @@ PyBytes::PyBytes(Bytes number)
 PyBytes::PyBytes() : PyBytes(Bytes{}) {}
 
 
-struct ByteBackInserter
-{
-	using iterator_category = std::output_iterator_tag;
-	using value_type = void;
-	using difference_type = std::ptrdiff_t;
-	using pointer = void;
-	using reference = void;
-	using container_type = std::vector<std::byte>;
-
-	container_type &m_bytes;
-	BaseException *m_exception{ nullptr };
-	ByteBackInserter(std::vector<std::byte> &bytes) : m_bytes(bytes) {}
-
-	BaseException *last_error() const { return m_exception; }
-
-	ByteBackInserter &operator=(PyObject *value)
+namespace {
+	struct ByteBackInserter
 	{
-		if (auto int_obj = as<PyInteger>(value)) {
-			if (int_obj->as_i64() >= 0 && int_obj->as_i64() <= 255) {
-				m_bytes.push_back(static_cast<std::byte>(int_obj->as_i64()));
+		using iterator_category = std::output_iterator_tag;
+		using value_type = void;
+		using difference_type = std::ptrdiff_t;
+		using pointer = void;
+		using reference = void;
+		using container_type = std::vector<std::byte>;
+
+		container_type &m_bytes;
+		BaseException *m_exception{ nullptr };
+		ByteBackInserter(std::vector<std::byte> &bytes) : m_bytes(bytes) {}
+
+		BaseException *last_error() const { return m_exception; }
+
+		ByteBackInserter &operator=(PyObject *value)
+		{
+			if (auto int_obj = as<PyInteger>(value)) {
+				if (int_obj->as_i64() >= 0 && int_obj->as_i64() <= 255) {
+					m_bytes.push_back(static_cast<std::byte>(int_obj->as_i64()));
+				}
+			} else {
+				m_exception = type_error(
+					"'{}' object cannot be interpreted as an integer", value->type()->name());
 			}
-		} else {
-			m_exception = type_error(
-				"'{}' object cannot be interpreted as an integer", value->type()->name());
+			return *this;
 		}
-		return *this;
-	}
-};
+	};
+}// namespace
 
 PyResult<int32_t> PyBytes::__init__(PyTuple *args, PyDict *kwargs)
 {
@@ -248,7 +240,7 @@ PyResult<int64_t> PyBytes::__hash__() const
 {
 	// bytes and str have the same hash
 	// e.g. hash("123") == hash(b"123")
-	std::string_view sv{ bit_cast<char *>(m_value.b.data()), m_value.b.size() };
+	std::string_view sv{ std::bit_cast<char *>(m_value.b.data()), m_value.b.size() };
 	return Ok(static_cast<int64_t>(std::hash<std::string_view>{}(sv)));
 }
 
@@ -324,7 +316,7 @@ PyResult<PyBytesIterator *> PyBytesIterator::create(PyBytes *bytes)
 
 std::string PyBytesIterator::to_string() const
 {
-	return fmt::format("<bytes_iterator object at {}>", static_cast<const void *>(this));
+	return std::format("<bytes_iterator object at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyBytesIterator::__repr__() const { return PyString::create(to_string()); }

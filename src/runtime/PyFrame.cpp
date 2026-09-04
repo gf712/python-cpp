@@ -1,17 +1,12 @@
-#include "PyFrame.hpp"
-#include "BaseException.hpp"
-#include "KeyError.hpp"
-#include "PyCell.hpp"
-#include "PyCode.hpp"
-#include "PyDict.hpp"
-#include "PyModule.hpp"
-#include "PyNone.hpp"
-#include "PyObject.hpp"
-#include "PyTraceback.hpp"
-#include "PyType.hpp"
-#include "executable/Function.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "executable/CodeFlags.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -93,26 +88,36 @@ PyFrame *PyFrame::create(PyFrame *parent,
 void PyFrame::push_exception(BaseException *exception)
 {
 	ASSERT(exception);
-	spdlog::debug("PyFrame::push_exception: current exception count {}", m_exception_stack->size());
+	::detail::log_debug(std::format(
+		"PyFrame::push_exception: current exception count {}", m_exception_stack->size())
+			.c_str());
 	m_exception_stack->push_back(ExceptionStackItem{ .exception = exception,
 		.exception_type = exception->type(),
 		.traceback = exception->traceback() });
-	spdlog::debug("PyFrame::push_exception: pushed exception {}",
-		m_exception_stack->back().exception->to_string());
-	spdlog::debug("PyFrame::push_exception: added exception, stack has now {} exceptions",
-		m_exception_stack->size());
+	::detail::log_debug(std::format("PyFrame::push_exception: pushed exception {}",
+		m_exception_stack->back().exception->to_string())
+			.c_str());
+	::detail::log_debug(
+		std::format("PyFrame::push_exception: added exception, stack has now {} exceptions",
+			m_exception_stack->size())
+			.c_str());
 }
 
 BaseException *PyFrame::pop_exception()
 {
 	ASSERT(!m_exception_stack->empty());
 	auto *exception = m_exception_stack->back().exception;
-	spdlog::debug("PyFrame::pop_exception: @{}", static_cast<void *>(this));
-	spdlog::debug("PyFrame::pop_exception: current exception count {}", m_exception_stack->size());
-	spdlog::debug("PyFrame::pop_exception: Popped exception {}", exception->to_string());
+	::detail::log_debug(
+		std::format("PyFrame::pop_exception: @{}", static_cast<void *>(this)).c_str());
+	::detail::log_debug(
+		std::format("PyFrame::pop_exception: current exception count {}", m_exception_stack->size())
+			.c_str());
+	::detail::log_debug(
+		std::format("PyFrame::pop_exception: Popped exception {}", exception->to_string()).c_str());
 	m_exception_stack->pop_back();
-	spdlog::debug(
-		"PyFrame::pop_exception: cleared exception, {} exceptions left", m_exception_stack->size());
+	::detail::log_debug(std::format(
+		"PyFrame::pop_exception: cleared exception, {} exceptions left", m_exception_stack->size())
+			.c_str());
 	return exception;
 }
 
@@ -203,9 +208,10 @@ std::vector<PyCell *> &PyFrame::freevars() { return m_freevars; }
 
 PyFrame *PyFrame::exit()
 {
-	spdlog::debug("Leaving PyFrame '{}' and entering PyFrame '{}'",
+	::detail::log_debug(std::format("Leaving PyFrame '{}' and entering PyFrame '{}'",
 		m_f_code->function()->function_name(),
-		m_f_back->m_f_code->function()->function_name());
+		m_f_back->m_f_code->function()->function_name())
+			.c_str());
 
 	return m_f_back;
 }
@@ -217,7 +223,7 @@ std::string PyFrame::to_string() const
 	const auto builtins = m_builtins ? m_builtins->to_string() : "";
 	const void *parent = m_f_back ? &m_f_back : nullptr;
 
-	return fmt::format("PyFrame(locals={}, globals={}, builtins={}, parent={})",
+	return std::format("PyFrame(locals={}, globals={}, builtins={}, parent={})",
 		locals,
 		globals,
 		builtins,
@@ -249,7 +255,7 @@ void PyFrame::visit_graph(Visitor &visitor)
 Value PyFrame::consts(size_t index) const
 {
 	ASSERT(index < m_consts->size());
-	spdlog::debug("m_consts: {}", (void *)m_consts);
+	::detail::log_debug(std::format("m_consts: {}", (void *)m_consts).c_str());
 	return m_consts->elements()[index];
 }
 

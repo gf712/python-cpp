@@ -1,34 +1,25 @@
+module;
+#include "memory/allocate.hpp"
+#include <cstdint>
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
+
+module py.runtime;
+
 #include "Match.hpp"
 #include "Pattern.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/modules/Modules.hpp"
-
-#include <cctype>
-#include <unicode/uchar.h>
-
-#include <cstdint>
-#include <limits>
-#include <unicode/unistr.h>
 
 
 namespace py {
 PyResult<PyObject *> compile(PyTuple *args, PyDict *kwargs)
 {
 	auto result =
-		PyArgsParser<PyObject *, int32_t, PyList *, size_t, PyDict *, PyTuple *>::unpack_tuple(args,
-			kwargs,
-			"_sre.compile",
-			std::integral_constant<size_t, 6>{},
-			std::integral_constant<size_t, 6>{});
+		PyArgsParser<PyObject *, std::int32_t, PyList *, std::size_t, PyDict *, PyTuple *>::
+			unpack_tuple(args,
+				kwargs,
+				"_sre.compile",
+				std::integral_constant<std::size_t, 6>{},
+				std::integral_constant<std::size_t, 6>{});
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [pattern, flags, code, groups, groupindex, indexgroup] = result.unwrap();
@@ -43,15 +34,15 @@ PyResult<PyObject *> unicode_iscased(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyInteger *>::unpack_tuple(args,
 		kwargs,
 		"_sre.unicode_iscased",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [character] = result.unwrap();
 
 	if (!character->as_big_int().fits_sint_p()) { return Ok(py_false()); }
 
-	icu::UnicodeString original{ UChar32{ static_cast<int32_t>(character->as_i64()) } };
+	icu::UnicodeString original{ UChar32{ static_cast<std::int32_t>(character->as_i64()) } };
 	auto other = original;
 	other.toUpper();
 	if (original != other) { return Ok(py_true()); }
@@ -66,15 +57,15 @@ PyResult<PyObject *> unicode_tolower(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyInteger *>::unpack_tuple(args,
 		kwargs,
 		"_sre.unicode_tolower",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [character] = result.unwrap();
 
 	if (!character->as_big_int().fits_sint_p()) { return Ok(py_false()); }
 
-	icu::UnicodeString original{ UChar32{ static_cast<int32_t>(character->as_i64()) } };
+	icu::UnicodeString original{ UChar32{ static_cast<std::int32_t>(character->as_i64()) } };
 	original.toLower();
 
 	return PyInteger::create(original.char32At(0));
@@ -85,8 +76,8 @@ PyResult<PyObject *> ascii_iscased(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyInteger *>::unpack_tuple(args,
 		kwargs,
 		"_sre.ascii_iscased",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [character] = result.unwrap();
@@ -103,8 +94,8 @@ PyResult<PyObject *> ascii_tolower(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyInteger *>::unpack_tuple(args,
 		kwargs,
 		"_sre.ascii_tolower",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [character] = result.unwrap();
@@ -126,10 +117,10 @@ PyModule *sre_module()
 	module_->add_symbol(PyString::create("MAGIC").unwrap(), Number{ BigIntType{ 20171005 } });
 
 	module_->add_symbol(PyString::create("MAXREPEAT").unwrap(),
-		Number{ BigIntType{ std::numeric_limits<uint32_t>::max() } });
+		Number{ BigIntType{ std::numeric_limits<std::uint32_t>::max() } });
 
 	module_->add_symbol(PyString::create("MAXGROUPS").unwrap(),
-		Number{ BigIntType{ std::numeric_limits<uint32_t>::max() / 2 } });
+		Number{ BigIntType{ std::numeric_limits<std::uint32_t>::max() / 2 } });
 
 	module_->add_symbol(PyString::create("compile").unwrap(),
 		PyNativeFunction::create("compile", &compile).unwrap());

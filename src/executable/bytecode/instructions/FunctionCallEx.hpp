@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class FunctionCallEx final : public Instruction
 {
 	Register m_function;
@@ -23,7 +20,7 @@ class FunctionCallEx final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("CALL_EX         r{:<3} r{:<3} r{:<3}", m_function, m_args, m_kwargs);
+		return std::format("CALL_EX         r{:<3} r{:<3} r{:<3}", m_function, m_args, m_kwargs);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

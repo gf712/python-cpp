@@ -1,14 +1,8 @@
-#include "../Modules.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFloat.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
+module;
+#include <ctime>
 
-#include <chrono>
-#include <ratio>
+module py.runtime;
+
 
 namespace py {
 

@@ -1,8 +1,15 @@
-#include "GarbageCollector.hpp"
-#include "Heap_test.hpp"
+#include "core.hpp"
+
+#include <gtest/gtest.h>
 
 #include <cstdint>
 #include <cstring>
+
+import py.memory;
+import py.runtime;
+import std;
+
+#include "Heap_test.hpp"
 
 namespace {
 

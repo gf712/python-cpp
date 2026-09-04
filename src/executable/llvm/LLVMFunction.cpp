@@ -1,5 +1,8 @@
+#include "core.hpp"
+import py.runtime;
+
+// After the import: these name module-owned types.
 #include "LLVMGenerator.hpp"
-#include "runtime/Value.hpp"
 
 using namespace codegen;
 

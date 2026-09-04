@@ -1,21 +1,18 @@
 #pragma once
 
-#include "Instructions.hpp"
-#include <optional>
-
 class MakeFunction : public Instruction
 {
 	Register m_dst;
 	Register m_name;
-	size_t m_defaults_size;
-	size_t m_kw_defaults_size;
+	std::size_t m_defaults_size;
+	std::size_t m_kw_defaults_size;
 	std::optional<Register> m_captures_tuple;
 
   public:
 	MakeFunction(Register dst,
 		Register function_name,
-		size_t defaults_size,
-		size_t kw_defaults_size,
+		std::size_t defaults_size,
+		std::size_t kw_defaults_size,
 		std::optional<Register> captures_tuple)
 		: m_dst(dst), m_name(function_name), m_defaults_size(defaults_size),
 		  m_kw_defaults_size(kw_defaults_size), m_captures_tuple(std::move(captures_tuple))
@@ -23,14 +20,14 @@ class MakeFunction : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name);
+		return std::format("MAKE_FUNCTION   r{}   ({})", m_dst, m_name);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 
-	void relocate(size_t) final {}
+	void relocate(std::size_t) final {}
 
-	std::vector<uint8_t> serialize() const final;
+	std::vector<std::uint8_t> serialize() const final;
 
-	uint8_t id() const final { return MAKE_FUNCTION; }
+	std::uint8_t id() const final { return MAKE_FUNCTION; }
 };

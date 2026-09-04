@@ -1,19 +1,7 @@
-#include "Modules.hpp"
-#include "config.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/Import.hpp"
-#include "runtime/ImportError.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
 
 namespace py {
 namespace {
@@ -36,8 +24,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"is_frozen",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *name = std::get<0>(result.unwrap());
 
@@ -56,8 +44,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"is_frozen_package",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *name = std::get<0>(result.unwrap());
 
@@ -81,8 +69,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"get_frozen_object",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *name = std::get<0>(result.unwrap());
 
@@ -126,8 +114,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyString *>::unpack_tuple(args,
 					kwargs,
 					"is_builtin",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				auto *name = std::get<0>(result.unwrap());
 
@@ -141,8 +129,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"create_builtin",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 
 				return create_builtin(std::get<0>(result.unwrap()));
@@ -155,8 +143,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"exec_builtin",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				return exec_builtin(std::get<0>(result.unwrap()));
 			})
@@ -168,8 +156,8 @@ PyModule *imp_module()
 				auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 					kwargs,
 					"exec_dynamic",
-					std::integral_constant<size_t, 1>{},
-					std::integral_constant<size_t, 1>{});
+					std::integral_constant<std::size_t, 1>{},
+					std::integral_constant<std::size_t, 1>{});
 				if (result.is_err()) return Err(result.unwrap_err());
 				return exec_builtin(std::get<0>(result.unwrap()));
 			})

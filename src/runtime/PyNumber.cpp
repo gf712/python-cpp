@@ -1,19 +1,12 @@
-#include "PyNumber.hpp"
-#include "NotImplemented.hpp"
-#include "PyFloat.hpp"
-#include "PyInteger.hpp"
-#include "PyNone.hpp"
-#include "PyObject.hpp"
-#include "PyString.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "Value.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/ValueError.hpp"
-#include "types/builtin.hpp"
-
+module;
+#include "core.hpp"
 #include <cmath>
-#include <variant>
+#include <gmpxx.h>
+
+module py.runtime;
+import py.types;
+import std;
+
 
 namespace py {
 

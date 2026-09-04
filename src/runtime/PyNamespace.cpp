@@ -1,10 +1,12 @@
-#include "PyNamespace.hpp"
-#include "MemoryError.hpp"
-#include "NotImplemented.hpp"
-#include "PyDict.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
 
 namespace py {
 
@@ -52,7 +54,7 @@ PyResult<PyObject *> PyNamespace::__new__(const PyType *type, PyTuple *, PyDict 
 
 PyResult<int32_t> PyNamespace::__init__(PyTuple *args, PyDict *kwargs)
 {
-	if (args || args->size() > 0) { return Err(type_error("no positional arguments expected")); }
+	if (!args || args->size() > 0) { return Err(type_error("no positional arguments expected")); }
 	if (kwargs) {
 		for (const auto &[key, value] : kwargs->map()) {
 			if (std::holds_alternative<PyObject *>(key)) {
@@ -121,7 +123,7 @@ std::string PyNamespace::to_string() const
 		i++;
 		if (i != m_dict->map().size()) { ss << ", "; }
 	}
-	return fmt::format("namespace({})", ss.str());
+	return std::format("namespace({})", ss.str());
 }
 
 

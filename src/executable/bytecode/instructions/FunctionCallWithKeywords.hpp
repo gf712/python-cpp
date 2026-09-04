@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class FunctionCallWithKeywords final : public Instruction
 {
 	Register m_function_name;
@@ -23,11 +21,11 @@ class FunctionCallWithKeywords final : public Instruction
 		std::string kwargs_regs{};
 		std::string keyword_regs{};
 
-		for (const auto arg : m_args) { args_regs += fmt::format(" r{:<3}", arg); }
-		for (const auto kwarg : m_kwargs) { kwargs_regs += fmt::format(" r{:<3}", kwarg); }
-		for (const auto &keyword : m_keywords) { keyword_regs += fmt::format("r{:<3} ", keyword); }
+		for (const auto arg : m_args) { args_regs += std::format(" r{:<3}", arg); }
+		for (const auto kwarg : m_kwargs) { kwargs_regs += std::format(" r{:<3}", kwarg); }
+		for (const auto &keyword : m_keywords) { keyword_regs += std::format("r{:<3} ", keyword); }
 
-		return fmt::format("CALL_FUNCTION_KW r{:<3}args={} kwargs={} keywords={}",
+		return std::format("CALL_FUNCTION_KW r{:<3}args={} kwargs={} keywords={}",
 			m_function_name,
 			args_regs,
 			kwargs_regs,

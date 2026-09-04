@@ -1,28 +1,12 @@
-#include "PySet.hpp"
-#include "KeyError.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyDict.hpp"
-#include "PyFrozenSet.hpp"
-#include "PyFunction.hpp"
-#include "PyInteger.hpp"
-#include "PyNone.hpp"
-#include "PyNumber.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "StopIteration.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/NotImplementedError.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "utilities.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include <algorithm>
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -395,7 +379,7 @@ PySetIterator::PySetIterator(const PyFrozenSet &pyset)
 
 std::string PySetIterator::to_string() const
 {
-	return fmt::format("<set_iterator at {}>", static_cast<const void *>(this));
+	return std::format("<set_iterator at {}>", static_cast<const void *>(this));
 }
 
 void PySetIterator::visit_graph(Visitor &visitor)

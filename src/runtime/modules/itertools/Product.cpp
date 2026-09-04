@@ -1,15 +1,18 @@
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+#include <gmpxx.h>
+
+#include <cstddef>
+
+module py.runtime;
+import py.memory;
+import py.types;
+import std;
+
+// After the import: these name module-owned types.
 #include "Product.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
-#include <variant>
 
 namespace py {
 namespace {

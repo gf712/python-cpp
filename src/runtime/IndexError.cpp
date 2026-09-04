@@ -1,9 +1,26 @@
-#include "IndexError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+IndexError *IndexError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<IndexError>(args);
+}
+
+BaseException *make_index_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return IndexError::create(args_tuple.unwrap());
+}
 
 IndexError::IndexError(PyType *type) : LookupError(type, nullptr) {}
 

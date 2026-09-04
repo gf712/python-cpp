@@ -1,11 +1,14 @@
-#include "PyEllipsis.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+std::string PyEllipsis::to_string() const { return "PyEllipsis"; }
 PyEllipsis::PyEllipsis(PyType *type) : PyBaseObject(type) {}
 
 PyEllipsis::PyEllipsis() : PyBaseObject(types::BuiltinTypes::the().ellipsis()) {}

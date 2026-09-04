@@ -1,12 +1,13 @@
-#include "../Bytecode.hpp"
-#include "../BytecodeProgram.hpp"
-#include "BytecodeGenerator.hpp"
+#include "core.hpp"
 #include "executable/common.hpp"
-#include "lexer/Lexer.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/PyCode.hpp"
-
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.runtime;
+import py.codegen;
+import py.ast;
+
+// After the import: these name module-owned types.
 
 
 namespace {

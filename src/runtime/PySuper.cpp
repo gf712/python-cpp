@@ -1,16 +1,12 @@
-#include "PySuper.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyCell.hpp"
-#include "PyCode.hpp"
-#include "PyFrame.hpp"
-#include "PyList.hpp"
-#include "PyString.hpp"
-#include "PyType.hpp"
-#include "RuntimeError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -210,11 +206,11 @@ PyResult<PyType *> PySuper::infer_type(PyFrame *frame, PyCode *code)
 std::string PySuper::to_string() const
 {
 	if (m_object_type) {
-		return fmt::format("<super: <class '{}'>, <{} object>>",
+		return std::format("<super: <class '{}'>, <{} object>>",
 			m_type ? m_type->name() : "NULL",
 			m_object_type->name());
 	} else {
-		return fmt::format("<super: <class '{}'>, NULL>", m_type ? m_type->name() : "NULL");
+		return std::format("<super: <class '{}'>, NULL>", m_type ? m_type->name() : "NULL");
 	}
 }
 

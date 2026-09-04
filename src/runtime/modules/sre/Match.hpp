@@ -1,12 +1,11 @@
 #pragma once
 
-#include "runtime/PyObject.hpp"
-
 namespace py {
 namespace sre {
 	class Match : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		Match();
 		Match(PyType *);

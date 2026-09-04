@@ -1,9 +1,19 @@
-#include "ast/AST.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/Value.hpp"
-#include "utilities.hpp"
+#include "core.hpp"
+
+// gmpxx's operators are declared in py.ast's global module fragment, so they
+// are not exported with mpz_class and have to be included here.
+#include <gmpxx.h>
+
+#include <spdlog/spdlog.h>
 
 #include "gtest/gtest.h"
+
+import py.lexer;
+import py.ast;
+import py.runtime;
+import std;
+
+// After the import: these name module-owned types.
 
 using namespace ast;
 using namespace py;
@@ -15,43 +25,28 @@ void dispatch(const ASTNode *result, const ASTNode *expected);
 void compare_constant(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::Constant);
-	const auto result_value = as<Constant>(result)->value();
-	const auto expected_value = as<Constant>(expected)->value();
+	const auto &result_value = as<Constant>(result)->value();
+	const auto &expected_value = as<Constant>(expected)->value();
 
-	ASSERT_EQ(result_value->index(), expected_value->index());
+	ASSERT_EQ(result_value.index(), expected_value.index());
 	std::visit(
-		overloaded{ [&](const Number &number_value) {
-					   if (auto *int_result = std::get_if<BigIntType>(&number_value.value)) {
-						   ASSERT_EQ(*int_result,
-							   std::get<BigIntType>(std::get<Number>(*expected_value).value));
-					   } else if (auto *double_result = std::get_if<double>(&number_value.value)) {
-						   ASSERT_EQ(*double_result,
-							   std::get<double>(std::get<Number>(*expected_value).value));
-					   } else {
-						   TODO();
-					   }
-				   },
-			[&](const String &string_value) {
-				ASSERT_EQ(string_value.s, std::get<String>(*expected_value).s);
+		overloaded{
+			[&](std::monostate) {},
+			[&](bool value) { ASSERT_EQ(value, std::get<bool>(expected_value)); },
+			[&](std::int64_t value) { ASSERT_EQ(value, std::get<std::int64_t>(expected_value)); },
+			[&](const mpz_class &value) {
+				ASSERT_EQ(value.get_str(), std::get<mpz_class>(expected_value).get_str());
 			},
-			[&](const NameConstant &name_constant_value) {
-				if (auto *bool_result = std::get_if<bool>(&name_constant_value.value)) {
-					ASSERT_EQ(*bool_result,
-						std::get<bool>(std::get<NameConstant>(*expected_value).value));
-				} else if (std::holds_alternative<NoneType>(
-							   std::get<NameConstant>(*expected_value).value)) {
-					ASSERT_TRUE(std::holds_alternative<NoneType>(name_constant_value.value));
-				} else {
-					TODO();
-				}
+			[&](double value) { ASSERT_EQ(value, std::get<double>(expected_value)); },
+			[&](const std::string &value) {
+				ASSERT_EQ(value, std::get<std::string>(expected_value));
 			},
-			[&](const Bytes &bytes) { ASSERT_EQ(bytes.b, std::get<Bytes>(*expected_value).b); },
-			[&](const auto &val) {
-				(void)val;
-				TODO();
-				// ASSERT_EQ(result_, std::get<result_.index()>(expected_));
-			} },
-		*result_value);
+			[&](const ast::Bytes &value) {
+				ASSERT_EQ(value, std::get<ast::Bytes>(expected_value));
+			},
+			[&](ast::EllipsisType) {},
+		},
+		result_value);
 }
 
 void compare_assign(const ASTNode *result, const ASTNode *expected)
@@ -240,8 +235,8 @@ void compare_yieldfrom(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::YieldFrom);
 
-	const auto result_value = as<YieldFrom>(result)->value();
-	const auto expected_value = as<YieldFrom>(expected)->value();
+	const auto result_value = as<ast::YieldFrom>(result)->value();
+	const auto expected_value = as<ast::YieldFrom>(expected)->value();
 	dispatch(result_value, expected_value);
 }
 
@@ -486,8 +481,8 @@ void compare_import_from(const ASTNode *result, const ASTNode *expected)
 {
 	ASSERT_EQ(result->node_type(), ASTNodeType::ImportFrom);
 
-	const auto result_names = as<ImportFrom>(result)->names();
-	const auto expected_names = as<ImportFrom>(expected)->names();
+	const auto result_names = as<ast::ImportFrom>(result)->names();
+	const auto expected_names = as<ast::ImportFrom>(expected)->names();
 	ASSERT_EQ(result_names.size(), expected_names.size());
 
 	for (size_t i = 0; i < result_names.size(); ++i) {
@@ -495,8 +490,8 @@ void compare_import_from(const ASTNode *result, const ASTNode *expected)
 		ASSERT_EQ(result_names[i].asname, expected_names[i].asname);
 	}
 
-	ASSERT_EQ(as<ImportFrom>(result)->level(), as<ImportFrom>(expected)->level());
-	ASSERT_EQ(as<ImportFrom>(result)->module(), as<ImportFrom>(expected)->module());
+	ASSERT_EQ(as<ast::ImportFrom>(result)->level(), as<ast::ImportFrom>(expected)->level());
+	ASSERT_EQ(as<ast::ImportFrom>(result)->module(), as<ast::ImportFrom>(expected)->module());
 }
 
 void compare_slices(const Subscript::SliceType &result, const Subscript::SliceType &expected)
@@ -1198,7 +1193,7 @@ TEST(Parser, SingleValueAssignmentTuple)
 			"_CASE_INSENSITIVE_PLATFORMS_STR_KEY", ContextType::STORE, SourceLocation{}) },
 		expected_ast->arena().create<ast::Tuple>(
 			std::vector<ASTNode *>{
-				expected_ast->arena().create<Constant>(String{ "win" }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(std::string{ "win" }, SourceLocation{}),
 			},
 			ContextType::LOAD,
 			SourceLocation{}),
@@ -2050,8 +2045,8 @@ TEST(Parser, ImportFrom)
 			.name = "fibo",
 		},
 	};
-	auto import =
-		expected_ast->arena().create<ImportFrom>("sequence", std::move(names), 0, SourceLocation{});
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
+		"sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
 	assert_generates_ast(program, expected_ast);
@@ -2065,7 +2060,7 @@ TEST(Parser, ImportFromDotted)
 	std::vector<alias> names{ alias{
 		.name = "fibo",
 	} };
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2088,7 +2083,7 @@ TEST(Parser, ImportFromDottedMutiple)
 			.name = "factorial",
 		},
 	};
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2111,7 +2106,7 @@ TEST(Parser, ImportFromDottedMutipleInParen)
 			.name = "factorial",
 		},
 	};
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"internal.math.sequence", std::move(names), 0, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2128,7 +2123,7 @@ TEST(Parser, ImportFromParent)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"fibonacci.impl", std::move(names), 1, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2145,7 +2140,7 @@ TEST(Parser, ImportFromParentLevel2)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"fibonacci.impl", std::move(names), 2, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2162,7 +2157,7 @@ TEST(Parser, ImportFromParentLevel3)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"fibonacci.impl", std::move(names), 3, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2179,7 +2174,7 @@ TEST(Parser, ImportFromParentLevel4)
 		.name = "fibonacci_cpu",
 		.asname = "fib",
 	} };
-	auto import = expected_ast->arena().create<ImportFrom>(
+	auto import = expected_ast->arena().create<ast::ImportFrom>(
 		"fibonacci.impl", std::move(names), 4, SourceLocation{});
 	expected_ast->emplace(import);
 
@@ -2974,8 +2969,7 @@ TEST(Parser, FunctionDefinitionWithDecoratorList)
 			SourceLocation{}),// args
 		std::vector<ASTNode *>{
 			expected_ast->arena().create<Return>(
-				expected_ast->arena().create<Constant>(
-					py::NameConstant{ py::NoneType{} }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(std::monostate{}, SourceLocation{}),
 				SourceLocation{}),
 		},// body
 		std::vector<ASTNode *>{
@@ -3236,8 +3230,7 @@ TEST(Parser, FunctionDefinitionWithOnlyDefaultArguments)
 			std::vector<ASTNode *>{},
 			nullptr,
 			std::vector<ASTNode *>{
-				expected_ast->arena().create<Constant>(
-					NameConstant{ NoneType{} }, SourceLocation{}),
+				expected_ast->arena().create<Constant>(std::monostate{}, SourceLocation{}),
 			},
 			SourceLocation{}),// args
 		std::vector<ASTNode *>{
@@ -3495,7 +3488,7 @@ TEST(Parser, Bytes)
 	constexpr std::string_view program = "b\"hello\"\n";
 
 	auto expected_ast = create_test_module();
-	expected_ast->emplace(expected_ast->arena().create<Constant>(Bytes{ { std::byte{ 'h' },
+	expected_ast->emplace(expected_ast->arena().create<Constant>(ast::Bytes{ { std::byte{ 'h' },
 																	 std::byte{ 'e' },
 																	 std::byte{ 'l' },
 																	 std::byte{ 'l' },
@@ -3576,8 +3569,8 @@ TEST(Parser, YieldEmpty)
 	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("gen",// function_name
 		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
 		std::vector<ASTNode *>{
-			expected_ast->arena().create<Yield>(expected_ast->arena().create<Constant>(
-													NameConstant{ NoneType{} }, SourceLocation{}),
+			expected_ast->arena().create<Yield>(
+				expected_ast->arena().create<Constant>(std::monostate{}, SourceLocation{}),
 				SourceLocation{}),
 		},// body
 		std::vector<ASTNode *>{},// decorator_list
@@ -3624,7 +3617,7 @@ TEST(Parser, YieldFrom)
 	expected_ast->emplace(expected_ast->arena().create<FunctionDefinition>("foo",// function_name
 		expected_ast->arena().create<Arguments>(std::vector<Argument *>{}, SourceLocation{}),// args
 		std::vector<ASTNode *>{
-			expected_ast->arena().create<YieldFrom>(
+			expected_ast->arena().create<ast::YieldFrom>(
 				expected_ast->arena().create<Name>("bar", ContextType::LOAD, SourceLocation{}),
 				SourceLocation{}),
 		},// body

@@ -1,15 +1,11 @@
-#include "PyProperty.hpp"
-#include "AttributeError.hpp"
-#include "PyArgParser.hpp"
-#include "PyDict.hpp"
-#include "PyFunction.hpp"
-#include "PyNone.hpp"
-#include "PyString.hpp"
-#include "PyType.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -77,7 +73,7 @@ PyProperty::PyProperty(PyObject *fget, PyObject *fset, PyObject *fdel, PyObject 
 
 std::string PyProperty::to_string() const
 {
-	return fmt::format("<property object at {}>", static_cast<const void *>(this));
+	return std::format("<property object at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyProperty *>

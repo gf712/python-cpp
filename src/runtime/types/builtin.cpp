@@ -1,74 +1,10 @@
-#include "builtin.hpp"
+module;
+#include "core.hpp"
 
-#include "runtime/AssertionError.hpp"
-#include "runtime/AttributeError.hpp"
-#include "runtime/ImportError.hpp"
-#include "runtime/IndexError.hpp"
-#include "runtime/KeyError.hpp"
-#include "runtime/LookupError.hpp"
-#include "runtime/MemoryError.hpp"
-#include "runtime/ModuleNotFoundError.hpp"
-#include "runtime/NameError.hpp"
-#include "runtime/NotImplemented.hpp"
-#include "runtime/NotImplementedError.hpp"
-#include "runtime/OSError.hpp"
-#include "runtime/PyAsyncGenerator.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyBoundMethod.hpp"
-#include "runtime/PyBuiltInMethod.hpp"
-#include "runtime/PyByteArray.hpp"
-#include "runtime/PyBytes.hpp"
-#include "runtime/PyCell.hpp"
-#include "runtime/PyClassMethod.hpp"
-#include "runtime/PyClassMethodDescriptor.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyComplex.hpp"
-#include "runtime/PyCoroutine.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyEllipsis.hpp"
-#include "runtime/PyEnumerate.hpp"
-#include "runtime/PyFloat.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyFrozenSet.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyGenerator.hpp"
-#include "runtime/PyGenericAlias.hpp"
-#include "runtime/PyGetSetDescriptor.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyIterator.hpp"
-#include "runtime/PyLLVMFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyMap.hpp"
-#include "runtime/PyMappingProxy.hpp"
-#include "runtime/PyMemberDescriptor.hpp"
-#include "runtime/PyMemoryView.hpp"
-#include "runtime/PyMethodDescriptor.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNamespace.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyProperty.hpp"
-#include "runtime/PyRange.hpp"
-#include "runtime/PyReversed.hpp"
-#include "runtime/PySet.hpp"
-#include "runtime/PySlice.hpp"
-#include "runtime/PySlotWrapper.hpp"
-#include "runtime/PyStaticMethod.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PySuper.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/PyZip.hpp"
-#include "runtime/RuntimeError.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/SyntaxError.hpp"
-#include "runtime/UnboundLocalError.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/warnings/DeprecationWarning.hpp"
-#include "runtime/warnings/ImportWarning.hpp"
-#include "runtime/warnings/PendingDeprecationWarning.hpp"
-#include "runtime/warnings/ResourceWarning.hpp"
-#include "runtime/warnings/Warning.hpp"
+module py.types;
+import py.runtime;
+import std;
+
 
 namespace py::types {
 
@@ -131,16 +67,18 @@ BuiltinTypes::BuiltinTypes()
 	  m_unbound_local_error(UnboundLocalError::type_factory())
 {}
 
-#define INITIALIZE_TYPE(TYPENAME)                                                         \
-	PyType *TYPENAME()                                                                    \
-	{                                                                                     \
-		static PyType *type = nullptr;                                                    \
-		if (!type) {                                                                      \
-			auto &prototype = BuiltinTypes::the().TYPENAME();                             \
-			type = PyType::initialize(prototype);                                         \
-			spdlog::trace("Initialized builtin type {} @{}", type->name(), (void *)type); \
-		}                                                                                 \
-		return type;                                                                      \
+#define INITIALIZE_TYPE(TYPENAME)                                                          \
+	PyType *TYPENAME()                                                                     \
+	{                                                                                      \
+		static PyType *type = nullptr;                                                     \
+		if (!type) {                                                                       \
+			auto &prototype = BuiltinTypes::the().TYPENAME();                              \
+			type = PyType::initialize(prototype);                                          \
+			::detail::log_trace(                                                           \
+				std::format("Initialized builtin type {} @{}", type->name(), (void *)type) \
+					.c_str());                                                             \
+		}                                                                                  \
+		return type;                                                                       \
 	}
 
 INITIALIZE_TYPE(type)

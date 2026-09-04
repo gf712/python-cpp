@@ -49,6 +49,11 @@ jobs:
       with:
         create-symlink: true
 
+    - name: Upgrade CMake
+      run: |
+        sudo apt-get purge cmake
+        sudo snap install cmake --classic
+
     - name: Configure CMake
       run: cmake --preset ${{env.CMAKE_PRESET}}
 

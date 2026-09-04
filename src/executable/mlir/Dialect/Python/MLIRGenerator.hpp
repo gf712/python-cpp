@@ -1,20 +1,16 @@
 #pragma once
 
-#include "ast/AST.hpp"
-#include "executable/Program.hpp"
-#include "executable/bytecode/codegen/VariablesResolver.hpp"
+#include "core.hpp"
 
-#include <memory>
 
-namespace mlir {
-class MLIRContext;
-class ModuleOp;
-class OpBuilder;
-class Block;
-namespace func {
-	class FuncOp;
-}
-}// namespace mlir
+#include "ast/ASTNodeTypes.hpp"
+
+
+// No forward declarations of mlir:: classes here: this header is included from
+// py.runtime's purview (compile.cpp), where a forward declaration would create a
+// module-attached entity conflicting with the real MLIR headers. Includers must
+// bring in mlir/IR/MLIRContext.h, mlir/IR/Builders.h, mlir/IR/BuiltinOps.h and
+// mlir/Dialect/Func/IR/FuncOps.h themselves.
 
 namespace codegen {
 
@@ -35,7 +31,7 @@ class Context
 
 	static Context create();
 
-	ContextImpl *operator->() { return m_impl.get(); }
+	ContextImpl *operator->();
 };
 
 class MLIRGenerator : ast::CodeGenerator
@@ -71,16 +67,8 @@ class MLIRGenerator : ast::CodeGenerator
 
 	struct ClearExceptionBeforeReturn
 	{
-		ClearExceptionBeforeReturn(Scope &scope) : scope(scope)
-		{
-			scope.clear_exception_before_return.push_back(true);
-		}
-
-		~ClearExceptionBeforeReturn()
-		{
-			ASSERT(!scope.clear_exception_before_return.empty());
-			scope.clear_exception_before_return.pop_back();
-		}
+		ClearExceptionBeforeReturn(Scope &scope);
+		~ClearExceptionBeforeReturn();
 
 		Scope &scope;
 	};
@@ -89,11 +77,7 @@ class MLIRGenerator : ast::CodeGenerator
 	{
 		Scope &scope;
 		MLIRGenerator *this_;
-		~RAIIScope()
-		{
-			ASSERT(!this_->m_scope.empty());
-			this_->m_scope.pop_back();
-		}
+		~RAIIScope();
 	};
 
   private:
@@ -186,7 +170,7 @@ class MLIRGenerator : ast::CodeGenerator
 
 	std::string mangle_namespace(const std::deque<Scope> &s) const;
 
-	Scope &scope() { return m_scope.back(); }
-	const Scope &scope() const { return m_scope.back(); }
+	Scope &scope();
+	const Scope &scope() const;
 };
 }// namespace codegen

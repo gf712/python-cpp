@@ -16,6 +16,9 @@
 #include <mlir/IR/Visitors.h>
 #include <spdlog/spdlog.h>
 
+// After the third-party headers: these name module-owned types.
+import py.runtime;
+
 using namespace codegen;
 
 namespace {

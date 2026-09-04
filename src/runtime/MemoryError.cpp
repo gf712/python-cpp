@@ -1,9 +1,34 @@
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+PyResult<MemoryError *> MemoryError::create(PyTuple *args)
+{
+	auto &heap = VirtualMachine::the().heap();
+	auto result = heap.allocate<MemoryError>(args);
+	if (!result) {
+		// TODO: if this exception fails to allocated we need to find a solution to signal it.
+		//       could force a GC run and try again?
+		TODO();
+	}
+	return Ok(result);
+}
+
+BaseException *memory_error(std::size_t failed_allocation_size)
+{
+	// if the allocation of the exception parameters fail, we bail (for now at least)
+	auto msg = PyString::create(
+		std::format("memory allocation failed, allocating {} bytes", failed_allocation_size));
+	if (msg.is_err()) { TODO(); }
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	if (args_tuple.is_err()) { TODO(); }
+	return MemoryError::create(args_tuple.unwrap()).unwrap();
+}
 
 template<> MemoryError *as(PyObject *obj)
 {

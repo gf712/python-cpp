@@ -1,18 +1,15 @@
-#include "ImportName.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
 
-#include "interpreter/Interpreter.hpp"
-#include "runtime/ImportError.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/TypeError.hpp"
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
 
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
 
-#include <numeric>
 
 using namespace py;
 

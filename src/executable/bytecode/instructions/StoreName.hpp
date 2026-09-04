@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class StoreName final : public Instruction
 {
 	std::string m_object_name;
@@ -14,7 +11,7 @@ class StoreName final : public Instruction
 	{}
 	std::string to_string() const final
 	{
-		return fmt::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
+		return std::format("STORE_NAME      \"{}\" r{:<3}", m_object_name, m_source);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

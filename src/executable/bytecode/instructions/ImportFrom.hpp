@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class ImportFrom : public Instruction
 {
 	Register m_destination;
@@ -15,7 +13,7 @@ class ImportFrom : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("IMPORT_FROM     r{:<3} {:<3}", m_destination, m_name);
+		return std::format("IMPORT_FROM     r{:<3} {:<3}", m_destination, m_name);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

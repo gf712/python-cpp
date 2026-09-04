@@ -1,11 +1,12 @@
-#include "PyFrozenSet.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PySet.hpp"
-#include "StopIteration.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 

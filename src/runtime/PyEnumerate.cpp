@@ -1,7 +1,12 @@
-#include "PyEnumerate.hpp"
-#include "MemoryError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 PyEnumerate::PyEnumerate(PyType *type) : PyBaseObject(type) {}

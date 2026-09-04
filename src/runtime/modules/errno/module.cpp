@@ -1,7 +1,9 @@
-#include "../Modules.hpp"
-#include "runtime/PyDict.hpp"
-#include <array>
+module;
+#include "core.hpp"
 #include <cerrno>
+
+module py.runtime;
+
 
 namespace py {
 

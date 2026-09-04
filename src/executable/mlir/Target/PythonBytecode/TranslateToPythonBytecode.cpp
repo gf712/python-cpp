@@ -1,85 +1,10 @@
+module;
 #include "Dialect/EmitPythonBytecode/IR/EmitPythonBytecode.hpp"
 #include "Dialect/Python/IR/PythonOps.hpp"
-#include "Target/PythonBytecode/PythonBytecodeEmitter.hpp"
-#include "executable/Mangler.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "executable/bytecode/instructions/BinaryOperation.hpp"
-#include "executable/bytecode/instructions/BinarySubscript.hpp"
-#include "executable/bytecode/instructions/BuildDict.hpp"
-#include "executable/bytecode/instructions/BuildList.hpp"
-#include "executable/bytecode/instructions/BuildSet.hpp"
-#include "executable/bytecode/instructions/BuildSlice.hpp"
-#include "executable/bytecode/instructions/BuildString.hpp"
-#include "executable/bytecode/instructions/BuildTuple.hpp"
-#include "executable/bytecode/instructions/ClearExceptionState.hpp"
-#include "executable/bytecode/instructions/CompareOperation.hpp"
-#include "executable/bytecode/instructions/DeleteAttr.hpp"
-#include "executable/bytecode/instructions/DeleteDeref.hpp"
-#include "executable/bytecode/instructions/DeleteFast.hpp"
-#include "executable/bytecode/instructions/DeleteGlobal.hpp"
-#include "executable/bytecode/instructions/DeleteName.hpp"
-#include "executable/bytecode/instructions/DeleteSubscript.hpp"
-#include "executable/bytecode/instructions/DictAdd.hpp"
-#include "executable/bytecode/instructions/DictUpdate.hpp"
-#include "executable/bytecode/instructions/ForIter.hpp"
-#include "executable/bytecode/instructions/FormatValue.hpp"
-#include "executable/bytecode/instructions/FunctionCall.hpp"
-#include "executable/bytecode/instructions/FunctionCallEx.hpp"
-#include "executable/bytecode/instructions/FunctionCallWithKeywords.hpp"
-#include "executable/bytecode/instructions/GetAwaitable.hpp"
-#include "executable/bytecode/instructions/GetIter.hpp"
-#include "executable/bytecode/instructions/GetYieldFromIter.hpp"
-#include "executable/bytecode/instructions/ImportFrom.hpp"
-#include "executable/bytecode/instructions/ImportName.hpp"
-#include "executable/bytecode/instructions/ImportStar.hpp"
-#include "executable/bytecode/instructions/InplaceOp.hpp"
-#include "executable/bytecode/instructions/Instructions.hpp"
-#include "executable/bytecode/instructions/Jump.hpp"
-#include "executable/bytecode/instructions/JumpIfExceptionMatch.hpp"
-#include "executable/bytecode/instructions/JumpIfFalse.hpp"
-#include "executable/bytecode/instructions/JumpIfNotExceptionMatch.hpp"
-#include "executable/bytecode/instructions/JumpIfTrue.hpp"
-#include "executable/bytecode/instructions/LeaveExceptionHandling.hpp"
-#include "executable/bytecode/instructions/ListAppend.hpp"
-#include "executable/bytecode/instructions/ListExtend.hpp"
-#include "executable/bytecode/instructions/ListToTuple.hpp"
-#include "executable/bytecode/instructions/LoadAssertionError.hpp"
-#include "executable/bytecode/instructions/LoadAttr.hpp"
-#include "executable/bytecode/instructions/LoadBuildClass.hpp"
-#include "executable/bytecode/instructions/LoadClosure.hpp"
-#include "executable/bytecode/instructions/LoadConst.hpp"
-#include "executable/bytecode/instructions/LoadDeref.hpp"
-#include "executable/bytecode/instructions/LoadException.hpp"
-#include "executable/bytecode/instructions/LoadFast.hpp"
-#include "executable/bytecode/instructions/LoadGlobal.hpp"
-#include "executable/bytecode/instructions/LoadMethod.hpp"
-#include "executable/bytecode/instructions/LoadName.hpp"
-#include "executable/bytecode/instructions/MakeFunction.hpp"
-#include "executable/bytecode/instructions/Move.hpp"
-#include "executable/bytecode/instructions/Pop.hpp"
-#include "executable/bytecode/instructions/Push.hpp"
-#include "executable/bytecode/instructions/RaiseVarargs.hpp"
-#include "executable/bytecode/instructions/ReRaise.hpp"
-#include "executable/bytecode/instructions/ReturnValue.hpp"
-#include "executable/bytecode/instructions/SetAdd.hpp"
-#include "executable/bytecode/instructions/SetUpdate.hpp"
-#include "executable/bytecode/instructions/SetupExceptionHandling.hpp"
-#include "executable/bytecode/instructions/SetupWith.hpp"
-#include "executable/bytecode/instructions/StoreAttr.hpp"
-#include "executable/bytecode/instructions/StoreDeref.hpp"
-#include "executable/bytecode/instructions/StoreFast.hpp"
-#include "executable/bytecode/instructions/StoreGlobal.hpp"
-#include "executable/bytecode/instructions/StoreName.hpp"
-#include "executable/bytecode/instructions/StoreSubscript.hpp"
-#include "executable/bytecode/instructions/ToBool.hpp"
-#include "executable/bytecode/instructions/Unary.hpp"
-#include "executable/bytecode/instructions/UnpackExpand.hpp"
-#include "executable/bytecode/instructions/UnpackSequence.hpp"
-#include "executable/bytecode/instructions/WithExceptStart.hpp"
-#include "executable/bytecode/instructions/YieldFrom.hpp"
-#include "executable/bytecode/instructions/YieldLoad.hpp"
-#include "executable/bytecode/instructions/YieldValue.hpp"
-#include "executable/mlir/Target/PythonBytecode/LinearScanRegisterAllocation.hpp"
+#include "Target/PythonBytecode/LinearScanRegisterAllocation.hpp"
+#include "core.hpp"
+#include "executable/CodeFlags.hpp"
+#include "executable/Label.hpp"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -93,15 +18,22 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
-#include "runtime/Value.hpp"
-#include "utilities.hpp"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#include <algorithm>
-#include <map>
-#include <optional>
-#include <ranges>
+#include <gmp.h>
+
+
+module py.runtime;
+import py.ast;
+import std;
+
+// The concrete instruction classes are global-module types deriving from
+// py.runtime's Instruction, so they follow the import.
+
+// Names ::Program, so it follows the import.
+#include "Target/PythonBytecode/PythonBytecodeEmitter.hpp"
+
 
 using namespace mlir;
 
@@ -284,7 +216,8 @@ struct PythonBytecodeEmitter
 					std::vector<std::byte> bytes;
 					for (const auto &el : bytes_attr) {
 						ASSERT(el.isIntN(8));
-						bytes.push_back(std::byte{ *bit_cast<const uint8_t *>(el.getRawData()) });
+						bytes.push_back(
+							std::byte{ *std::bit_cast<const uint8_t *>(el.getRawData()) });
 					}
 					return ::py::Bytes{ std::move(bytes) };
 				})

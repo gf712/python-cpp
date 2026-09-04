@@ -1,14 +1,16 @@
-#include "ForIter.hpp"
+module;
+#include "core.hpp"
 #include "executable/Label.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyTraceback.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/StopIteration.hpp"
-#include "vm/VM.hpp"
+#include <cstddef>
+#include <cstdint>
 
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
+#include "executable/Label.hpp"
+
 
 using namespace py;
 

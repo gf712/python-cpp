@@ -1,12 +1,9 @@
-#include "PyMemberDescriptor.hpp"
-#include "MemoryError.hpp"
-#include "PyString.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -57,7 +54,7 @@ void PyMemberDescriptor::visit_graph(Visitor &visitor)
 
 std::string PyMemberDescriptor::to_string() const
 {
-	return fmt::format(
+	return std::format(
 		"<member '{}' of '{}' objects>", m_name->to_string(), m_underlying_type->name());
 }
 

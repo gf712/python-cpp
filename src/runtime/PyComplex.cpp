@@ -1,7 +1,8 @@
-#include "PyComplex.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/types/api.hpp"
+module;
+
+module py.runtime;
+import py.types;
+
 
 using namespace py;
 

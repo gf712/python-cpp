@@ -1,4 +1,9 @@
-#include "../Modules.hpp"
+module;
+#include "memory/allocate.hpp"
+#include <cstddef>
+
+module py.runtime;
+
 #include "Chain.hpp"
 #include "Count.hpp"
 #include "ISlice.hpp"
@@ -6,8 +11,7 @@
 #include "Product.hpp"
 #include "Repeat.hpp"
 #include "StarMap.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyType.hpp"
+
 
 namespace py {
 

@@ -1,20 +1,19 @@
+#include "core.hpp"
+#include "executable/common.hpp"
+#include "linenoise.h"
 #include <cstdio>
 #include <cstdlib>
-
-#include "linenoise.h"
 #include <cxxopts.hpp>
+#include <spdlog/spdlog.h>
 
-#include <filesystem>
-#include <iostream>
-#include <optional>
-#include <string>
+import py.lexer;
+import py.runtime;
+import std;
 
-#include "executable/Program.hpp"
+#ifdef USE_LLVM
+// Names ast:: and Program, so it follows the import.
 #include "executable/llvm/LLVMGenerator.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "parser/Parser.hpp"
-#include "runtime/modules/Modules.hpp"
-#include "vm/VM.hpp"
+#endif
 
 using namespace py;
 
@@ -215,8 +214,8 @@ int main(int argc, char **argv)
 	// static constexpr std::string_view compiler = "Clang 11.0.0";
 	// static constexpr std::string_view platform = "Linux";
 
-	// std::cout << fmt::format("Python {}.{}.{}\n", major_version, minor_version, build_version);
-	// std::cout << fmt::format("[{}] :: {}\n", compiler, platform);
+	// std::cout << std::format("Python {}.{}.{}\n", major_version, minor_version, build_version);
+	// std::cout << std::format("[{}] :: {}\n", compiler, platform);
 	// std::cout << "Type \"help\", \"copyright\", \"credits\" or \"license\" for more
 	// information."; std::cout << std::endl;
 

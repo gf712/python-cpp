@@ -1,6 +1,6 @@
 #pragma once
+#include "core.hpp"
 
-#include "executable/Program.hpp"
 
 class Function;
 class PyFunction;

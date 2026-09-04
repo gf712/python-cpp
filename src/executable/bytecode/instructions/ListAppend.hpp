@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class ListAppend final : public Instruction
 {
 	Register m_list;
@@ -13,7 +10,7 @@ class ListAppend final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("LIST_APPEND     r{:<3} r{:<3}", m_list, m_value);
+		return std::format("LIST_APPEND     r{:<3} r{:<3}", m_list, m_value);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

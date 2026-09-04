@@ -9,8 +9,9 @@ This is an experimental Python 3.9-compatible interpreter implementation in C++.
 ## Build System
 
 ### Prerequisites
-- CMake 3.25+
-- C++23 compiler
+- CMake 3.30+ (`CMAKE_EXPERIMENTAL_CXX_IMPORT_STD`, used for `import std`)
+- A C++26 compiler supporting C++20 named modules and `import std`
+  (built and tested with GCC 16)
 - LLVM 23+ with MLIR (required for MLIR backend)
 - GMP (GNU Multiple Precision library)
 - ICU (International Components for Unicode)

@@ -1,7 +1,8 @@
-#include "PyLLVMFunction.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -14,7 +15,7 @@ PyLLVMFunction::PyLLVMFunction(std::string &&name, FunctionType &&function)
 
 std::string PyLLVMFunction::to_string() const
 {
-	return fmt::format("LLVM JIT function {} at {}", m_name, (void *)this);
+	return std::format("LLVM JIT function {} at {}", m_name, (void *)this);
 }
 
 PyResult<PyObject *> PyLLVMFunction::__call__(PyTuple *args, PyDict *kwargs)

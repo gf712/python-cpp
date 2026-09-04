@@ -1,4 +1,15 @@
+#include "core.hpp"
+
+#include <cstdint>
+#include <cstring>
+#include <gtest/gtest.h>
+
+import py.memory;
+import py.runtime;
+import std;
+
 #include "Heap_test.hpp"
+
 namespace {
 static constexpr size_t chunk_size = 64;
 }
@@ -62,7 +73,8 @@ TEST_F(TestHeap, AllocatesInOldBlockWhenPossible)
 	static constexpr size_t index = 100;
 	ASSERT(index < n_chunks * chunk_size);
 	auto *old_ptr = data[index];
-	m_heap->slab().block_32()->deallocate(bit_cast<uint8_t *>(old_ptr) - sizeof(GarbageCollected));
+	m_heap->slab().block_32()->deallocate(
+		std::bit_cast<uint8_t *>(old_ptr) - sizeof(GarbageCollected));
 
 	auto *ptr = m_heap->allocate<Data>(n_chunks * chunk_size + 1);
 
@@ -96,7 +108,8 @@ TEST_F(TestHeap, DeallocatesAllChunkSlotsIncludingLast)
 	for (size_t idx = 0; idx < chunk_size; ++idx) { data.push_back(m_heap->allocate<Data>(idx)); }
 
 	for (auto *d : data) {
-		m_heap->slab().block_32()->deallocate(bit_cast<uint8_t *>(d) - sizeof(GarbageCollected));
+		m_heap->slab().block_32()->deallocate(
+			std::bit_cast<uint8_t *>(d) - sizeof(GarbageCollected));
 	}
 }
 

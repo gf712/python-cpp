@@ -1,8 +1,7 @@
-#include "../Modules.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyString.hpp"
+module;
+
+module py.runtime;
+
 
 namespace py {
 

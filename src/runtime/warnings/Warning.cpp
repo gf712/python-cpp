@@ -1,7 +1,10 @@
-#include "Warning.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 

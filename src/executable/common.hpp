@@ -12,5 +12,3 @@ enum class OptimizationLevel {
 	Basic = 1,
 };
 }// namespace compiler
-
-class Program;

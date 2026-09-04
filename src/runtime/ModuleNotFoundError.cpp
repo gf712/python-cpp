@@ -1,9 +1,27 @@
-#include "ModuleNotFoundError.hpp"
-#include "PyString.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+module;
+#include "core.hpp"
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+ModuleNotFoundError *ModuleNotFoundError::create(PyTuple *args, PyObject *name, PyObject *path)
+{
+	auto &heap = VirtualMachine::the().heap();
+	return heap.allocate<ModuleNotFoundError>(args, name, path);
+}
+
+BaseException *make_module_not_found_error(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return ModuleNotFoundError::create(args_tuple.unwrap(), py_none(), py_none());
+}
 
 ModuleNotFoundError::ModuleNotFoundError(PyType *type) : ImportError(type, nullptr) {}
 

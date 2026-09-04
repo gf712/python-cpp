@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class GetAwaitable final : public Instruction
 {
 	Register m_dst;
@@ -13,7 +10,7 @@ class GetAwaitable final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("GET_AWAITABLE   r{:<3} r{:<3}", m_dst, m_src);
+		return std::format("GET_AWAITABLE   r{:<3} r{:<3}", m_dst, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

@@ -1,6 +1,17 @@
-#include "BuildDict.hpp"
-#include "runtime/PyDict.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
+
+// After the import: this header names Instruction and Register, which the
+// module owns, so it cannot be parsed before py.runtime is visible.
 
 using namespace py;
 

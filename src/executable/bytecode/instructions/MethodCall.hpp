@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class MethodCall final : public Instruction
 {
 	const Register m_caller;
@@ -15,8 +13,8 @@ class MethodCall final : public Instruction
 	std::string to_string() const final
 	{
 		std::string args_regs{};
-		for (const auto arg : m_args) { args_regs += fmt::format(" r{:<3}", arg); }
-		return fmt::format("CALL_METHOD     r{:<3} {}", m_caller, args_regs);
+		for (const auto arg : m_args) { args_regs += std::format(" r{:<3}", arg); }
+		return std::format("CALL_METHOD     r{:<3} {}", m_caller, args_regs);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

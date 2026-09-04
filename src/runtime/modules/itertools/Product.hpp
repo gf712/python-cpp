@@ -1,13 +1,11 @@
 #pragma once
 
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-
 namespace py {
 namespace itertools {
 	class Product : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		PyList *m_pools{ nullptr };
 		size_t m_repeat;

@@ -1,9 +1,21 @@
-#include "ImportWarning.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/types/api.hpp"
-#include "runtime/types/builtin.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
+
+BaseException *make_import_warning(std::string &&message)
+{
+	auto msg = PyString::create(std::move(message));
+	ASSERT(msg.is_ok());
+	auto args_tuple = PyTuple::create(msg.unwrap());
+	ASSERT(args_tuple.is_ok());
+	return ImportWarning::create(ImportWarning::class_type(), args_tuple.unwrap()).unwrap();
+}
 
 ImportWarning::ImportWarning(PyType *type) : Warning(type) {}
 

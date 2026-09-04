@@ -1,13 +1,7 @@
 #pragma once
 
-#include "forward.hpp"
-#include "runtime/Value.hpp"
 #include "serialize.hpp"
-#include "utilities.hpp"
 
-#include <iostream>
-#include <span>
-#include <string>
 
 namespace py {
 
@@ -65,7 +59,7 @@ inline auto deserialize(std::span<const uint8_t> &buffer)
 		return result;
 	} else if constexpr (std::is_same_v<T, std::byte>) {
 		static_assert(sizeof(std::byte) == sizeof(uint8_t));
-		std::byte result = bit_cast<std::byte>(buffer.front());
+		std::byte result = std::bit_cast<std::byte>(buffer.front());
 		buffer = buffer.subspan(sizeof(std::byte));
 		return result;
 	} else if constexpr (std::is_same_v<T, bool>) {

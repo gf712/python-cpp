@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
 class DeleteGlobal final : public Instruction
 {
 	Register m_name;
@@ -9,7 +7,7 @@ class DeleteGlobal final : public Instruction
   public:
 	DeleteGlobal(Register name) : m_name(name) {}
 
-	std::string to_string() const final { return fmt::format("DELETE_GLOBAL   r{:<3}", m_name); }
+	std::string to_string() const final { return std::format("DELETE_GLOBAL   r{:<3}", m_name); }
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;
 

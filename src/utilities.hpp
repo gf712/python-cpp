@@ -1,48 +1,15 @@
 #pragma once
 
+// TODO/ASSERT/ASSERT_NOT_REACHED and NonCopyable/NonMoveable live in core.hpp,
+// which pulls in no libstdc++ and is therefore safe inside a module's global
+// module fragment. This header keeps the pieces that genuinely need spdlog.
+
+#include "core.hpp"
+
 #include "spdlog/spdlog.h"
 #include <bit>
-
-#define TODO()                                                      \
-	do {                                                            \
-		spdlog::error("Not implemented {}:{}", __FILE__, __LINE__); \
-		std::abort();                                               \
-	} while (0)
-
-#define ASSERT(condition)                                                               \
-	do {                                                                                \
-		if (!(condition)) {                                                             \
-			spdlog::error("Assertion failed {} {}:{}", #condition, __FILE__, __LINE__); \
-			std::abort();                                                               \
-		}                                                                               \
-	} while (0)
-
-#define ASSERT_NOT_REACHED()                                                \
-	do {                                                                    \
-		spdlog::error("Reached unexpected line {}:{}", __FILE__, __LINE__); \
-		__builtin_unreachable();                                            \
-		std::abort();                                                       \
-	} while (0)
-template<class... Ts> struct overloaded : Ts...
-{
-	using Ts::operator()...;
-};
-// explicit deduction guide (not needed as of C++20)
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
-struct NonCopyable
-{
-	NonCopyable() = default;
-	NonCopyable(const NonCopyable &) = delete;
-	NonCopyable &operator=(const NonCopyable &) = delete;
-};
-
-struct NonMoveable
-{
-	NonMoveable() = default;
-	NonMoveable(NonMoveable &&) = delete;
-	NonMoveable &operator=(NonMoveable &&) = delete;
-};
+#include <cstring>
+#include <type_traits>
 
 
 namespace detail {

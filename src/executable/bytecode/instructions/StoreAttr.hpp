@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class StoreAttr final : public Instruction
 {
 	Register m_dst;
@@ -16,7 +13,7 @@ class StoreAttr final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("STORE_ATTR      r{:<3} ({}) r{:<3}", m_dst, m_attr_name, m_src);
+		return std::format("STORE_ATTR      r{:<3} ({}) r{:<3}", m_dst, m_attr_name, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

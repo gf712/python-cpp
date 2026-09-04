@@ -1,16 +1,31 @@
-#include "compile.hpp"
+module;
+#include "core.hpp"
+#include "executable/common.hpp"
+
 #include "Conversion/Passes.hpp"
 #include "Conversion/PythonToPythonBytecode/PythonToPythonBytecode.hpp"
-#include "Dialect/Python/MLIRGenerator.hpp"
-#include "Target/PythonBytecode/PythonBytecodeEmitter.hpp"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/ViewOpGraph.h"
 #include "llvm/Support/GraphWriter.h"
+
+module py.runtime;
+import std;
+import py.ast;
+import py.codegen;
+
+#include "Target/PythonBytecode/PythonBytecodeEmitter.hpp"
+
+// After the import: these name module-owned types.
+#include "Dialect/Python/MLIRGenerator.hpp"
+#include "compile.hpp"
 
 
 namespace compiler::mlir {

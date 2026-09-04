@@ -1,65 +1,17 @@
-#include "Modules.hpp"
-#include "runtime/AssertionError.hpp"
-#include "runtime/AttributeError.hpp"
-#include "runtime/Import.hpp"
-#include "runtime/ImportError.hpp"
-#include "runtime/IndexError.hpp"
-#include "runtime/KeyError.hpp"
-#include "runtime/LookupError.hpp"
-#include "runtime/ModuleNotFoundError.hpp"
-#include "runtime/NameError.hpp"
-#include "runtime/NotImplementedError.hpp"
-#include "runtime/OSError.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyBytes.hpp"
-#include "runtime/PyCell.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyModule.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyNumber.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyRange.hpp"
-#include "runtime/PyStaticMethod.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/RuntimeError.hpp"
-#include "runtime/StopIteration.hpp"
-#include "runtime/SyntaxError.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/UnboundLocalError.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/modules/Modules.hpp"
-#include "runtime/types/builtin.hpp"
-#include "runtime/warnings/ImportWarning.hpp"
-#include "runtime/warnings/Warning.hpp"
+module;
+#include "core.hpp"
+#include "executable/common.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <gmpxx.h>
 
-#include "executable/Mangler.hpp"
-#include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
-#include "executable/bytecode/instructions/FunctionCall.hpp"
+module py.runtime;
+import py.lexer;
+import py.types;
+import std;
 
-#include "interpreter/Interpreter.hpp"
-
-#include "lexer/Lexer.hpp"
-
-#include "memory/GarbageCollector.hpp"
-
-#include "parser/Parser.hpp"
-
-#include "vm/VM.hpp"
-
-#include "utilities.hpp"
-#include <algorithm>
-#include <variant>
 
 using namespace py;
 
@@ -154,11 +106,12 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 	--arg_it_end;
 
 	while (arg_it != arg_it_end) {
-		spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap()));
+		::detail::log_debug(
+			std::format("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap())).c_str());
 		auto reprobj_ = strfunc(*arg_it);
 		if (reprobj_.is_err()) { return reprobj_; }
 		auto reprobj = reprobj_.unwrap();
-		spdlog::debug("repr result: {}", reprobj->value());
+		::detail::log_debug(std::format("repr result: {}", reprobj->value()).c_str());
 		if (auto result = file_write->call(PyTuple::create(reprobj).unwrap(), nullptr);
 			result.is_err()) {
 			return result;
@@ -170,11 +123,12 @@ PyResult<PyObject *> print(const PyTuple *args, const PyDict *kwargs, Interprete
 		std::advance(arg_it, 1);
 	}
 
-	spdlog::debug("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap()));
+	::detail::log_debug(
+		std::format("arg function ptr: {}", static_cast<void *>((*arg_it).unwrap())).c_str());
 	auto reprobj_ = strfunc(*arg_it);
 	if (reprobj_.is_err()) { return reprobj_; }
 	auto reprobj = reprobj_.unwrap();
-	spdlog::debug("repr result: {}", reprobj->value());
+	::detail::log_debug(std::format("repr result: {}", reprobj->value()).c_str());
 	if (auto result = file_write->call(PyTuple::create(reprobj).unwrap(), nullptr);
 		result.is_err()) {
 		return result;
@@ -199,8 +153,8 @@ PyResult<PyObject *> iter(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"iter",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	return std::get<0>(result.unwrap())->iter();
 }
@@ -210,10 +164,10 @@ PyResult<PyObject *> hash(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"hash",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
-	return std::get<0>(result.unwrap())->hash().and_then([](const size_t h) {
+	return std::get<0>(result.unwrap())->hash().and_then([](const std::size_t h) {
 		return PyInteger::create(h);
 	});
 }
@@ -223,8 +177,8 @@ PyResult<PyObject *> next(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"next",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	return std::get<0>(result.unwrap())->next();
 }
@@ -257,9 +211,10 @@ PyResult<PyObject *>
 	auto mangled_class_name_ = args->operator[](1);
 	if (mangled_class_name_.is_err()) return mangled_class_name_;
 	auto *mangled_class_name = mangled_class_name_.unwrap();
-	spdlog::debug("__build_class__({}, {})",
+	::detail::log_debug(std::format("__build_class__({}, {})",
 		mangled_class_name->to_string(),
-		maybe_function_location->to_string());
+		maybe_function_location->to_string())
+			.c_str());
 
 	if (!as<PyString>(mangled_class_name)) {
 		return Err(type_error("__build_class__: name is not a string"));
@@ -432,8 +387,8 @@ PyResult<PyObject *> len(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"len",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 
 	auto *o = std::get<0>(result.unwrap());
@@ -451,7 +406,7 @@ PyResult<PyObject *> id(const PyTuple *args, const PyDict *, Interpreter &)
 	ASSERT(args->size() == 1);
 	auto obj = args->operator[](0);
 	if (obj.is_err()) return obj;
-	return PyInteger::create(bit_cast<intptr_t>(obj.unwrap()));
+	return PyInteger::create(std::bit_cast<std::intptr_t>(obj.unwrap()));
 }
 
 PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
@@ -534,7 +489,7 @@ PyResult<PyObject *> import(const PyTuple *args, const PyDict *, Interpreter &)
 		as<PyDict>(globals),
 		locals,
 		fromlist,
-		static_cast<uint32_t>(as<PyInteger>(level)->as_size_t()));
+		static_cast<std::uint32_t>(as<PyInteger>(level)->as_size_t()));
 }
 
 PyResult<PyObject *> hasattr(PyTuple *args, PyDict *kwargs, Interpreter &)
@@ -542,8 +497,8 @@ PyResult<PyObject *> hasattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"hasattr",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto [obj, name] = result.unwrap();
 	if (!as<PyString>(name)) { return Err(type_error("hasattr(): attribute name must be string")); }
@@ -563,8 +518,8 @@ PyResult<PyObject *> getattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"getattr",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 3>{},
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 3>{},
 		nullptr /* default */);
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto [obj, name, default_value] = result.unwrap();
@@ -594,8 +549,8 @@ PyResult<PyObject *> setattr(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"setattr",
-		std::integral_constant<size_t, 3>{},
-		std::integral_constant<size_t, 3>{});
+		std::integral_constant<std::size_t, 3>{},
+		std::integral_constant<std::size_t, 3>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto [obj, name, value] = result.unwrap();
 
@@ -613,8 +568,8 @@ PyResult<PyObject *> hex(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"hex",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *obj = std::get<0>(result.unwrap());
 	if (auto pynumber = PyNumber::as_number(obj)) {
@@ -638,13 +593,13 @@ PyResult<PyObject *> ord(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"ord",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *obj = std::get<0>(result.unwrap());
 	if (auto pystr = as<PyString>(obj)) {
 		if (auto codepoint = pystr->codepoint()) {
-			return PyObject::from(Number{ static_cast<int64_t>(*codepoint) });
+			return PyObject::from(Number{ static_cast<std::int64_t>(*codepoint) });
 		} else {
 			auto mapping = pystr->as_mapping();
 			if (mapping.is_err()) { return Err(mapping.unwrap_err()); }
@@ -664,8 +619,8 @@ PyResult<PyObject *> chr(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"chr",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *obj = std::get<0>(result.unwrap());
 
@@ -729,8 +684,8 @@ PyResult<PyObject *> repr(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"repr",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	return std::get<0>(result.unwrap())->repr();
 }
@@ -740,8 +695,8 @@ PyResult<PyObject *> abs(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"abs",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	return std::get<0>(result.unwrap())->abs();
 }
@@ -849,8 +804,8 @@ PyResult<PyObject *> isinstance(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"isinstance",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto [object, classinfo] = result.unwrap();
 
@@ -883,8 +838,8 @@ PyResult<PyObject *> issubclass(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"issubclass",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto [class_, classinfo] = result.unwrap();
 
@@ -906,8 +861,8 @@ PyResult<PyObject *> all(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"all",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *iterable = std::get<0>(result.unwrap());
 
@@ -934,8 +889,8 @@ PyResult<PyObject *> any(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"any",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *iterable = std::get<0>(result.unwrap());
 
@@ -961,8 +916,8 @@ PyResult<PyObject *> exec(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"exec",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 3>{},
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 3>{},
 		py_none() /* globals */,
 		py_none() /* locals */);
 	if (result.is_err()) return Err(result.unwrap_err());
@@ -1009,8 +964,8 @@ PyResult<PyObject *> eval(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 	auto result = PyArgsParser<PyObject *, PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"eval",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 3>{},
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 3>{},
 		py_none() /* globals */,
 		py_none() /* locals */);
 
@@ -1166,8 +1121,8 @@ PyResult<PyObject *> callable(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"callable",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 	if (result.is_err()) return Err(result.unwrap_err());
 	auto *obj = std::get<0>(result.unwrap());
 	return obj->type_prototype().__call__.has_value() ? Ok(py_true()) : Ok(py_false());
@@ -1178,8 +1133,8 @@ PyResult<PyObject *> ascii(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"ascii",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 	auto [obj] = result.unwrap();
@@ -1271,11 +1226,11 @@ PyResult<PyObject *> sorted(PyTuple *args, PyDict *kwargs, Interpreter &interpre
 		if (err.is_err()) { return err; }
 	} else {
 		PyResult<PyObject *> err = Ok(py_none());
-		std::vector<size_t> indices(cmp_list->elements().size());
+		std::vector<std::size_t> indices(cmp_list->elements().size());
 		std::iota(indices.begin(), indices.end(), 0);
 		// FIXME: should throw exception when comparing, as returning true is
 		// probably messing up the C++ Compare requirment
-		auto cmp = [&err, cmp_list](size_t lhs_index, size_t rhs_index) -> bool {
+		auto cmp = [&err, cmp_list](std::size_t lhs_index, std::size_t rhs_index) -> bool {
 			const auto &lhs = cmp_list->elements()[lhs_index];
 			const auto &rhs = cmp_list->elements()[rhs_index];
 			if (auto cmp = less_than(lhs, rhs, VirtualMachine::the().interpreter()); cmp.is_ok()) {
@@ -1312,8 +1267,8 @@ PyResult<PyObject *> vars(PyTuple *args, PyDict *kwargs, Interpreter &interprete
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"vars",
-		std::integral_constant<size_t, 0>{},
-		std::integral_constant<size_t, 1>{},
+		std::integral_constant<std::size_t, 0>{},
+		std::integral_constant<std::size_t, 1>{},
 		nullptr);
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
@@ -1334,8 +1289,8 @@ PyResult<PyObject *> divmod(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"divmod",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 	auto [lhs, rhs] = result.unwrap();
@@ -1348,8 +1303,8 @@ PyResult<PyObject *> round(PyTuple *args, PyDict *kwargs, Interpreter &)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"round",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 2>{},
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 2>{},
 		nullptr);
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
@@ -1442,7 +1397,8 @@ PyModule *builtins_module(Interpreter &interpreter)
 	// FIXME: second check (check address is valid) is only needed for unittests since each test
 	// 		  clears the heap but is still the same executable (so it still uses the same static
 	// 		  address)
-	if (s_builtin_module && heap.slab().has_address(bit_cast<uint8_t *>(s_builtin_module))) {
+	if (s_builtin_module
+		&& heap.slab().has_address(std::bit_cast<std::uint8_t *>(s_builtin_module))) {
 		return s_builtin_module;
 	}
 

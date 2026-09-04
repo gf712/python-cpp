@@ -1,44 +1,49 @@
-#include "Lexer.hpp"
+module;
+#include "core.hpp"
 
-#include <filesystem>
-#include <fstream>
-#include <optional>
-#include <string>
+module py.lexer;
+
+
+std::string Token::to_string() const
+{
+	std::string value{ m_start.pointer_to_program, m_end.pointer_to_program };
+	if (m_token_exact_type == TokenType::NEWLINE) { value = "\\n"; }
+	return std::format("{:<12} {:>1}:{:>3} - {:>1}:{:>3} \t\"{}\"",
+		stringify_token_type(m_token_type),
+		m_start.row,
+		m_start.column,
+		m_end.row,
+		m_end.column,
+		value);
+}
 
 std::optional<std::string> read_file(const std::string &filename)
 {
 	std::filesystem::path path = filename;
 	if (!std::filesystem::exists(path)) {
-		std::cerr << fmt::format("File {} does not exist", path.c_str()) << std::endl;
+		std::cerr << std::format("File {} does not exist", path.c_str()) << std::endl;
 		return {};
 	}
-
 	std::ifstream in(std::filesystem::absolute(path).c_str());
 	if (!in.is_open()) {
-		std::cerr << fmt::format("Failed to open {}", std::filesystem::absolute(path).c_str())
+		std::cerr << std::format("Failed to open {}", std::filesystem::absolute(path).c_str())
 				  << std::endl;
 		return {};
 	}
-
 	std::string program;
-
 	in.seekg(0, std::ios::end);
 	program.reserve(in.tellg());
 	in.seekg(0, std::ios::beg);
-
 	program.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	if (program.back() != '\n') { program.append("\n"); }
-
-	spdlog::debug("Input program: \n----\n{}\n----\n", program.c_str());
+	::detail::log_debug(std::format("Input program: \n----\n{}\n----\n", program.c_str()).c_str());
 	return program;
 }
-
 void Lexer::push_token(Token::TokenType token_type, const Position &start, const Position &end)
 {
 	m_tokens_to_emit.emplace_back(token_type, start, end);
 	m_current_line_tokens.emplace_back(token_type, start, end);
 }
-
 bool Lexer::read_more_tokens_loop()
 {
 	if (m_cursor > m_program.size()) { return false; }
@@ -53,7 +58,6 @@ bool Lexer::read_more_tokens_loop()
 		push_token(Token::TokenType::ENDMARKER, original_position, m_position);
 		return true;
 	}
-
 	if (current_mode() == Mode::NORMAL) {
 		if (try_empty_line()) { return true; }
 		if (try_read_comment()) { return true; }
@@ -68,32 +72,35 @@ bool Lexer::read_more_tokens_loop()
 	} else {
 		if (try_fstring()) { return true; }
 	}
-
 	return false;
 }
-
 bool Lexer::read_more_tokens()
 {
-	const size_t token_size = m_tokens_to_emit.size();
+	const std::size_t token_size = m_tokens_to_emit.size();
 	while (token_size >= m_tokens_to_emit.size()) {
+		const std::size_t already_filtered = m_tokens_to_emit.size();
 		bool read_tokens = read_more_tokens_loop();
 		if (read_tokens) {
-			std::erase_if(m_tokens_to_emit, [this](Token &token) {
-				if (m_ignore_comments && token.token_type() == Token::TokenType::COMMENT) {
-					return true;
-				}
-				if (m_ignore_nl_token && token.token_type() == Token::TokenType::NL) {
-					return true;
-				}
-				return false;
-			});
+			const auto first = m_tokens_to_emit.begin() + already_filtered;
+			m_tokens_to_emit.erase(
+				std::remove_if(first,
+					m_tokens_to_emit.end(),
+					[this](const Token &token) {
+						if (m_ignore_comments && token.token_type() == Token::TokenType::COMMENT) {
+							return true;
+						}
+						if (m_ignore_nl_token && token.token_type() == Token::TokenType::NL) {
+							return true;
+						}
+						return false;
+					}),
+				m_tokens_to_emit.end());
 		} else {
 			return false;
 		}
 	}
 	return true;
 }
-
 void Lexer::push_new_line()
 {
 	const auto original_position = m_position;
@@ -105,7 +112,6 @@ void Lexer::push_new_line()
 	}
 	increment_row_position();
 }
-
 void Lexer::push_empty_line()
 {
 	const auto original_position = m_position;
@@ -113,11 +119,9 @@ void Lexer::push_empty_line()
 	push_token(Token::TokenType::NL, original_position, m_position);
 	increment_row_position();
 }
-
-
-std::optional<size_t> Lexer::comment_start() const
+std::optional<std::size_t> Lexer::comment_start() const
 {
-	size_t n = 0;
+	std::size_t n = 0;
 	if (m_cursor >= m_program.size()) { return {}; }
 	if (peek(n) == '#') { return n; }
 	while (std::isblank(peek(n)) && peek(n) != '\n') {
@@ -126,21 +130,18 @@ std::optional<size_t> Lexer::comment_start() const
 	}
 	return {};
 }
-
 bool Lexer::try_read_comment()
 {
 	if (auto start = comment_start(); start.has_value()) {
 		// advance to '#'
 		advance(*start);
 		const auto original_position = m_position;
-
 		// skip '#'
 		advance(1);
 		advance_while([](const char c) {
 			// TODO: make newline check platform agnostic in Windows this can be "\r\n"
 			return std::isalnum(c) || c != '\n';
 		});
-
 		push_token(Token::TokenType::COMMENT, original_position, m_position);
 		// if we want NL tokens, we need to look back and see if this
 		// line has a non-comment token
@@ -162,10 +163,8 @@ bool Lexer::try_read_comment()
 		}
 		return true;
 	}
-
 	return false;
 }
-
 bool Lexer::try_empty_line()
 {
 	const auto original_position = m_position;
@@ -189,7 +188,6 @@ bool Lexer::try_empty_line()
 	m_cursor = cursor;
 	return false;
 }
-
 bool Lexer::try_read_indent()
 {
 	// if we are the start of a new line we need to check indent/dedent
@@ -212,11 +210,10 @@ bool Lexer::try_read_indent()
 	}
 	return false;
 }
-
-std::tuple<size_t, size_t> Lexer::compute_indent_level()
+std::tuple<std::size_t, std::size_t> Lexer::compute_indent_level()
 {
-	size_t pos = 0;
-	size_t indentation_value = 0;
+	std::size_t pos = 0;
+	std::size_t indentation_value = 0;
 	while (std::isblank(peek(pos))) {
 		if (peek(pos) == '\t') {
 			indentation_value += tab_size;
@@ -227,9 +224,8 @@ std::tuple<size_t, size_t> Lexer::compute_indent_level()
 	}
 	return { indentation_value, pos };
 }
-
 template<typename FunctorType>
-std::optional<size_t> Lexer::parse_digits(size_t n, FunctorType &&f) const
+std::optional<std::size_t> Lexer::parse_digits(std::size_t n, FunctorType &&f) const
 {
 	bool previous_is_underscore = false;
 	while (f(peek(n)) || peek(n) == '_') {
@@ -251,8 +247,7 @@ std::optional<size_t> Lexer::parse_digits(size_t n, FunctorType &&f) const
 	}
 	return n;
 }
-
-std::optional<size_t> Lexer::int_number(size_t n) const
+std::optional<std::size_t> Lexer::int_number(std::size_t n) const
 {
 	// ugly, but it isn't trivial to chain/pipe these operations in a generic way
 	if (auto end = hex_number(n)) {
@@ -267,8 +262,7 @@ std::optional<size_t> Lexer::int_number(size_t n) const
 		return {};
 	}
 }
-
-std::optional<size_t> Lexer::hex_number(size_t n) const
+std::optional<std::size_t> Lexer::hex_number(std::size_t n) const
 {
 	if (peek(n++) != '0') { return {}; }
 	if (peek(n) != 'x' && peek(n) != 'X') { return {}; }
@@ -283,8 +277,7 @@ std::optional<size_t> Lexer::hex_number(size_t n) const
 	if (result.has_value() && *result < 3) { return {}; }
 	return result;
 }
-
-std::optional<size_t> Lexer::bin_number(size_t n) const
+std::optional<std::size_t> Lexer::bin_number(std::size_t n) const
 {
 	if (peek(n++) != '0') { return {}; }
 	if (peek(n) != 'b' && peek(n) != 'B') { return {}; }
@@ -299,8 +292,7 @@ std::optional<size_t> Lexer::bin_number(size_t n) const
 	if (result.has_value() && *result < 3) { return {}; }
 	return result;
 }
-
-std::optional<size_t> Lexer::oct_number(size_t n) const
+std::optional<std::size_t> Lexer::oct_number(std::size_t n) const
 {
 	if (peek(n++) != '0') { return {}; }
 	if (peek(n) != 'o' && peek(n) != 'O') { return {}; }
@@ -315,8 +307,7 @@ std::optional<size_t> Lexer::oct_number(size_t n) const
 	if (result.has_value() && *result < 3) { return {}; }
 	return result;
 }
-
-std::optional<size_t> Lexer::dec_number(size_t n) const
+std::optional<std::size_t> Lexer::dec_number(std::size_t n) const
 {
 	bool previous_is_underscore = false;
 	// (?:0(?:_?0)*
@@ -332,7 +323,6 @@ std::optional<size_t> Lexer::dec_number(size_t n) const
 		// we found a valid decimal number with just 0s (possibly with '_')
 		return n;
 	}
-
 	ASSERT(n == 0);
 	ASSERT(previous_is_underscore == false);
 	// [1-9](?:_?[0-9])*)
@@ -344,19 +334,16 @@ std::optional<size_t> Lexer::dec_number(size_t n) const
 	if (n > 0) { return n; }
 	return {};
 }
-
-std::optional<size_t> Lexer::exp_number(size_t n) const
+std::optional<std::size_t> Lexer::exp_number(std::size_t n) const
 {
 	if (peek(n) != 'e' && peek(n) != 'E') { return {}; }
 	n++;
 	if (peek(n) == '-' || peek(n) == '+') { n++; }
-
 	if (!std::isdigit(peek(n))) { return {}; }
 	n++;
 	return parse_digits(n, [](const char c) { return std::isdigit(c); });
 }
-
-std::optional<size_t> Lexer::point_float_number(size_t n) const
+std::optional<std::size_t> Lexer::point_float_number(std::size_t n) const
 {
 	// [0-9](?:_?[0-9])*
 	if (std::isdigit(peek(n))) {
@@ -365,7 +352,6 @@ std::optional<size_t> Lexer::point_float_number(size_t n) const
 		if (!result) { return {}; }
 		n = *result;
 	}
-
 	// \.(?:[0-9](?:_?[0-9])*)?`
 	if (peek(n) != '.') { return {}; }
 	n++;
@@ -373,8 +359,7 @@ std::optional<size_t> Lexer::point_float_number(size_t n) const
 	n++;
 	return parse_digits(n, [](const char c) { return std::isdigit(c); });
 }
-
-std::optional<size_t> Lexer::exp_float_number(size_t n) const
+std::optional<std::size_t> Lexer::exp_float_number(std::size_t n) const
 {
 	// [0-9](?:_?[0-9])*)
 	if (!(peek(n) >= '0' && peek(n) <= '9')) { return {}; }
@@ -384,35 +369,30 @@ std::optional<size_t> Lexer::exp_float_number(size_t n) const
 	if (result) { return exp_number(*result); }
 	return {};
 }
-
-std::optional<size_t> Lexer::imag_number(size_t n) const
+std::optional<std::size_t> Lexer::imag_number(std::size_t n) const
 {
-	auto result = [this](size_t n) -> std::optional<size_t> {
+	auto result = [this](std::size_t n) -> std::optional<std::size_t> {
 		// [0-9](?:_?[0-9])*)
 		if (!(peek(n) >= '0' && peek(n) <= '9')) { return {}; }
 		n++;
 		auto result = parse_digits(n, [](const char c) { return std::isdigit(c); });
 		if (!result) { return {}; }
 		n = *result;
-
 		if (!(peek(n) == 'j' && peek(n) == 'J')) { return {}; }
 		n++;
 		return n;
 	}(n);
-
 	if (!result) {
-		result = [this](size_t n) -> std::optional<size_t> {
+		result = [this](std::size_t n) -> std::optional<std::size_t> {
 			if (auto result = float_number(n)) {
 				if (peek(*result) == 'j' || peek(*result) == 'J') { return *result + 1; }
 			}
 			return {};
 		}(n);
 	}
-
 	return result;
 }
-
-std::optional<size_t> Lexer::float_number(size_t n) const
+std::optional<std::size_t> Lexer::float_number(std::size_t n) const
 {
 	if (auto end = exp_float_number(n)) {
 		return *end;
@@ -422,14 +402,11 @@ std::optional<size_t> Lexer::float_number(size_t n) const
 		return {};
 	}
 }
-
 bool Lexer::try_read_number()
 {
 	const Position original_position = m_position;
-	size_t n = 0;
-
+	std::size_t n = 0;
 	if (m_cursor >= m_program.size()) { return false; }
-
 	if (auto end = imag_number(n)) {
 		increment_column_position(*end);
 	} else if (auto end = float_number(n)) {
@@ -442,25 +419,21 @@ bool Lexer::try_read_number()
 	push_token(Token::TokenType::NUMBER, original_position, m_position);
 	return true;
 }
-
-bool Lexer::single_quote_string(size_t n)
+bool Lexer::single_quote_string(std::size_t n)
 {
 	const auto original_position = m_position;
 	const auto original_cursor = m_cursor;
 	while (true) {
 		// [^'\\]*(?:\\.[^'\\]*)*'
-
 		// [^'\\]*
 		while (peek(n) != '\\' && peek(n) != '\'') { n++; }
-
-		auto advance = [this](size_t n) -> std::optional<size_t> {
+		auto advance = [this](std::size_t n) -> std::optional<std::size_t> {
 			// (?:\\.[^'\\]*)
 			if (peek(n++) != '\\') return {};
 			if (peek(n++) == '\n') return {};
 			while (peek(n) != '\\' && peek(n) != '\'') { n++; }
 			return n;
 		};
-
 		// (?:\\.[^'\\]*)*
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
@@ -469,7 +442,6 @@ bool Lexer::single_quote_string(size_t n)
 				break;
 			}
 		}
-
 		if (peek(n) == '\\' && peek(n + 1) == '\n') {
 			Lexer::advance(n + 2);
 			n = 0;
@@ -486,28 +458,23 @@ bool Lexer::single_quote_string(size_t n)
 		n = 0;
 		break;
 	}
-
 	return true;
 }
-
-bool Lexer::double_quote_string(size_t n)
+bool Lexer::double_quote_string(std::size_t n)
 {
 	const auto original_position = m_position;
 	const auto original_cursor = m_cursor;
 	while (true) {
 		// [^"\\]*(?:\\.[^"\\]*)*"
-
 		// [^"\\]*
 		while (peek(n) != '\\' && peek(n) != '\"') { n++; }
-
-		auto advance = [this](size_t n) -> std::optional<size_t> {
+		auto advance = [this](std::size_t n) -> std::optional<std::size_t> {
 			// (?:\\.[^"\\]*)
 			if (peek(n++) != '\\') return {};
 			if (peek(n++) == '\n') return {};
 			while (peek(n) != '\\' && peek(n) != '\"') { n++; }
 			return n;
 		};
-
 		// (?:\\.[^"\\]*)*
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
@@ -516,14 +483,12 @@ bool Lexer::double_quote_string(size_t n)
 				break;
 			}
 		}
-
 		if (peek(n) == '\\' && peek(n + 1) == '\n') {
 			Lexer::advance(n + 2);
 			n = 0;
 			increment_row_position();
 			continue;
 		}
-
 		// "
 		if (peek(n) != '"') {
 			m_position = original_position;
@@ -534,45 +499,35 @@ bool Lexer::double_quote_string(size_t n)
 		n = 0;
 		break;
 	}
-
 	return true;
 }
-
-
-bool Lexer::single_triple_quote_string(size_t n)
+bool Lexer::single_triple_quote_string(std::size_t n)
 {
 	const auto original_position = m_position;
 	const auto original_cursor = m_cursor;
 	while (true) {
 		// [^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''
-
 		// [^'\\]*
 		while (peek(n) != '\\' && peek(n) != '\'') {
 			if (peek(n) == '\n') { increment_row_position(); }
 			n++;
 		}
-
-		auto advance = [this](size_t n) -> std::optional<size_t> {
+		auto advance = [this](std::size_t n) -> std::optional<std::size_t> {
 			// (?:\\.|'(?!''))
-
 			if (peek(n) == '\\' && peek(n + 1) != '\n') {
 				// \\.
 				return n + 2;
 			} else {
 				// '(?!'')
-
 				// '
 				if (peek(n) != '\'') return {};
 				if (peek(n) == '\n') { increment_row_position(); }
 				n++;
-
 				// (?!'')
 				if (peek(n) == '\'' && peek(n + 1) == '\'') return {};
-
 				return n;
 			}
 		};
-
 		// (?:(?:\\.|'(?!''))[^'\\]*)*
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
@@ -585,14 +540,12 @@ bool Lexer::single_triple_quote_string(size_t n)
 				break;
 			}
 		}
-
 		if (peek(n) == '\\' && peek(n + 1) == '\n') {
 			Lexer::advance(n + 2);
 			n = 0;
 			increment_row_position();
 			continue;
 		}
-
 		// '''
 		if (peek(n) != '\'' || peek(n + 1) != '\'' || peek(n + 2) != '\'') {
 			m_position = original_position;
@@ -603,44 +556,35 @@ bool Lexer::single_triple_quote_string(size_t n)
 		n = 0;
 		break;
 	}
-
 	return true;
 }
-
-bool Lexer::double_triple_quote_string(size_t n)
+bool Lexer::double_triple_quote_string(std::size_t n)
 {
 	const auto original_position = m_position;
 	const auto original_cursor = m_cursor;
 	while (true) {
 		// [^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""
-
 		// [^"\\]*
 		while (peek(n) != '\\' && peek(n) != '\"') {
 			if (peek(n) == '\n') { increment_row_position(); }
 			n++;
 		}
-
-		auto advance = [this](size_t n) -> std::optional<size_t> {
+		auto advance = [this](std::size_t n) -> std::optional<std::size_t> {
 			// (?:\\.|"(?!""))
-
 			if (peek(n) == '\\' && peek(n + 1) != '\n') {
 				// \\.
 				return n + 2;
 			} else {
 				// "(?!"")
-
 				// "
 				if (peek(n) != '\"') return {};
 				if (peek(n) == '\n') { increment_row_position(); }
 				n++;
-
 				// (?!"")
 				if (peek(n) == '\"' && peek(n + 1) == '\"') return {};
-
 				return n;
 			}
 		};
-
 		// (?:(?:\\.|"(?!""))[^"\\]*)*
 		while (true) {
 			if (auto inc = advance(n); inc.has_value()) {
@@ -653,14 +597,12 @@ bool Lexer::double_triple_quote_string(size_t n)
 				break;
 			}
 		}
-
 		if (peek(n) == '\\' && peek(n + 1) == '\n') {
 			Lexer::advance(n + 2);
 			n = 0;
 			increment_row_position();
 			continue;
 		}
-
 		// """
 		if (peek(n) != '\"' || peek(n + 1) != '\"' || peek(n + 2) != '\"') {
 			m_position = original_position;
@@ -671,14 +613,11 @@ bool Lexer::double_triple_quote_string(size_t n)
 		n = 0;
 		break;
 	}
-
 	return true;
 }
-
 bool Lexer::try_read_string()
 {
 	if (m_cursor >= m_program.size()) { return false; }
-
 	static constexpr std::array<std::string_view, 25> string_possible_prefixes = { "",
 		"br",
 		"f",
@@ -704,33 +643,25 @@ bool Lexer::try_read_string()
 		"FR",
 		"Rf",
 		"Rb" };
-
 	const Position original_position = m_position;
 	const auto original_cursor = m_cursor;
-
-	size_t idx = 0;
-
+	std::size_t idx = 0;
 	const auto it = std::find_if(string_possible_prefixes.begin(),
 		string_possible_prefixes.end(),
 		[this, idx](std::string_view el) {
-			for (size_t i = idx; i < el.size(); ++i) {
+			for (std::size_t i = idx; i < el.size(); ++i) {
 				if (peek(i) != el[i]) return false;
 			}
 			return peek(idx + el.size()) == '\'' || peek(idx + el.size()) == '\"';
 		});
-
 	if (it == string_possible_prefixes.end()) { return false; }
-
 	idx += it->size();
-
 	auto is_triple_quote = [this, idx](const char quote) {
 		ASSERT(quote == '\'' || quote == '\"');
 		return peek(idx) == quote && peek(idx + 1) == quote && peek(idx + 2) == quote;
 	};
-
 	const bool is_fstring =
 		(it->find('f') != std::string_view::npos || it->find('F') != std::string_view::npos);
-
 	auto push_string_token =
 		[this, original_position, is_fstring, original_cursor, is_triple_quote, idx]() {
 			if (!is_fstring) {
@@ -738,18 +669,15 @@ bool Lexer::try_read_string()
 			} else {
 				m_cursor = original_cursor;
 				m_position = original_position;
-
 				auto quote_size = (is_triple_quote('\'') || is_triple_quote('\"')) ? 3 : 1;
 				m_quote.push(quote_type(std::string_view{ m_program.begin() + m_cursor + idx,
 					m_program.begin() + m_cursor + idx + quote_size }));
-
 				Lexer::advance(idx + quote_size);
 				push_token(Token::TokenType::FSTRING_START, original_position, m_position);
 				m_mode.push(Mode::FSTRING);
 				m_fstring_paren_level.push(m_parenthesis_level);
 			}
 		};
-
 	if (is_triple_quote('\'')) {
 		idx += 3;
 		if (single_triple_quote_string(idx)) {
@@ -785,11 +713,9 @@ bool Lexer::try_read_string()
 	}
 	return false;
 }
-
 bool Lexer::try_fstring()
 {
 	const auto original_position = m_position;
-
 	auto reached_end = [this, original_position]() {
 		auto position = m_position;
 		if ((m_cursor + 1) < m_program.size() && peek(0) == '}') {
@@ -842,17 +768,12 @@ bool Lexer::try_fstring()
 		}
 		return false;
 	};
-
 	while (!reached_end()) { ASSERT(!peek("\n")); }
-
 	return true;
 }
-
-
 std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 {
 	if (std::isalnum(peek(0))) return {};
-
 	if (peek(0) == '(') {
 		m_parenthesis_level++;
 		return Token::TokenType::LPAREN;
@@ -915,7 +836,6 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_one_character()
 											 // easier
 	return {};
 }
-
 std::optional<Token::TokenType> Lexer::try_read_operation_with_two_characters() const
 {
 	if (m_cursor + 1 >= m_program.size()) return {};
@@ -941,7 +861,6 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_two_characters() 
 	if (peek(0) == '-' && peek(1) == '>') return Token::TokenType::RARROW;
 	return {};
 }
-
 std::optional<Token::TokenType> Lexer::try_read_operation_with_three_characters() const
 {
 	if (m_cursor + 2 >= m_program.size()) return {};
@@ -956,14 +875,11 @@ std::optional<Token::TokenType> Lexer::try_read_operation_with_three_characters(
 	if (peek(0) == '.' && peek(1) == '.' && peek(2) == '.') return Token::TokenType::ELLIPSIS;
 	return {};
 }
-
 bool Lexer::try_read_operation()
 {
 	const Position original_position = m_position;
 	std::optional<Token::TokenType> type;
-
 	if (m_cursor >= m_program.size()) { return false; }
-
 	if (type = try_read_operation_with_three_characters(); type.has_value()) {
 		advance(3);
 	} else if (type = try_read_operation_with_two_characters(); type.has_value()) {
@@ -973,12 +889,9 @@ bool Lexer::try_read_operation()
 	} else {
 		return false;
 	}
-
 	push_token(*type, original_position, m_position);
-
 	return true;
 }
-
 void Lexer::try_read_backslash()
 {
 	try_read_space();
@@ -992,59 +905,49 @@ void Lexer::try_read_backslash()
 		}
 	}
 }
-
 bool Lexer::try_read_space()
 {
-	const size_t whitespace_size = advance_while([](const char c) { return std::isblank(c); });
+	const std::size_t whitespace_size = advance_while([](const char c) { return std::isblank(c); });
 	if (whitespace_size > 0) {
 		return true;
 	} else {
 		return false;
 	}
 }
-
 bool Lexer::try_read_newline()
 {
 	if (!peek("\n")) { return false; }
 	push_new_line();
 	return true;
 }
-
 bool Lexer::try_read_name()
 {
 	if (m_cursor >= m_program.size()) { return false; }
-
 	auto valid_start_name = [](const char c) { return std::isalpha(c) || c == '_'; };
-
 	if (!valid_start_name(peek(0))) { return false; }
 	const Position original_position = m_position;
 	// name must start with alpha
 	if (!advance_if([valid_start_name](const char c) { return valid_start_name(c); })) {
 		return false;
 	}
-
 	auto valid_name = [](const char c) { return std::isalnum(c) || c == '_'; };
-
 	advance_while([valid_name](const char c) { return valid_name(c); });
 	push_token(Token::TokenType::NAME, original_position, m_position);
 	return true;
 }
-
-char Lexer::peek(size_t i) const
+char Lexer::peek(std::size_t i) const
 {
 	ASSERT(m_cursor + i < m_program.size());
 	return m_program[m_cursor + i];
 }
-
 bool Lexer::peek(std::string_view pattern) const
 {
 	int j = 0;
-	for (size_t i = m_cursor; i < m_cursor + pattern.size(); ++i) {
+	for (std::size_t i = m_cursor; i < m_cursor + pattern.size(); ++i) {
 		if (m_program[i] != pattern[j++]) { return false; }
 	}
 	return true;
 }
-
 void Lexer::increment_row_position()
 {
 	m_position.column = 0;
@@ -1052,21 +955,18 @@ void Lexer::increment_row_position()
 	m_position.pointer_to_program = &m_program[m_cursor];
 	m_current_line_tokens.clear();
 }
-
-void Lexer::increment_column_position(size_t idx)
+void Lexer::increment_column_position(std::size_t idx)
 {
 	m_cursor += idx;
 	m_position.column += idx;
 	m_position.pointer_to_program = &m_program[m_cursor];
 }
-
-void Lexer::advance(const size_t positions)
+void Lexer::advance(const std::size_t positions)
 {
 	m_cursor += positions;
 	m_position.column += positions;
 	m_position.pointer_to_program = &m_program[m_cursor];
 }
-
 bool Lexer::advance_if(const char pattern)
 {
 	if (m_program[m_cursor] == pattern) {
@@ -1075,7 +975,6 @@ bool Lexer::advance_if(const char pattern)
 	}
 	return false;
 }
-
 Token Lexer::pop_front()
 {
 	auto &result = m_tokens_to_emit.front();

@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class StoreSubscript final : public Instruction
 {
 	Register m_obj;
@@ -16,7 +13,7 @@ class StoreSubscript final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("STORE_SUBSCRIPT r{:<3} r{:<3} r{:<3}", m_obj, m_slice, m_src);
+		return std::format("STORE_SUBSCRIPT r{:<3} r{:<3} r{:<3}", m_obj, m_slice, m_src);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &vm, Interpreter &interpreter) const final;

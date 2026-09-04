@@ -1,15 +1,12 @@
-#include "PySlice.hpp"
-#include "MemoryError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyInteger.hpp"
-#include "PyNone.hpp"
-#include "PyType.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -111,7 +108,7 @@ std::string PySlice::to_string() const
 	ASSERT(m_start);
 	ASSERT(m_stop);
 	ASSERT(m_step);
-	return fmt::format(
+	return std::format(
 		"slice({}, {}, {})", m_start->to_string(), m_stop->to_string(), m_step->to_string());
 }
 

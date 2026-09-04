@@ -1,16 +1,12 @@
 #pragma once
 
-#include "forward.hpp"
-#include "runtime/PyObject.hpp"
-#include <cstddef>
-#include <cstdint>
-#include <deque>
 
 namespace py {
 namespace collections {
 	class Deque : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		std::deque<Value> m_deque;
 		std::optional<size_t> m_maxlength;

@@ -1,15 +1,29 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.30)
 include(FetchContent)
 include(ExternalProject)
 include(CheckCXXSourceCompiles)
 
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "f35a9ac6-8463-4d38-8eec-5d6008153e7d")
+
 project(python++)
 
 set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(cmake/CPM.cmake)
 
-CPMAddPackage("gh:gabime/spdlog@1.8.5")
+# spdlog 1.11+ can format through std::format instead of its bundled fmt.
+# SPDLOG_USE_STD_FORMAT keeps fmt out of the build entirely, which matters for
+# modules: spdlog/fmt/fmt.h drags 231 libstdc++ headers, and anything reaching a
+# module's global module fragment lands in its BMI and then collides with the
+# same headers #included by consumers.
+CPMAddPackage(
+  NAME spdlog
+  GITHUB_REPOSITORY gabime/spdlog
+  VERSION 1.15.3
+  OPTIONS "SPDLOG_USE_STD_FORMAT ON" "SPDLOG_BUILD_PIC ON"
+)
 CPMAddPackage("gh:google/googletest@1.18.0")
 CPMAddPackage("gh:jarro2783/cxxopts@3.3.1")
 CPMAddPackage("gh:Tessil/ordered-map@1.2.0")

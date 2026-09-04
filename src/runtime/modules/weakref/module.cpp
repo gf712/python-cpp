@@ -1,20 +1,17 @@
-#include "../Modules.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+
+module py.runtime;
+import py.memory;
+import py.types;
+
+// These name py:: types, so they belong in the purview where the implicit
+// import of py.runtime has already happened.
 #include "PyCallableProxyType.hpp"
 #include "PyWeakProxy.hpp"
 #include "PyWeakRef.hpp"
-#include "runtime/PyArgParser.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyInteger.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyType.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/ValueError.hpp"
-#include "runtime/types/builtin.hpp"
-#include "vm/VM.hpp"
-#include <bit>
-#include <cstdint>
+
 
 namespace py {
 
@@ -28,15 +25,15 @@ PyResult<PyObject *> getweakrefcount(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"getweakrefcount",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [object] = result.unwrap();
 
 	return PyInteger::create(
-		VirtualMachine::the().heap().weakref_count(std::bit_cast<uint8_t *>(object)));
+		VirtualMachine::the().heap().weakref_count(std::bit_cast<std::uint8_t *>(object)));
 }
 
 PyResult<PyObject *> getweakrefs(PyTuple *args, PyDict *kwargs)
@@ -44,19 +41,24 @@ PyResult<PyObject *> getweakrefs(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyObject *>::unpack_tuple(args,
 		kwargs,
 		"getweakrefs",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 1>{});
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 1>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 
 	auto [object] = result.unwrap();
 
-	auto weakrefs = VirtualMachine::the().heap().get_weakrefs(std::bit_cast<uint8_t *>(object));
+	auto weakrefs =
+		VirtualMachine::the().heap().get_weakrefs(std::bit_cast<std::uint8_t *>(object));
 
 	auto weakref_list = PyList::create();
 	if (result.is_err()) { return weakref_list; }
-	weakref_list.unwrap()->elements().insert(
-		weakref_list.unwrap()->elements().end(), weakrefs.begin(), weakrefs.end());
+	// Heap::get_weakrefs returns Cell* so that memory/ does not have to name
+	// py::PyObject (that dependency closed a module cycle); every weakref stored
+	// there is a PyObject, so the downcast is safe.
+	auto &elements = weakref_list.unwrap()->elements();
+	elements.reserve(elements.size() + weakrefs.size());
+	for (auto *cell : weakrefs) { elements.push_back(static_cast<PyObject *>(cell)); }
 
 	return weakref_list;
 }
@@ -66,8 +68,8 @@ PyResult<PyObject *> proxy(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"proxy",
-		std::integral_constant<size_t, 1>{},
-		std::integral_constant<size_t, 2>{},
+		std::integral_constant<std::size_t, 1>{},
+		std::integral_constant<std::size_t, 2>{},
 		nullptr);
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
@@ -84,8 +86,8 @@ PyResult<PyObject *> remove_dead_weakref(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"remove_dead_weakref",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 
 	if (result.is_err()) { return Err(result.unwrap_err()); }
 

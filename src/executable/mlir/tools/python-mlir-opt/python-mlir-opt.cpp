@@ -17,6 +17,9 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
+// After the third-party headers: these name module-owned types.
+import py.runtime;
+
 int main(int argc, char **argv)
 {
 	mlir::DialectRegistry registry;

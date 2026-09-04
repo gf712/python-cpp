@@ -1,13 +1,17 @@
-#include "../Modules.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+#include <pthread.h>
+
+module py.runtime;
+import py.types;
+
 #include "Lock.hpp"
 #include "RLock.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/TypeError.hpp"
-#include "runtime/types/builtin.hpp"
 
-#include <thread>
 
 namespace py {
 
@@ -16,8 +20,8 @@ PyResult<PyObject *> start_new_thread(PyTuple *args, PyDict *kwargs)
 	auto result = PyArgsParser<PyObject *, PyObject *>::unpack_tuple(args,
 		kwargs,
 		"start_new_thread",
-		std::integral_constant<size_t, 2>{},
-		std::integral_constant<size_t, 2>{});
+		std::integral_constant<std::size_t, 2>{},
+		std::integral_constant<std::size_t, 2>{});
 
 	if (result.is_err()) { return Ok(result.unwrap_err()); }
 
@@ -67,7 +71,7 @@ PyModule *thread_module()
 		PyString::create("TIMEOUT_MAX").unwrap(), PyInteger::create(LLONG_MAX).unwrap());
 
 	pthread_attr_t attr;
-	size_t stacksize;
+	std::size_t stacksize;
 	pthread_attr_init(&attr);
 	pthread_attr_getstacksize(&attr, &stacksize);
 

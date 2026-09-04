@@ -15,6 +15,9 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 
+// After the third-party headers: the generated .inc code names py:: types.
+import py.runtime;
+
 #include "Python/IR/Dialect.cpp.inc"
 
 #include "Python/IR/PythonInterfaces.cpp.inc"

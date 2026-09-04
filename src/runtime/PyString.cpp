@@ -1,37 +1,21 @@
-#include "PyString.hpp"
-#include "IndexError.hpp"
-#include "KeyError.hpp"
-#include "MemoryError.hpp"
-#include "NotImplementedError.hpp"
-#include "PyArgParser.hpp"
-#include "PyBool.hpp"
-#include "PyDict.hpp"
-#include "PyFloat.hpp"
-#include "PyInteger.hpp"
-#include "PyList.hpp"
-#include "PyNone.hpp"
-#include "PySlice.hpp"
-#include "StopIteration.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "runtime/PyBytes.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/forward.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "utilities.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
 
-#include <algorithm>
 #include <cstddef>
-#include <limits>
-#include <optional>
-#include <span>
+#include <cstdint>
+#include <cstdio>
 
+#include <gmpxx.h>
 #include <unicode/stringpiece.h>
 #include <unicode/uchar.h>
 #include <unicode/umachine.h>
 #include <unicode/unistr.h>
+
+module py.runtime;
+import py.types;
+import std;
+
 
 namespace py {
 
@@ -166,21 +150,21 @@ PyResult<PyString *> PyString::create(const Bytes &bytes, const std::string &enc
 			if (*it > std::byte{ 127 }) {
 				return Err(value_error(
 					"'utf-8' codec can't decode byte {} in position {}: invalid start byte",
-					*it,
+					std::to_integer<int>(*it),
 					std::distance(bytes.b.begin(), it)));
 			}
 			auto length = utf8::codepoint_length(static_cast<char>(*it));
-			if (!utf8::codepoint(bit_cast<const char *>(it.base()), length).has_value()) {
+			if (!utf8::codepoint(std::bit_cast<const char *>(it.base()), length).has_value()) {
 				return Err(value_error(
 					"'utf-8' codec can't decode byte {} in position {}: invalidutf8 codepoint ",
-					*it,
+					std::to_integer<int>(*it),
 					std::distance(bytes.b.begin(), it)));
 			}
 			for (size_t i = 0; i < length; ++i) {
 				if (it == bytes.b.end()) {
 					return Err(value_error(
 						"'utf-8' codec can't decode byte {} in position {}: invalidutf8 codepoint ",
-						*it,
+						std::to_integer<int>(*it),
 						std::distance(bytes.b.begin(), it)));
 				}
 				result.push_back(static_cast<char>(*it));
@@ -243,7 +227,7 @@ PyResult<int64_t> PyString::__hash__() const
 
 PyResult<PyObject *> PyString::__repr__() const
 {
-	return PyString::create(fmt::format("'{}'", m_value));
+	return PyString::create(std::format("'{}'", m_value));
 }
 
 PyResult<PyObject *> PyString::__str__() const { return Ok(const_cast<PyString *>(this)); }
@@ -1374,7 +1358,8 @@ namespace {
 			if (conversion.has_value()) {
 				replacement_field.conversion = *conversion;
 			} else {
-				return Err(value_error("Invalid conversion specifier '{}'", *conversion));
+				return Err(value_error(
+					"Invalid conversion specifier '{}'", static_cast<int>(*conversion)));
 			}
 			str = end == std::string_view::npos ? "" : str.substr(end);
 		}
@@ -1573,7 +1558,7 @@ PyResult<PyString *> PyString::convert_to_ascii(PyObject *obj)
 			if (cp <= 128) {
 				new_string.push_back(static_cast<char>(cp));
 			} else {
-				new_string += fmt::format("\\U{:08x}", cp);
+				new_string += std::format("\\U{:08x}", cp);
 			}
 		}
 
@@ -1868,7 +1853,7 @@ PyStringIterator::PyStringIterator(const PyString &pystring)
 
 std::string PyStringIterator::to_string() const
 {
-	return fmt::format("<str_iterator at {}>", static_cast<const void *>(this));
+	return std::format("<str_iterator at {}>", static_cast<const void *>(this));
 }
 
 void PyStringIterator::visit_graph(Visitor &visitor)

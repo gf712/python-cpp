@@ -1,10 +1,13 @@
+#include "core.hpp"
+#include "gtest/gtest.h"
+
+import py.lexer;
+import py.runtime;
+import py.ast;
+
+// After the import: these name module-owned types.
 #include "LLVMGenerator.hpp"
 #include "LLVMProgram.hpp"
-
-#include "lexer/Lexer.hpp"
-#include "parser/Parser.hpp"
-
-#include "gtest/gtest.h"
 
 namespace {
 std::shared_ptr<Program> generate_llvm_module(std::string_view program)

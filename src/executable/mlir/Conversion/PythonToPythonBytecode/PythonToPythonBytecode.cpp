@@ -4,12 +4,7 @@
 #include "Dialect/Python/IR/Dialect.hpp"
 #include "Dialect/Python/IR/PythonAttributes.hpp"
 #include "Dialect/Python/IR/PythonOps.hpp"
-#include "ast/AST.hpp"
-#include "executable/Mangler.hpp"
-#include "executable/bytecode/instructions/BinaryOperation.hpp"
-#include "executable/bytecode/instructions/GetAwaitable.hpp"
-#include "executable/bytecode/instructions/Unary.hpp"
-
+#include "core.hpp"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -27,15 +22,18 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "utilities.hpp"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+import py.runtime;
+import py.ast;
+import std;
 
-#include <algorithm>
+// After the import: these name module-owned types.
+
 
 namespace mlir {
 namespace py {

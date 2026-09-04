@@ -1,10 +1,22 @@
-#include "Program.hpp"
-#include "executable/bytecode/codegen/BytecodeGenerator.hpp"
-#include "executable/llvm/LLVMGenerator.hpp"
-#include "executable/mlir/Dialect/Python/MLIRGenerator.hpp"
-#include "mlir/compile.hpp"
-#include "utilities.hpp"
+module;
+#include <cstdint>
 
+#include "core.hpp"
+#include "executable/common.hpp"
+
+module py.runtime;
+import py.ast;
+import py.codegen;
+import std;
+
+// These name py:: types, so they belong in the purview where the implicit
+// import of py.runtime has already happened. Including LLVMGenerator.hpp
+// unconditionally would attach codegen::LLVMGenerator to py.runtime and pull
+// its virtual members into the vtable even though the backend is not built.
+#if defined(ENABLE_LLVM_BACKEND) && defined(LLVM_FOUND)
+#include "executable/llvm/LLVMGenerator.hpp"
+#endif
+#include "mlir/compile.hpp"
 
 Program::Program(std::string &&filename, std::vector<std::string> &&argv)
 	: m_filename(std::move(filename)), m_argv(std::move(argv))

@@ -1,18 +1,12 @@
-#include "PyTuple.hpp"
-#include "IndexError.hpp"
-#include "MemoryError.hpp"
-#include "PyBool.hpp"
-#include "PyInteger.hpp"
-#include "PyList.hpp"
-#include "PySlice.hpp"
-#include "PyString.hpp"
-#include "StopIteration.hpp"
-#include "TypeError.hpp"
-#include "ValueError.hpp"
-#include "interpreter/Interpreter.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "memory/allocate.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import py.types;
+
 
 namespace py {
 
@@ -337,7 +331,7 @@ PyResult<PyTupleIterator *> PyTupleIterator::create(const PyTuple &pytuple)
 
 std::string PyTupleIterator::to_string() const
 {
-	return fmt::format("<tuple_iterator at {}>", static_cast<const void *>(this));
+	return std::format("<tuple_iterator at {}>", static_cast<const void *>(this));
 }
 
 PyResult<PyObject *> PyTupleIterator::__repr__() const { return PyString::create(to_string()); }

@@ -1,6 +1,14 @@
-#include "Push.hpp"
-#include "runtime/PyNone.hpp"
-#include "vm/VM.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include <cstddef>
+#include <cstdint>
+
+module py.runtime;
+import std;
+
+// After the import: these name module-owned types.
+
 
 using namespace py;
 

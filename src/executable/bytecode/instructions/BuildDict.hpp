@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class BuildDict final : public Instruction
 {
 	Register m_dst;
@@ -13,7 +10,7 @@ class BuildDict final : public Instruction
 
 	std::string to_string() const final
 	{
-		return fmt::format("BUILD_DICT      r{:<3} (size={})", m_dst, m_size);
+		return std::format("BUILD_DICT      r{:<3} (size={})", m_dst, m_size);
 	}
 
 	py::PyResult<py::Value> execute(VirtualMachine &, Interpreter &) const final;

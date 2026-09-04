@@ -1,34 +1,9 @@
-#include "Interpreter.hpp"
-
-#include "runtime/BaseException.hpp"
-#include "runtime/Import.hpp"
-#include "runtime/KeyError.hpp"
-#include "runtime/NameError.hpp"
-#include "runtime/PyBool.hpp"
-#include "runtime/PyCode.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyFunction.hpp"
-#include "runtime/PyList.hpp"
-#include "runtime/PyNone.hpp"
-#include "runtime/PyNumber.hpp"
-#include "runtime/PyObject.hpp"
-#include "runtime/PyString.hpp"
-#include "runtime/PyTuple.hpp"
-#include "runtime/Value.hpp"
-#include "runtime/modules/Modules.hpp"
-#include "runtime/modules/config.hpp"
-#include "runtime/types/builtin.hpp"
-
-#include "executable/Program.hpp"
-#include "executable/bytecode/Bytecode.hpp"
-#include "executable/bytecode/BytecodeProgram.hpp"
-#include "utilities.hpp"
-
-#include <cstdio>
-#include <filesystem>
-#include <ranges>
+module;
+#include "core.hpp"
 #include <unistd.h>
+
+module py.runtime;
+import py.types;
 
 namespace fs = std::filesystem;
 using namespace py;
@@ -129,7 +104,7 @@ Interpreter::Interpreter() {}
 void Interpreter::internal_setup(const std::string &name,
 	std::string entry_script,
 	std::vector<std::string> argv,
-	size_t local_registers,
+	std::size_t local_registers,
 	const PyTuple *consts,
 	const std::vector<std::string> &names,
 	Config &&config,
@@ -271,7 +246,9 @@ void Interpreter::internal_setup(const std::string &name,
 		if (args.is_err()) { TODO(); }
 		auto result = install.unwrap()->call(args.unwrap(), nullptr);
 		if (result.is_err()) {
-			spdlog::error("Error calling _install: {}", result.unwrap_err()->to_string());
+			::detail::log_error(
+				std::format("Error calling _install: {}", result.unwrap_err()->to_string())
+					.c_str());
 			TODO();
 		}
 
@@ -281,8 +258,9 @@ void Interpreter::internal_setup(const std::string &name,
 
 		result = install_external.unwrap()->call(PyTuple::create().unwrap(), nullptr);
 		if (result.is_err()) {
-			spdlog::error(
-				"Error calling _install_external_importers: {}", result.unwrap_err()->to_string());
+			::detail::log_error(std::format(
+				"Error calling _install_external_importers: {}", result.unwrap_err()->to_string())
+					.c_str());
 			TODO();
 		}
 	}
@@ -399,7 +377,8 @@ PyResult<PyObject *> Interpreter::call(PyNativeFunction *native_func, PyTuple *a
 	auto &vm = VirtualMachine::the();
 	ASSERT(native_func->is_function());
 	return native_func->operator()(args, kwargs).and_then([&vm](PyObject *result) {
-		spdlog::debug("Native function return value: {}", result->to_string());
+		::detail::log_debug(
+			std::format("Native function return value: {}", result->to_string()).c_str());
 		vm.reg(0) = result;
 		return Ok(result);
 	});
@@ -411,7 +390,8 @@ PyResult<PyObject *>
 	auto &vm = VirtualMachine::the();
 	ASSERT(native_func->is_method());
 	return native_func->operator()(self, args, kwargs).and_then([&vm](PyObject *result) {
-		spdlog::debug("Native function return value: {}", result->to_string());
+		::detail::log_debug(
+			std::format("Native function return value: {}", result->to_string()).c_str());
 		vm.reg(0) = result;
 		return Ok(result);
 	});
@@ -419,17 +399,19 @@ PyResult<PyObject *>
 
 PyResult<std::monostate> Interpreter::store_object(const std::string &name, const Value &value)
 {
-	if (spdlog::get_level() == spdlog::level::debug) {
-		spdlog::debug("Interpreter::store_object(name={}, value={}, current_frame={})",
-			name,
-			std::visit(
-				[](const auto &val) {
-					std::ostringstream os;
-					os << val;
-					return os.str();
-				},
-				value),
-			(void *)m_current_frame);
+	if (::detail::log_debug_enabled()) {
+		::detail::log_debug(
+			std::format("Interpreter::store_object(name={}, value={}, current_frame={})",
+				name,
+				std::visit(
+					[](const auto &val) {
+						std::ostringstream os;
+						os << val;
+						return os.str();
+					},
+					value),
+				(void *)m_current_frame)
+				.c_str());
 	}
 	return m_current_frame->put_local(name, value);
 }

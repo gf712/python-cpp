@@ -1,13 +1,16 @@
-#include "FunctionCallWithKeywords.hpp"
-#include "FunctionCall.hpp"
+module;
+#include "core.hpp"
+#include "executable/Label.hpp"
+#include "spdlog/spdlog.h"
+#include <cstddef>
+#include <cstdint>
 
-#include "interpreter/Interpreter.hpp"
-#include "runtime/PyDict.hpp"
-#include "runtime/PyFrame.hpp"
-#include "runtime/PyTuple.hpp"
-#include "vm/VM.hpp"
+module py.runtime;
+import std;
 
+// After the import: these name module-owned types.
 #include "../serialization/serialize.hpp"
+
 
 using namespace py;
 

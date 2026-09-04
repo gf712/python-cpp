@@ -1,30 +1,18 @@
-#include "PyObject.hpp"
+module;
+#include "core.hpp"
 
-#include "AttributeError.hpp"
-#include "NotImplemented.hpp"
-#include "NotImplementedError.hpp"
-#include "PyBool.hpp"
-#include "PyBytes.hpp"
-#include "PyDict.hpp"
-#include "PyEllipsis.hpp"
-#include "PyGenericAlias.hpp"
-#include "PyInteger.hpp"
-#include "PyIterator.hpp"
-#include "PyNone.hpp"
-#include "PyNumber.hpp"
-#include "PySlotWrapper.hpp"
-#include "PyStaticMethod.hpp"
-#include "PyString.hpp"
-#include "PyTuple.hpp"
-#include "PyType.hpp"
-#include "StopIteration.hpp"
-#include "TypeError.hpp"
-#include "runtime/Value.hpp"
-#include "types/api.hpp"
-#include "types/builtin.hpp"
+// The global-namespace C names (size_t, the intN_t family): `import std;` below
+// exports only the std:: spellings, and this file uses the unqualified ones.
+#include <cstddef>
+#include <cstdint>
 
-#include "vm/VM.hpp"
-#include <variant>
+// mpz_class comparison operators (BigIntType)
+#include <gmpxx.h>
+
+module py.runtime;
+import py.types;
+import std;
+
 
 namespace py {
 
@@ -71,18 +59,18 @@ size_t ValueHash::operator()(const Value &value) const
 				   },
 			[](const String &s) -> size_t { return std::hash<std::string>{}(s.s); },
 			[](const Bytes &b) -> size_t {
-				std::string_view sv{ bit_cast<char *>(b.b.data()), b.b.size() };
+				std::string_view sv{ std::bit_cast<char *>(b.b.data()), b.b.size() };
 				return static_cast<int64_t>(std::hash<std::string_view>{}(sv));
 			},
-			[](const Ellipsis &) -> size_t { return ::bit_cast<size_t>(py_ellipsis()); },
+			[](const Ellipsis &) -> size_t { return std::bit_cast<size_t>(py_ellipsis()); },
 			[](const NameConstant &c) -> size_t {
 				if (std::holds_alternative<bool>(c.value)) {
 					return std::get<bool>(c.value) ? 0 : 1;
 				} else {
-					return bit_cast<size_t>(py_none()) >> 4;
+					return std::bit_cast<size_t>(py_none()) >> 4;
 				}
 			},
-			[](const Tuple &t) -> size_t { return ::bit_cast<size_t>(t.elements.data()); },
+			[](const Tuple &t) -> size_t { return std::bit_cast<size_t>(t.elements.data()); },
 			[](PyObject *obj) -> size_t {
 				auto val = obj->hash();
 				ASSERT(val.is_ok());
@@ -424,7 +412,7 @@ void PyObject::visit_graph(Visitor &visitor)
 	if (m_attributes) { visitor.visit(*m_attributes); }
 	for (size_t i = 0, offset = type()->underlying_type().basicsize; i < type()->__slots__.size();
 		++i, offset += sizeof(PyObject *)) {
-		auto *slot = *bit_cast<PyObject **>(bit_cast<uint8_t *>(this) + offset);
+		auto *slot = *std::bit_cast<PyObject **>(std::bit_cast<uint8_t *>(this) + offset);
 		if (slot) { visitor.visit(*slot); }
 	}
 	if (std::holds_alternative<PyType *>(m_type)) {
@@ -474,7 +462,7 @@ PyResult<std::monostate> PyObject::get_buffer(PyBuffer &buffer, int flags)
 
 PyResult<PyObject *> PyObject::__repr__() const
 {
-	return PyString::create(fmt::format(
+	return PyString::create(std::format(
 		"<{} object at {}>", type_prototype().__name__, static_cast<const void *>(this)));
 }
 
@@ -1364,7 +1352,7 @@ PyResult<std::monostate> PyObject::__delattribute__(PyObject *attribute)
 	return Ok(std::monostate{});
 }
 
-PyResult<int64_t> PyObject::__hash__() const { return Ok(bit_cast<size_t>(this) >> 4); }
+PyResult<int64_t> PyObject::__hash__() const { return Ok(std::bit_cast<size_t>(this) >> 4); }
 
 bool PyObject::is_callable() const { return type_prototype().__call__.has_value(); }
 
@@ -1440,7 +1428,7 @@ PyResult<int32_t> PyObject::__init__(PyTuple *args, PyDict *kwargs)
 
 std::string PyObject::to_string() const
 {
-	return fmt::format("PyObject at {}", static_cast<const void *>(this));
+	return std::format("PyObject at {}", static_cast<const void *>(this));
 }
 
 PyType *PyObject::type() const

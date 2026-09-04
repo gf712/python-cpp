@@ -1,11 +1,9 @@
-#include "runtime/PyObject.hpp"
-#include "runtime/Value.hpp"
-
 namespace py {
 namespace itertools {
 	class Count : public PyBaseObject
 	{
 		friend class ::Heap;
+		friend class py::detail::Allocator;
 
 		Number m_start{ 0 };
 		Number m_step{ 1 };

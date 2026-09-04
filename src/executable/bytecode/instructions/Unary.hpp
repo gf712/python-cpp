@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Instructions.hpp"
-
-
 class Unary final : public Instruction
 {
   public:
@@ -25,7 +22,7 @@ class Unary final : public Instruction
 	std::string to_string() const final
 	{
 		std::array op_str{ "+", "-", "~", "!" };
-		return fmt::format("UNARY  r{:<3} r{:<3} ({})",
+		return std::format("UNARY  r{:<3} r{:<3} ({})",
 			m_destination,
 			m_source,
 			op_str[static_cast<uint8_t>(m_operation)]);
