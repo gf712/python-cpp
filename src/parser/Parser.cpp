@@ -46,6 +46,24 @@ static std::uint16_t next_memo_rule_id()
 
 template<typename Rule> inline const std::uint16_t memo_rule_id = next_memo_rule_id();
 
+// Seeding the left-recursion sentinel is only useful for a rule that can re-enter itself at
+// the same position: the seed exists so the re-entry finds it, flips it, and hands control to
+// grow_lr.
+// Keep this in step with the grammar: a rule whose first element can reach the rule itself
+// needs an entry here, or it recurses until the stack runs out. Both current entries are
+// direct self-references, which is also all grow_lr claims to detect.
+template<typename Rule> struct is_left_recursive : std::false_type
+{
+};
+
+template<> struct is_left_recursive<struct TPrimaryPattern> : std::true_type
+{
+};
+
+template<> struct is_left_recursive<struct DottedNamePattern> : std::true_type
+{
+};
+
 template<typename T> struct traits;
 
 namespace detail {
@@ -98,15 +116,21 @@ template<typename Derived> struct PatternV2
   public:
 	static std::optional<ResultType> matches(Parser &p)
 	{
+		// Memoisation itself happens in PatternMatchV2_::match, which stores the result
+		// whether or not a sentinel was seeded; this only governs the left-recursion seed.
+		static constexpr bool seeds_sentinel =
+			::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}
+			&& is_left_recursive<Derived>::value;
+
 		const auto start_position = p.token_position();
-		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
+		if constexpr (seeds_sentinel) {
 			// Seed the left-recursion sentinel: if the rule re-enters itself at this same
 			// position the lookup below flips the bool, and grow_lr takes over.
 			p.memo_insert(start_position, memo_rule_id<Derived>) =
 				Parser::CacheValue{ false, start_position };
 		}
-		const std::optional<ResultType> result = Derived::matches_impl(p);
-		if constexpr (::detail::has_type<ResultType, ::detail::ValueTypesTuple>{}) {
+		const auto &result = Derived::matches_impl(p);
+		if constexpr (seeds_sentinel) {
 			if (result.has_value()) {
 				// Safe to hold across grow_lr: memo entries live in a deque.
 				auto *slot = p.memo_find(start_position, memo_rule_id<Derived>);
@@ -2968,78 +2992,88 @@ struct PrimaryPattern : PatternV2<PrimaryPattern>
 	//     | primary '(' [arguments] ')'
 	//     | primary '[' slices ']'
 	//     | atom
+	//
+	// Spelled left-recursively the rule re-parses the whole primary once per postfix
+	// operator and leans on grow_lr to extend the seed. The postfix forms all start at the
+	// position after the primary, so a loop over them does the same work without
+	// re-entering the rule: parse the atom once, then keep appending. The alternatives are
+	// tried in the order above - genexp before the call form, since a genexp also opens
+	// with '('.
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
-		//  primary '.' NAME
 		DEBUG_LOG("PrimaryPattern");
-		using pattern2 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::DOT>,
-			NAMEPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG(" primary '.' NAME");
-			auto [value, _, name_token] = *result;
-			std::string name{ name_token.token.start().pointer_to_program,
-				name_token.token.end().pointer_to_program };
-			return p.arena().create<Attribute>(value,
-				name,
-				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, name_token.token.end() });
-		}
 
-		//  primary genexp
-		using pattern3 = PatternMatchV2<PrimaryPattern, GenexPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("primary genexp");
-			auto [function, arg] = *result;
-			std::vector<ASTNode *> args{ arg };
-			std::vector<Keyword *> kwargs;
-			return p.arena().create<Call>(function,
-				args,
-				kwargs,
-				SourceLocation{ function->source_location().start, arg->source_location().end });
-		}
+		auto atom = PatternMatchV2<AtomPattern>::match(p);
+		if (!atom.has_value()) { return {}; }
+		ASTNode *value = std::get<0>(*atom);
 
-		// primary '(' [arguments] ')'
-		using pattern4 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::LPAREN>,
-			ZeroOrOnePatternV2<ArgumentsPattern>,
-			SingleTokenPatternV2<Token::TokenType::RPAREN>>;
-		if (auto result = pattern4::match(p)) {
-			DEBUG_LOG("primary '(' [arguments] ')'");
-			std::vector<ASTNode *> args;
-			std::vector<Keyword *> kwargs;
-			auto [function, _, arguments, r] = *result;
-			if (arguments.has_value()) {
-				auto [args_, kwargs_] = *arguments;
-				args = std::move(args_);
-				kwargs = std::move(kwargs_);
+		while (true) {
+			//  primary '.' NAME
+			using dot_name =
+				PatternMatchV2<SingleTokenPatternV2<Token::TokenType::DOT>, NAMEPattern>;
+			if (auto result = dot_name::match(p)) {
+				DEBUG_LOG(" primary '.' NAME");
+				auto [_, name_token] = *result;
+				std::string name{ name_token.token.start().pointer_to_program,
+					name_token.token.end().pointer_to_program };
+				value = p.arena().create<Attribute>(value,
+					name,
+					ContextType::LOAD,
+					SourceLocation{ value->source_location().start, name_token.token.end() });
+				continue;
 			}
-			return p.arena().create<Call>(function,
-				args,
-				kwargs,
-				SourceLocation{ function->source_location().start, r.token.end() });
-		}
 
-		// primary '[' slices ']'
-		using pattern5 = PatternMatchV2<PrimaryPattern,
-			SingleTokenPatternV2<Token::TokenType::LSQB>,
-			SlicesPattern,
-			SingleTokenPatternV2<Token::TokenType::RSQB>>;
-		if (auto result = pattern5::match(p)) {
-			DEBUG_LOG("'[' slices ']'");
-			auto [value, l, slices, r] = *result;
-			return p.arena().create<Subscript>(value,
-				slices,
-				ContextType::LOAD,
-				SourceLocation{ value->source_location().start, r.token.end() });
-		}
+			//  primary genexp
+			if (auto result = PatternMatchV2<GenexPattern>::match(p)) {
+				DEBUG_LOG("primary genexp");
+				auto [arg] = *result;
+				std::vector<ASTNode *> args{ arg };
+				std::vector<Keyword *> kwargs;
+				value = p.arena().create<Call>(value,
+					args,
+					kwargs,
+					SourceLocation{ value->source_location().start, arg->source_location().end });
+				continue;
+			}
 
-		using pattern6 = PatternMatchV2<AtomPattern>;
-		if (auto result = pattern6::match(p)) {
-			auto [atom] = *result;
-			return atom;
+			// primary '(' [arguments] ')'
+			using call = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LPAREN>,
+				ZeroOrOnePatternV2<ArgumentsPattern>,
+				SingleTokenPatternV2<Token::TokenType::RPAREN>>;
+			if (auto result = call::match(p)) {
+				DEBUG_LOG("primary '(' [arguments] ')'");
+				std::vector<ASTNode *> args;
+				std::vector<Keyword *> kwargs;
+				auto [_, arguments, r] = *result;
+				if (arguments.has_value()) {
+					auto [args_, kwargs_] = *arguments;
+					args = std::move(args_);
+					kwargs = std::move(kwargs_);
+				}
+				value = p.arena().create<Call>(value,
+					args,
+					kwargs,
+					SourceLocation{ value->source_location().start, r.token.end() });
+				continue;
+			}
+
+			// primary '[' slices ']'
+			using subscript = PatternMatchV2<SingleTokenPatternV2<Token::TokenType::LSQB>,
+				SlicesPattern,
+				SingleTokenPatternV2<Token::TokenType::RSQB>>;
+			if (auto result = subscript::match(p)) {
+				DEBUG_LOG("'[' slices ']'");
+				auto [l, slices, r] = *result;
+				value = p.arena().create<Subscript>(value,
+					slices,
+					ContextType::LOAD,
+					SourceLocation{ value->source_location().start, r.token.end() });
+				continue;
+			}
+
+			break;
 		}
-		return {};
+		return value;
 	}
 };
 
