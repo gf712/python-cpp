@@ -3183,316 +3183,94 @@ struct FactorPattern : PatternV2<FactorPattern>
 	}
 };
 
-template<> struct traits<struct TermPattern>
+// The grammar spells the binary operator precedence levels as a chain of left-recursive
+// rules - bitwise_or -> bitwise_xor -> bitwise_and -> shift_expr -> sum -> term
+// Precedence climbing does one descent to the operand and a token peek per
+// operator, and takes the left recursion. BitwiseOrPattern keeps its name because ComparisonPattern
+// refers to it; nothing outside the chain referred to the five levels below.
+//
+// Precedences are the Python ones, lowest binding first. Every operator here is
+// left-associative; `not` and the comparisons sit above this in ComparisonPattern, and unary
+// +-~ and the right-associative ** below it in FactorPattern, so neither is affected.
+struct BinaryOperatorInfo
 {
-	using result_type = ASTNode *;
+	std::uint8_t precedence;
+	BinaryOpType type;
 };
 
-struct TermPattern : PatternV2<TermPattern>
+static constexpr std::optional<BinaryOperatorInfo> binary_operator(Token::TokenType token)
 {
-	using ResultType = typename traits<TermPattern>::result_type;
-
-	// term:
-	//     | term '*' factor
-	//     | term '/' factor
-	//     | term '//' factor
-	//     | term '%' factor
-	//     | term '@' factor
-	//     | factor
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("TermPattern");
-
-		using pattern1 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::STAR>,
-			FactorPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("term '*' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MULTIPLY,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::SLASH>,
-			FactorPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("term '/' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::SLASH,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern3 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::DOUBLESLASH>,
-			FactorPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("term '//' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::FLOORDIV,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern4 = PatternMatchV2<TermPattern,
-			SingleTokenPatternV2<Token::TokenType::PERCENT>,
-			FactorPattern>;
-		if (auto result = pattern4::match(p)) {
-			DEBUG_LOG("term '%' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MODULO,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern5 =
-			PatternMatchV2<TermPattern, SingleTokenPatternV2<Token::TokenType::AT>, FactorPattern>;
-		if (auto result = pattern5::match(p)) {
-			DEBUG_LOG("term '@' factor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MATMUL,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// factor
-		using pattern6 = PatternMatchV2<FactorPattern>;
-		if (auto result = pattern6::match(p)) {
-			auto [factor] = *result;
-			return factor;
-		}
-
+	switch (token) {
+	case Token::TokenType::VBAR:
+		return BinaryOperatorInfo{ 1, BinaryOpType::OR };
+	case Token::TokenType::CIRCUMFLEX:
+		return BinaryOperatorInfo{ 2, BinaryOpType::XOR };
+	case Token::TokenType::AMPER:
+		return BinaryOperatorInfo{ 3, BinaryOpType::AND };
+	case Token::TokenType::LEFTSHIFT:
+		return BinaryOperatorInfo{ 4, BinaryOpType::LEFTSHIFT };
+	case Token::TokenType::RIGHTSHIFT:
+		return BinaryOperatorInfo{ 4, BinaryOpType::RIGHTSHIFT };
+	case Token::TokenType::PLUS:
+		return BinaryOperatorInfo{ 5, BinaryOpType::PLUS };
+	case Token::TokenType::MINUS:
+		return BinaryOperatorInfo{ 5, BinaryOpType::MINUS };
+	case Token::TokenType::STAR:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MULTIPLY };
+	case Token::TokenType::SLASH:
+		return BinaryOperatorInfo{ 6, BinaryOpType::SLASH };
+	case Token::TokenType::DOUBLESLASH:
+		return BinaryOperatorInfo{ 6, BinaryOpType::FLOORDIV };
+	case Token::TokenType::PERCENT:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MODULO };
+	case Token::TokenType::AT:
+		return BinaryOperatorInfo{ 6, BinaryOpType::MATMUL };
+	default:
 		return {};
 	}
-};
-
-template<> struct traits<struct SumPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct SumPattern : PatternV2<SumPattern>
-{
-	using ResultType = typename traits<SumPattern>::result_type;
-	// left recursive
-	// sum:
-	//     | sum '+' term
-	//     | sum '-' term
-	//     | term
-
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("SumPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// sum '+' term
-		using pattern1 =
-			PatternMatchV2<SumPattern, SingleTokenPatternV2<Token::TokenType::PLUS>, TermPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("sum '+' term");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::PLUS,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// sum '-' term
-		using pattern2 =
-			PatternMatchV2<SumPattern, SingleTokenPatternV2<Token::TokenType::MINUS>, TermPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("sum '-' term");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::MINUS,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// term
-		using pattern3 = PatternMatchV2<TermPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("term");
-			auto [term] = *result;
-			return term;
-		}
-
-		return {};
-	}
-};
-
-
-template<> struct traits<struct ShiftExprPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct ShiftExprPattern : PatternV2<ShiftExprPattern>
-{
-	using ResultType = typename traits<ShiftExprPattern>::result_type;
-
-	// shift_expr:
-	//     | shift_expr '<<' sum
-	//     | shift_expr '>>' sum
-	//     | sum
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("ShiftExprPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		using pattern1 = PatternMatchV2<ShiftExprPattern,
-			SingleTokenPatternV2<Token::TokenType::LEFTSHIFT>,
-			SumPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("shift_expr '<<' sum");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::LEFTSHIFT,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<ShiftExprPattern,
-			SingleTokenPatternV2<Token::TokenType::RIGHTSHIFT>,
-			SumPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("shift_expr '>>' sum");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::RIGHTSHIFT,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern3 = PatternMatchV2<SumPattern>;
-		if (auto result = pattern3::match(p)) {
-			DEBUG_LOG("sum");
-			auto [sum] = *result;
-			return sum;
-		}
-		return {};
-	}
-};
-
-template<> struct traits<struct BitwiseAndPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct BitwiseAndPattern : PatternV2<BitwiseAndPattern>
-{
-	using ResultType = typename traits<BitwiseAndPattern>::result_type;
-	// bitwise_and:
-	//     | bitwise_and '&' shift_expr
-	//     | shift_expr
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("bitwise_and");
-
-		// bitwise_and '&' shift_expr
-		using pattern1 = PatternMatchV2<BitwiseAndPattern,
-			SingleTokenPatternV2<Token::TokenType::AMPER>,
-			ShiftExprPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_and '&' shift_expr");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::AND,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		using pattern2 = PatternMatchV2<ShiftExprPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("shift_expr");
-			auto [shift_expr] = *result;
-			return shift_expr;
-		}
-
-		return {};
-	}
-};
-
-template<> struct traits<struct BitwiseXorPattern>
-{
-	using result_type = ASTNode *;
-};
-
-struct BitwiseXorPattern : PatternV2<BitwiseXorPattern>
-{
-	using ResultType = typename traits<BitwiseXorPattern>::result_type;
-
-	// bitwise_xor:
-	//     | bitwise_xor '^' bitwise_and
-	//     | bitwise_and
-	static std::optional<ResultType> matches_impl(Parser &p)
-	{
-		DEBUG_LOG("BitwiseXorPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// bitwise_xor '^' bitwise_and
-		using pattern1 = PatternMatchV2<BitwiseXorPattern,
-			SingleTokenPatternV2<Token::TokenType::CIRCUMFLEX>,
-			BitwiseAndPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_xor '^' bitwise_and");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::XOR,
-				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
-		}
-
-		// bitwise_and
-		using pattern2 = PatternMatchV2<BitwiseAndPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("bitwise_and");
-			auto [and_op] = *result;
-			return and_op;
-		}
-
-		return {};
-	}
-};
-
+}
 
 struct BitwiseOrPattern : PatternV2<BitwiseOrPattern>
 {
 	using ResultType = typename traits<BitwiseOrPattern>::result_type;
 
-	// bitwise_or:
-	//     | bitwise_or '|' bitwise_xor
-	//     | bitwise_xor
+	// bitwise_or / bitwise_xor / bitwise_and / shift_expr / sum / term
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
 		DEBUG_LOG("BitwiseOrPattern");
-		DEBUG_LOG("{}", p.lexer().peek_token(p.token_position())->to_string());
-		// bitwise_or '|' bitwise_xor
-		using pattern1 = PatternMatchV2<BitwiseOrPattern,
-			SingleTokenPatternV2<Token::TokenType::VBAR>,
-			BitwiseXorPattern>;
-		if (auto result = pattern1::match(p)) {
-			DEBUG_LOG("bitwise_or '|' bitwise_xor");
-			auto [lhs, _, rhs] = *result;
-			return p.arena().create<BinaryExpr>(BinaryOpType::OR,
+		return climb(p, 1);
+	}
+
+  private:
+	static std::optional<ResultType> climb(Parser &p, std::uint8_t min_precedence)
+	{
+		auto operand = PatternMatchV2<FactorPattern>::match(p);
+		if (!operand.has_value()) { return {}; }
+		ASTNode *lhs = std::get<0>(*operand);
+
+		while (true) {
+			const auto token = p.lexer().peek_token(p.token_position());
+			if (!token.has_value()) { break; }
+			const auto op = binary_operator(token->token_type());
+			if (!op.has_value() || op->precedence < min_precedence) { break; }
+
+			// Left associativity: the right operand takes only strictly tighter operators,
+			// so an operator of equal precedence is left for the next turn of this loop.
+			const auto before_operator = p.token_position();
+			p.token_position() += 1;
+			auto rhs = climb(p, static_cast<std::uint8_t>(op->precedence + 1));
+			if (!rhs.has_value()) {
+				// No right operand: the ladder would have failed this alternative and
+				// fallen through to the bare operand, so give the operator back.
+				p.token_position() = before_operator;
+				break;
+			}
+			lhs = p.arena().create<BinaryExpr>(op->type,
 				lhs,
-				rhs,
-				SourceLocation{ lhs->source_location().start, rhs->source_location().end });
+				*rhs,
+				SourceLocation{ lhs->source_location().start, (*rhs)->source_location().end });
 		}
-
-		// bitwise_xor
-		using pattern2 = PatternMatchV2<BitwiseXorPattern>;
-		if (auto result = pattern2::match(p)) {
-			DEBUG_LOG("bitwise_xor");
-			auto [bitwise_xor] = *result;
-			return bitwise_xor;
-		}
-
-		return {};
+		return lhs;
 	}
 };
 
