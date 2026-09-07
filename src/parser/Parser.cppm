@@ -25,18 +25,20 @@ class Parser
 
 	using MemoSlot = std::optional<CacheValue>;
 
-	MemoSlot *memo_find(std::size_t position, std::uint16_t rule)
+	std::optional<MemoSlot &> memo_find(std::size_t position, std::uint16_t rule)
 	{
-		if (position >= m_memo_index.size()) { return nullptr; }
+		if (position >= m_memo_index.size()) { return std::nullopt; }
 		for (const auto &[id, slot] : m_memo_index[position]) {
-			if (id == rule) { return &m_memo_pool[slot]; }
+			if (id == rule) { return m_memo_pool[slot]; }
 		}
-		return nullptr;
+		return std::nullopt;
 	}
 
 	MemoSlot &memo_insert(std::size_t position, std::uint16_t rule)
 	{
-		if (auto *existing = memo_find(position, rule)) { return *existing; }
+		if (const auto &existing = memo_find(position, rule); existing.has_value()) {
+			return existing.value();
+		}
 		if (position >= m_memo_index.size()) { m_memo_index.resize(position + 1); }
 		m_memo_pool.emplace_back();
 		m_memo_index[position].emplace_back(

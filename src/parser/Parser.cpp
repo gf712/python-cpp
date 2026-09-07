@@ -133,8 +133,8 @@ template<typename Derived> struct PatternV2
 		if constexpr (seeds_sentinel) {
 			if (result.has_value()) {
 				// Safe to hold across grow_lr: memo entries live in a deque.
-				auto *slot = p.memo_find(start_position, memo_rule_id<Derived>);
-				ASSERT(slot);
+				const auto &slot = p.memo_find(start_position, memo_rule_id<Derived>);
+				ASSERT(slot.has_value());
 				ASSERT(slot->has_value());
 				auto &value = *slot;
 				if (std::holds_alternative<bool>(value->value) && std::get<bool>(value->value)) {
@@ -212,7 +212,8 @@ template<size_t TypeIdx, typename PatternTuple, typename = void> class PatternMa
 		if (!t.has_value()) { return {}; }
 		if constexpr (::detail::has_type<typename ResultTypeHead::value_type,
 						  ::detail::ValueTypesTuple>{}) {
-			if (auto *slot = p.memo_find(original_token_position, memo_rule_id<CurrentType>)) {
+			if (const auto &slot = p.memo_find(original_token_position, memo_rule_id<CurrentType>);
+				slot.has_value()) {
 				if (!slot->has_value()) { return {}; }
 				auto &value = (*slot)->value;
 				p.token_position() = (*slot)->position;
