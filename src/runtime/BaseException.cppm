@@ -72,6 +72,8 @@ class BaseException : public PyBaseObject
 	PyType *static_type() const override;
 	static PyType *class_type();
 
+	virtual std::string format_exception_only() const;
+
 	void visit_graph(Visitor &) override;
 };
 

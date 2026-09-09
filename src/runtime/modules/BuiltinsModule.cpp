@@ -1098,9 +1098,10 @@ PyResult<PyObject *> compile(const PyTuple *args, const PyDict *, Interpreter &)
 
 		auto lexer = Lexer::create(source_str, filename_str);
 		parser::Parser p{ lexer };
-		p.parse();
+		auto module_ = p.parse();
+		if (module_.is_err()) { TODO(); }
 
-		std::shared_ptr<Program> bytecode = compiler::compile(p.module(),
+		std::shared_ptr<Program> bytecode = compiler::compile(module_.unwrap(),
 			{ filename_str },
 			compiler::Backend::MLIR,
 			compiler::OptimizationLevel::None);

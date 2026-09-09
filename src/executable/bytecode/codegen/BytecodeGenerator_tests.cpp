@@ -15,7 +15,7 @@ std::shared_ptr<BytecodeProgram> generate_bytecode(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_bytecode_generator_tests_.py");
 	parser::Parser p{ lexer };
-	p.parse();
+	ASSERT(p.parse().is_ok());
 
 	auto module = p.module();
 	ASSERT(module);

@@ -466,7 +466,7 @@ void assert_generates_ast(std::string_view program,
 	parser::Parser p{ lexer };
 	const auto spdlog_level = spdlog::get_level();
 	spdlog::set_level(spdlog::level::debug);
-	p.parse();
+	ASSERT(p.parse().is_ok());
 	spdlog::set_level(spdlog_level);
 
 	if (lvl > compiler::OptimizationLevel::None) {

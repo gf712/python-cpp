@@ -107,9 +107,9 @@ std::string BaseException::to_string() const
 std::string BaseException::format_traceback() const
 {
 	std::ostringstream out;
-	out << "Traceback (most recent call last):\n";
 	auto *tb = m_traceback;
-	while (tb) {
+	if (tb) { out << "Traceback (most recent call last):\n"; }
+	for (; tb; tb = tb->m_tb_next) {
 		const auto &filename = tb->m_tb_frame->code()->m_filename;
 		out << std::format("  File \"{}\", line {}, in {}\n",
 			filename,
@@ -118,11 +118,16 @@ std::string BaseException::format_traceback() const
 		const auto source = SourceManager::the().line(filename, tb->m_tb_lineno);
 		const auto trimmed = SourceManager::strip_leading_whitespace(source);
 		if (!trimmed.empty()) { out << "    " << trimmed << "\n"; }
-		tb = tb->m_tb_next;
 	}
-	out << type()->name() << ": " << what() << "\n";
+	out << format_exception_only();
 	return out.str();
 }
+
+std::string BaseException::format_exception_only() const
+{
+	return std::format("{}: {}\n", type()->name(), what());
+}
+
 
 PyResult<PyObject *> BaseException::__repr__() const
 {

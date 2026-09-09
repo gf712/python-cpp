@@ -12,6 +12,7 @@ class Parser
 	std::shared_ptr<ast::Module> m_module;
 	Lexer &m_lexer;
 	std::size_t m_token_position{ 0 };
+	std::size_t m_furthest_token{ m_token_position };
 
   public:
 	struct CacheValue
@@ -67,8 +68,15 @@ class Parser
 	const std::size_t &token_position() const { return m_token_position; }
 	std::size_t &token_position() { return m_token_position; }
 
+	std::size_t furthest_token() const { return m_furthest_token; }
+
+	void observe_token(std::size_t position)
+	{
+		m_furthest_token = std::max(m_furthest_token, position);
+	}
+
 	// parses a file
-	void parse();
+	py::PyResult<std::shared_ptr<ast::Module>> parse();
 
 	// parses an expression used by the builtin `eval` function
 	py::PyResult<std::shared_ptr<ast::Module>> parse_expression();

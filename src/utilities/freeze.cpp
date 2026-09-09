@@ -18,9 +18,13 @@ std::shared_ptr<Program> compile(const std::string &filename, std::vector<std::s
 {
 	auto lexer = Lexer::create(std::filesystem::absolute(filename));
 	parser::Parser p{ lexer };
-	p.parse();
+	auto module_ = p.parse();
+	if (module_.is_err()) {
+		std::cerr << module_.unwrap_err()->format_traceback();
+		return nullptr;
+	}
 	return compiler::compile(
-		p.module(), argv, compiler::Backend::MLIR, compiler::OptimizationLevel::None);
+		module_.unwrap(), argv, compiler::Backend::MLIR, compiler::OptimizationLevel::None);
 }
 
 int freeze(size_t argc, char **argv, const std::string &output)
@@ -34,6 +38,7 @@ int freeze(size_t argc, char **argv, const std::string &output)
 	[[maybe_unused]] auto &vm = VirtualMachine::the();
 
 	auto bytecode = compile(filename, std::move(argv_vector));
+	if (!bytecode) { return EXIT_FAILURE; }
 	std::cout << bytecode->to_string() << "-----------------------------\n\n";
 
 	const auto bytes = bytecode->serialize();

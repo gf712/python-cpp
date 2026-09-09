@@ -46,4 +46,24 @@ else
     echo $file "... PASSED!"
 fi
 
+# A syntax error must exit non-zero and report the line the parser actually gave
+# up on -- not line 1 -- with a caret under the offending token.
+file=$SCRIPT_DIR/tests/expected_failures/syntax_error_reporting.py
+output=$(timeout 10s $PYTHON_EXECUTABLE $file --gc-frequency $GC_FREQUENCY 2>&1)
+if [ $? -eq 0 ]; then
+    echo $file "... FAILED! (expected a non-zero exit code)"
+    exit_code=1
+elif ! echo "$output" | grep -q '", line 4$'; then
+    echo $file "... FAILED! (expected the error on line 4, got: ${output})"
+    exit_code=1
+elif ! echo "$output" | grep -qF '            ^'; then
+    echo $file "... FAILED! (expected a caret under the ':', got: ${output})"
+    exit_code=1
+elif ! echo "$output" | grep -q '^SyntaxError: invalid syntax$'; then
+    echo $file "... FAILED! (expected a SyntaxError, got: ${output})"
+    exit_code=1
+else
+    echo $file "... PASSED!"
+fi
+
 exit $exit_code

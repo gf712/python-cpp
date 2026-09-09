@@ -1,7 +1,8 @@
 module;
 #include "core.hpp"
-#include "spdlog/spdlog.h"
+#include "runtime/SourceManager.hpp"
 
+#include "spdlog/spdlog.h"
 #include <gmpxx.h>
 
 
@@ -709,6 +710,7 @@ struct SingleTokenPatternV2 : PatternV2<SingleTokenPatternV2<Patterns...>>
 
 	static std::optional<ResultType> matches_impl(Parser &p)
 	{
+		p.observe_token(p.token_position());
 		if (SingleTokenPattern_<ComposedTypes<Patterns...>>::match(p)) {
 			const auto &t = p.lexer().peek_token(p.token_position());
 			return t.has_value() ? std::make_optional(ResultType{ *t }) : std::nullopt;
@@ -7390,33 +7392,41 @@ struct FilePattern : PatternV2<FilePattern>
 			}
 			return p.module();
 		}
-		size_t idx = 0;
-		auto t = *p.lexer().peek_token(idx);
-		auto begin = t.start().pointer_to_program;
-		auto end = t.end().pointer_to_program;
-		const size_t row = t.start().row;
-		while (row == t.start().row) {
-			end = t.end().pointer_to_program;
-			idx++;
-			t = *p.lexer().peek_token(idx);
-		}
-		std::string line{ begin, end };
-		spdlog::error("Syntax error on line {}: '{}'", row + 1, line);
-		// PARSER_ERROR();
 		return {};
 	}
 };
 
 namespace parser {
-void Parser::parse()
+PyResult<std::shared_ptr<ast::Module>> Parser::parse()
 {
 	auto result = PatternMatchV2<FilePattern>::match(*this);
 	if (result) {
 		auto [module] = *result;
 		m_module = std::move(module);
-		m_module->print_node("");
+		return Ok(m_module);
 	}
-	DEBUG_LOG("Parser return code: {}", result.has_value());
+	std::size_t index = m_furthest_token;
+	std::optional<Token> token = m_lexer.peek_token(index);
+	while (!token.has_value() && index > 0) { token = m_lexer.peek_token(--index); }
+
+	const auto &filename = m_lexer.filename();
+	const auto &program = m_lexer.program();
+	auto lineno = token.has_value() ? token->start().row + 1 : 1;
+	auto offset = token.has_value() ? token->start().column + 1 : 1;
+	const auto line_count =
+		std::max(static_cast<std::size_t>(std::count(program.begin(), program.end(), '\n'))
+					 + (program.empty() || program.back() == '\n' ? 0uz : 1uz),
+			1uz);
+	if (lineno > line_count) {
+		lineno = line_count;
+		offset = SourceManager::the().line(filename, lineno).size() + 1;
+	}
+	const auto text = SourceManager::the().line(filename, lineno);
+	return Err(syntax_error("invalid syntax",
+		SyntaxErrorLocation{ .filename = filename,
+			.lineno = lineno,
+			.offset = offset,
+			.text = std::string{ text } }));
 }
 
 PyResult<std::shared_ptr<ast::Module>> Parser::parse_expression()

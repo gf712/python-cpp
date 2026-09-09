@@ -13,7 +13,7 @@ VariablesResolver::VisibilityMap generate_resolver(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_bytecode_generator_tests_.py");
 	parser::Parser p{ lexer };
-	p.parse();
+	ASSERT(p.parse().is_ok());
 
 	auto *module = as<ast::Module>(p.module().get());
 	ASSERT(module);

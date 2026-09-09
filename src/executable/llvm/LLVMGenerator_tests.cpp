@@ -14,7 +14,7 @@ std::shared_ptr<Program> generate_llvm_module(std::string_view program)
 {
 	auto lexer = Lexer::create(std::string(program), "_llvm_backend_tests_.py");
 	parser::Parser p{ lexer };
-	p.parse();
+	ASSERT(p.parse().is_ok());
 
 	auto module = as<ast::Module>(p.module());
 	ASSERT(module);

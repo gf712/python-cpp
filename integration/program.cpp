@@ -110,7 +110,7 @@ class RunPythonProgram : public ::testing::Test
 
 		auto lexer = Lexer::create(std::string(program), "_integration_dummy_.py");
 		parser::Parser p{ lexer };
-		p.parse();
+		ASSERT_TRUE(p.parse().is_ok());
 		p.module()->print_node("");
 		m_bytecode = compiler::compile(p.module(),
 			{},
