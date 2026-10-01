@@ -19,12 +19,9 @@ namespace {
 		return s.substr(first, s.find_last_not_of(whitespace) - first + 1);
 	}
 
-	// `as<T>` dereferences its argument, and every location attribute is null
-	// until an info tuple sets it.
-	template<typename T> const T *attribute_as(PyObject *attribute)
-	{
-		return attribute ? as<T>(attribute) : nullptr;
-	}
+	// The location attributes are user-writable, so `lineno` and `offset` can
+	// be any int; format them without the range-asserting conversions.
+	std::string int_to_string(const PyInteger &value) { return value.as_big_int().get_str(); }
 }// namespace
 
 SyntaxError *SyntaxError::create(PyTuple *args)
@@ -60,9 +57,15 @@ SyntaxError *SyntaxError::create(std::string message, SyntaxErrorLocation locati
 	return error;
 }
 
-SyntaxError::SyntaxError(PyType *type) : Exception(type) {}
+// Every attribute reads as None until `__init__` sets it, as in CPython.
+SyntaxError::SyntaxError(PyType *type)
+	: Exception(type), m_msg(py_none()), m_filename(py_none()), m_text(py_none()),
+	  m_lineno(py_none()), m_offset(py_none())
+{}
 
-SyntaxError::SyntaxError(PyTuple *args) : Exception(types::BuiltinTypes::the().syntax_error(), args)
+SyntaxError::SyntaxError(PyTuple *args)
+	: Exception(types::BuiltinTypes::the().syntax_error(), args), m_msg(py_none()),
+	  m_filename(py_none()), m_text(py_none()), m_lineno(py_none()), m_offset(py_none())
 {}
 
 PyResult<PyObject *> SyntaxError::__new__(const PyType *type, PyTuple *args, PyDict *kwargs)
@@ -105,14 +108,11 @@ PyResult<int32_t> SyntaxError::__init__(PyTuple *args, PyDict *kwargs)
 
 PyResult<PyObject *> SyntaxError::__str__() const
 {
-	std::string msg{ "None" };
-	if (m_msg) {
-		auto str = m_msg->str();
-		if (str.is_err()) { return str; }
-		msg = str.unwrap()->to_string();
-	}
-	const auto *filename = attribute_as<PyString>(m_filename);
-	const auto *lineno = attribute_as<PyInteger>(m_lineno);
+	auto msg_ = m_msg->str();
+	if (msg_.is_err()) { return msg_; }
+	const auto msg = msg_.unwrap()->to_string();
+	const auto *filename = as<PyString>(m_filename);
+	const auto *lineno = as<PyInteger>(m_lineno);
 	if (!filename && !lineno) { return PyString::create(msg); }
 	std::string basename;
 	if (filename) {
@@ -122,28 +122,36 @@ PyResult<PyObject *> SyntaxError::__str__() const
 	}
 	if (filename && lineno) {
 		return PyString::create(
-			std::format("{} ({}, line {})", msg, basename, lineno->as_size_t()));
+			std::format("{} ({}, line {})", msg, basename, int_to_string(*lineno)));
 	}
 	if (filename) { return PyString::create(std::format("{} ({})", msg, basename)); }
-	return PyString::create(std::format("{} (line {})", msg, lineno->as_size_t()));
+	return PyString::create(std::format("{} (line {})", msg, int_to_string(*lineno)));
 }
 
 std::string SyntaxError::format_exception_only() const
 {
 	std::ostringstream out;
 
-	const auto *lineno = attribute_as<PyInteger>(m_lineno);
+	const auto *lineno = as<PyInteger>(m_lineno);
 	if (lineno) {
-		const auto *filename = attribute_as<PyString>(m_filename);
+		const auto *filename = as<PyString>(m_filename);
 		out << std::format("  File \"{}\", line {}\n",
 			filename ? filename->value() : std::string{ "<string>" },
-			lineno->as_size_t());
-		if (const auto *text = attribute_as<PyString>(m_text)) {
+			int_to_string(*lineno));
+		if (const auto *text = as<PyString>(m_text)) {
 			const std::string_view line{ text->value() };
 			if (const auto trimmed = strip(line); !trimmed.empty()) {
 				out << "    " << trimmed << "\n";
-				if (const auto *offset = attribute_as<PyInteger>(m_offset)) {
-					const auto column = std::min(line.size(), offset->as_size_t());
+				// `offset` is 1-based and may be `line.size() + 1`, i.e. just
+				// past the last character; a negative one means "no column".
+				const auto *offset = as<PyInteger>(m_offset);
+				const auto value = offset ? offset->as_big_int() : BigIntType{ -1 };
+				// gmpxx's comparison operators aren't reachable through the module
+				// interface; this is what the `mpz_sgn` macro expands to.
+				if (value.get_mpz_t()->_mp_size >= 0) {
+					const auto column = value.fits_ulong_p()
+											? std::min(line.size() + 1, value.get_ui())
+											: line.size() + 1;
 					auto prefix = line.substr(0, column > 0 ? column - 1 : 0);
 					if (const auto first = prefix.find_first_not_of(whitespace);
 						first != std::string_view::npos) {
@@ -164,7 +172,7 @@ std::string SyntaxError::format_exception_only() const
 	}
 
 	std::string msg{ "<no detail available>" };
-	if (m_msg && m_msg != py_none()) {
+	if (m_msg != py_none()) {
 		if (auto str = m_msg->str(); str.is_ok()) { msg = str.unwrap()->to_string(); }
 	}
 	out << std::format("{}: {}\n", type()->name(), msg);
@@ -180,11 +188,11 @@ PyType *SyntaxError::static_type() const
 void SyntaxError::visit_graph(Visitor &visitor)
 {
 	Exception::visit_graph(visitor);
-	if (m_msg) visitor.visit(*m_msg);
-	if (m_filename) visitor.visit(*m_filename);
-	if (m_text) visitor.visit(*m_text);
-	if (m_lineno) visitor.visit(*m_lineno);
-	if (m_offset) visitor.visit(*m_offset);
+	visitor.visit(*m_msg);
+	visitor.visit(*m_filename);
+	visitor.visit(*m_text);
+	visitor.visit(*m_lineno);
+	visitor.visit(*m_offset);
 }
 
 namespace {

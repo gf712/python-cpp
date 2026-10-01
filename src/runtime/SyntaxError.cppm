@@ -36,11 +36,11 @@ class SyntaxError : public Exception
 	friend BaseException *syntax_error(std::string, SyntaxErrorLocation);
 
   public:
-	PyObject *m_msg{ nullptr };
-	PyObject *m_filename{ nullptr };
-	PyObject *m_text{ nullptr };
-	PyObject *m_lineno{ nullptr };
-	PyObject *m_offset{ nullptr };
+	PyObject *m_msg;
+	PyObject *m_filename;
+	PyObject *m_text;
+	PyObject *m_lineno;
+	PyObject *m_offset;
 
   private:
 	SyntaxError(PyType *type);

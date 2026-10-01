@@ -66,4 +66,18 @@ else
     echo $file "... PASSED!"
 fi
 
+# Running off the end of the input puts the caret just past the last character.
+file=$SCRIPT_DIR/tests/expected_failures/syntax_error_end_of_line.py
+output=$(timeout 10s $PYTHON_EXECUTABLE $file --gc-frequency $GC_FREQUENCY 2>&1)
+if [ $? -eq 0 ]; then
+    echo $file "... FAILED! (expected a non-zero exit code)"
+    exit_code=1
+elif ! echo "$output" | grep -qxF '          ^'; then
+    echo $file "... FAILED! (expected a caret after the ',', got: ${output})"
+    exit_code=1
+else
+    echo $file "... PASSED!"
+fi
+
+
 exit $exit_code
