@@ -1104,7 +1104,7 @@ void assert_generates_ast(std::string_view program, std::shared_ptr<Module> expe
 {
 	auto lexer = Lexer::create(std::string(program), "_parser_test_.py");
 	parser::Parser p{ lexer };
-	p.parse();
+	ASSERT_TRUE(p.parse().is_ok());
 	ASSERT_TRUE(p.module());
 
 	const auto lvl = spdlog::get_level();

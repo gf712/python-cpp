@@ -12,6 +12,7 @@ class Parser
 	std::shared_ptr<ast::Module> m_module;
 	Lexer &m_lexer;
 	std::size_t m_token_position{ 0 };
+	std::size_t m_furthest_token{ m_token_position };
 
   public:
 	struct CacheValue
@@ -25,18 +26,20 @@ class Parser
 
 	using MemoSlot = std::optional<CacheValue>;
 
-	MemoSlot *memo_find(std::size_t position, std::uint16_t rule)
+	std::optional<MemoSlot &> memo_find(std::size_t position, std::uint16_t rule)
 	{
-		if (position >= m_memo_index.size()) { return nullptr; }
+		if (position >= m_memo_index.size()) { return std::nullopt; }
 		for (const auto &[id, slot] : m_memo_index[position]) {
-			if (id == rule) { return &m_memo_pool[slot]; }
+			if (id == rule) { return m_memo_pool[slot]; }
 		}
-		return nullptr;
+		return std::nullopt;
 	}
 
 	MemoSlot &memo_insert(std::size_t position, std::uint16_t rule)
 	{
-		if (auto *existing = memo_find(position, rule)) { return *existing; }
+		if (const auto &existing = memo_find(position, rule); existing.has_value()) {
+			return existing.value();
+		}
 		if (position >= m_memo_index.size()) { m_memo_index.resize(position + 1); }
 		m_memo_pool.emplace_back();
 		m_memo_index[position].emplace_back(
@@ -65,8 +68,15 @@ class Parser
 	const std::size_t &token_position() const { return m_token_position; }
 	std::size_t &token_position() { return m_token_position; }
 
+	std::size_t furthest_token() const { return m_furthest_token; }
+
+	void observe_token(std::size_t position)
+	{
+		m_furthest_token = std::max(m_furthest_token, position);
+	}
+
 	// parses a file
-	void parse();
+	py::PyResult<std::shared_ptr<ast::Module>> parse();
 
 	// parses an expression used by the builtin `eval` function
 	py::PyResult<std::shared_ptr<ast::Module>> parse_expression();

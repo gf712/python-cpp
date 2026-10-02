@@ -16,36 +16,66 @@ import std;
 export namespace py {
 class PyType;
 
+// Where a syntax error happened, in CPython's (filename, lineno, offset, text)
+// order -- the same order as the info tuple accepted by `SyntaxError(msg, info)`.
+// `lineno` and `offset` are 1-based, and `offset` indexes into `text` (the source
+// line), not into the file.
+struct SyntaxErrorLocation
+{
+	std::string filename;
+	std::size_t lineno;
+	std::size_t offset;
+	std::string text;
+};
+
 class SyntaxError : public Exception
 {
 	friend class ::Heap;
 	friend class py::detail::Allocator;
-	friend BaseException *make_syntax_error(std::string &&);
+	friend BaseException *syntax_error(std::string);
+	friend BaseException *syntax_error(std::string, SyntaxErrorLocation);
+
+  public:
+	PyObject *m_msg;
+	PyObject *m_filename;
+	PyObject *m_text;
+	PyObject *m_lineno;
+	PyObject *m_offset;
 
   private:
 	SyntaxError(PyType *type);
-
 	SyntaxError(PyTuple *args);
 
-	static SyntaxError *create(PyTuple *args);
+	static SyntaxError *create(PyTuple *);
+
+	static SyntaxError *create(std::string message);
+
+	static SyntaxError *create(std::string message, SyntaxErrorLocation location);
 
   public:
 	static PyResult<PyObject *> __new__(const PyType *type, PyTuple *args, PyDict *kwargs);
 
+	PyResult<std::int32_t> __init__(PyTuple *args, PyDict *kwargs);
+
+	PyResult<PyObject *> __str__() const;
+
 	static std::function<std::unique_ptr<TypePrototype>()> type_factory();
 
 	PyType *static_type() const override;
+
+	std::string format_exception_only() const override;
+
+	void visit_graph(Visitor &) override;
 };
 
-// Defined in SyntaxError.cpp. Keeping the PyString/PyTuple construction and the
-// heap allocation out of the interface means this partition no longer has
-// to materialise those types just to declare one exception class.
-BaseException *make_syntax_error(std::string &&message);
-
-template<typename... Args>
-inline BaseException *syntax_error(const std::string &message, Args &&...args)
+inline BaseException *syntax_error(std::string message)
 {
-	return make_syntax_error(std::vformat(message, std::make_format_args(args...)));
+	return SyntaxError::create(std::move(message));
+}
+
+inline BaseException *syntax_error(std::string message, SyntaxErrorLocation location)
+{
+	return SyntaxError::create(std::move(message), std::move(location));
 }
 
 }// namespace py
